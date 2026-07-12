@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[package]
+name = "squonk-conformance-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+# A standalone workspace on purpose: these targets need a nightly toolchain and the
+# libFuzzer runtime, so they must never be pulled into the top-level workspace —
+# the published crates and `cargo test` stay installable/runnable on stable
+# (rust-toolchain.toml). `cargo +nightly fuzz run` operates here; `cargo build` /
+# `cargo nextest` at the repo root never sees this crate.
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+# The fuzz targets are thin shells over the conformance crate's Bolero target
+# bodies, so the generators and oracle logic are shared verbatim between the stable
+# `cargo test` Bolero checks and these libFuzzer targets (one harness, two engines).
+[dependencies.squonk-conformance]
+path = ".."
+
+# The SQLite/DuckDB raw-byte differential targets need the conformance crate's
+# in-process oracles, which live behind its `oracle-engines` feature (rusqlite bundled
+# + system libduckdb). Off by default so the other targets (parse_no_panic, roundtrip,
+# recover_invariants, pg_differential_raw_bytes) build with NO system library, exactly
+# as before — `fuzz-nightly.yml` installs libduckdb only for the two matrix entries
+# that pass `--features oracle-engines`. The `sqlite_/duckdb_differential_raw_bytes`
+# shells compile to a no-op without it, so `cargo fuzz build` never breaks.
+[features]
+oracle-engines = ["squonk-conformance/oracle-engines"]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "parse_no_panic"
+path = "fuzz_targets/parse_no_panic.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "roundtrip"
+path = "fuzz_targets/roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "differential"
+path = "fuzz_targets/differential.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pg_differential_raw_bytes"
+path = "fuzz_targets/pg_differential_raw_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "recover_invariants"
+path = "fuzz_targets/recover_invariants.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sqlite_differential_raw_bytes"
+path = "fuzz_targets/sqlite_differential_raw_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "duckdb_differential_raw_bytes"
+path = "fuzz_targets/duckdb_differential_raw_bytes.rs"
+test = false
+doc = false
+bench = false

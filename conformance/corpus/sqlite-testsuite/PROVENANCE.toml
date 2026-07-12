@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: CC0-1.0
+#
+# Provenance record for the SQLite core-tranche spec-audit corpus, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the corpus content is
+# extracted from the SQLite source tree, which is public domain (the author
+# disclaims copyright — see LICENSE, verbatim from the upstream LICENSE.md, which
+# states the whole test/ directory is public domain). CC0-1.0 is the elected SPDX
+# for redistributing that public-domain content (on the permissive allowlist,
+# matching the sibling self-authored corpus/sqlite group). See README.md for the
+# extraction narrative.
+#
+# This is the spec-audit-sqlite-suite-corpus tranche: a broad, curated slice of the
+# TCL regression suite (test/*.test), pinned to the EXACT SQLite version our
+# in-process rusqlite oracle links (bundled libsqlite3-sys 0.38.1 -> SQLite 3.53.2,
+# SOURCE_ID d6e03d8c…). It is a measurement surface, distinct from the self-authored
+# feature-probe corpus/sqlite group.
+source = "https://sqlite.org/src/ SQLite source tree (test/*.test TCL regression suite; src/parse.y — derived top-level cmd command inventory); vendored via the release source archive"
+reference = "SQLite 3.53.2 (SOURCE_ID 2026-06-03 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24) — the exact version our bundled rusqlite (libsqlite3-sys 0.38.1) links. Download: https://sqlite.org/2026/sqlite-src-3530200.zip (sha256 cafff764c03f6d720968f746e2f47a986bbf12bf4c18904f1eb131c0b0b592d3)"
+license = "CC0-1.0"
+regenerate = "python3 extract_tcl.py <sqlite-src-3530200-checkout> statements.sql statements_with_schema.sql rejects.sql --cap=12 --reject-cap=8 (unzip https://sqlite.org/2026/sqlite-src-3530200.zip outside the repo). statements.sql is the flat accept corpus (execsql + do_execsql_test bodies), rejects.sql is the flat reject corpus (catchsql + do_catchsql_test bodies — the over-acceptance differential's food; NB many are RUNTIME rejects, the sweep's reject classifier sorts syntax from binding), and statements_with_schema.sql regroups both under their source .test file with that file's pure CREATE TABLE setup DDL (# file:/# setup/# query/# reject). Also run `python3 extract_cmd_productions.py <sqlite-src-3530200-checkout>/src/parse.y commands.txt` — commands.txt is the sorted canonical inventory of SQLite's top-level `cmd` command alternatives (EXPLAIN excluded as an ecmd-level prefix), the independent denominator for command-production coverage. Then re-baseline the sweep pins: cargo nextest run -p squonk-conformance --features oracle-engines sqlite_testsuite_spec_audit_inventory sqlite_testsuite_command_production_coverage_is_measured --no-capture"

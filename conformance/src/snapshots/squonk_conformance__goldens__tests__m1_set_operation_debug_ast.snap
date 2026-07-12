@@ -1,0 +1,168 @@
+---
+source: conformance/src/goldens.rs
+expression: "&query.body"
+---
+SetOperation {
+    op: Union,
+    all: true,
+    by_name: false,
+    left: Select {
+        select: Select {
+            distinct: None,
+            straight_join: false,
+            projection: [
+                Expr {
+                    expr: Literal {
+                        literal: Literal {
+                            kind: Integer,
+                            meta: Meta {
+                                span: Span {
+                                    start: 7,
+                                    end: 8,
+                                },
+                                node_id: NodeId(
+                                    1,
+                                ),
+                            },
+                        },
+                        meta: Meta {
+                            span: Span {
+                                start: 7,
+                                end: 8,
+                            },
+                            node_id: NodeId(
+                                2,
+                            ),
+                        },
+                    },
+                    alias: None,
+                    alias_spelling: As,
+                    meta: Meta {
+                        span: Span {
+                            start: 7,
+                            end: 8,
+                        },
+                        node_id: NodeId(
+                            3,
+                        ),
+                    },
+                },
+            ],
+            into: None,
+            from: [],
+            lateral_views: [],
+            selection: None,
+            connect_by: None,
+            group_by: [],
+            group_by_quantifier: None,
+            group_by_all: None,
+            having: None,
+            windows: [],
+            qualify: None,
+            sample: None,
+            spelling: Select,
+            meta: Meta {
+                span: Span {
+                    start: 0,
+                    end: 8,
+                },
+                node_id: NodeId(
+                    4,
+                ),
+            },
+        },
+        meta: Meta {
+            span: Span {
+                start: 0,
+                end: 8,
+            },
+            node_id: NodeId(
+                5,
+            ),
+        },
+    },
+    right: Select {
+        select: Select {
+            distinct: None,
+            straight_join: false,
+            projection: [
+                Expr {
+                    expr: Literal {
+                        literal: Literal {
+                            kind: Integer,
+                            meta: Meta {
+                                span: Span {
+                                    start: 26,
+                                    end: 27,
+                                },
+                                node_id: NodeId(
+                                    6,
+                                ),
+                            },
+                        },
+                        meta: Meta {
+                            span: Span {
+                                start: 26,
+                                end: 27,
+                            },
+                            node_id: NodeId(
+                                7,
+                            ),
+                        },
+                    },
+                    alias: None,
+                    alias_spelling: As,
+                    meta: Meta {
+                        span: Span {
+                            start: 26,
+                            end: 27,
+                        },
+                        node_id: NodeId(
+                            8,
+                        ),
+                    },
+                },
+            ],
+            into: None,
+            from: [],
+            lateral_views: [],
+            selection: None,
+            connect_by: None,
+            group_by: [],
+            group_by_quantifier: None,
+            group_by_all: None,
+            having: None,
+            windows: [],
+            qualify: None,
+            sample: None,
+            spelling: Select,
+            meta: Meta {
+                span: Span {
+                    start: 19,
+                    end: 27,
+                },
+                node_id: NodeId(
+                    9,
+                ),
+            },
+        },
+        meta: Meta {
+            span: Span {
+                start: 19,
+                end: 27,
+            },
+            node_id: NodeId(
+                10,
+            ),
+        },
+    },
+    meta: Meta {
+        span: Span {
+            start: 0,
+            end: 27,
+        },
+        node_id: NodeId(
+            11,
+        ),
+    },
+}

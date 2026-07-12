@@ -1,0 +1,9 @@
+---
+source: conformance/src/coverage/matrix.rs
+assertion_line: 573
+expression: render_m2_oracle_matrix()
+---
+engine | semantics    | squonk dialect | setup driver
+-------+--------------+----------------+---------------------------------
+sqlite | prepare_bind | sqlite         | schema-independent + provisioned
+duckdb | prepare_bind | duckdb         | schema-independent + provisioned

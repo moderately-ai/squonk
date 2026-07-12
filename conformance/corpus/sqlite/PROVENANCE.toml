@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: CC0-1.0
+#
+# Provenance record for the SQLite feature-probe corpus, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). Unlike the sqlglot/sqllogictest corpora this is NOT extracted from an
+# upstream file: it is self-authored SQL that exercises the SQLite-specific
+# grammar the sweep (corpus_sqlite_verdicts) surfaces as divergences from the
+# ANSI baseline. The constructs mirror the documented SQLite grammar (itself
+# public domain: https://sqlite.org/copyright.html), but the statement text is
+# our own, dedicated to the public domain under CC0-1.0 (the machine-checked
+# `license` field, on the permissive allowlist). The SPDX header above covers
+# this metadata file. See README.md for the family breakdown.
+source = "self-authored (constructs mirror the public-domain SQLite grammar at https://sqlite.org/lang.html)"
+reference = "sqlite-dialect-100-percent-programme phase-0 assessment (2026-07)"
+license = "CC0-1.0"
+regenerate = "Hand-maintained: add a schema-independent probe line to features.sql for each newly surveyed SQLite family, then re-run cargo nextest run -p squonk-conformance --features oracle-engines corpus_sqlite_verdicts"

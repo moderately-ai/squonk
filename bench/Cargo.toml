@@ -1,0 +1,302 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[package]
+name = "squonk-bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autotests = false
+autobenches = false
+
+[lints]
+workspace = true
+
+[features]
+# Opt-in ADR-0004 measurement: build the rejected `phf` perfect-hash lookup beside
+# the dependency-free generated one and compare them (lookup speed, plus the
+# cold-compile / binary-size / dependency-tree cost a production swap would add).
+# Off by default so the standard bench build — and the `cargo nextest` / `clippy`
+# gates — pull in neither `phf` nor the codegen toolchain, keeping the rejected dep
+# off the default path exactly as ADR-0017 intends. Run the comparison with
+# `--features phf-compare` (see `benches/keyword_lookup_ref/mod.rs`).
+phf-compare = ["dep:phf", "dep:phf_codegen", "dep:squonk-sourcegen"]
+
+# Allocation-isolation probe for the libpg-gap decomposition (`alloc_probe` bench,
+# `docs/performance.md`). Each feature swaps the `alloc_probe`
+# binary's GLOBAL allocator to size how much of the ~1.6-1.9x libpg raw-parse gap is
+# general-purpose malloc/free overhead. `alloc_probe` measures the production system
+# allocator by default and only switches when one of these is set; the two are mutually
+# exclusive by construction — `alloc-probe-mimalloc` takes priority — so `--all-features`
+# builds a single global allocator (mimalloc) for that binary, never two. mimalloc itself
+# is now an unconditional bench dev-dependency (below) — the COMPUTE comparison + profiler
+# binaries run under it — so `alloc-probe-mimalloc` is only a compile-time SELECTOR for
+# `alloc_probe`'s allocator, not a dep gate (hence `[]`, like `alloc-probe-bump`). The
+# PRODUCTION allocator is untouched; this is the bench build only (ADR-0017).
+alloc-probe-mimalloc = []
+alloc-probe-bump = []
+
+# Allocator/mode selector for the ours-vs-external comparison examples
+# (`examples/compare_*.rs`). A process has exactly one `#[global_allocator]`, so the
+# family binaries that carry BOTH a wall-clock and a heap comparison (compare_upstream,
+# compare_tokenizer_logos, compare_interner) cannot switch at runtime: OFF (default)
+# builds them under `mimalloc` running the WALL-CLOCK comparison; ON swaps the global
+# allocator to `dhat::Alloc` and runs the deterministic HEAP comparison instead — the
+# same compile-time-selection pattern `alloc_probe` uses for its allocator arms, hence
+# `[]` (both allocators are already unconditional bench dev-deps; this only selects one).
+# `compare_libpg`/`compare_keyword_lookup` are wall-clock only and `compare_adversarial`
+# is heap only, so they ignore this flag. The upstream ratio gate's baseline is
+# regenerated in heap mode: see `benches/upstream/mod.rs`.
+compare-heap = []
+
+# ADR-0003 rejected-interner measurement: build `lasso` + `string-interner` beside our
+# in-house interner and compare (parse-time allocation, resolver freeze cost, lookup
+# throughput). Off by default so the standard bench build + the nextest/clippy gates pull
+# in neither — measured fallbacks, never adopted (ADR-0017), exactly like `phf-compare`.
+# Run with `--features interner-compare`.
+interner-compare = ["dep:lasso", "dep:string-interner"]
+
+# Parallel-parse comparison (`spike-parallel-processing-feasibility`, NO-GO): builds
+# the `rayon` work-stealing variant of the `parallel_compare` example beside the
+# dep-free `std::thread` one, to measure whether an owned parallel feature would pay
+# (it did not — see `docs/performance.md`). Off by default so the
+# standard bench build + the nextest/clippy gates pull in neither `rayon` nor its
+# subtree (`rayon-core`, `crossbeam-*`) — a MEASURED, not-adopted dep exactly like
+# `phf`/`logos`/`lasso` in this crate (ADR-0017). The std::thread path in the example
+# is always built; only the rayon columns need this feature.
+parallel-compare = ["dep:rayon"]
+
+[dependencies]
+# `full` so the benchmarks and their gates cover every shipped dialect, and so the
+# dialect features unify onto the libraries' own unit tests under the default
+# `cargo nextest run` (see conformance/Cargo.toml).
+squonk = { workspace = true, features = ["full"] }
+squonk-ast = { workspace = true, features = ["full"] }
+
+# Bench-only and optional: the runtime side of the `phf-compare` measurement (the
+# `phf::Map` type the generated map literal instantiates). `publish = false` plus
+# `optional` keep it out of every default build and out of the published crates'
+# graphs — it is the rejected dep we are measuring, never adopting (ADR-0017).
+phf = { version = "0.11", optional = true }
+# The two ADR-0003 rejected interner alternatives, gated behind `interner-compare`
+# (optional + publish=false ⇒ never in a default build or a published graph). Measured
+# against our in-house interner, never adopted unless the data is compelling (ADR-0017).
+lasso = { version = "0.7.3", optional = true }
+string-interner = { version = "0.20.0", optional = true }
+# The rayon variant, gated behind `parallel-compare` (optional + publish=false ⇒
+# never in a default build or a published graph). The data-parallel work-stealing
+# alternative to the dep-free `std::thread` batch parse, measured for the parallel
+# comparison — never adopted (the spike found no win that justifies the subtree; ADR-0017).
+rayon = { version = "1", optional = true }
+
+[dev-dependencies]
+# Bench-only fast global allocator. Promoted from the `alloc-probe-mimalloc`-only
+# optional dep to an UNCONDITIONAL dev-dependency so the COMPUTE comparison + profiler
+# binaries (the `examples/compare_*` wall-clock comparisons, and the
+# `perf_testbed` / `small_throughput` examples) can each set it as their
+# `#[global_allocator]`: the us-vs-them wall-clock comparison runs under the realistic
+# fast allocator a perf-sensitive consumer ships — on BOTH `ours` and `theirs` (fair,
+# same allocator both sides) — separate from the dhat MEMORY suite, which stays on dhat.
+# `publish = false` (crate-level) keeps it out of the published crates' graphs; it is a
+# BENCH MEASUREMENT allocator, NEVER a production dependency and NEVER the production
+# allocator (ADR-0017). `alloc_probe` still selects it per-binary via the (now dep-free)
+# `alloc-probe-mimalloc` feature, alongside its system + bump arms.
+mimalloc = "0.1"
+
+codspeed-criterion-compat = "5.0.1"
+dhat = "0.3.3"
+gungraun = "0.19.2"
+# Snapshot the allocation-pin tables (`tests/allocations.rs`,
+# `tests/corpus_allocations.rs`): an intentional layout change re-baselines by
+# reviewing the .snap diff instead of hand-editing per-metric numbers.
+insta = { workspace = true }
+# Prior-art yardstick (apache/datafusion-sqlparser-rs), the 184-method-god-trait
+# design ADR-0011 supersedes. Dev-only and exact-pinned so the checked-in
+# comparison numbers correspond to one upstream revision (publish=false → never
+# ships, ADR-0017). Default features (`std` + `recursive-protection`) = the crate
+# "as it actually runs" for a `cargo add sqlparser` user; the stack-guard cost
+# that adds is documented as a fairness caveat in the `compare_upstream` report header.
+sqlparser = "=0.62.0"
+
+# Read `upstream-baseline.json` back for the ratio gate (`tests/upstream_gate.rs`).
+# Already in the dev tree via codspeed, and `publish = false` keeps it out of the
+# published crates' graphs (ADR-0017). The snapshot is written hand-rolled in
+# `upstream/mod.rs` for byte-stable diffs; only the read side uses serde.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# `libpg_query` (the real PostgreSQL parser, statically linked) for the
+# apples-to-apples COMPUTE comparison (ours vs the reference C parser). SAME
+# version `conformance` pins — it is already the differential oracle (ADR-0015), so
+# the C library is built + cached: no network, no second build. Dev-only +
+# `publish = false` ⇒ never ships. Memory is intentionally NOT compared against it:
+# it allocates its tree in C, invisible to dhat's Rust allocator hook, so a heap
+# ratio would measure only our side (see `benches/libpg/mod.rs`).
+pg_query = "6.1"
+
+# ADR-0005's rejected lexer generator, kept as a MEASURED reference — never a
+# production dep (ADR-0017, exactly like phf/lasso/text-size elsewhere). A `logos`
+# DFA can express only the REGULAR SQL token subset; the non-regular cases that
+# justify our hand-written cursor — PostgreSQL `$tag$ … $tag$` dollar quotes and
+# nested block comments — are out of a regular grammar's reach, so they stay owned
+# by the cursor. Dev-only + `publish = false`, so it never reaches downstream
+# users. The reference lexer, the comparison binary, and the parity test live in
+# `benches/logos_ref/`, `examples/compare_tokenizer_logos.rs`, and `tests/logos_reference.rs`.
+logos = "0.16"
+
+# Build-time half of the `phf-compare` measurement, both optional so they compile
+# only when the feature is on. `phf_codegen` renders the perfect-hash map literal;
+# `squonk-sourcegen` (the production keyword codegen) renders the REAL
+# dependency-free generated lookup over the full inventory, so the bench measures
+# the actual generated path, not a hand-rolled stand-in. Dev/build-only — never a
+# published-crate dependency.
+[build-dependencies]
+phf_codegen = { version = "0.11", optional = true }
+squonk-sourcegen = { path = "../crates/squonk-sourcegen", optional = true }
+
+[[test]]
+name = "integration"
+path = "tests/main.rs"
+
+[[bench]]
+name = "ast"
+harness = false
+
+[[bench]]
+name = "perf"
+harness = false
+
+# Apples-to-apples comparison vs upstream `sqlparser`. The wall-clock + dhat-heap
+# ratios moved to `examples/compare_upstream.rs` (mode selected by `compare-heap`); the
+# gungraun instruction lane STAYS a bench because gungraun's `main!` macro IS the
+# harness (a plain `main` cannot produce a callgrind Ir count). See the ticket close.
+[[bench]]
+name = "upstream_instr"        # gungraun/callgrind instruction counts (Linux CI signal)
+harness = false
+
+# Apples-to-apples COMPUTE comparison vs `libpg_query` — the real PostgreSQL parser,
+# in-process (ours vs the reference C parser). The wall-clock ratios moved to
+# `examples/compare_libpg.rs`; compute only (memory is not dhat-comparable across the C
+# boundary, so there is no libpg heap comparison). The gungraun instruction lane stays a
+# bench (see `upstream_instr` above). Both pull the shared scaffolding from
+# `benches/libpg/mod.rs`.
+[[bench]]
+name = "libpg_instr"           # gungraun/callgrind instruction counts, ours vs libpg_query (Linux CI signal)
+harness = false
+
+# Allocation-isolation probe (Part 2 of the libpg-gap decomposition): times OUR Postgres
+# parser building + dropping its owned AST over the same both-accept corpus the libpg
+# wall-clock comparison uses, under a compile-time-selectable global allocator (system /
+# mimalloc / never-free bump). `harness = false` with a hand-written manual-timing `main`
+# (like `examples/perf_testbed.rs`) rather than criterion, because the bump allocator's
+# bulk-reset model is unsound to share with criterion's own long-lived allocations. Reuses
+# the `libpg`/`upstream` corpus scaffolding. See `docs/performance.md`.
+[[bench]]
+name = "alloc_probe"
+harness = false
+
+# Per-node metadata-cost probe (`spike-per-node-metadata-cost-and-optionality`): isolates
+# the per-node `Meta` (source span + `NodeId`) cost on two axes — SIZE (12 B/node, the
+# dominant one) and parse-time COMPUTE (an isolated micro-A/B: the `make_meta` op sequence
+# vs a constant-`Meta` baseline, x the measured node count). `harness = false` with a manual
+# timing `main` like `alloc_probe`/`examples/perf_testbed.rs`. Reuses the `libpg`/`upstream`
+# corpus scaffolding. Bench binary only — the production AST + default parse are untouched.
+# See `docs/performance.md`.
+[[bench]]
+name = "meta_probe"
+harness = false
+
+# Corpus-scale parser benchmarks: aggregate cost of parsing realistic batches of
+# statements from the vendored conformance corpora (the corpus counterpart to the
+# single-statement upstream_*/perf benches). Split by harness family — dhat heap vs
+# gungraun instructions cannot share a bench binary's `main` — the same way the
+# upstream_* family is. Both pull the shared corpus + measurement from
+# `benches/corpus/mod.rs`. The deterministic failing gate lives in the consolidated
+# `tests/main.rs` integration target via `tests/corpus_allocations.rs`.
+[[bench]]
+name = "corpus_heap"           # dhat: aggregate transient + retained + peak heap over the corpus subset
+harness = false
+
+[[bench]]
+name = "corpus_instr"          # gungraun/callgrind aggregate Ir over the corpus subset (Linux CI signal)
+harness = false
+
+# Adversarial / pathological scaling benchmarks. The ours-vs-sqlparser HEAP scaling
+# ladder moved to `examples/compare_adversarial.rs` (dhat, heap only); the ours-only
+# gungraun `Ir` gate at the worst-case width STAYS a bench (it is ours-only — no
+# `theirs` half — and a callgrind Ir count needs the gungraun harness). Both pull the
+# shared generators + measurement from `benches/adversarial/mod.rs`
+# (+ `squonk_bench::adversarial`). The deterministic failing gates live in the
+# consolidated `tests/main.rs` integration target via `tests/adversarial_scaling.rs`
+# (linear-scaling pin) and `tests/adversarial_recursion.rs` (recursion-limit policy).
+[[bench]]
+name = "adversarial_instr"     # gungraun/callgrind Ir per width family, ours-only (Linux CI signal)
+harness = false
+
+# Hand-written cursor vs the ADR-0005 `logos` reference on the REGULAR SQL subset logos
+# can express: the wall-clock + dhat-heap comparison moved to
+# `examples/compare_tokenizer_logos.rs` (mode selected by `compare-heap`), pulling the
+# shared reference lexer from `benches/logos_ref/mod.rs` (also read by
+# `tests/logos_reference.rs`).
+
+# Dependency-free generated keyword lookup vs a `phf` perfect hash over the full
+# ANSI/PostgreSQL inventory (ADR-0004 backlog #3): the wall-clock comparison moved to
+# `examples/compare_keyword_lookup.rs` (`required-features` gated below), while
+# `tests/main.rs` cfg-gates the parity module, so default bench, nextest, and clippy
+# lanes never touch `phf`.
+
+# Parity + reproducibility evidence: the two lookups agree on the whole inventory,
+# so the speed numbers compare equivalent work (mirrors `tests/logos_reference.rs`).
+# Compiled through the consolidated `tests/main.rs` integration target only when
+# `phf-compare` is enabled.
+
+# Two minimal binaries that each reference ONLY one lookup, so the difference of
+# their stripped release sizes isolates the phf map + hashing footprint from the
+# generated tables (the shared std baseline cancels in the delta).
+[[example]]
+name = "keyword_size_generated"
+required-features = ["phf-compare"]
+
+[[example]]
+name = "keyword_size_phf"
+required-features = ["phf-compare"]
+
+# The ADR-0008 backlog #7 `match`-vs-array binding-power encoding A/B is RETIRED (its
+# decision — keep the production `match` — is settled): see `docs/performance.md`.
+
+# In-house interner (ADR-0003) vs the rejected `lasso` + `string-interner` fallbacks,
+# over the identifier-heavy TPC-DS/TPC-H `Word` stream: the wall-clock + dhat-heap
+# comparison moved to `examples/compare_interner.rs` (mode selected by `compare-heap`),
+# pulling the shared corpus + drivers from `benches/interner_ref/mod.rs`. The
+# integration-test parity module is feature-gated so default bench, nextest, and clippy
+# lanes never compile either rejected crate (ADR-0017).
+
+# Parity + reproducibility evidence: all three interners round-trip every identifier
+# and dedup identically, so the speed/heap numbers compare equivalent work (mirrors
+# `tests/keyword_phf.rs`).
+# Compiled through the consolidated `tests/main.rs` integration target only when
+# `interner-compare` is enabled.
+
+# ---------------------------------------------------------------------------
+# Ours-vs-external comparison binaries (dedicated examples, one CLI each).
+#
+# These replace the criterion/dhat `[[bench]]` comparison targets removed above, so a
+# default `cargo bench` builds no ours-vs-external wall-clock/heap comparison. They are
+# EXAMPLES (not `[[bin]]`) because their "theirs" side — `sqlparser`, `pg_query`,
+# `logos`, `lasso`/`string-interner`, `phf` — lives in `[dev-dependencies]`, which
+# `[[bin]]` targets cannot see; examples can, matching `examples/perf_testbed.rs`. Run:
+#   cargo run -p squonk-bench --release --example compare_upstream            # wall-clock
+#   cargo run -p squonk-bench --release --example compare_upstream \
+#     --features compare-heap -- --update-baseline                                # heap + baseline
+# The four dependency-unconditional binaries (compare_upstream, compare_libpg,
+# compare_adversarial, compare_tokenizer_logos) are Cargo-auto-discovered; only the two
+# whose rejected deps are feature-gated need an explicit `required-features` entry.
+# ---------------------------------------------------------------------------
+[[example]]
+name = "compare_interner"      # ours vs lasso + string-interner (wall-clock | heap via compare-heap)
+required-features = ["interner-compare"]
+
+[[example]]
+name = "compare_keyword_lookup" # generated lookup vs phf (wall-clock)
+required-features = ["phf-compare"]

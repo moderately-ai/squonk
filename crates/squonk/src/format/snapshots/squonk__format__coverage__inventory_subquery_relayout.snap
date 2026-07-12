@@ -1,0 +1,102 @@
+---
+source: crates/squonk/src/format/coverage.rs
+expression: "inventory(fixtures, &FormatOptions::default())"
+---
+[exists-subquery]  (Ansi)
+  input:
+    SELECT a FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.k = t.k)
+  output:
+    SELECT a
+    FROM t
+    WHERE EXISTS (
+      SELECT 1
+      FROM u
+      WHERE u.k = t.k
+    )
+
+[not-exists-subquery]  (Ansi)
+  input:
+    SELECT a FROM t WHERE NOT EXISTS (SELECT 1 FROM u WHERE u.k = t.k)
+  output:
+    SELECT a
+    FROM t
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM u
+      WHERE u.k = t.k
+    )
+
+[scalar-subquery-projection]  (Ansi)
+  input:
+    SELECT a, (SELECT max(b) FROM u WHERE u.k = t.k) AS mx FROM t
+  output:
+    SELECT
+      a,
+      (
+        SELECT max(b)
+        FROM u
+        WHERE u.k = t.k
+      ) AS mx
+    FROM t
+
+[quantified-comparison-subquery]  (Ansi)
+  input:
+    SELECT a FROM t WHERE a > ALL (SELECT b FROM u WHERE u.k = t.k)
+  output:
+    SELECT a
+    FROM t
+    WHERE a > ALL (
+      SELECT b
+      FROM u
+      WHERE u.k = t.k
+    )
+
+[join-derived-subquery]  (Ansi)
+  input:
+    SELECT a FROM t JOIN (SELECT k, max(b) AS mb FROM u GROUP BY k) m ON m.k = t.k
+  output:
+    SELECT a
+    FROM
+      t JOIN (
+        SELECT k, max(b) AS mb
+        FROM u
+        GROUP BY k
+      ) m ON m.k = t.k
+
+[nested-two-level-subquery]  (Ansi)
+  input:
+    SELECT x FROM (SELECT a AS x FROM u WHERE a IN (SELECT id FROM v WHERE v.ok)) s
+  output:
+    SELECT x
+    FROM
+      (
+        SELECT a AS x
+        FROM u
+        WHERE a IN (
+          SELECT id
+          FROM v
+          WHERE v.ok
+        )
+      ) s
+
+[set-op-derived-subquery]  (Ansi)
+  input:
+    SELECT x FROM (SELECT a FROM t1 UNION ALL SELECT a FROM t2) s
+  output:
+    SELECT x
+    FROM
+      (
+        SELECT a
+        FROM t1
+        UNION ALL
+        SELECT a
+        FROM t2
+      ) s
+
+[trivial-subquery-stays-inline]  (Ansi)
+  input:
+    SELECT a FROM t WHERE a > (SELECT 1)
+  output:
+    SELECT a
+    FROM t
+    WHERE a > (SELECT 1)

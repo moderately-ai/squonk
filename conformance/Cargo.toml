@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[package]
+name = "squonk-conformance"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# `squonk` (the parser engine) is essential: the round-trip oracle parses
+# with it. `squonk-ast` is kept as a direct dependency because the renderer
+# and the AST node builders used by the oracle live there, and `m1-proptest`
+# will build strategies over its types directly. `proptest` stays declared for
+# `m1-proptest`; M1 uses it only for the smoke test that keeps it wired.
+# `full` so the conformance suite exercises every shipped dialect. Enabling it on
+# these workspace members also unifies the dialect features onto the libraries'
+# own unit tests, so the default `cargo nextest run` compiles and runs the whole
+# suite; the ANSI-only minimal build is verified separately by
+# `cargo build -p squonk --no-default-features`.
+squonk = { workspace = true, features = ["full"] }
+squonk-ast = { workspace = true, features = ["full"] }
+thin-vec = { workspace = true }
+arbitrary = { workspace = true }
+pg_query = "6.1"
+proptest = { workspace = true }
+# m2 differential oracles (SQLite + DuckDB), opt-in via the `oracle-engines`
+# feature (off by default, so the standard build needs no system libduckdb).
+# rusqlite bundles SQLite. DuckDB uses libduckdb-sys (official C API) + a thin
+# safe wrapper (`duckdb_ffi`) — NOT the ergonomic duckdb-rs crate — so the Arrow
+# runtime tree is out of the graph (duckdb-oracle-thin-prepare-binding). Discovery:
+# DUCKDB_LIB_DIR in `.cargo/config.toml` (+ rpath for runtime). Residual: sys
+# crate still compiles download build-deps (reqwest/tar/zip) unconditionally.
+rusqlite = { version = "0.40", features = ["bundled"], optional = true }
+# Official DuckDB C-API bindings (bindgen). Preferred over hand-rolled FFI and over
+# the ergonomic `duckdb` crate (unconditional Arrow). Residual: download build-deps.
+libduckdb-sys = { version = "1", default-features = false, optional = true }
+# serde_json parses DuckDB's `json_serialize_sql` parse-tree dump for the structural
+# oracle (duckdb-structural-oracle-select). Optional + gated behind `oracle-engines`
+# so the default build stays as-is; already a workspace dep (dev/serde round-trip).
+serde_json = { workspace = true, optional = true }
+# m3 differential oracle (external MySQL/MariaDB server), opt-in via `oracle-mysql`.
+# `mysql` (rust-mysql-simple) is dual MIT/Apache-2.0 and pure Rust — verified on
+# crates.io. It speaks the wire protocol to a real `mysqld`/`mariadbd` running as an
+# EXTERNAL process (never linked/vendored — those servers are GPL; see m3.rs). It is
+# PREPARE-only, so nothing is fetched. `default-features = false` + `minimal-rust`
+# keeps it C-free: no native-tls/openssl and the Rust `flate2` backend (not system
+# zlib); the local/CI server is reached over plaintext 127.0.0.1, so no TLS is needed.
+mysql = { version = "26", default-features = false, features = ["minimal-rust"], optional = true }
+
+[features]
+# Build the SQLite + DuckDB accept/reject oracles (prod-dialect-m2-sqlite-duckdb-oracles).
+# Off by default → the standard `cargo nextest run` is unaffected + needs no system lib.
+oracle-engines = ["dep:rusqlite", "dep:libduckdb-sys", "dep:serde_json"]
+# Build the external-server MySQL accept/reject oracle (mysql-differential-oracle-no-daemon).
+# Independent of `oracle-engines` on purpose: a sqlite/duckdb user must not be forced to
+# compile the `mysql` crate. Off by default → no server dependency in the standard build.
+oracle-mysql = ["dep:mysql"]
+# External `clickhouse local` ParseOnly oracle (oracle-parity-clickhouse). No linked
+# deps — pure process spawn. Independent of oracle-engines / oracle-mysql.
+oracle-clickhouse = []
+# External-process BigQuery ParseOnly cross-check via Python sqlglot (oracle-parity-bigquery).
+# Final-ditch until ZetaSQL is provisioned. No linked deps — pure process spawn.
+oracle-bigquery = []
+
+[dev-dependencies]
+# `datadriven` (golden-corpus harness) and `insta` (snapshot assertions) are used
+# only from `#[cfg(test)]` modules (goldens.rs, coverage/matrix.rs), so they are
+# dev-deps: this keeps them out of the bare `cargo build -p squonk-conformance`
+# lib compile and out of the external `conformance/fuzz` workspace, which consumes
+# this crate's lib and paid for both for nothing. Matches `bench`, which already
+# declares `insta` as a dev-dep.
+datadriven = { workspace = true }
+insta = { workspace = true }
+# Bolero is the stable `cargo test` fuzz runner, used only from `#[cfg(test)]`. It
+# is a dev-dependency on purpose: as a normal dependency it would be pulled into the
+# libFuzzer fuzz crate (which depends on this crate) and fail to compile under
+# cargo-fuzz's `--cfg fuzzing` (bolero switches to engine mode there). The libFuzzer
+# targets get their engine from `libfuzzer-sys` instead — see `fuzz/`.
+bolero = { workspace = true }

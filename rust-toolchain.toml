@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[toolchain]
+# squonk builds on STABLE on purpose: the crates must stay installable on any
+# contributor's default stable toolchain. Edition 2024 requires stable >= 1.85.
+# Pin to a specific stable (e.g. "1.96.0") if CI reproducibility ever needs it.
+channel = "stable"
+components = ["rustfmt", "clippy"]

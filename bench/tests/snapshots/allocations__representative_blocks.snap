@@ -1,0 +1,14 @@
+---
+source: bench/tests/allocations.rs
+expression: blocks
+---
+tokenize_analytic_select: total_blocks=2 max_blocks=1
+tokenize_ddl_create_table: total_blocks=1 max_blocks=1
+tokenize_dml_insert: total_blocks=2 max_blocks=1
+parse_ansi_analytic_select: total_blocks=41 max_blocks=37
+parse_ansi_multi_statement: total_blocks=38 max_blocks=36
+parse_postgres_analytic_select: total_blocks=41 max_blocks=37
+parse_ansi_ddl_create_table: total_blocks=14 max_blocks=10
+parse_ansi_dml_insert: total_blocks=16 max_blocks=12
+parse_ansi_dml_update: total_blocks=15 max_blocks=13
+parse_ansi_dml_delete: total_blocks=13 max_blocks=11

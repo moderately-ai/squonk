@@ -1,0 +1,42 @@
+---
+source: crates/squonk/src/format/coverage.rs
+expression: "inventory(fixtures, &FormatOptions::default())"
+---
+[operator-crossing]  (Ansi)
+  input:
+    SELECT a + /* mid */ b FROM t
+  output:
+    SELECT a + b /* mid */
+    FROM t
+
+[empty-parens-dangling]  (Ansi)
+  input:
+    SELECT count(/* why */) FROM t
+  output:
+    SELECT count() /* why */
+    FROM t
+
+[inside-subquery-fragment]  (Ansi)
+  input:
+    SELECT x FROM (SELECT a /* inner */ FROM u) s
+  output:
+    SELECT x
+    FROM
+      (
+        SELECT a /* inner */
+        FROM u
+      ) s
+
+[inside-insert-fallback]  (Ansi)
+  input:
+    INSERT INTO t (a) VALUES (1) /* tail */
+  output:
+    INSERT INTO t (a) VALUES (1) /* tail */
+
+[inside-where-predicate-expr]  (Ansi)
+  input:
+    SELECT a FROM t WHERE b = /* mid */ 2
+  output:
+    SELECT a
+    FROM t
+    WHERE b = 2 /* mid */

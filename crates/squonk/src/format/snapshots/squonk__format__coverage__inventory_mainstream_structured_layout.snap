@@ -1,0 +1,118 @@
+---
+source: crates/squonk/src/format/coverage.rs
+expression: "inventory(fixtures, &FormatOptions::default())"
+---
+[select-clauses]  (Ansi)
+  input:
+    select a, b from t where a = 1 group by a having count(*) > 1
+  output:
+    SELECT a, b
+    FROM t
+    WHERE a = 1
+    GROUP BY a
+    HAVING count(*) > 1
+
+[distinct]  (Ansi)
+  input:
+    SELECT DISTINCT a FROM t
+  output:
+    SELECT DISTINCT a
+    FROM t
+
+[distinct-on]  (Postgres)
+  input:
+    SELECT DISTINCT ON (a) a, b FROM t
+  output:
+    SELECT DISTINCT ON (a) a, b
+    FROM t
+
+[inner-join]  (Ansi)
+  input:
+    SELECT a FROM t1 JOIN t2 ON t1.id = t2.id WHERE t1.x > 0
+  output:
+    SELECT a
+    FROM t1 JOIN t2 ON t1.id = t2.id
+    WHERE t1.x > 0
+
+[left-join]  (Ansi)
+  input:
+    SELECT a FROM t1 LEFT JOIN t2 ON t1.id = t2.id
+  output:
+    SELECT a
+    FROM t1 LEFT JOIN t2 ON t1.id = t2.id
+
+[order-by-limit]  (Ansi)
+  input:
+    SELECT a FROM t ORDER BY a DESC, b ASC LIMIT 10
+  output:
+    SELECT a
+    FROM t
+    ORDER BY a DESC, b ASC
+    LIMIT 10
+
+[single-cte]  (Ansi)
+  input:
+    WITH cte AS (SELECT a FROM t) SELECT a FROM cte
+  output:
+    WITH cte AS (
+      SELECT a
+      FROM t
+    )
+    SELECT a
+    FROM cte
+
+[multi-cte]  (Ansi)
+  input:
+    WITH a AS (SELECT 1), b AS (SELECT 2) SELECT x FROM a, b
+  output:
+    WITH a AS (
+      SELECT 1
+    ),
+    b AS (
+      SELECT 2
+    )
+    SELECT x
+    FROM a, b
+
+[recursive-cte]  (Ansi)
+  input:
+    WITH RECURSIVE r AS (SELECT 1) SELECT n FROM r
+  output:
+    WITH RECURSIVE r AS (
+      SELECT 1
+    )
+    SELECT n
+    FROM r
+
+[union-all]  (Ansi)
+  input:
+    SELECT a FROM t1 UNION ALL SELECT a FROM t2
+  output:
+    SELECT a
+    FROM t1
+    UNION ALL
+    SELECT a
+    FROM t2
+
+[intersect-chain]  (Ansi)
+  input:
+    SELECT a FROM t1 UNION SELECT a FROM t2 INTERSECT SELECT a FROM t3
+  output:
+    SELECT a
+    FROM t1
+    UNION
+    SELECT a
+    FROM t2
+    INTERSECT
+    SELECT a
+    FROM t3
+
+[statement-list]  (Ansi)
+  input:
+    SELECT a FROM t; SELECT b FROM u
+  output:
+    SELECT a
+    FROM t;
+    
+    SELECT b
+    FROM u

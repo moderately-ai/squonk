@@ -1,0 +1,42 @@
+# Microsoft SQL Server (T-SQL) keywords absent from the PostgreSQL / SQL:2016 /
+# MySQL / SQLite / DuckDB / BigQuery inventories.
+#
+# @generated-source: provenance data for the keyword codegen (ADR-0004, ADR-0015).
+# DO derive the Rust tables from this file via `cargo run -p squonk-sourcegen`;
+# do NOT hand-edit the generated `dialect/keyword/generated.rs`.
+#
+# Source: the T-SQL reserved-keyword list (SQL Server docs). Only spellings genuinely
+# *absent* from the shared inventories are enumerated here:
+#
+# - `APPLY`, the tail keyword of the `CROSS APPLY` / `OUTER APPLY` lateral join
+#   operators. It carries no reservation class (a plain identifier in every position
+#   unless a dialect's per-position set names it): the leading `CROSS`/`OUTER` keyword
+#   already anchors the operator, so the preceding factor's alias never swallows it,
+#   and `APPLY` needs no per-position reservation for the join grammar to fire.
+#
+# - `CONTAINED`, a word of the `FOR SYSTEM_TIME CONTAINED IN (…, …)` temporal-table
+#   modifier. Like `APPLY` it carries no reservation class (a contextual keyword — a plain
+#   identifier in every position elsewhere): it is reached only inside the `FOR SYSTEM_TIME`
+#   tail, after the `SYSTEM_TIME` keyword already anchored the clause, so it needs no
+#   per-position reservation. The clause's other words — `SYSTEM_TIME`, `AS`, `OF`, `FROM`,
+#   `TO`, `BETWEEN`, `AND`, `ALL`, `IN`, and the Databricks `VERSION`/`TIMESTAMP` — already
+#   live in the shared inventories, so `CONTAINED` is the only spelling this clause adds.
+#
+# - `OPENJSON`, the head keyword of the `OPENJSON(<json> [, <path>]) [WITH (…)]` rowset
+#   function table factor. Like `APPLY`/`CONTAINED` it carries no reservation class (a rowset
+#   function name, a plain identifier in every position elsewhere): the `open_json` table-factor
+#   gate fires only when `OPENJSON` is immediately followed by `(`, so a bare `OPENJSON` stays an
+#   ordinary identifier and needs no per-position reservation. On for MSSQL / Lenient.
+#
+# The MSSQL preset enables the shared `apply_join` and `table_version` grammars and the
+# `open_json` table factor (all also on for Lenient), which recognize these keywords; the preset
+# adds no per-position reservation for them — the anchors above are enough. A later T-SQL
+# expansion that reserves further keywords would grow this list and hand-compose its per-position
+# reservation sets, the same pattern SQLite and DuckDB use.
+#
+# Format: `keyword` per line (single column; no reservation class).
+
+keyword
+apply
+contained
+openjson

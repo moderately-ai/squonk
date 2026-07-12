@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[alias]
+xtask = "run -p xtask --"
+
+# libduckdb autodetection for the conformance `oracle-engines` feature, so no agent or
+# contributor has to export env vars by hand: duckdb-sys reads DUCKDB_LIB_DIR at build
+# time, and `force = false` means an explicitly-set environment always wins (the Linux
+# builder / CI set their own or use system paths; a search path that does not exist is
+# ignored by the linker).
+[env]
+DUCKDB_LIB_DIR = { value = "/opt/homebrew/lib", force = false }
+
+# Embed an rpath so oracle test binaries locate libduckdb.dylib at RUN time without
+# DYLD_LIBRARY_PATH (macOS strips DYLD_* across protected-process boundaries anyway,
+# which is why the env-var approach kept needing rediscovery).
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,/opt/homebrew/lib"]

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: CC0-1.0
+#
+# Provenance record for the MySQL top-level statement-family probe corpus, enforced
+# by `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). This is NOT extracted from any upstream file.
+#
+# LICENSING BOUNDARY (the headline constraint). MySQL's grammar `sql_yacc.yy` is
+# GPL and is NEVER vendored, copied, or extracted-from into this repository — zero
+# grammar bytes, zero verbatim rule text. The family SET below was derived from a
+# LOCAL, READ-ONLY reading of the pinned GPL grammar (github.com/mysql/mysql-server
+# at tag mysql-8.4.10, matching the live oracle server version) for the FACT of
+# which top-level statement families the `simple_statement` production admits.
+# Facts (which families exist) are not copyrightable expression; every byte WRITTEN
+# here — the family names, the descriptions, and each probe's SQL — is ORIGINAL text
+# authored for this corpus, dedicated to the public domain under CC0-1.0 (the
+# machine-checked `license` field, on the permissive allowlist). Unlike the
+# PostgreSQL `stmt-productions.txt` denominator (extracted by a committed script
+# from the permissively-licensed `gram.y`), there is deliberately NO extraction
+# script here: the reproducibility story is this documented fact-derivation plus the
+# per-family live-oracle probes, never a program run over GPL text.
+source = "self-authored (family set derived from a local read-only reading of the GPL sql_yacc.yy simple_statement production for facts only — no grammar bytes copied or extracted; see README.md)"
+reference = "MySQL 8.4.10 (upstream release tag mysql-8.4.10) — the live m3 oracle server version. NB: nothing from that GPL tree is vendored; it was read locally for facts only (see README.md), so this names the fact source, not vendored corpus data"
+license = "CC0-1.0"
+regenerate = "Hand-maintained. To add a family: append a `-- family: <NAME>` header + one authored minimal probe line to families.sql, then re-run MYSQL_ORACLE_URL=mysql://root@127.0.0.1:3306 cargo nextest run -p squonk-conformance --features oracle-engines,oracle-mysql mysql_statement_family_inventory, which re-derives the coverage split and re-pins MYSQL_STATEMENT_FAMILY_COUNT / MYSQL_UNCOVERED_STATEMENT_FAMILIES and the engine-reach summary."

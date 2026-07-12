@@ -1,0 +1,74 @@
+{
+  "upstream_version": "0.62.0",
+  "corpus_size": 32,
+  "ratio": "ours / theirs (> 1.0 = we are heavier)",
+  "pairs": [
+    {
+      "pair": "Ansi ↔ GenericDialect",
+      "coverage_pct": 87.5,
+      "measured": 28,
+      "metrics": {
+        "transient_bytes": { "ours": 63878, "theirs": 987236, "ratio": 0.065 },
+        "transient_blocks": { "ours": 670, "theirs": 2230, "ratio": 0.300 },
+        "retained_bytes": { "ours": 45465, "theirs": 667075, "ratio": 0.068 },
+        "retained_blocks": { "ours": 470, "theirs": 591, "ratio": 0.795 },
+        "peak_bytes": { "ours": 56306, "theirs": 770662, "ratio": 0.073 }
+      }
+    },
+    {
+      "pair": "Postgres ↔ PostgreSqlDialect",
+      "coverage_pct": 90.6,
+      "measured": 29,
+      "metrics": {
+        "transient_bytes": { "ours": 65346, "theirs": 1020154, "ratio": 0.064 },
+        "transient_blocks": { "ours": 684, "theirs": 2224, "ratio": 0.308 },
+        "retained_bytes": { "ours": 46693, "theirs": 694663, "ratio": 0.067 },
+        "retained_blocks": { "ours": 483, "theirs": 610, "ratio": 0.792 },
+        "peak_bytes": { "ours": 57702, "theirs": 801178, "ratio": 0.072 }
+      }
+    }
+  ],
+  "complex_corpus": {
+    "provenance": "sqlglot tests/fixtures/optimizer @ fd6d4d61c25e7918118fc22c5579098a86a58e10",
+    "pairs": [
+      {
+        "pair": "Ansi ↔ GenericDialect",
+        "measured": 230,
+        "datasets": [
+          { "name": "tpc-h", "candidates": 22, "ours_accepts": 22, "theirs_accepts": 22, "both_accept": 22 },
+          { "name": "tpc-ds", "candidates": 99, "ours_accepts": 99, "theirs_accepts": 99, "both_accept": 99 },
+          { "name": "merge_subqueries", "candidates": 67, "ours_accepts": 66, "theirs_accepts": 67, "both_accept": 66 },
+          { "name": "unnest_subqueries", "candidates": 38, "ours_accepts": 34, "theirs_accepts": 37, "both_accept": 34 },
+          { "name": "pushdown_cte_alias_columns", "candidates": 6, "ours_accepts": 4, "theirs_accepts": 4, "both_accept": 4 },
+          { "name": "eliminate_ctes", "candidates": 6, "ours_accepts": 5, "theirs_accepts": 6, "both_accept": 5 }
+        ],
+        "metrics": {
+          "transient_bytes": { "ours": 3796558, "theirs": 65201033, "ratio": 0.058 },
+          "transient_blocks": { "ours": 33274, "theirs": 155524, "ratio": 0.214 },
+          "retained_bytes": { "ours": 2024995, "theirs": 17593961, "ratio": 0.115 },
+          "retained_blocks": { "ours": 24464, "theirs": 29850, "ratio": 0.820 },
+          "peak_bytes": { "ours": 2508487, "theirs": 35362629, "ratio": 0.071 }
+        }
+      },
+      {
+        "pair": "Postgres ↔ PostgreSqlDialect",
+        "measured": 232,
+        "datasets": [
+          { "name": "tpc-h", "candidates": 22, "ours_accepts": 22, "theirs_accepts": 22, "both_accept": 22 },
+          { "name": "tpc-ds", "candidates": 99, "ours_accepts": 99, "theirs_accepts": 99, "both_accept": 99 },
+          { "name": "merge_subqueries", "candidates": 67, "ours_accepts": 66, "theirs_accepts": 66, "both_accept": 66 },
+          { "name": "unnest_subqueries", "candidates": 38, "ours_accepts": 36, "theirs_accepts": 37, "both_accept": 36 },
+          { "name": "pushdown_cte_alias_columns", "candidates": 6, "ours_accepts": 4, "theirs_accepts": 4, "both_accept": 4 },
+          { "name": "eliminate_ctes", "candidates": 6, "ours_accepts": 5, "theirs_accepts": 6, "both_accept": 5 }
+        ],
+        "metrics": {
+          "transient_bytes": { "ours": 3810372, "theirs": 67012230, "ratio": 0.057 },
+          "transient_blocks": { "ours": 33401, "theirs": 163157, "ratio": 0.205 },
+          "retained_bytes": { "ours": 2033588, "theirs": 17696965, "ratio": 0.115 },
+          "retained_blocks": { "ours": 24552, "theirs": 29968, "ratio": 0.819 },
+          "peak_bytes": { "ours": 2519529, "theirs": 35489347, "ratio": 0.071 }
+        }
+      }
+    ]
+  }
+}

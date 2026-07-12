@@ -1,0 +1,422 @@
+# SPDX-License-Identifier: MIT
+#
+# Tokenizer differential-oracle goldens (ADR-0005). Each case pins one input's
+# whole token stream: per token its byte span, TokenKind, and the exact source
+# slice, with skipped whitespace/comment gaps shown as `trivia` lines so the
+# interleaving reconstructs the source. The dialect rides in the directive
+# (`tokens-ansi` / `tokens-postgres` / `tokens-mysql` / `tokens-mssql`). The SQL
+# strings are hand-authored adversarial fixtures for the high-risk cursor cases
+# the ADR calls out; the expected blocks are generated and the oracle invariants
+# (UTF-8 boundaries, non-overlap, trivia-only gaps, reconstruction, kind/slice
+# agreement) are checked on every regeneration. Rewrite with:
+#   REWRITE=1 cargo test -p squonk-conformance goldens::tests::datadriven_golden_corpus --lib
+
+# --- Multibyte UTF-8 (the headline char-boundary risk) ---
+
+tokens-ansi
+café = δ
+----
+source "café = δ"
+0..5 Word "café"
+5..6 trivia " "
+6..7 Operator(Eq) "="
+7..8 trivia " "
+8..10 Word "δ"
+
+tokens-ansi
+δ=1
+----
+source "δ=1"
+0..2 Word "δ"
+2..3 Operator(Eq) "="
+3..4 Number "1"
+
+tokens-ansi
+'naïve''s'
+----
+source "'naïve''s'"
+0..11 String "'naïve''s'"
+
+tokens-ansi
+'🎉x'
+----
+source "'🎉x'"
+0..7 String "'🎉x'"
+
+tokens-ansi
+"café"
+----
+source "\"café\""
+0..7 QuotedIdent "\"café\""
+
+tokens-postgres
+$$café δ$$
+----
+source "$$café δ$$"
+0..12 String "$$café δ$$"
+
+# --- Escaped / doubled quoting ---
+
+tokens-ansi
+"Odd""Name"
+----
+source "\"Odd\"\"Name\""
+0..11 QuotedIdent "\"Odd\"\"Name\""
+
+tokens-ansi
+'it''s'
+----
+source "'it''s'"
+0..7 String "'it''s'"
+
+tokens-mysql
+`a``b`
+----
+source "`a``b`"
+0..6 QuotedIdent "`a``b`"
+
+tokens-mysql
+"a""b"
+----
+source "\"a\"\"b\""
+0..6 String "\"a\"\"b\""
+
+tokens-mssql
+[a]]b]
+----
+source "[a]]b]"
+0..6 QuotedIdent "[a]]b]"
+
+tokens-mssql
+N'x'
+----
+source "N'x'"
+0..4 String "N'x'"
+
+# PostgreSQL has no `N'…'` national-string constant (its scanner reads `N'x'` as the
+# identifier `nchar` + a separate string), so the PG preset leaves `national_strings`
+# off and `N` lexes as a bare word (pg-national-strings-lexing-divergence).
+tokens-postgres
+N'x'
+----
+source "N'x'"
+0..1 Word "N"
+1..4 String "'x'"
+
+# --- Dollar-quoting, tagged and edge ---
+
+tokens-postgres
+$$x$$
+----
+source "$$x$$"
+0..5 String "$$x$$"
+
+tokens-postgres
+$tag$y$tag$
+----
+source "$tag$y$tag$"
+0..11 String "$tag$y$tag$"
+
+tokens-postgres
+$$$$
+----
+source "$$$$"
+0..4 String "$$$$"
+
+tokens-postgres
+$a$ inner $b$ still body $a$
+----
+source "$a$ inner $b$ still body $a$"
+0..28 String "$a$ inner $b$ still body $a$"
+
+tokens-postgres
+$1
+----
+source "$1"
+0..2 Parameter "$1"
+
+# --- Prefixed and backslash-escaped strings ---
+
+tokens-postgres
+E'can\'t' e'x'
+----
+source "E'can\\'t' e'x'"
+0..9 String "E'can\\'t'"
+9..10 trivia " "
+10..14 String "e'x'"
+
+tokens-mysql
+'a\'b'
+----
+source "'a\\'b'"
+0..6 String "'a\\'b'"
+
+# --- Comments: nested block, line, hash, trivia-only ---
+
+tokens-ansi
+/* a /* b */ c */x
+----
+source "/* a /* b */ c */x"
+0..17 trivia "/* a /* b */ c */"
+17..18 Word "x"
+
+tokens-ansi
+a /* c */ b
+----
+source "a /* c */ b"
+0..1 Keyword(A) "a"
+1..10 trivia " /* c */ "
+10..11 Word "b"
+
+tokens-mysql
+a # c
+b
+----
+source "a # c\nb"
+0..1 Keyword(A) "a"
+1..6 trivia " # c\n"
+6..7 Word "b"
+
+tokens-ansi
+/* only */
+----
+source "/* only */"
+0..10 trivia "/* only */"
+
+tokens-ansi
+--eof comment
+----
+source "--eof comment"
+0..13 trivia "--eof comment"
+
+tokens-ansi
+/**/x
+----
+source "/**/x"
+0..4 trivia "/**/"
+4..5 Word "x"
+
+# --- MySQL versioned comments (conditional inclusion) and non-nesting blocks ---
+
+tokens-mysql
+SELECT /*!40101 1 */
+----
+source "SELECT /*!40101 1 */"
+0..6 Keyword(Select) "SELECT"
+6..16 trivia " /*!40101 "
+16..17 Number "1"
+17..20 trivia " */"
+
+tokens-mysql
+SELECT /*!99999 1 */ x
+----
+source "SELECT /*!99999 1 */ x"
+0..6 Keyword(Select) "SELECT"
+6..21 trivia " /*!99999 1 */ "
+21..22 Word "x"
+
+tokens-mysql
+a /*!40101 '*/' */ b
+----
+source "a /*!40101 '*/' */ b"
+0..1 Keyword(A) "a"
+1..11 trivia " /*!40101 "
+11..15 String "'*/'"
+15..19 trivia " */ "
+19..20 Word "b"
+
+tokens-mysql
+/*!012345 9 */
+----
+source "/*!012345 9 */"
+0..10 trivia "/*!012345 "
+10..11 Number "9"
+11..14 trivia " */"
+
+tokens-mysql
+/* a /* b */ x
+----
+source "/* a /* b */ x"
+0..13 trivia "/* a /* b */ "
+13..14 Word "x"
+
+tokens-mysql
+SELECT /*!40101 1
+----
+source "SELECT /*!40101 1"
+error UnterminatedBlockComment 7..17 "/*!40101 1"
+
+# --- Representative coverage: a full statement, operators, punctuation, numbers ---
+
+tokens-ansi
+SELECT a, b + 1 FROM t WHERE x <> 'y'
+----
+source "SELECT a, b + 1 FROM t WHERE x <> 'y'"
+0..6 Keyword(Select) "SELECT"
+6..7 trivia " "
+7..8 Keyword(A) "a"
+8..9 Punctuation(Comma) ","
+9..10 trivia " "
+10..11 Word "b"
+11..12 trivia " "
+12..13 Operator(Plus) "+"
+13..14 trivia " "
+14..15 Number "1"
+15..16 trivia " "
+16..20 Keyword(From) "FROM"
+20..21 trivia " "
+21..22 Keyword(T) "t"
+22..23 trivia " "
+23..28 Keyword(Where) "WHERE"
+28..29 trivia " "
+29..30 Word "x"
+30..31 trivia " "
+31..33 Operator(NotEq) "<>"
+33..34 trivia " "
+34..37 String "'y'"
+
+tokens-ansi
+a <= b >= c <> d != e
+----
+source "a <= b >= c <> d != e"
+0..1 Keyword(A) "a"
+1..2 trivia " "
+2..4 Operator(LtEq) "<="
+4..5 trivia " "
+5..6 Word "b"
+6..7 trivia " "
+7..9 Operator(GtEq) ">="
+9..10 trivia " "
+10..11 Keyword(C) "c"
+11..12 trivia " "
+12..14 Operator(NotEq) "<>"
+14..15 trivia " "
+15..16 Word "d"
+16..17 trivia " "
+17..19 Operator(NotEq) "!="
+19..20 trivia " "
+20..21 Word "e"
+
+tokens-ansi
+a || b && c | d & e ^ f ~ g
+----
+source "a || b && c | d & e ^ f ~ g"
+0..1 Keyword(A) "a"
+1..2 trivia " "
+2..4 Operator(Concat) "||"
+4..5 trivia " "
+5..6 Word "b"
+6..7 trivia " "
+7..9 Operator(AmpAmp) "&&"
+9..10 trivia " "
+10..11 Keyword(C) "c"
+11..12 trivia " "
+12..13 Operator(Pipe) "|"
+13..14 trivia " "
+14..15 Word "d"
+15..16 trivia " "
+16..17 Operator(Amp) "&"
+17..18 trivia " "
+18..19 Word "e"
+19..20 trivia " "
+20..21 Operator(Caret) "^"
+21..22 trivia " "
+22..23 Word "f"
+23..24 trivia " "
+24..25 Operator(Tilde) "~"
+25..26 trivia " "
+26..27 Keyword(G) "g"
+
+tokens-ansi
+( ) , ; . [ ] { }
+----
+source "( ) , ; . [ ] { }"
+0..1 Punctuation(LParen) "("
+1..2 trivia " "
+2..3 Punctuation(RParen) ")"
+3..4 trivia " "
+4..5 Punctuation(Comma) ","
+5..6 trivia " "
+6..7 Punctuation(Semicolon) ";"
+7..8 trivia " "
+8..9 Punctuation(Dot) "."
+9..10 trivia " "
+10..11 Punctuation(LBracket) "["
+11..12 trivia " "
+12..13 Punctuation(RBracket) "]"
+13..14 trivia " "
+14..15 Punctuation(LBrace) "{"
+15..16 trivia " "
+16..17 Punctuation(RBrace) "}"
+
+tokens-ansi
+42 3.14 .5 1. 1e10 2.5E-3
+----
+source "42 3.14 .5 1. 1e10 2.5E-3"
+0..2 Number "42"
+2..3 trivia " "
+3..7 Number "3.14"
+7..8 trivia " "
+8..10 Number ".5"
+10..11 trivia " "
+11..13 Number "1."
+13..14 trivia " "
+14..18 Number "1e10"
+18..19 trivia " "
+19..25 Number "2.5E-3"
+
+# --- Errors: stray bytes and unterminated constructs (reported independently) ---
+
+tokens-ansi
+a @ b
+----
+source "a @ b"
+error StrayByte 2..3 "@"
+
+tokens-ansi
+$ x
+----
+source "$ x"
+error StrayByte 0..1 "$"
+
+tokens-ansi
+?
+----
+source "?"
+error StrayByte 0..1 "?"
+
+tokens-ansi
+a \ b
+----
+source "a \\ b"
+error StrayByte 2..3 "\\"
+
+tokens-ansi
+'abc
+----
+source "'abc"
+error UnterminatedString 0..4 "'abc"
+
+tokens-ansi
+"abc
+----
+source "\"abc"
+error UnterminatedQuotedIdent 0..4 "\"abc"
+
+tokens-ansi
+/* open
+----
+source "/* open"
+error UnterminatedBlockComment 0..7 "/* open"
+
+tokens-ansi
+/* a /* b */
+----
+source "/* a /* b */"
+error UnterminatedBlockComment 0..12 "/* a /* b */"
+
+tokens-postgres
+$tag$ body
+----
+source "$tag$ body"
+error UnterminatedDollarQuote 0..10 "$tag$ body"

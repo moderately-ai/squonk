@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: CC0-1.0
+#
+# Provenance record for the vendored sqllogictest SQL corpus, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). Upstream COPYRIGHT.md offers GPL/BSD/MIT/CC0 "no attribution
+# required"; we elect CC0-1.0 (the machine-checked `license` field). The SPDX
+# header above covers this metadata file. See README.md for the extraction
+# narrative.
+source = "https://github.com/gregrahn/sqllogictest"
+reference = "c67f97bf3ca7e590d12e073408bcacaf2ff0f3a0"
+license = "CC0-1.0"
+regenerate = "Re-extract statements.sql from the pinned .test files and caps in README.md, then refresh supported.sql: REWRITE=1 cargo nextest run -p squonk-conformance corpus_sqllogictest"

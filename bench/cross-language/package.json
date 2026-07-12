@@ -1,0 +1,18 @@
+{
+  "name": "squonk-cross-language-js",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Node throughput + footprint harness comparing sql-formatter against the squonk wasm library (devDependency-only; sql-formatter is never a production dependency of the published package).",
+  "license": "MIT",
+  "scripts": {
+    "throughput:postgres": "node sql_formatter_throughput.mjs --dialect postgres",
+    "throughput:mysql": "node sql_formatter_throughput.mjs --dialect mysql",
+    "throughput:sqlite": "node sql_formatter_throughput.mjs --dialect sqlite",
+    "footprint": "node wasm_footprint.mjs",
+    "dry-run": "node sql_formatter_throughput.mjs --dialect postgres --dry-run"
+  },
+  "devDependencies": {
+    "sql-formatter": "15.4.11"
+  }
+}

@@ -1,0 +1,252 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# The M2 SQLite/DuckDB accept/reject oracles (`conformance/src/m2.rs`) live behind the
+# off-by-default `oracle-engines` cargo feature (`conformance/Cargo.toml`) because the
+# DuckDB oracle system-links `libduckdb`, which the default build must never require.
+# Before this workflow, no committed CI ever passed `--features oracle-engines`, so the
+# M2 milestone validated nothing in the committed gate: pg_query was the only
+# externally-grounded oracle running by default (`run-m2-oracle-engines-in-ci`). This
+# workflow installs libduckdb on the runner and runs the oracle suite nightly; rusqlite
+# needs no such step (bundled).
+#
+# The M3 MySQL accept/reject oracle (`conformance/src/m3.rs`, `oracle-mysql` feature) is
+# folded into the same job: it speaks the wire protocol to a real MySQL server with the
+# pure-Rust `mysql` crate, so — unlike libmysqlclient linking or a vendored MariaDB
+# grammar — nothing GPL ever enters the build graph. The server runs as an external
+# `mysql:8` service container (running a GPL server as a separate process is sanctioned;
+# linking or vendoring it is not). Like DuckDB, the oracle degrades to a skip when no
+# server is reachable, so the "actually ran" guard below covers it too.
+#
+# The ClickHouse accept/reject oracle (`conformance/src/clickhouse.rs`, `oracle-clickhouse`
+# feature) is likewise folded in: it spawns the Apache-2.0 `clickhouse local` single binary
+# as an external process and reads `EXPLAIN AST` (ParseOnly) verdicts — no linked crate, no
+# GPL boundary. The install step below fetches the binary and points `CLICKHOUSE_ORACLE_BIN`
+# at it; like the others it skips cleanly when the binary is absent, so the "actually ran"
+# guard covers it too. This is the standing nightly guard the tier-promotion programme
+# (clickhouse-tier-promotion-generative-nightly) wired for the ClickHouse generative lane.
+#
+# Folded in from `verify-bench-gungraun-modules-compile-on-linux`: the same job also
+# builds `squonk-bench --all-targets`. Its gungraun/callgrind gate builders are
+# `cfg(target_os = "linux")`-gated and therefore invisible to a macOS `cargo build` —
+# this is the only place in committed CI that type-checks them, so a break here is a
+# nightly signal instead of a surprise the next time someone runs `cargo bench` on a
+# Linux box. The bench-build step runs even if the oracle steps above it fail
+# (`if: ${{ !cancelled() }}`) so an unrelated duckdb hiccup can never mask it —
+# mirroring the fuzz-nightly `fail-fast: false` principle of keeping independent
+# failure domains from hiding one another.
+#
+# Deliberately a separate workflow from `fuzz-nightly.yml` rather than a second job
+# there: unrelated failure domains (a duckdb link break here has nothing to do with a
+# libFuzzer crash) and its own concurrency group, so neither run ever blocks the other.
+
+name: oracle-nightly
+
+on:
+  schedule:
+    # 07:41 UTC daily — nightly alongside fuzz-nightly's 07:19 run (see
+    # fuzz-nightly.yml), offset off the top of the hour for the same reason: dodge
+    # GitHub's cron congestion at popular times.
+    - cron: "41 7 * * *"
+  # Manual trigger: run on demand, or exercise the job after touching the oracle suite
+  # or this workflow without waiting for the nightly cron.
+  workflow_dispatch:
+
+# Least privilege: the job only reads the tree and runs tests/builds.
+permissions:
+  contents: read
+
+# One run at a time; never cancel an in-flight run when the next night triggers.
+concurrency:
+  group: oracle-nightly
+  cancel-in-progress: false
+
+jobs:
+  oracle-engines:
+    name: sqlite + duckdb + mysql + clickhouse oracles, bench Linux build
+    runs-on: ubuntu-latest
+    env:
+      # Pinned to the DuckDB release already verified (locally, via the homebrew
+      # package — reconfirmed while building this workflow) to build and link cleanly
+      # against the `duckdb`/`libduckdb-sys` crate pin in `conformance/Cargo.toml`; see
+      # `prod-dialect-m2-sqlite-duckdb-oracles`. DuckDB's C API is stable across
+      # releases, so this can be bumped independently of the crate version if ever
+      # needed — re-verify locally first.
+      DUCKDB_VERSION: "1.5.4"
+      # The M3 MySQL oracle connects here; matches `m3::DEFAULT_MYSQL_ORACLE_URL` but is
+      # set explicitly so the "actually ran" guard's premise (service declared → oracle
+      # must connect) is self-documenting. The `mysql` service below maps 3306 to the
+      # runner's localhost with an empty-password root.
+      MYSQL_ORACLE_URL: "mysql://root@127.0.0.1:3306"
+      # The ClickHouse oracle spawns this binary; the install step below downloads it and
+      # writes the concrete path into GITHUB_ENV so this default is overridden with the real
+      # location. Declared here so the "actually ran" guard's premise (binary provisioned →
+      # oracle must run) is self-documenting, mirroring MYSQL_ORACLE_URL above.
+      CLICKHOUSE_ORACLE_BIN: "clickhouse"
+    services:
+      mysql:
+        # Official MySQL image — a GPL server run as an EXTERNAL process, which the
+        # licensing policy sanctions (linking/vendoring it would not). Empty-password
+        # root over plaintext 127.0.0.1, so the pure-Rust `mysql` client needs no TLS.
+        image: mysql:8
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        ports:
+          - 3306:3306
+        # Health-gate the service: GitHub Actions holds the job's steps until the probe
+        # passes, so the oracle never races a still-initializing server on first boot.
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install stable toolchain
+        # rust-toolchain.toml already pins `stable` for the whole repo; installed
+        # explicitly here (rather than relying on rustup's implicit toolchain-file
+        # pickup) so the setup step is visible, matching fuzz-nightly's explicit
+        # `dtolnay/rust-toolchain@efcb852328a9f50117170cc43094fb6f09eaf1ae # nightly` override.
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        # No `workspaces:` override: unlike `conformance/fuzz` (its own detached
+        # `[workspace]`), `conformance` and `bench` are ordinary members of the root
+        # workspace, so the default (repo root) is correct.
+
+      - name: Install cargo-nextest
+        # Prebuilt, checksum-verified binary from GitHub Releases instead of a
+        # from-source `cargo install` compile (minutes) on every nightly run.
+        # cargo-nextest is a native install-action manifest tool; the version is
+        # pinned so a nightly tool bump is a deliberate, reviewable change.
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        with:
+          tool: cargo-nextest@0.9.140
+
+      - name: Install libduckdb
+        # DuckDB is not in the Ubuntu apt repositories; the documented, redistributable
+        # way to get the C headers + shared library on Linux CI is the prebuilt
+        # `libduckdb-linux-amd64.zip` release asset (contains duckdb.h/duckdb.hpp/
+        # libduckdb.so flat, no subdirectory — verified against the real asset).
+        # Mirrors the local dev pattern already recorded in `conformance/Cargo.toml`
+        # (`DUCKDB_LIB_DIR`/`DUCKDB_INCLUDE_DIR`), with `LD_LIBRARY_PATH` standing in
+        # for macOS's `DYLD_LIBRARY_PATH` so the test binary finds the shared lib at
+        # runtime.
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/libduckdb.zip" \
+            "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/libduckdb-linux-amd64.zip"
+          mkdir -p "$RUNNER_TEMP/libduckdb"
+          unzip -q "$RUNNER_TEMP/libduckdb.zip" -d "$RUNNER_TEMP/libduckdb"
+          test -f "$RUNNER_TEMP/libduckdb/duckdb.h"
+          test -f "$RUNNER_TEMP/libduckdb/libduckdb.so"
+          {
+            echo "DUCKDB_LIB_DIR=$RUNNER_TEMP/libduckdb"
+            echo "DUCKDB_INCLUDE_DIR=$RUNNER_TEMP/libduckdb"
+            echo "LD_LIBRARY_PATH=$RUNNER_TEMP/libduckdb:${LD_LIBRARY_PATH}"
+          } >> "$GITHUB_ENV"
+
+      - name: Install clickhouse-local
+        # ClickHouse ships as a single self-contained static binary (Apache-2.0), fetched by
+        # the official one-liner installer, which downloads the latest stable `clickhouse`
+        # into the current directory (the same "latest stable, moving tag" posture as the
+        # `mysql:8` service above — not a pinned patch). It is run under $RUNNER_TEMP and
+        # CLICKHOUSE_ORACLE_BIN is pointed at the concrete path, so the oracle
+        # (conformance/src/clickhouse.rs) spawns exactly this binary with no PATH ambiguity.
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -sSfL https://clickhouse.com/ | sh
+          test -x "$RUNNER_TEMP/clickhouse"
+          "$RUNNER_TEMP/clickhouse" local --query "SELECT 1"
+          echo "CLICKHOUSE_ORACLE_BIN=$RUNNER_TEMP/clickhouse" >> "$GITHUB_ENV"
+
+      - name: Run SQLite/DuckDB/MySQL/ClickHouse oracle suite
+        # Two flags make the "actually ran" evidence reach the next step:
+        #
+        #   `--success-output final` — all three oracles report unavailability by
+        #   *passing* (an `eprintln!` + early return, see `conformance/src/m2.rs` and
+        #   `m3.rs`), and nextest suppresses a passing test's captured output by default.
+        #   `final` replays it at the end, so each lane's `oracle-ran:` evidence line
+        #   (emitted only on the ran path) survives for the next step to grep.
+        #
+        #   `2>&1` — nextest writes ALL of its human output (the status lines AND the
+        #   replayed test output) to STDERR, not stdout. A bare `| tee` pipes only stdout,
+        #   so the saved log was empty and every evidence grep failed: the latent bug that
+        #   made this guard report "verified nothing" on every run since the job landed.
+        #   Folding stderr into the pipe is what captures the evidence.
+        #
+        # GitHub Actions' default `pipefail` shell still fails this step if `cargo nextest`
+        # does. Both oracle features are enabled together so one run covers all engines.
+        run: |
+          cargo nextest run -p squonk-conformance --features oracle-engines,oracle-mysql,oracle-clickhouse \
+            --success-output final 2>&1 | tee "$RUNNER_TEMP/oracle-engines-output.log"
+
+      - name: Verify all four oracles actually ran (not silently skipped)
+        # Each oracle lane emits ONE stable, machine-readable evidence line —
+        # `oracle-ran: <engine> …` — from its curated-corpus parity test, and ONLY on the
+        # path where the engine was reachable/linked (the skip path prints `skipping
+        # <engine> …` and no evidence line). So the presence of the token is a
+        # self-contained proof the oracle ran: we grep our own emitted marker rather than
+        # nextest's human-formatted `PASS …` status lines, which keeps this guard robust
+        # to test-runner output-format drift. (The evidence lines reach this log only
+        # because the run step above redirects nextest's stderr into the tee — see there.)
+        #
+        # rusqlite is bundled, so its line should always appear — its absence means the
+        # suite did not run at all. DuckDB (linked libduckdb), MySQL (wire connection to the
+        # service), and ClickHouse (spawned `clickhouse local` binary) are the real gates:
+        # each *can* silently report unavailable and still leave the suite green (module docs,
+        # `conformance/src/m2.rs`, `m3.rs`, and `clickhouse.rs`) — exactly the "worse than no
+        # oracle" failure mode this job exists to prevent — so each fails the job on its own,
+        # not only in the all-unavailable case.
+        run: |
+          LOG="$RUNNER_TEMP/oracle-engines-output.log"
+
+          sqlite_ran=false
+          if grep -q "oracle-ran: sqlite" "$LOG"; then
+            sqlite_ran=true
+          fi
+
+          duckdb_ran=false
+          if grep -q "oracle-ran: duckdb" "$LOG"; then
+            duckdb_ran=true
+          fi
+
+          mysql_ran=false
+          if grep -q "oracle-ran: mysql" "$LOG"; then
+            mysql_ran=true
+          fi
+
+          clickhouse_ran=false
+          if grep -q "oracle-ran: clickhouse" "$LOG"; then
+            clickhouse_ran=true
+          fi
+
+          echo "sqlite oracle ran: $sqlite_ran"
+          echo "duckdb oracle ran: $duckdb_ran"
+          echo "mysql oracle ran: $mysql_ran"
+          echo "clickhouse oracle ran: $clickhouse_ran"
+
+          if [ "$sqlite_ran" = false ] && [ "$duckdb_ran" = false ] && [ "$mysql_ran" = false ] && [ "$clickhouse_ran" = false ]; then
+            echo "::error::All four oracles (SQLite, DuckDB, MySQL, ClickHouse) report unavailable — the oracle job verified nothing this run."
+            exit 1
+          elif [ "$duckdb_ran" = false ]; then
+            echo "::error::DuckDB oracle did not run even though this job installs libduckdb specifically so it does; see the 'Install libduckdb' step above and the OracleUnavailable handling in conformance/src/m2.rs."
+            exit 1
+          elif [ "$mysql_ran" = false ]; then
+            echo "::error::MySQL oracle did not run even though this job declares a mysql:8 service specifically so it does; see the 'services' block above and the OracleUnavailable handling in conformance/src/m3.rs."
+            exit 1
+          elif [ "$clickhouse_ran" = false ]; then
+            echo "::error::ClickHouse oracle did not run even though this job installs clickhouse-local specifically so it does; see the 'Install clickhouse-local' step above and the OracleUnavailable handling in conformance/src/clickhouse.rs."
+            exit 1
+          elif [ "$sqlite_ran" = false ]; then
+            echo "::error::SQLite oracle evidence not found in the nextest output; rusqlite is bundled and should never report unavailable, so this likely means the suite did not run or the 'oracle-ran: sqlite' evidence line in conformance/src/m2.rs was removed."
+            exit 1
+          fi
+
+      - name: Build bench Linux-gated modules
+        if: ${{ !cancelled() }}
+        # Runs independent of the oracle steps' outcome (see the header comment): an
+        # unrelated duckdb failure must never silently skip this check too.
+        run: cargo build -p squonk-bench --all-targets

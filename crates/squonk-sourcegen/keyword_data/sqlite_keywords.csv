@@ -1,0 +1,30 @@
+# SQLite operator keywords absent from the PostgreSQL / SQL:2016 / MySQL inventories.
+#
+# @generated-source: provenance data for the keyword codegen (ADR-0004, ADR-0015).
+# DO derive the Rust tables from this file via `cargo run -p squonk-sourcegen`;
+# do NOT hand-edit the generated `dialect/keyword/generated.rs`.
+#
+# Source: SQLite's tokenizer keyword table (src/parse.y / tool/mkkeywordhash.c,
+# public domain). SQLite's keyword universe is overwhelmingly a subset of the
+# ANSI/PostgreSQL one the shared inventory already carries, so only the spellings
+# genuinely *absent* from it are enumerated here — `GLOB`, the built-in Unix-glob
+# pattern operator (`KeywordOperators::Sqlite`), and `INDEXED`, the head of the
+# `INDEXED BY` / `NOT INDEXED` index-directive clause on a table reference. `GLOB`'s
+# siblings `MATCH` (SQL:2016) and `REGEXP` (MySQL) are already in the union, so they
+# need no row. These are keyword-inventory additions, not a reservation class: neither
+# carries a PostgreSQL/MySQL reservation, so each stays a plain identifier in every
+# position unless a dialect's per-position handling names it. SQLite does not reserve
+# either — `GLOB` is a fallback keyword usable as an identifier off the operator
+# position, and `INDEXED` is special ONLY in the bare-post-table-name position (a
+# fallback identifier everywhere else: `SELECT indexed`, `t AS indexed`, `indexed INT`
+# all parse), so its bare-alias decline is modelled at the parse site rather than in a
+# reserved set (the `CONNECT BY` clause-decline precedent).
+#
+# This file contributes spellings to the shared `Keyword` union only; the SQLite
+# per-position reserved sets are hand-composed from existing variants in
+# `crates/squonk-ast/src/dialect/sqlite.rs` (the `POSTGRES_NON_GENERIC_FUNCTION_KEYWORDS`
+# precedent), because SQLite's reserved set is a small subset of words the union
+# already holds.
+keyword
+glob
+indexed

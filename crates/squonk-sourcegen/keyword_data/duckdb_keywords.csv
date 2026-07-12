@@ -1,0 +1,40 @@
+# DuckDB keywords absent from the PostgreSQL / SQL:2016 / MySQL / SQLite inventories.
+#
+# @generated-source: provenance data for the keyword codegen (ADR-0004, ADR-0015).
+# DO derive the Rust tables from this file via `cargo run -p squonk-sourcegen`;
+# do NOT hand-edit the generated `dialect/keyword/generated.rs`.
+#
+# Source: DuckDB's keyword inventory (`duckdb_keywords()`, DuckDB 1.5.4; the grammar
+# is third_party/libpg_query, MIT). DuckDB's keyword universe is overwhelmingly the
+# PostgreSQL one the shared inventory already carries, so only the spellings
+# genuinely *absent* from it are enumerated here:
+#
+# - `QUALIFY`, the post-window filter clause (`duckdb_keywords()` class `reserved`,
+#   like `HAVING`).
+# - `PIVOT` and `UNPIVOT`, the row/column rotation operators (`duckdb_keywords()`
+#   class `reserved`, like `QUALIFY` — reserved in every identifier position so a
+#   trailing `PIVOT` reads the operator instead of the source's alias).
+# - `ASOF` and `POSITIONAL`, the nonstandard join operators (`duckdb_keywords()`
+#   class `type_function`, like `CROSS`).
+# - `SEMI` and `ANTI`, the semi-/anti-join operators (`duckdb_keywords()` class
+#   `type_function`; DuckDB's grammar additionally rejects them as function names —
+#   `semi(1)` syntax-errors where `asof(1)` parses — so the DuckDb preset reserves
+#   them in the function-name position too, unlike `ASOF`/`POSITIONAL`).
+#
+# These are keyword-inventory additions, not reservation classes: the spellings
+# carry no PostgreSQL/MySQL reservation, so they stay plain identifiers in every
+# position unless a dialect's per-position set names them. DuckDB *does* reserve
+# them — its per-position sets are hand-composed from existing variants in
+# `crates/squonk-ast/src/dialect/duckdb.rs`, the same pattern SQLite uses
+# (`sqlite_keywords.csv`).
+#
+# Format: `keyword` per line (single column; no reservation class).
+
+keyword
+anti
+asof
+pivot
+positional
+qualify
+semi
+unpivot

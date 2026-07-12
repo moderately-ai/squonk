@@ -1,0 +1,119 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[package]
+name = "squonk-ast"
+description = "Dialect-agnostic SQL abstract syntax tree for the squonk toolkit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/squonk-ast"
+keywords = ["sql", "ast", "syntax-tree", "parser", "sqlparser"]
+categories = ["parser-implementations", "data-structures"]
+autotests = false
+# Deliberate publish allowlist (not the git-tracked default): the library sources,
+# the integration tests, the crate README, and a crate-local MIT LICENSE copy so the
+# tarball is self-contained (the workspace-root LICENSE sits outside the package root
+# and would not otherwise ship). Corpora and build artifacts live outside
+# the crate directory and never entered the default set; this list freezes the exact
+# shipped inventory instead of tracking whatever happens to be committed here.
+include = ["src/**", "tests/**", "README.md", "LICENSE"]
+
+[lints]
+workspace = true
+
+# docs.rs builds with every feature so the published docs render the full
+# multi-dialect + serde surface (a default build documents ANSI only).
+[package.metadata.docs.rs]
+all-features = true
+# Set the `docsrs` cfg on the docs.rs rustdoc invocation so the lib.rs
+# `#![cfg_attr(docsrs, feature(doc_cfg))]` activates the "Available on crate
+# feature X" banners on feature-gated items.
+rustdoc-args = ["--cfg", "docsrs"]
+
+# Dialect packaging (ADR-0009/0011): `ansi` is the always-compiled baseline (no
+# feature gates it); every other dialect is opt-in so the default build is the
+# smallest useful thing (ANSI-only). The data-driven grammar stays always-compiled
+# — these features gate only the per-dialect preset *data*, never the grammar.
+# `lenient` is reserved here so the feature vocabulary stays stable when work
+# adds its behaviour; it gates no data yet. `full` is the drop-in parity build (every
+# dialect, plus lenient once it lands).
+[features]
+default = []
+postgres = []
+mysql = []
+sqlite = []
+# DuckDB is PostgreSQL-derived: its preset (`dialect/duckdb.rs`) reuses the `::POSTGRES`
+# sub-preset consts directly, so enabling `duckdb` must compile `mod postgres` too.
+duckdb = ["postgres"]
+# BigQuery / ZetaSQL is ANSI-derived (its preset in `dialect/bigquery.rs` reuses the `::ANSI`
+# sub-preset consts, which are always compiled), so `bigquery` implies no other dialect
+# feature — the conservative, standalone-buildable minimal preset.
+bigquery = []
+# Hive / HiveQL is ANSI-derived (its preset in `dialect/hive.rs` reuses the `::ANSI`
+# sub-preset consts, which are always compiled), so `hive` implies no other dialect feature
+# — the conservative, standalone-buildable minimal preset.
+hive = []
+# ClickHouse is ANSI-derived (its preset in `dialect/clickhouse.rs` reuses the `::ANSI`
+# sub-preset consts, which are always compiled), so `clickhouse` implies no other
+# dialect feature — the conservative, standalone-buildable minimal preset.
+clickhouse = []
+# Databricks is ANSI-derived (its preset in `dialect/databricks.rs` reuses the `::ANSI`
+# sub-preset consts, which are always compiled), so `databricks` implies no other dialect
+# feature — the conservative, standalone-buildable minimal preset.
+databricks = []
+# MSSQL / T-SQL is ANSI-derived (its preset in `dialect/mssql.rs` reuses the `::ANSI`
+# sub-preset consts, which are always compiled), so `mssql` implies no other dialect
+# feature — the conservative, standalone-buildable minimal preset.
+mssql = []
+# Snowflake is ANSI-derived (its preset in `dialect/snowflake.rs` reuses the `::ANSI`
+# sub-preset consts, which are always compiled), so `snowflake` implies no other dialect
+# feature — the conservative, standalone-buildable minimal preset.
+snowflake = []
+# Amazon Redshift is ANSI-derived (its preset in `dialect/redshift.rs` reuses the `::ANSI`
+# sub-preset consts, which are always compiled), so `redshift` implies no other dialect feature
+# — the conservative, standalone-buildable minimal preset. It derives from ANSI, not `postgres`,
+# despite Redshift being a PostgreSQL-8 fork: our `postgres` preset is oracle-fitted to PG-17 and
+# would over-accept features Redshift never had (see `dialect/redshift.rs` module docs).
+redshift = []
+lenient = []
+full = ["postgres", "mysql", "sqlite", "duckdb", "bigquery", "hive", "clickhouse", "databricks", "mssql", "snowflake", "redshift", "lenient"]
+# Opt-in serialization features for the public AST node graph (ADR-0017 dep
+# discipline, mirroring the phf/lasso measured-but-not-default rule). Off by
+# default, so the default build pulls neither serde nor its derive macro. `serde`
+# is the umbrella that turns on both halves (`serde-serialize` + `serde-deserialize`)
+# for the full round-trip; either half is selectable on its own — this tripartite
+# split is the intended design.
+serde = ["serde-serialize", "serde-deserialize"]
+serde-serialize = ["dep:serde", "thin-vec/serde"]
+serde-deserialize = ["dep:serde", "thin-vec/serde"]
+
+[dependencies]
+thin-vec = { workspace = true }
+# Optional: only compiled when the `serde` feature is on (see [features]).
+serde = { workspace = true, optional = true }
+
+# Dev-only self-dependency (ADR-0009/0011 lean-default corollary). A standalone
+# `cargo nextest run -p squonk-ast` builds the crate at its default (ANSI-only)
+# features, but the crate's own `#[cfg(test)]` code asserts on `full`-gated preset
+# data (`FeatureSet::POSTGRES`/`MYSQL`, the MySQL/Postgres syntax constants), so it
+# fails to compile in isolation. Depending on ourselves with `full` feature-unifies
+# `full` into this crate's *test* build only. Dev-deps never reach `cargo build` or
+# downstream consumers, so the published graph and the lean default are unchanged;
+# this exists purely to make per-crate `-p` testing compile standalone.
+[dev-dependencies]
+squonk-ast = { path = ".", features = ["full"] }
+# Dev-only: the concrete serde format the `serde`-gated round-trip and
+# recursion-depth tests deserialize through. Never a runtime dependency, so it
+# leaves the published graph and the zero-dep default untouched (ADR-0017).
+# `unbounded_depth` exposes `disable_recursion_limit`, letting the depth test
+# isolate OUR format-agnostic guard from serde_json's own JSON-only limit.
+serde_json = { workspace = true, features = ["unbounded_depth"] }
+
+[[test]]
+name = "integration"
+path = "tests/main.rs"

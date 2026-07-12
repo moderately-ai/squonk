@@ -1,0 +1,48 @@
+---
+source: crates/squonk/src/format/coverage.rs
+assertion_line: 350
+expression: "inventory(fixtures, &FormatOptions::default())"
+---
+[leading-before-statement]  (Ansi)
+  input:
+    -- header
+    SELECT a FROM t WHERE a = 1
+  output:
+    -- header
+    SELECT a
+    FROM t
+    WHERE a = 1
+
+[between-statements]  (Ansi)
+  input:
+    SELECT 1;
+    -- divider
+    SELECT 2
+  output:
+    SELECT 1;
+    
+    -- divider
+    SELECT 2
+
+[trailing-after-last-token]  (Ansi)
+  input:
+    SELECT a FROM t WHERE a = 1 -- filter
+  output:
+    SELECT a
+    FROM t
+    WHERE a = 1 -- filter
+
+[stmt-final-line-comment]  (Ansi)
+  input:
+    SELECT a FROM t
+    -- trailing note
+  output:
+    SELECT a
+    FROM t -- trailing note
+
+[stmt-final-after-semicolon]  (Ansi)
+  input:
+    SELECT 1;
+    -- after
+  output:
+    SELECT 1 -- after

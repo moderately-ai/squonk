@@ -1,0 +1,6 @@
+---
+source: bench/tests/corpus_allocations.rs
+expression: blocks
+---
+Ansi: transient_blocks=22574 retained_blocks=16526
+Postgres: transient_blocks=23587 retained_blocks=17209

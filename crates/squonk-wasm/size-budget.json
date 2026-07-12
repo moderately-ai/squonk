@@ -1,0 +1,12 @@
+{
+  "_comment": "Per-package ceilings are 10% above the fresh 1.0.0 measurements, rounded to KiB. Entry counts are exact.",
+  "packages": {
+    "ansi": { "rawBytes": 4171776, "gzipBytes": 772096, "packedBytes": 841728, "unpackedBytes": 4526080, "entryCount": 18 },
+    "postgres": { "rawBytes": 4610048, "gzipBytes": 863232, "packedBytes": 932864, "unpackedBytes": 4965376, "entryCount": 18 },
+    "mysql": { "rawBytes": 4803584, "gzipBytes": 927744, "packedBytes": 996352, "unpackedBytes": 5157888, "entryCount": 18 },
+    "sqlite": { "rawBytes": 4390912, "gzipBytes": 811008, "packedBytes": 878592, "unpackedBytes": 4745216, "entryCount": 18 },
+    "duckdb": { "rawBytes": 4633600, "gzipBytes": 873472, "packedBytes": 941056, "unpackedBytes": 4988928, "entryCount": 18 },
+    "lenient": { "rawBytes": 5219328, "gzipBytes": 1040384, "packedBytes": 1108992, "unpackedBytes": 5573632, "entryCount": 18 },
+    "all": { "rawBytes": 8301568, "gzipBytes": 1250304, "packedBytes": 1318912, "unpackedBytes": 8664064, "entryCount": 18 }
+  }
+}

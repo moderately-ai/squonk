@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the vendored sqlglot identity corpus, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the corpus content's
+# elected licence is the machine-checked `license` field below. See README.md for
+# the full narrative.
+source = "https://github.com/tobymao/sqlglot"
+reference = "fd6d4d61c25e7918118fc22c5579098a86a58e10"
+license = "MIT"
+regenerate = "Re-vendor tests/fixtures/identity.sql from the pinned commit byte-for-byte, then refresh supported.sql: REWRITE=1 cargo nextest run -p squonk-conformance corpus_sqlglot"

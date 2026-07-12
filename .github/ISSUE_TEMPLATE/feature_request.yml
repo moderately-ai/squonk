@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+name: Feature or dialect/syntax request
+description: Request new SQL syntax, a new dialect preset, or another parser capability.
+title: "[request]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The requests we can act on name concrete SQL and cite an engine. Please read the
+        [dialect & syntax request policy](../../docs/dialect-requests.md) first — it explains the tier a new
+        dialect enters at, the evidence bar for a preset to become **stable**, and how requests are triaged.
+        The fields below are the minimal shape a good request takes: **SQL input + dialect + engine citation.**
+  - type: checkboxes
+    id: search
+    attributes:
+      label: Before filing
+      options:
+        - label: I searched [existing issues](https://github.com/moderately-ai/squonk/issues?q=is%3Aissue) and read the [request policy](../../docs/dialect-requests.md).
+          required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What should squonk parse or do?
+      description: One or two sentences. If this is a new dialect, name it; if it is new syntax, name the construct.
+    validations:
+      required: true
+  - type: textarea
+    id: sql
+    attributes:
+      label: SQL input
+      description: A concrete snippet squonk should accept (and, if useful, one it should keep rejecting).
+      render: sql
+    validations:
+      required: true
+  - type: input
+    id: dialect
+    attributes:
+      label: Dialect / engine
+      description: The dialect or engine this syntax belongs to (for example `postgres`, `snowflake`, `trino`).
+    validations:
+      required: true
+  - type: textarea
+    id: citation
+    attributes:
+      label: Engine citation
+      description: A link to the engine's own documentation or grammar showing this is real, accepted syntax — the evidence bar the request policy describes. Quote or deep-link the exact page.
+    validations:
+      required: true

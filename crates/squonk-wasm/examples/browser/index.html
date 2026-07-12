@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>squonk WASM AST explorer</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div class="title-block">
+          <p class="eyebrow">squonk wasm</p>
+          <h1>SQL AST Explorer</h1>
+        </div>
+        <output id="status" class="status"></output>
+      </header>
+
+      <section class="controls" aria-label="Query controls">
+        <div id="presets" class="presets" aria-label="Example queries"></div>
+        <div class="toolbar">
+          <label>
+            Dialect
+            <select id="dialect"></select>
+          </label>
+          <label>
+            Target dialect
+            <select id="target-dialect"></select>
+          </label>
+          <label class="toggle">
+            <input id="recovering" type="checkbox" />
+            Recover
+          </label>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <section class="editor-pane" aria-label="SQL editor">
+          <div class="panel-heading">
+            <h2>SQL Source</h2>
+            <output id="selection-summary"></output>
+          </div>
+          <div id="editor" class="editor-shell"></div>
+        </section>
+
+        <aside class="inspector" aria-label="AST inspector">
+          <section class="tree-panel">
+            <div class="panel-heading">
+              <h2>AST Tree</h2>
+              <output id="tree-summary"></output>
+            </div>
+            <div id="ast-tree" class="ast-tree"></div>
+          </section>
+          <section class="node-panel">
+            <h2>Selected Node</h2>
+            <div id="node-details"></div>
+          </section>
+          <section class="metrics-panel">
+            <h2>Timings</h2>
+            <div id="metrics" class="metric-grid"></div>
+          </section>
+          <section class="metrics-panel">
+            <h2>Resources</h2>
+            <div id="resources" class="metric-grid"></div>
+          </section>
+        </aside>
+      </section>
+
+      <section class="result-grid">
+        <article class="panel">
+          <h2>Diagnostics</h2>
+          <div id="diagnostics" class="diagnostics"></div>
+        </article>
+        <article class="panel">
+            <h2>Canonical SQL</h2>
+          <pre id="rendered"></pre>
+        </article>
+        <article class="panel">
+          <h2>Redacted SQL</h2>
+          <pre id="redacted"></pre>
+        </article>
+        <article class="panel">
+          <h2>Target SQL</h2>
+          <pre id="transpiled"></pre>
+        </article>
+      </section>
+
+      <details class="raw">
+        <summary>Raw AST JSON</summary>
+        <pre id="raw"></pre>
+      </details>
+    </main>
+  </body>
+</html>

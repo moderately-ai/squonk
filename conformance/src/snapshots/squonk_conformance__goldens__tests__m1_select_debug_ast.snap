@@ -1,0 +1,376 @@
+---
+source: conformance/src/goldens.rs
+expression: parsed.statements()
+---
+[
+    Query {
+        query: Query {
+            with: None,
+            body: Select {
+                select: Select {
+                    distinct: None,
+                    straight_join: false,
+                    projection: [
+                        Expr {
+                            expr: BinaryOp {
+                                left: Column {
+                                    name: ObjectName(
+                                        [
+                                            Ident {
+                                                sym: Symbol(
+                                                    1,
+                                                ),
+                                                quote: None,
+                                                meta: Meta {
+                                                    span: Span {
+                                                        start: 7,
+                                                        end: 8,
+                                                    },
+                                                    node_id: NodeId(
+                                                        1,
+                                                    ),
+                                                },
+                                            },
+                                        ],
+                                    ),
+                                    meta: Meta {
+                                        span: Span {
+                                            start: 7,
+                                            end: 8,
+                                        },
+                                        node_id: NodeId(
+                                            2,
+                                        ),
+                                    },
+                                },
+                                op: Plus,
+                                right: BinaryOp {
+                                    left: Column {
+                                        name: ObjectName(
+                                            [
+                                                Ident {
+                                                    sym: Symbol(
+                                                        895,
+                                                    ),
+                                                    quote: None,
+                                                    meta: Meta {
+                                                        span: Span {
+                                                            start: 11,
+                                                            end: 12,
+                                                        },
+                                                        node_id: NodeId(
+                                                            3,
+                                                        ),
+                                                    },
+                                                },
+                                            ],
+                                        ),
+                                        meta: Meta {
+                                            span: Span {
+                                                start: 11,
+                                                end: 12,
+                                            },
+                                            node_id: NodeId(
+                                                4,
+                                            ),
+                                        },
+                                    },
+                                    op: Multiply,
+                                    right: Column {
+                                        name: ObjectName(
+                                            [
+                                                Ident {
+                                                    sym: Symbol(
+                                                        61,
+                                                    ),
+                                                    quote: None,
+                                                    meta: Meta {
+                                                        span: Span {
+                                                            start: 15,
+                                                            end: 16,
+                                                        },
+                                                        node_id: NodeId(
+                                                            5,
+                                                        ),
+                                                    },
+                                                },
+                                            ],
+                                        ),
+                                        meta: Meta {
+                                            span: Span {
+                                                start: 15,
+                                                end: 16,
+                                            },
+                                            node_id: NodeId(
+                                                6,
+                                            ),
+                                        },
+                                    },
+                                    meta: Meta {
+                                        span: Span {
+                                            start: 11,
+                                            end: 16,
+                                        },
+                                        node_id: NodeId(
+                                            7,
+                                        ),
+                                    },
+                                },
+                                meta: Meta {
+                                    span: Span {
+                                        start: 7,
+                                        end: 16,
+                                    },
+                                    node_id: NodeId(
+                                        8,
+                                    ),
+                                },
+                            },
+                            alias: None,
+                            alias_spelling: As,
+                            meta: Meta {
+                                span: Span {
+                                    start: 7,
+                                    end: 16,
+                                },
+                                node_id: NodeId(
+                                    9,
+                                ),
+                            },
+                        },
+                    ],
+                    into: None,
+                    from: [
+                        TableWithJoins {
+                            relation: Table {
+                                name: ObjectName(
+                                    [
+                                        Ident {
+                                            sym: Symbol(
+                                                758,
+                                            ),
+                                            quote: None,
+                                            meta: Meta {
+                                                span: Span {
+                                                    start: 22,
+                                                    end: 23,
+                                                },
+                                                node_id: NodeId(
+                                                    10,
+                                                ),
+                                            },
+                                        },
+                                    ],
+                                ),
+                                inheritance: Plain,
+                                json_path: [],
+                                version: None,
+                                partition: [],
+                                alias: None,
+                                indexed_by: None,
+                                index_hints: [],
+                                sample: None,
+                                table_hints: [],
+                                meta: Meta {
+                                    span: Span {
+                                        start: 22,
+                                        end: 23,
+                                    },
+                                    node_id: NodeId(
+                                        11,
+                                    ),
+                                },
+                            },
+                            joins: [],
+                            meta: Meta {
+                                span: Span {
+                                    start: 22,
+                                    end: 23,
+                                },
+                                node_id: NodeId(
+                                    12,
+                                ),
+                            },
+                        },
+                    ],
+                    lateral_views: [],
+                    selection: Some(
+                        BinaryOp {
+                            left: Column {
+                                name: ObjectName(
+                                    [
+                                        Ident {
+                                            sym: Symbol(
+                                                1,
+                                            ),
+                                            quote: None,
+                                            meta: Meta {
+                                                span: Span {
+                                                    start: 30,
+                                                    end: 31,
+                                                },
+                                                node_id: NodeId(
+                                                    13,
+                                                ),
+                                            },
+                                        },
+                                    ],
+                                ),
+                                meta: Meta {
+                                    span: Span {
+                                        start: 30,
+                                        end: 31,
+                                    },
+                                    node_id: NodeId(
+                                        14,
+                                    ),
+                                },
+                            },
+                            op: Eq(
+                                Single,
+                            ),
+                            right: Column {
+                                name: ObjectName(
+                                    [
+                                        Ident {
+                                            sym: Symbol(
+                                                895,
+                                            ),
+                                            quote: None,
+                                            meta: Meta {
+                                                span: Span {
+                                                    start: 34,
+                                                    end: 35,
+                                                },
+                                                node_id: NodeId(
+                                                    15,
+                                                ),
+                                            },
+                                        },
+                                    ],
+                                ),
+                                meta: Meta {
+                                    span: Span {
+                                        start: 34,
+                                        end: 35,
+                                    },
+                                    node_id: NodeId(
+                                        16,
+                                    ),
+                                },
+                            },
+                            meta: Meta {
+                                span: Span {
+                                    start: 30,
+                                    end: 35,
+                                },
+                                node_id: NodeId(
+                                    17,
+                                ),
+                            },
+                        },
+                    ),
+                    connect_by: None,
+                    group_by: [],
+                    group_by_quantifier: None,
+                    group_by_all: None,
+                    having: None,
+                    windows: [],
+                    qualify: None,
+                    sample: None,
+                    spelling: Select,
+                    meta: Meta {
+                        span: Span {
+                            start: 0,
+                            end: 35,
+                        },
+                        node_id: NodeId(
+                            18,
+                        ),
+                    },
+                },
+                meta: Meta {
+                    span: Span {
+                        start: 0,
+                        end: 35,
+                    },
+                    node_id: NodeId(
+                        19,
+                    ),
+                },
+            },
+            order_by: [
+                OrderByExpr {
+                    expr: Column {
+                        name: ObjectName(
+                            [
+                                Ident {
+                                    sym: Symbol(
+                                        1,
+                                    ),
+                                    quote: None,
+                                    meta: Meta {
+                                        span: Span {
+                                            start: 45,
+                                            end: 46,
+                                        },
+                                        node_id: NodeId(
+                                            20,
+                                        ),
+                                    },
+                                },
+                            ],
+                        ),
+                        meta: Meta {
+                            span: Span {
+                                start: 45,
+                                end: 46,
+                            },
+                            node_id: NodeId(
+                                21,
+                            ),
+                        },
+                    },
+                    asc: None,
+                    using: None,
+                    nulls_first: None,
+                    meta: Meta {
+                        span: Span {
+                            start: 45,
+                            end: 46,
+                        },
+                        node_id: NodeId(
+                            22,
+                        ),
+                    },
+                },
+            ],
+            order_by_all: None,
+            limit_by: None,
+            limit: None,
+            settings: [],
+            format: None,
+            locking: [],
+            pipe_operators: [],
+            for_clause: None,
+            meta: Meta {
+                span: Span {
+                    start: 0,
+                    end: 46,
+                },
+                node_id: NodeId(
+                    23,
+                ),
+            },
+        },
+        meta: Meta {
+            span: Span {
+                start: 0,
+                end: 46,
+            },
+            node_id: NodeId(
+                24,
+            ),
+        },
+    },
+]

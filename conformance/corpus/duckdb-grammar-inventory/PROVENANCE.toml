@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the DuckDB top-level statement-production inventory, enforced
+# by `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the vendored inventory
+# content is under the DuckDB MIT licence (the machine-checked `license` field,
+# verbatim in LICENSE). See README.md for the extraction narrative.
+#
+# This is the production DENOMINATOR for the DuckDB spec-coverage instrument: the
+# sorted set of direct alternatives of DuckDB's top-level `stmt` grammar production,
+# pinned to the EXACT upstream commit our in-process libduckdb 1.5.4 oracle links. It
+# is independent negative space — it names an upstream production even when no
+# vendored corpus statement exercises it — and is distinct from the test-derived
+# corpus/duckdb-testsuite and corpus/duckdb-testsuite-tranche2 measurement surfaces.
+source = "https://github.com/duckdb/duckdb (third_party/libpg_query/grammar/statements.list — the top-level stmt alternative manifest; scripts/generate_grammar.py materializes the bison `stmt:` rule verbatim from it)"
+reference = "v1.5.4 (08e34c447bae34eaee3723cac61f2878b6bdf787) — DuckDB 1.5.4; the exact commit our vendored libduckdb 1.5.4 oracle links"
+license = "MIT"
+regenerate = "Extract the vendored manifest without a full clone via `git archive 08e34c447bae34eaee3723cac61f2878b6bdf787 third_party/libpg_query/grammar/statements.list | tar -xO > statements.list` (or from a duckdb/duckdb checkout at tag v1.5.4), grab LICENSE from the checkout root, then run `python3 extract_stmt_productions.py statements.list stmt-productions.txt`. stmt-productions.txt is the sorted, de-duped set of direct `stmt` alternatives. Then re-baseline the coverage pins against the libduckdb 1.5.4 oracle (discovery is automatic via .cargo/config.toml — do not export DUCKDB_LIB_DIR/DYLD_LIBRARY_PATH): cargo nextest run -p squonk-conformance --features oracle-engines duckdb_statement_production --no-capture"

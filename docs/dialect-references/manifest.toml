@@ -1,0 +1,470 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+#
+# ============================================================================
+# Dialect docs/spec reference library — ACQUISITION MANIFEST
+# Owned by: dialect-docs-reference-library. Related: spec-level-coverage-audit-programme.
+# ============================================================================
+#
+# WHAT THIS IS
+# A per-dialect, per-artifact registry of the OFFICIAL grammars, SQL-reference doc
+# trees, and keyword lists that guide dialect work in this repo. It is the
+# reproducible acquisition record (source URL + pinned version + licence verdict +
+# storage class + destination) for every dialect we ship or are onboarding, and it
+# is the stable citation anchor consumers point at instead of bare, rotting URLs.
+# It feeds the oracle-parity-* lanes (grammar-guided generation), the
+# spec-level-coverage-audit-programme (production-coverage measurement), and the
+# keyword-inventory diffs (the kwlist.h precedent generalized).
+#
+# ---------------------------------------------------------------------------
+# STORAGE CLASSES (licence policy is ABSOLUTE — ADR-0015)
+# ---------------------------------------------------------------------------
+#   vendorable
+#       Permissive licence (PostgreSQL, SQLite public-domain/CC0, Apache-2.0,
+#       MIT, BSD, ISC, …; the `cargo xtask license` allowlist). MAY be copied
+#       into this repo under docs/dialect-references/corpora/<dialect>/ with a
+#       PROVENANCE.toml + LICENSE + per-file `.license` companion — greppable
+#       in-repo, and gate-enforced: `corpora/` is a vendored-corpus root, so
+#       `cargo xtask license` requires the SPDX marker + provenance on every file.
+#   local-only
+#       Proprietary but freely readable docs (Oracle, Snowflake, BigQuery, MSSQL,
+#       Redshift, Databricks, MySQL docs). NOT redistributable. Lives ONLY in a
+#       machine-local library OUTSIDE the repo (~/workspace/dialect-docs/<dialect>/
+#       and the builder machine). Only this manifest (URL + version) is committed,
+#       so acquisition is reproducible without ever vendoring the bytes.
+#   gpl-adjacent-local-only
+#       GPL / copyleft sources (the MySQL/MariaDB server grammar + test suites).
+#       NEVER linked or vendored — external process at most (run the engine as an
+#       accept/reject oracle). Consistent with the server-as-external-process
+#       boundary. Manifest records the pin; the bytes never enter the repo.
+#
+# STATUS field (per entry):
+#   vendored       — the bytes are in-repo now under `dest` (permissive + acquired).
+#   acquisition    — on the acquisition list for Thomas (see README.md). Either a
+#                    local-only download, or a vendorable source not yet cloned
+#                    locally (clone-then-vendor).
+#   manifest-only  — recorded for reproducibility; no artifact to fetch (e.g. a
+#                    hand-written parser with no single grammar file, or a
+#                    permissive union with no upstream).
+#
+# LICENCE VERDICTS are best-knowledge assessments. `verify_on_acquisition = true`
+# marks any entry whose exact redistribution terms must be re-checked at download
+# time before the bytes are treated as vendorable. Proprietary/GPL verdicts drive
+# local-only regardless, so they need no such flag.
+#
+# ---------------------------------------------------------------------------
+# CITATION CONVENTION (consumption seam i — doc-citation discipline)
+# ---------------------------------------------------------------------------
+# In-repo docs and comments cite a manifest entry by its STABLE `id` plus the
+# pinned `version`, NOT a bare URL. The canonical form in a Rust doc/comment:
+#
+#     dialect-ref: <id> @ <version>   (docs/dialect-references/...)
+#
+# e.g. `dialect-ref: postgres/kwlist @ REL_18_BETA1-3053-g4b0bf0788b0`. For a
+# vendored entry the citation resolves to an in-repo path under `dest`; for a
+# local-only entry it resolves to this manifest row (URL + version), which the
+# reader acquires per README.md. A URL may still appear once — here, in the
+# entry's `source` — so there is exactly one place to fix when it rots.
+# Exemplar wired: crates/squonk-ast/src/dialect/ansi.rs (postgres/kwlist).
+#
+# ---------------------------------------------------------------------------
+# VERSION / BUMP PROTOCOL (doc trees move — the sqlite-version precedent)
+# ---------------------------------------------------------------------------
+# Every entry pins a `version` (release tag, commit, or dated snapshot). A bump is
+# a DELIBERATE commit: update the entry's `version` (and, for a vendored entry,
+# re-copy the bytes + the PROVENANCE.toml `reference` + re-cite the new version in
+# every consumer). Never silently track upstream HEAD. Vendored pins should match
+# the corresponding conformance corpus pin where one exists (postgres does today),
+# so the reference library and the regression corpus never drift onto different
+# upstream revisions.
+#
+# ============================================================================
+# ENTRIES
+# ============================================================================
+
+# ---- ANSI / ISO 9075 (baseline; maps to "generic") ----
+[[reference]]
+id = "ansi/iso-9075"
+dialect = "ansi"
+kind = "spec"
+source = "https://www.iso.org/standard/76583.html (ISO/IEC 9075:2023 — SQL standard)"
+version = "ISO/IEC 9075:2023"
+license = "ISO copyright (purchasable; not redistributable)"
+storage_class = "local-only"
+status = "manifest-only"
+dest = "~/workspace/dialect-docs/ansi/"
+notes = "The strict SQL:2016/2023 baseline the ANSI/generic preset targets. Proprietary ISO document. The PG sql_features.txt entry (postgres/sql_features) is the vendorable, machine-readable proxy for ISO feature coverage."
+
+# ---- PostgreSQL ----
+[[reference]]
+id = "postgres/kwlist"
+dialect = "postgres"
+kind = "keywords"
+source = "https://github.com/postgres/postgres (src/include/parser/kwlist.h)"
+version = "REL_18_BETA1-3053-g4b0bf0788b0 (4b0bf0788b066a4ca1d4f959566678e44ec93422)"
+license = "PostgreSQL"
+storage_class = "vendorable"
+status = "vendored"
+dest = "docs/dialect-references/corpora/postgres/kwlist.h"
+notes = "Canonical keyword categories (unreserved/col_name/type_func_name/reserved + bare-label). Source-of-truth for the per-position reject sets; cited by dialect/ansi.rs. Pin matches conformance/corpus/postgres."
+
+[[reference]]
+id = "postgres/sql_features"
+dialect = "postgres"
+kind = "spec"
+source = "https://github.com/postgres/postgres (src/backend/catalog/sql_features.txt)"
+version = "REL_18_BETA1-3053-g4b0bf0788b0 (4b0bf0788b066a4ca1d4f959566678e44ec93422)"
+license = "PostgreSQL"
+storage_class = "vendorable"
+status = "vendored"
+dest = "docs/dialect-references/corpora/postgres/sql_features.txt"
+notes = "PostgreSQL's ISO/IEC 9075 feature-conformance table — the machine-readable ISO-coverage proxy for the spec-level-coverage-audit-programme."
+
+[[reference]]
+id = "postgres/grammar"
+dialect = "postgres"
+kind = "grammar"
+source = "https://github.com/postgres/postgres (src/backend/parser/gram.y)"
+version = "REL_18_BETA1-3053-g4b0bf0788b0 (4b0bf0788b066a4ca1d4f959566678e44ec93422)"
+license = "PostgreSQL"
+storage_class = "vendorable"
+status = "acquisition"
+dest = "docs/dialect-references/corpora/postgres/gram.y"
+notes = "The full bison grammar (~500 KB). Vendorable and locally available; deferred to a consuming lane to avoid bloating this landing — pull on demand per the corpus pattern."
+
+[[reference]]
+id = "postgres/docs"
+dialect = "postgres"
+kind = "doc-tree"
+source = "https://www.postgresql.org/docs/current/sql-commands.html (source: postgres/doc/src/sgml, PostgreSQL licence)"
+version = "PostgreSQL 18 (track with the vendored pin above)"
+license = "PostgreSQL"
+storage_class = "vendorable"
+status = "acquisition"
+dest = "~/workspace/dialect-docs/postgres/ (or vendor a subset on demand)"
+notes = "SQL command reference. Permissive; a curated subset is vendorable if a lane needs it."
+
+# ---- MySQL ----
+[[reference]]
+id = "mysql/docs"
+dialect = "mysql"
+kind = "doc-tree"
+source = "https://dev.mysql.com/doc/refman/8.0/en/sql-statements.html"
+version = "MySQL 8.0 reference manual (dated snapshot at download)"
+license = "Proprietary (Oracle) — docs are NOT GPL and NOT redistributable"
+storage_class = "local-only"
+status = "acquisition"
+dest = "~/workspace/dialect-docs/mysql/"
+notes = "Verified 2026-07-09: the MySQL reference MANUAL is proprietary Oracle content (distinct from the GPL server). Freely readable, never vendored."
+
+[[reference]]
+id = "mysql/grammar"
+dialect = "mysql"
+kind = "grammar"
+source = "https://github.com/mysql/mysql-server (sql/sql_yacc.yy)"
+version = "mysql-8.0 (dated snapshot)"
+license = "GPL-2.0"
+storage_class = "gpl-adjacent-local-only"
+status = "acquisition"
+dest = "~/workspace/dialect-docs/mysql/ (external only)"
+notes = "GPL server grammar. NEVER linked or vendored — run the MySQL engine as an external accept/reject oracle (the mysql-test suite is likewise GPL and gate-banned)."
+
+# ---- SQLite ----
+[[reference]]
+id = "sqlite/keywords"
+dialect = "sqlite"
+kind = "keywords"
+source = "https://www.sqlite.org/lang_keywords.html"
+version = "SQLite 3.x (dated snapshot)"
+license = "Public domain (https://sqlite.org/copyright.html)"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "docs/dialect-references/corpora/sqlite/keywords.txt"
+notes = "SQLite's reserved-keyword list. Public domain -> vendorable (record as CC0-1.0, the allowlist token, mirroring conformance/corpus/sqlite). No local sqlite clone present; acquire from the site."
+
+[[reference]]
+id = "sqlite/docs"
+dialect = "sqlite"
+kind = "doc-tree"
+source = "https://www.sqlite.org/lang.html"
+version = "SQLite 3.x (dated snapshot)"
+license = "Public domain"
+storage_class = "vendorable"
+status = "acquisition"
+dest = "docs/dialect-references/corpora/sqlite/ (curated subset)"
+notes = "SQL syntax reference. Public domain; a curated subset is vendorable."
+
+# ---- DuckDB ----
+[[reference]]
+id = "duckdb/keywords"
+dialect = "duckdb"
+kind = "keywords"
+source = "https://github.com/duckdb/duckdb (src/parser/peg/grammar/keywords/*.list)"
+version = "v1.5.2-6871-g7bacf4a248 (7bacf4a248656d5a442c4fac4b6ada1e91423e5a)"
+license = "MIT"
+storage_class = "vendorable"
+status = "vendored"
+dest = "docs/dialect-references/corpora/duckdb/"
+notes = "DuckDB's own PEG-parser keyword categories (not the libpg_query subtree). Diffs against our DuckDB keyword inventory."
+
+[[reference]]
+id = "duckdb/docs"
+dialect = "duckdb"
+kind = "doc-tree"
+source = "https://duckdb.org/docs/ (source: github.com/duckdb/duckdb-web, MIT)"
+version = "DuckDB 1.x (dated snapshot)"
+license = "MIT"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "docs/dialect-references/corpora/duckdb/ (curated subset)"
+notes = "SQL reference. duckdb-web is MIT; verify the specific pages carry no third-party content before vendoring a subset."
+
+# ---- BigQuery / GoogleSQL (ZetaSQL) ----
+[[reference]]
+id = "bigquery/docs"
+dialect = "bigquery"
+kind = "doc-tree"
+source = "https://cloud.google.com/bigquery/docs/reference/standard-sql/"
+version = "GoogleSQL reference (dated snapshot)"
+license = "Proprietary (Google) — freely readable, not redistributable"
+storage_class = "local-only"
+status = "acquisition"
+dest = "~/workspace/dialect-docs/bigquery/"
+notes = "The GoogleSQL lexical + query-syntax reference cited today by bigquery.rs. Local-only."
+
+[[reference]]
+id = "bigquery/grammar"
+dialect = "bigquery"
+kind = "grammar"
+source = "https://github.com/google/zetasql"
+version = "latest release (dated snapshot)"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "docs/dialect-references/corpora/bigquery/ (grammar/test subset)"
+notes = "ZetaSQL is the GoogleSQL reference implementation (Apache-2.0). Not locally cloned; heavy C++/Bazel. See oracle-parity-bigquery for the external-process-oracle plan; a vendorable grammar/test subset can land per the corpus pattern once cloned."
+
+# ---- Hive / HiveQL ----
+[[reference]]
+id = "hive/grammar"
+dialect = "hive"
+kind = "grammar"
+source = "https://github.com/apache/hive (parser/src/java/org/apache/hadoop/hive/ql/parse/HiveParser.g, HiveLexer.g)"
+version = "c5f0f5ba6bc7f8711ad8a6400a7443cf6efed193 (no reachable release tag)"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "vendored"
+dest = "docs/dialect-references/corpora/hive/"
+notes = "HiveQL ANTLR3 grammar. Feeds planner-parity-hive / oracle-parity-hive."
+
+[[reference]]
+id = "hive/docs"
+dialect = "hive"
+kind = "doc-tree"
+source = "https://cwiki.apache.org/confluence/display/Hive/LanguageManual"
+version = "Hive LanguageManual (dated snapshot)"
+license = "Apache Software Foundation wiki content"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "~/workspace/dialect-docs/hive/ (or vendor a subset once licence confirmed)"
+notes = "Verify the ASF wiki content licence before vendoring; treat as acquisition/local-only until confirmed permissive."
+
+# ---- ClickHouse ----
+[[reference]]
+id = "clickhouse/docs"
+dialect = "clickhouse"
+kind = "doc-tree"
+source = "https://clickhouse.com/docs/en/sql-reference (source: github.com/ClickHouse/clickhouse-docs)"
+version = "ClickHouse docs (dated snapshot)"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "docs/dialect-references/corpora/clickhouse/ (curated subset)"
+notes = "SQL reference. clickhouse-docs is Apache-2.0; verify pages before vendoring."
+
+[[reference]]
+id = "clickhouse/grammar"
+dialect = "clickhouse"
+kind = "grammar"
+source = "https://github.com/ClickHouse/ClickHouse (src/Parsers — hand-written recursive-descent, Apache-2.0)"
+version = "n/a"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "manifest-only"
+notes = "ClickHouse hand-writes its parser: there is no single grammar file to vendor, and keyword lists are scattered across C++ Parsers/. No clean single-file artifact — recorded, not fetched. Keyword inventory would be an extraction task for the consuming lane."
+
+# ---- Databricks (Spark-derived) ----
+[[reference]]
+id = "databricks/docs"
+dialect = "databricks"
+kind = "doc-tree"
+source = "https://docs.databricks.com/en/sql/language-manual/"
+version = "Databricks SQL reference (dated snapshot)"
+license = "Proprietary (Databricks) — freely readable, not redistributable"
+storage_class = "local-only"
+status = "acquisition"
+dest = "~/workspace/dialect-docs/databricks/"
+notes = "Databricks SQL is Spark-derived; the vendorable grammar proxy is spark/grammar. Databricks' own docs are proprietary local-only."
+
+# ---- MSSQL / T-SQL ----
+[[reference]]
+id = "mssql/docs"
+dialect = "mssql"
+kind = "doc-tree"
+source = "https://learn.microsoft.com/en-us/sql/t-sql/"
+version = "T-SQL reference (dated snapshot)"
+license = "Proprietary (Microsoft) — freely readable, not redistributable"
+storage_class = "local-only"
+status = "acquisition"
+dest = "~/workspace/dialect-docs/mssql/"
+notes = "The T-SQL reference cited today by dialect/mod.rs. Local-only."
+
+# ---- Snowflake ----
+[[reference]]
+id = "snowflake/docs"
+dialect = "snowflake"
+kind = "doc-tree"
+source = "https://docs.snowflake.com/en/sql-reference"
+version = "Snowflake SQL reference (dated snapshot)"
+license = "Proprietary (Snowflake) — freely readable, not redistributable"
+storage_class = "local-only"
+status = "acquisition"
+dest = "~/workspace/dialect-docs/snowflake/"
+notes = "The reserved-keywords + constructs reference cited today by snowflake.rs. Local-only."
+
+# ---- Redshift ----
+[[reference]]
+id = "redshift/docs"
+dialect = "redshift"
+kind = "doc-tree"
+source = "https://docs.aws.amazon.com/redshift/latest/dg/cm_chap_SQLCommandRef.html"
+version = "Redshift Database Developer Guide (dated snapshot)"
+license = "Proprietary (AWS) — freely readable, not redistributable"
+storage_class = "local-only"
+status = "acquisition"
+dest = "~/workspace/dialect-docs/redshift/"
+notes = "Redshift is Postgres-derived (with Teradata-origin surface). Local-only docs."
+
+# ---- Lenient (permissive union) ----
+[[reference]]
+id = "lenient/union"
+dialect = "lenient"
+kind = "n/a"
+source = "n/a — Lenient is a maximally-permissive union of the shipped presets, not an upstream dialect"
+version = "n/a"
+license = "n/a"
+storage_class = "vendorable"
+status = "manifest-only"
+notes = "No upstream doc/spec. Its reference surface is the union of the entries above; recorded here for completeness."
+
+# ==== INCOMING DIALECTS (dialect-trino / dialect-presto / dialect-spark / dialect-oracle-db) ====
+
+# ---- Trino ----
+[[reference]]
+id = "trino/grammar"
+dialect = "trino"
+kind = "grammar"
+source = "https://github.com/trinodb/trino (core/trino-grammar/src/main/antlr4/io/trino/grammar/sql/SqlBase.g4)"
+version = "479-352-gd48da09a364 (d48da09a364761fd24e30f71b911196d9b3d51dd)"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "vendored"
+dest = "docs/dialect-references/corpora/trino/SqlBase.g4"
+notes = "The grammar dialect-trino names as the base for the Trino preset + grammar-guided generation."
+
+[[reference]]
+id = "trino/docs"
+dialect = "trino"
+kind = "doc-tree"
+source = "https://trino.io/docs/current/language.html (source: github.com/trinodb/trino/docs, Apache-2.0)"
+version = "Trino docs (track with the vendored grammar pin)"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "docs/dialect-references/corpora/trino/ (curated subset)"
+notes = "SQL language reference. In-repo Trino docs are Apache-2.0; a curated subset is vendorable."
+
+# ---- Presto (Trino sibling) ----
+[[reference]]
+id = "presto/grammar"
+dialect = "presto"
+kind = "grammar"
+source = "https://github.com/prestodb/presto (presto-parser/src/main/antlr4/com/facebook/presto/sql/parser/SqlBase.g4)"
+version = "latest master (dated snapshot)"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "docs/dialect-references/corpora/presto/SqlBase.g4"
+notes = "Verified 2026-07-09: prestodb/presto SqlBase.g4 is Apache-2.0. Not locally cloned. Model Presto as a delta against the vendored Trino grammar (shared ancestry) per dialect-presto."
+
+[[reference]]
+id = "presto/docs"
+dialect = "presto"
+kind = "doc-tree"
+source = "https://prestodb.io/docs/current/"
+version = "Presto docs (dated snapshot)"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "docs/dialect-references/corpora/presto/ (curated subset)"
+notes = "SQL reference; Apache-2.0. Vendorable subset on demand."
+
+# ---- Spark SQL ----
+[[reference]]
+id = "spark/grammar"
+dialect = "spark"
+kind = "grammar"
+source = "https://github.com/apache/spark (sql/api/src/main/antlr4/org/apache/spark/sql/catalyst/parser/SqlBaseParser.g4, SqlBaseLexer.g4)"
+version = "latest master (dated snapshot)"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "docs/dialect-references/corpora/spark/"
+notes = "Verified 2026-07-09: apache/spark SqlBaseParser.g4 + SqlBaseLexer.g4 are Apache-2.0 (adapted from Presto's grammar). apache/spark not locally cloned. Also the vendorable proxy for the Spark-derived Databricks preset."
+
+[[reference]]
+id = "spark/docs"
+dialect = "spark"
+kind = "doc-tree"
+source = "https://spark.apache.org/docs/latest/sql-ref.html"
+version = "Spark SQL reference (dated snapshot)"
+license = "Apache-2.0"
+storage_class = "vendorable"
+status = "acquisition"
+verify_on_acquisition = true
+dest = "docs/dialect-references/corpora/spark/ (curated subset)"
+notes = "SQL reference; Apache-2.0. Vendorable subset on demand."
+
+# ---- Oracle Database ----
+[[reference]]
+id = "oracle/docs"
+dialect = "oracle-db"
+kind = "doc-tree"
+source = "https://docs.oracle.com/en/database/oracle/oracle-database/23/sqlrf/"
+version = "Oracle Database 23ai SQL Language Reference (dated snapshot)"
+license = "Proprietary (Oracle) — freely readable, not redistributable"
+storage_class = "local-only"
+status = "acquisition"
+dest = "~/workspace/dialect-docs/oracle-db/"
+notes = "The SQL Language Reference. Proprietary local-only. No public grammar file — grammar entry is manifest-only."
+
+[[reference]]
+id = "oracle/grammar"
+dialect = "oracle-db"
+kind = "grammar"
+source = "n/a — Oracle publishes no machine-readable grammar; SQL syntax diagrams live inside the proprietary SQL Language Reference"
+version = "n/a"
+license = "Proprietary (Oracle)"
+storage_class = "local-only"
+status = "manifest-only"
+notes = "No public grammar artifact. The syntax-diagram surface must be transcribed from the local-only reference; recorded, not fetched."

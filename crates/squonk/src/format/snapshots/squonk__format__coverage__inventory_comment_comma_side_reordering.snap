@@ -1,0 +1,23 @@
+---
+source: crates/squonk/src/format/coverage.rs
+assertion_line: 378
+expression: "inventory(fixtures, &FormatOptions::default())"
+---
+[comma-leading-side]  (Ansi)
+  input:
+    SELECT a
+    , /* on b */ b FROM t
+  output:
+    SELECT
+      a,
+      /* on b */
+      b
+    FROM t
+
+[comma-trailing-side]  (Ansi)
+  input:
+    SELECT a /* on a */
+    , b FROM t
+  output:
+    SELECT a /* on a */, b
+    FROM t

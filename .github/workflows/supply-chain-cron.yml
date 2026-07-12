@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# Scheduled supply-chain backstop. `cargo deny check` runs in-gate (ci.yml) and in
+# pre-commit, but both fire only on a change: a new RustSec advisory published
+# against the frozen dependency graph is invisible until the next PR touches
+# something. tokio and rustls run a daily `cargo deny` cron for exactly this reason.
+# This workflow re-runs the whole-graph audit (advisories / licenses / sources /
+# bans, config in `deny.toml`) on a schedule so a freshly disclosed advisory
+# surfaces as a red scheduled run within a day, not whenever a PR next lands.
+#
+# This is a TRIAGE SIGNAL, not a PR gate: it is deliberately NOT in the required
+# status checks (docs/release/cutover.md §5). A red run means "a human should look",
+# the same standing as the nightly soaks — never a merge blocker.
+
+name: supply-chain-cron
+
+on:
+  schedule:
+    # Daily at 07:53 UTC. Offset off the top of the hour and clear of the other
+    # scheduled runs (fuzz 07:19, oracle 07:41, platform Mon 08:03) to dodge
+    # GitHub's cron congestion, matching platform.yml's offsetting rationale.
+    - cron: "53 7 * * *"
+  workflow_dispatch:
+
+# Least privilege: the audit only reads the tree.
+permissions:
+  contents: read
+
+# A backstop soak, not an interactive gate: NEVER cancel an in-flight run (unlike
+# ci.yml / platform.yml, which cancel superseded runs). Its own group so it never
+# contends with the gate workflows.
+concurrency:
+  group: supply-chain-cron-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deny:
+    name: cargo deny check (scheduled)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install stable toolchain
+        # `cargo deny` shells out to `cargo metadata`, which needs a toolchain.
+        # Installed explicitly like the other workflows rather than relying on the
+        # runner image's preinstalled toolchain.
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+
+      - name: Install cargo-deny
+        # Prebuilt + pinned, the same version and convention as ci.yml's gate step
+        # (deny.toml requires >= 0.18; this is well above that floor).
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        with:
+          tool: cargo-deny@0.19.6
+
+      - name: Whole-graph supply-chain audit (cargo deny check)
+        run: cargo deny check

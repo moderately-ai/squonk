@@ -1,0 +1,24 @@
+---
+source: crates/squonk/src/format/coverage.rs
+expression: "inventory(fixtures, &FormatOptions::default())"
+---
+[uescape-string-custom-escape]  (Postgres)
+  input:
+    SELECT U&'d!0061t!0061' UESCAPE '!' FROM t
+  output:
+    SELECT U&'d!0061t!0061' UESCAPE '!'
+    FROM t
+
+[uescape-string-default-escape]  (Postgres)
+  input:
+    SELECT U&'d\0061t\0061' FROM t
+  output:
+    SELECT U&'d\0061t\0061'
+    FROM t
+
+[uescape-unicode-identifier]  (Postgres)
+  input:
+    SELECT U&"d!0061ta" UESCAPE '!' FROM t
+  output:
+    SELECT U&"d!0061ta" UESCAPE '!'
+    FROM t

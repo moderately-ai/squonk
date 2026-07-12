@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the DuckDB core-tranche spec-audit corpus, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the corpus content is
+# under the DuckDB MIT licence (the machine-checked `license` field, verbatim in
+# LICENSE). See README.md for the extraction narrative.
+#
+# This is the spec-audit-duckdb-test-suite-corpus tranche: a broad slice of nine
+# core test/sql directories, pinned to the EXACT upstream tag our in-process oracle
+# links (libduckdb 1.5.4). It is a measurement surface, distinct from the
+# signature-weighted corpus/duckdb group.
+source = "https://github.com/duckdb/duckdb (test/sql/{select,join,subquery,aggregate,window,cte,order,limit,types}/**/*.test)"
+reference = "v1.5.4 (08e34c447bae34eaee3723cac61f2878b6bdf787) — the exact commit our vendored libduckdb 1.5.4 oracle links"
+license = "MIT"
+regenerate = "python3 extract_core.py <duckdb-v1.5.4-checkout> statements.sql statements_with_schema.sql rejects.sql --cap=12 --reject-cap=8 (clone duckdb/duckdb at tag v1.5.4 into a temp dir outside the repo). statements.sql is the flat accept corpus (statement ok + query bodies), rejects.sql is the flat reject corpus (statement error bodies — the over-acceptance differential's food), and statements_with_schema.sql regroups both under their source file with that file's concrete CREATE setup DDL (# file:/# setup/# query/# reject). Then re-baseline the sweep pins: DUCKDB_LIB_DIR=/opt/homebrew/opt/duckdb/lib DYLD_LIBRARY_PATH=/opt/homebrew/opt/duckdb/lib cargo nextest run -p squonk-conformance --features oracle-engines core_tranche_spec_audit_inventory --no-capture"

@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the vendored Trino SQL grammar, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the vendored grammar
+# is Apache-2.0 (the machine-checked `license` field; LICENSE is the verbatim
+# Apache-2.0 text, and SqlBase.g4 carries the ASF licence header inline). Part of
+# the dialect docs/spec reference library (dialect-docs-reference-library),
+# manifest id `trino/grammar`. Trino's own dialect ticket (dialect-trino) calls
+# for this file as the base for grammar-guided generation; see ../../manifest.toml.
+source = "https://github.com/trinodb/trino (core/trino-grammar/src/main/antlr4/io/trino/grammar/sql/SqlBase.g4)"
+reference = "d48da09a364761fd24e30f71b911196d9b3d51dd (post-release-479, 479-352-gd48da09a364)"
+license = "Apache-2.0"
+regenerate = "Re-copy core/trino-grammar/src/main/antlr4/io/trino/grammar/sql/SqlBase.g4 from a trinodb/trino checkout at the pinned commit, keeping SqlBase.g4.license. Bumping the pin is a deliberate commit per the manifest version/bump protocol."

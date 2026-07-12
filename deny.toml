@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# cargo-deny configuration — supply-chain / advisory gate for squonk.
+#
+# Run locally:
+#     cargo install cargo-deny   # one-time, per dev machine
+#     cargo deny check
+#
+# The pre-commit hook runs the same command before every commit
+# (see .pre-commit-config.yaml). All dependencies come from crates.io, so the gate
+# focuses on advisories, licenses, and source provenance.
+
+[advisories]
+db-urls = ["https://github.com/RustSec/advisory-db"]
+# Every advisory severity (vulnerability, unsound, notice) denies by default in
+# cargo-deny >= 0.18; extend the gate to crates yanked from crates.io.
+yanked = "deny"
+# Only flag unmaintained advisories for crates we directly own; transitive ones
+# surface as informational notices without failing the build.
+unmaintained = "workspace"
+
+[licenses]
+# Our own `publish = false` crates (bench, conformance, and a future fuzz crate)
+# carry no license expression and don't need a supply-chain license audit — skip
+# them. Third-party dependencies from crates.io are still fully checked.
+private = { ignore = true }
+# OSI-permissive set, plus MPL-2.0 (file-level weak copyleft, standard to allow for
+# an unmodified dependency). A dependency whose license falls outside this set fails
+# the gate, forcing deliberate review. Kept broad/forward-looking.
+unused-allowed-license = "allow"
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "Unlicense",
+    "MPL-2.0",
+]
+
+[bans]
+# Scope note (ADR-0017): this file governs the WHOLE dependency graph — advisories,
+# licences, sources, and duplicate versions across every crate, dev-deps included.
+# The complementary "published crates stay lean" rule — that `squonk` and
+# `squonk-ast` ship only an allowlisted runtime surface (today: `thin-vec`) — is
+# NOT expressible here: cargo-deny's bans apply graph-wide and cannot be scoped to a
+# single crate's normal-edge subtree, so a graph-wide allowlist would also have to
+# enumerate every dev/bench dependency. That allowlist lives in `cargo xtask deps`
+# instead (xtask/src/lib.rs::check_published_deps), kept local-runnable per ADR-0017.
+# See docs/adr/published-dependency-policy.md.
+#
+# Transitive duplicate minor versions are common and upstream's concern; WARN
+# (visible, non-blocking) rather than fail the gate.
+multiple-versions = "warn"
+# The only wildcard deps are inter-member path deps, which are legitimate.
+wildcards = "allow"
+
+[sources]
+# Only crates.io is allowed; any other registry or git source fails the gate.
+unknown-registry = "deny"
+unknown-git = "deny"

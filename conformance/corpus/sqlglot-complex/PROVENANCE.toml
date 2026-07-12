@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the vendored sqlglot complex-query corpus, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the corpus content's
+# elected licence is the machine-checked `license` field below. See README.md for
+# the full narrative.
+source = "https://github.com/tobymao/sqlglot (tests/fixtures/optimizer)"
+reference = "fd6d4d61c25e7918118fc22c5579098a86a58e10"
+license = "MIT"
+regenerate = "Re-extract the even-indexed input statements from tests/fixtures/optimizer/{tpc-h/tpc-h,tpc-ds/tpc-ds,merge_subqueries,unnest_subqueries,pushdown_cte_alias_columns,eliminate_ctes}.sql at the pinned commit (strip comment lines, split on the statement terminator, keep the even-indexed entries); the odd-indexed entries are sqlglot's optimized output and are not vendored."

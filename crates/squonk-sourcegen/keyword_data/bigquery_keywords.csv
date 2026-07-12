@@ -1,0 +1,26 @@
+# BigQuery / ZetaSQL keywords absent from the PostgreSQL / SQL:2016 / MySQL / SQLite /
+# DuckDB inventories.
+#
+# @generated-source: provenance data for the keyword codegen (ADR-0004, ADR-0015).
+# DO derive the Rust tables from this file via `cargo run -p squonk-sourcegen`;
+# do NOT hand-edit the generated `dialect/keyword/generated.rs`.
+#
+# Source: BigQuery / ZetaSQL pipe query syntax (the `|>` operators). Only the spellings
+# genuinely *absent* from the shared inventory are enumerated here — every other pipe
+# operator keyword (`SELECT`, `WHERE`, `ORDER`, `LIMIT`, `OFFSET`, `AS`, …) already
+# exists as a standard SQL keyword.
+#
+# - `EXTEND`, the pipe operator that appends computed columns to the current row shape
+#   (`|> EXTEND <select-items>`; ZetaSQL pipe syntax). Non-reserved: it carries no
+#   reservation class, so it stays a plain identifier in every position and no dialect's
+#   reserved sets shift. The parser only reads it in the `|>` pipe-operator dispatch,
+#   which is itself gated by `SelectSyntax::pipe_syntax`.
+#
+# These are keyword-inventory additions, not reservation classes: the spellings carry no
+# PostgreSQL/MySQL reservation, so they stay plain identifiers everywhere unless a
+# dialect's per-position set names them — the same pattern SQLite/DuckDB use.
+#
+# Format: `keyword` per line (single column; no reservation class).
+
+keyword
+extend

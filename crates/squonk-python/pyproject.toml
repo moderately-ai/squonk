@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[project]
+name = "squonk"
+dynamic = ["version"]
+description = "Fast, multi-dialect SQL parser — a Rust core with Python bindings"
+readme = "README.md"
+requires-python = ">=3.11"
+# PEP 639 SPDX expression + license file. This supersedes the deprecated
+# `License :: OSI Approved ::` classifier (Metadata-Version 2.4 emits a
+# `License-Expression` field, and PyPI rejects an upload that carries BOTH that and a
+# license *classifier*), so no license classifier appears below. `license-files` is
+# resolved relative to this file, so the crate carries its own copy of the workspace
+# MIT text at `crates/squonk-python/LICENSE` — a real file, not a symlink, because a
+# symlink does not survive sdist packaging on Windows.
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Moderately AI" }]
+keywords = ["sql", "parser", "ast", "dialect", "sql-parser", "transpile"]
+classifiers = [
+    # `5 - Production/Stable` matches the 1.0.0 stable release: the public API is frozen
+    # and the semver gate is active (see docs/stable-api.md, CHANGELOG.md).
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Compilers",
+    # OS classifiers match the wheels the release workflow actually builds AND
+    # install-smokes (`.github/workflows/release-python.yml`): manylinux x86_64, macOS
+    # arm64 + x86_64, Windows x86_64. Per docs/platform-support.md, an OS is advertised
+    # here only once a green wheel lane exists for it — do not add a classifier ahead of
+    # its build+smoke job.
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+]
+
+[project.urls]
+Homepage = "https://github.com/moderately-ai/squonk"
+Repository = "https://github.com/moderately-ai/squonk"
+Documentation = "https://github.com/moderately-ai/squonk/tree/main/docs"
+Issues = "https://github.com/moderately-ai/squonk/issues"
+
+[dependency-groups]
+# PEP 735 dev tooling: `uv sync --group dev`. Build/test/lint only — never shipped in
+# the wheel and not a runtime dependency (the wheel holds only the compiled extension
+# module and the thin Python wrapper). maturin is pinned to a `>=1.7,<2.0` range
+# that builds the abi3 wheel cleanly across the supported matrix.
+dev = [
+    "maturin>=1.7,<2.0",
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.15",
+    "pyright>=1.1.400",
+]
+
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+python-source = "python"
+module-name = "squonk._native"
+# `extension-module` is a NON-default cargo feature (see Cargo.toml): enabling it here
+# makes PyO3 omit libpython for the wheel and lets maturin add the macOS dynamic-lookup
+# link arg, while a bare `cargo build --workspace` keeps it off so the CI gate links
+# libpython normally.
+features = ["extension-module"]
+# No custom cargo `profile` is set on purpose. PyO3 needs `panic = "unwind"` to convert
+# a Rust panic into a Python exception, and the workspace `[profile.release]` already
+# uses the default `unwind`, so no custom profile is required. If one is ever added it
+# must NOT be named
+# `maturin` — that collides with maturin's own `target/maturin/` staging directory; name
+# it e.g. `python-release`.
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["python/squonk/_ast.py", "python/squonk/_exceptions.py", "python/squonk/_native.pyi"]
+follow_imports = "skip"
+
+[tool.ruff.lint.per-file-ignores]
+"*.pyi" = ["F401"]

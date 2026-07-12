@@ -1,0 +1,27 @@
+{
+  "name": "squonk-wasm-build",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run build:wasm && npm run build:ts && npm run stage",
+    "build:ts": "tsc -p tsconfig.json && node scripts/stamp-generated-headers.mjs",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "stage": "node scripts/stage-packages.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.type-tests.json",
+    "smoke:variants": "node scripts/smoke-variants.mjs",
+    "smoke:install": "node scripts/smoke-install.mjs",
+    "size:check": "node scripts/check-size-budget.mjs",
+    "size:check:tarball": "node scripts/check-size-budget.mjs --tarball",
+    "examples:typecheck:node": "npm --prefix examples/node run typecheck",
+    "examples:typecheck:browser": "npm --prefix examples/browser run typecheck",
+    "examples:build:browser": "npm --prefix examples/browser run build",
+    "pack:check": "node scripts/pack-packages.mjs --dry-run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "expect-type": "^1.3.0",
+    "typescript": "^5.8.0"
+  },
+  "license": "MIT"
+}

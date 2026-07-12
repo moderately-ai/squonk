@@ -1,0 +1,196 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+name: release-npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish after the build (still requires npm environment approval)"
+        type: boolean
+        default: false
+  push:
+    tags: ["npm-v*"]
+
+# Builds need only the source tree. The publish job widens this to OIDC locally.
+# The first real package cannot configure npm Trusted Publishing before it exists,
+# so v1.0.0 also receives the protected Environment's one-time bootstrap token;
+# after that publish the token is deleted and npm uses OIDC for later versions.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build and smoke npm package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/squonk-wasm
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+
+      - name: Install Rust toolchain and wasm target
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Install wasm-bindgen CLI
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        with:
+          tool: wasm-bindgen-cli@0.2.108
+
+      - name: Install JavaScript and Binaryen tooling
+        run: |
+          npm install --ignore-scripts --no-package-lock
+          npm install --global binaryen@130.0.0
+
+      - name: Build and stage every npm package
+        run: npm run build
+
+      - name: Verify declarations and every Node/browser runtime
+        run: |
+          npm run typecheck
+          npm run smoke:variants
+
+      - name: Install browser example dependencies
+        run: |
+          npm --prefix examples/browser install --ignore-scripts --no-package-lock
+          npm --prefix examples/browser exec playwright install chromium
+
+      - name: Verify examples in TypeScript and a real browser
+        run: |
+          npm run examples:typecheck:node
+          npm run examples:typecheck:browser
+          npm run examples:build:browser
+          npm --prefix examples/browser run test:e2e
+
+      - name: Enforce artifact and tarball budgets
+        run: npm run size:check:tarball
+
+      - name: Audit every package manifest
+        run: |
+          for dir in dist/npm/*; do
+            npm publish "$dir" --dry-run --access public
+          done
+
+      - name: Install-smoke the packed package
+        run: npm run smoke:install
+
+      - name: Upload the verified package tree
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-packages
+          if-no-files-found: error
+          retention-days: 7
+          path: crates/squonk-wasm/dist/npm
+
+  node-compat:
+    name: Node ${{ matrix.node }} package consumers
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "24"]
+    defaults:
+      run:
+        working-directory: crates/squonk-wasm
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ matrix.node }}
+          registry-url: https://registry.npmjs.org
+
+      - name: Download verified packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: npm-packages
+          path: crates/squonk-wasm/dist/npm
+
+      - name: Smoke direct and packed imports
+        run: |
+          npm run smoke:variants
+          npm run smoke:install
+
+  publish:
+    name: publish to npm
+    needs: [build, node-compat]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: packages
+    steps:
+      - name: Download the verified package tree
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: npm-packages
+          path: packages
+
+      - name: Set up Node for npm Trusted Publishing
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+
+      - name: Install the OIDC-capable npm CLI
+        run: npm install --global npm@11.5.1
+
+      - name: Enable publishing in the verified artifacts
+        run: |
+          for label in ansi postgres mysql sqlite duckdb lenient all; do
+            npm pkg set private=false --json --prefix "$label"
+          done
+
+      - name: Review every exact publish manifest again
+        run: |
+          for label in ansi postgres mysql sqlite duckdb lenient all; do
+            npm publish "./$label" --dry-run --provenance --access public
+          done
+
+      - name: Publish with OIDC provenance
+        env:
+          # Bootstrap only: npm requires the package to exist before its Trusted
+          # Publisher can be configured. For v1.0.0 this is a short-expiry,
+          # package-scoped granular token held by the protected npm Environment.
+          # Delete it immediately after configuring Trusted Publishing; npm 11.5.1+
+          # then detects OIDC automatically on subsequent releases.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+        run: |
+          for label in ansi postgres mysql sqlite duckdb lenient all; do
+            NAME=$(node -p "require('./$label/package.json').name")
+            VERSION=$(node -p "require('./$label/package.json').version")
+            EXPECTED=$(npm pack "./$label" --dry-run --json | node --input-type=module -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => process.stdout.write(JSON.parse(s)[0].integrity))')
+            if PUBLISHED=$(npm view "$NAME@$VERSION" dist.integrity 2>/dev/null); then
+              if [ "$PUBLISHED" != "$EXPECTED" ]; then
+                echo "$NAME@$VERSION exists with different contents; refusing to continue" >&2
+                exit 1
+              fi
+              echo "$NAME@$VERSION already matches the verified artifact; skipping"
+            else
+              npm publish "./$label" --provenance --access public
+            fi
+          done

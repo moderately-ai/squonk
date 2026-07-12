@@ -1,0 +1,6 @@
+---
+source: bench/tests/corpus_allocations.rs
+expression: bytes
+---
+Ansi: transient_bytes=2002240 retained_bytes=1304381 peak_bytes=1672875
+Postgres: transient_bytes=2086186 retained_bytes=1358110 peak_bytes=1743729

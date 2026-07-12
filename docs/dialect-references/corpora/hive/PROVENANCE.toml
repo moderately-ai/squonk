@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the vendored Apache Hive grammar (ANTLR3 parser + lexer),
+# enforced by `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017
+# local-runnable checks). The SPDX header above covers this metadata file; the
+# vendored grammar is Apache-2.0 (the machine-checked `license` field; LICENSE is
+# the verbatim Apache-2.0 text, and each .g file carries the ASF licence header
+# inline). Part of the dialect docs/spec reference library
+# (dialect-docs-reference-library), manifest id `hive/grammar`; feeds the
+# HiveQL parity lanes (planner-parity-hive, oracle-parity-hive). See
+# ../../manifest.toml.
+source = "https://github.com/apache/hive (parser/src/java/org/apache/hadoop/hive/ql/parse/HiveParser.g, HiveLexer.g)"
+reference = "c5f0f5ba6bc7f8711ad8a6400a7443cf6efed193 (no reachable release tag; pinned by commit)"
+license = "Apache-2.0"
+regenerate = "Re-copy HiveParser.g and HiveLexer.g from parser/src/java/org/apache/hadoop/hive/ql/parse/ of an apache/hive checkout at the pinned commit, keeping the .license companions. Bumping the pin is a deliberate commit per the manifest version/bump protocol."

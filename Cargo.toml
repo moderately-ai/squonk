@@ -1,0 +1,130 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/squonk-ast",
+    "crates/squonk",
+    "crates/squonk-sourcegen",
+    "crates/squonk-python",
+    "crates/squonk-wasm",
+    "bench",
+    "conformance",
+    "xtask",
+]
+# Everyday lanes (bare `cargo build/check/clippy/doc`) resolve to these members:
+# the parser, AST, sourcegen, and tooling
+# crates. The binding, conformance, and benchmark crates stay off that hot path
+# because each carries a distinct expensive graph: pyo3/wasm + serde uplift for
+# bindings, pg_query/proptest/bolero/oracle adapters for conformance, and perf-only
+# targets for bench. These crates stay full `members`, so explicit package builds
+# still work and preflight restores their coverage via explicit `-p` lanes (see
+# `xtask/src/preflight.rs`).
+default-members = [
+    "crates/squonk-ast",
+    "crates/squonk",
+    "crates/squonk-sourcegen",
+    "xtask",
+]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/moderately-ai/squonk"
+authors = ["Moderately AI"]
+
+[workspace.dependencies]
+# Internal crates — path + version so the libraries stay publishable as-is.
+squonk-ast = { path = "crates/squonk-ast", version = "1.0.0" }
+squonk = { path = "crates/squonk", version = "1.0.0" }
+
+# External, shared across the workspace.
+# `thin-vec`: one-word (8 B) child-sequence container vs `Vec`'s three words
+# (24 B); a sanctioned leaf dep (ADR-0007, ADR-0017) whose `unsafe` is
+# encapsulated, so our crates stay unsafe-free.
+thin-vec = "0.2"
+# `serde`: opt-in AST (de)serialization, reachable ONLY through the non-default
+# `serde` feature so the default build stays zero-dep (ADR-0017). Unlike thin-vec
+# it is NOT a zero-subtree leaf: the `derive` feature pulls the serde_derive
+# proc-macro (syn/quote/proc-macro2), which run at build time and never reach the
+# runtime artifact. Sanctioned as a feature-gated optional dep, not a default one.
+serde = { version = "1", features = ["derive"] }
+# `serde_json`: dev-only, the concrete self-describing format the serde
+# round-trip and recursion-depth tests exercise (never a runtime dependency).
+serde_json = "1"
+serde-wasm-bindgen = "0.6.5"
+arbitrary = { version = "1", features = ["derive"] }
+bolero = { version = "0.13.4", features = ["arbitrary"] }
+datadriven = { version = "0.9.0", default-features = false }
+insta = { version = "1.48.0", default-features = false }
+proptest = "1"
+criterion = "0.5"
+
+# Disk hygiene + fast iteration: line-tables-only debug info, opt-level=1 deps.
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.release]
+# Shrink the shipping artifact. LTO is left to CI (CARGO_PROFILE_RELEASE_LTO),
+# not set here — it inflates intermediate bitcode locally for no benefit.
+strip = true
+codegen-units = 1
+
+# Size-tuned wasm release for `squonk-wasm`. Cargo profiles are workspace-level,
+# so this lives at the root even
+# though only the wasm crate builds with it:
+#   cargo build --profile release-wasm --target wasm32-unknown-unknown -p squonk-wasm
+# Inherits `release` (so `strip = true`), then swaps to size-first codegen:
+# `opt-level = "z"`, full LTO, panic-abort, and a single codegen unit deduplicate
+# the parser's monomorphizations and remove unwinding paths from the browser artifact.
+[profile.release-wasm]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+
+# Optimized build that KEEPS symbols, for `samply`/profilers. Release strips, so
+# profiling it shows raw addresses; this profile is release-equivalent codegen
+# with line-table debug info retained. Used by `bench/examples/perf_testbed.rs`:
+#   cargo build --profile profiling --example perf_testbed
+#   samply record -- target/profiling/examples/perf_testbed ours
+[profile.profiling]
+inherits = "release"
+strip = false
+# FULL debug info (not line-tables-only) so samply --unstable-presymbolicate
+# resolves function NAMES, not just file:line. line-tables-only yields raw hex.
+debug = true
+
+# The gungraun/callgrind instruction benches key their collection toggle on a symbol
+# name (`--toggle-collect=*::__gungraun_wrapper_mod::*`), so the bench binaries must
+# keep their symbols. `bench` inherits `release`, which strips them — silently yielding
+# zero-instruction measurements. Keep debug symbols for `cargo bench` (the code stays
+# release-optimized; only symbols are added, and bench binaries never ship).
+[profile.bench]
+debug = true
+strip = false
+
+[workspace.lints.rust]
+# `deny` (not `forbid`) so a specific, reviewed perf path in the parser can opt in via
+# `#[allow(unsafe_code)]` — e.g. zero-copy / interning internals later. The deny-vs-forbid
+# split is deliberate: `squonk-ast`, a pure data-vocabulary crate with no such hatch to
+# reserve, escalates to the uncappable `#![forbid(unsafe_code)]` at its crate root, so the
+# workspace floor is deny and the AST crate is the stronger forbid.
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[workspace.lints.rustdoc]
+# A broken `[`Type`]` intra-doc link fails the build rather than rotting silently.
+# Linking is already pervasive and correct across both published crates, so this is a
+# cheap, durable guarantee that the reference stays navigable.
+broken_intra_doc_links = "deny"

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the vendored DuckDB keyword-category lists, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the vendored lists
+# are under the DuckDB MIT licence (the machine-checked `license` field, verbatim
+# in LICENSE). Part of the dialect docs/spec reference library
+# (dialect-docs-reference-library), manifest id `duckdb/keywords`. These are
+# DuckDB's own PEG-parser keyword categories (src/parser/peg/grammar/keywords/,
+# NOT the third_party/libpg_query subtree), so the licence is cleanly DuckDB MIT.
+# They feed the keyword-inventory diff consumer (the kwlist.h precedent
+# generalized). See ../../manifest.toml.
+source = "https://github.com/duckdb/duckdb (src/parser/peg/grammar/keywords/{reserved,unreserved,column_name,func_name}_keyword.list)"
+reference = "7bacf4a248656d5a442c4fac4b6ada1e91423e5a (v1.5.2-6871-g7bacf4a248)"
+license = "MIT"
+regenerate = "Re-copy the four *_keyword.list files from src/parser/peg/grammar/keywords/ of a duckdb/duckdb checkout at the pinned commit, keeping the .license companions. Bumping the pin is a deliberate commit per the manifest version/bump protocol."

@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# The first stable tag is the immutable API baseline. The xtask gate permits the
+# tag to be absent while the workspace is 0.x, then requires it for every 1.x+
+# comparison. Package paths deliberately survive the final crate-name sweep.
+schema = 1
+baseline_tag = "v1.0.0"
+packages = ["crates/squonk-ast", "crates/squonk"]

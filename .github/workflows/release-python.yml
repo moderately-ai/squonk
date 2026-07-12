@@ -1,0 +1,198 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# Python wheel + sdist release build for the `squonk` distribution (crate
+# `squonk-python`). This workflow BUILDS and INSTALL-SMOKES the full wheel matrix and
+# the sdist, uploads them as run artifacts, and — only behind a manual gate — publishes
+# to PyPI. It never publishes automatically: the `publish` job targets a protected
+# GitHub Environment (`pypi`) whose required-reviewer rule is the human approval, so a
+# dispatch or tag build stops at green artifacts until a maintainer approves.
+#
+# The wheel matrix is the authoritative v1 set from `docs/platform-support.md`
+# (Python-wheel row) and the runbook `docs/release/python-distribution.md`. Every entry
+# is a single `cp311-abi3` wheel (PyO3 `abi3`/`abi3-py311`: one stable-ABI module per
+# platform, usable on CPython >= 3.11 — see `crates/squonk-python/Cargo.toml`) and every
+# entry is BUILT and INSTALL-SMOKED on a native GitHub-hosted runner, so no shipped
+# wheel rests on emulation:
+#
+#   manylinux x86_64   ubuntu-latest    manylinux2014 container, host-native smoke
+#   macOS arm64        macos-14         Apple silicon, native
+#   macOS x86_64       macos-13         Intel, native
+#   Windows x86_64     windows-latest   native
+#
+# Linux aarch64 (manylinux/musllinux) and musllinux x86_64 are deliberately NOT in the
+# v1 set: they would require a QEMU-emulated install-smoke, which is weaker evidence
+# than the native lanes above. They are the documented Tier-2 growth path in the runbook
+# — add them here with their own smoke lane before advertising them (an OS/arch is never
+# published ahead of a green lane, per docs/platform-support.md).
+
+name: release-python
+
+on:
+  # Manual is the primary trigger: a release is a human-initiated event. A pushed
+  # `python-v*` tag also builds artifacts (a release candidate), but publishing still
+  # requires the `pypi` environment approval below — the tag does not publish on its own.
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to PyPI after the build (still requires `pypi` environment approval)"
+        type: boolean
+        default: false
+      repository:
+        description: "Package index to publish to"
+        type: choice
+        default: testpypi
+        options: [testpypi, pypi]
+  push:
+    tags: ["python-v*"]
+
+# Least privilege by default; individual jobs widen as needed (the publish job adds
+# `id-token: write` for PyPI Trusted Publishing / OIDC — no long-lived API token secret).
+permissions:
+  contents: read
+
+concurrency:
+  group: release-python-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-wheels:
+    name: wheel ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # Independent failure domains: a Windows link break must not hide a macOS break.
+      fail-fast: false
+      matrix:
+        include:
+          - name: manylinux-x86_64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            manylinux: "2014"
+          - name: macos-arm64
+            runner: macos-14
+            target: aarch64-apple-darwin
+            manylinux: auto
+          - name: macos-x86_64
+            runner: macos-13
+            target: x86_64-apple-darwin
+            manylinux: auto
+          - name: windows-x86_64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            manylinux: auto
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python (for the install smoke)
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Build wheel
+        # PyO3/maturin-action builds the cp311-abi3 wheel. On Linux it runs inside a
+        # manylinux2014 container so the wheel's glibc floor is auditable; the produced
+        # wheel is manylinux-tagged and pip-installs on the plain ubuntu-latest host, so
+        # the smoke below is host-native. On macOS/Windows the action builds natively.
+        # `--manifest-path` points maturin at the binding crate; `sccache` warms the
+        # third-party dependency build across runs.
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --out dist --manifest-path crates/squonk-python/Cargo.toml
+          sccache: "true"
+
+      - name: Install-smoke the built wheel (native, clean venv)
+        # The release acceptance test: create a throwaway venv holding ONLY the freshly
+        # built wheel, install it, and run the dependency-free smoke script, which
+        # exercises parse -> render -> re-parse round trips, transpile, redact,
+        # recovering parse, dialect selection, and tokenize, and refuses to pass if it
+        # imported the source tree instead of the installed wheel. A red smoke here fails
+        # the matrix leg before any artifact is trusted.
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .smoke
+          if [ -f .smoke/bin/python ]; then PY=.smoke/bin/python; else PY=.smoke/Scripts/python; fi
+          "$PY" -m pip install --upgrade pip
+          "$PY" -m pip install --find-links dist --no-index squonk
+          "$PY" docs/release/smoke_python.py
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: wheel-${{ matrix.name }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  build-sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python (for the source-build smoke)
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install stable Rust toolchain
+        # A source build of the sdist compiles the Rust extension, so the host needs a
+        # toolchain (the wheel jobs get theirs from maturin-action's container/image).
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+
+      - name: Build sdist
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
+        with:
+          command: sdist
+          args: --out dist --manifest-path crates/squonk-python/Cargo.toml
+
+      - name: Source-build-smoke the sdist (clean venv, compiles from source)
+        # Proves the sdist is self-contained: pip builds the extension from the tarball's
+        # vendored workspace sources and the same smoke script runs against the result.
+        run: |
+          set -euo pipefail
+          python -m venv .sdist
+          .sdist/bin/pip install --upgrade pip
+          .sdist/bin/pip install dist/*.tar.gz
+          cd /tmp && "$GITHUB_WORKSPACE/.sdist/bin/python" "$GITHUB_WORKSPACE/docs/release/smoke_python.py"
+
+      - name: Upload sdist artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: publish to ${{ github.event.inputs.repository || 'testpypi' }}
+    # HUMAN GATE. This job runs only when a maintainer dispatches with `publish: true`,
+    # and even then it is pinned to a protected GitHub Environment: configure the `pypi`
+    # / `testpypi` environments in repo settings with a required reviewer so the run
+    # PAUSES for manual approval before this job starts. No token lives here — PyPI
+    # Trusted Publishing (OIDC) exchanges the `id-token` for a short-lived upload
+    # credential, which is why `id-token: write` is the only extra permission.
+    needs: [build-wheels, build-sdist]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.repository || 'testpypi' }}
+    permissions:
+      id-token: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish with maturin (Trusted Publishing)
+        # `maturin upload` sends every wheel + the sdist. `--repository` selects PyPI vs
+        # TestPyPI; the rehearsal path in the runbook publishes to TestPyPI first. No
+        # `MATURIN_PYPI_TOKEN` — the OIDC id-token above is exchanged for the upload
+        # credential by the index's Trusted Publishing configuration.
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
+        with:
+          command: upload
+          args: --repository ${{ github.event.inputs.repository || 'testpypi' }} --non-interactive dist/*

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the DuckDB signature-surface corpus, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the corpus content is
+# under the DuckDB MIT licence (the machine-checked `license` field, verbatim in
+# LICENSE). See README.md for the extraction narrative and family weighting.
+source = "https://github.com/duckdb/duckdb (test/sql/**/*.test) + DuckDB documented canonical syntax forms"
+reference = "7bacf4a248656d5a442c4fac4b6ada1e91423e5a (v1.5.2-6871-g7bacf4a248)"
+license = "MIT"
+regenerate = "python3 extract.py statements.sql statements_with_schema.sql against a duckdb/duckdb checkout at the pinned reference; statements.sql is the flat schema-independent corpus and statements_with_schema.sql regroups the same queries under their source file with that file's concrete CREATE setup DDL (the per-file setup driver). docs_examples.sql is the hand-curated canonical-forms supplement (engine-validated via json_serialize_sql). Then re-pin the sweep counts: cargo nextest run -p squonk-conformance --features oracle-engines corpus_duckdb"

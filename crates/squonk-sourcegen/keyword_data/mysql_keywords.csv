@@ -1,0 +1,329 @@
+# MySQL reserved-keyword inventory and reservation classes.
+#
+# @generated-source: provenance data for the keyword codegen (ADR-0004, ADR-0015).
+# DO derive the Rust tables from this file via `cargo run -p squonk-sourcegen`;
+# do NOT hand-edit the generated `dialect/keyword/generated.rs`.
+#
+# Source: MySQL 8.0 Reference Manual, "Keywords and Reserved Words"
+# (https://dev.mysql.com/doc/refman/8.0/en/keywords.html). This file lists the
+# words MySQL 8.0 marks reserved "(R)" — the ones that must be backtick-quoted to
+# serve as identifiers. MySQL's non-reserved keywords are matched contextually by
+# the parser and need no inventory entry, so only the reserved set is enumerated.
+#
+# Four words are pinned to the 8.4 LTS behaviour, not the raw 8.0 list, because the fitted
+# MySql preset (and the m3 oracle) target 8.4 (see `CommentSyntax::MYSQL_8_VERSION_BOUND`).
+# Engine-measured on mysql:8.4.10 (`SELECT 1 AS <kw>` => 1064; fully reserved — 1064 in
+# every non-dotted position): intersect, parallel, qualify, tablesample — the set-operation
+# and sampling keywords 8.0.31+/8.4 reserved that the early-8.0 list missed. They already
+# exist in the shared keyword universe via other dialects' lists, so only the MySQL
+# reservation is new (no enum change).
+#
+# The three 8.4 over-REJECTIONS a full 889-keyword m3 sweep found (tracked in
+# Previously over-reserved words are now resolved, each
+# engine-verified on mysql:8.4.10:
+#   array          — a plain identifier in every position in 8.4 (`SELECT 1 AS array`,
+#                    `SELECT 1 array` both prepare) EXCEPT a function call, where
+#                    `array(...)` is 1064. This is exactly the `function_only` class
+#                    below: admitted as column/type/bare-alias, rejected only as a call
+#                    head — the inverse of `type_func_name` — which closes both the
+#                    `ARRAY(...)` over-acceptance (4 sqlglot lines) and the `AS array`
+#                    over-rejection at once.
+#   master_bind, master_ssl_verify_server_cert — the deprecated MASTER_* replication
+#                    grammar 8.4 removed, so both are ordinary identifiers now
+#                    (`SELECT 1 AS master_bind` prepares). They are MySQL-only words used
+#                    by no other dialect's list, so freeing them means dropping their rows
+#                    here entirely: they leave the shared `Keyword` enum (no longer a
+#                    keyword in any modelled dialect), which shifts every later keyword's
+#                    interned symbol — deterministic golden regen. A non-reserved MySQL
+#                    entry would keep them in the universe as inert dead keywords, which
+#                    this file's "only reserved words are listed" design (below) forbids.
+#
+# MySQL has no PostgreSQL-style four-way class table; it has a single reserved set
+# plus a grammar carve-out for built-in functions. We map that onto the same
+# per-position model (prod-keyword-position-reserved-sets) with three classes:
+#   reserved        - never a plain identifier: rejected as column, function, type,
+#                     and bare-alias name (e.g. SELECT, RLIKE, DIV, XOR).
+#   type_func_name  - reserved as a column/type/bare-alias name, but admissible as a
+#                     *function* name, because MySQL parses `kw(...)` as a call for
+#                     these built-ins (e.g. LEFT(s,n), IF(c,a,b), MOD(a,b)). This
+#                     mirrors PostgreSQL's type_func_name carve-out so `dialect/
+#                     keyword.rs` composes the MySQL gates exactly like the shared
+#                     ones: a ColId rejects `type_func_name ∪ reserved`, a function
+#                     name rejects only `reserved`.
+#   function_only   - the inverse of type_func_name: admissible as a column/type/
+#                     bare-alias name but reserved as a *function* name, because MySQL
+#                     parses the bare word as an identifier yet syntax-rejects `kw(...)`
+#                     as a call (only `array`, engine-verified on 8.4.10). Added to the
+#                     function-name reject set only (mysql.rs `MYSQL_RESERVED_FUNCTION_NAME`).
+#
+# Reservation only (identifier-or-not); DIV/XOR/MOD/RLIKE *operator* semantics are a
+# separate concern (out of scope here).
+#
+# The inventory is shared across dialects, so words listed here that PostgreSQL/ANSI
+# do not reserve still enter the universe as keywords but stay non-reserved under
+# those dialects (admissible as identifiers) — the cross-dialect invariant is held
+# by the per-dialect reject sets, not by the shared `Keyword` enum.
+keyword,class
+accessible,reserved
+add,reserved
+all,reserved
+alter,reserved
+analyze,reserved
+and,reserved
+array,function_only
+as,reserved
+asc,reserved
+asensitive,reserved
+before,reserved
+between,reserved
+bigint,reserved
+binary,reserved
+blob,reserved
+both,reserved
+by,reserved
+call,reserved
+cascade,reserved
+case,reserved
+change,reserved
+char,type_func_name
+character,reserved
+check,reserved
+collate,reserved
+column,reserved
+condition,reserved
+constraint,reserved
+continue,reserved
+convert,type_func_name
+create,reserved
+cross,reserved
+cube,reserved
+cume_dist,reserved
+current_date,reserved
+current_time,reserved
+current_timestamp,reserved
+current_user,reserved
+cursor,reserved
+database,reserved
+databases,reserved
+day_hour,reserved
+day_microsecond,reserved
+day_minute,reserved
+day_second,reserved
+dec,reserved
+decimal,reserved
+declare,reserved
+default,reserved
+delayed,reserved
+delete,reserved
+dense_rank,reserved
+desc,reserved
+describe,reserved
+deterministic,reserved
+distinct,reserved
+distinctrow,reserved
+div,reserved
+double,reserved
+drop,reserved
+dual,reserved
+each,reserved
+else,reserved
+elseif,reserved
+empty,reserved
+enclosed,reserved
+escaped,reserved
+except,reserved
+exists,reserved
+exit,reserved
+explain,reserved
+false,reserved
+fetch,reserved
+first_value,reserved
+float,reserved
+float4,reserved
+float8,reserved
+for,reserved
+force,reserved
+foreign,reserved
+from,reserved
+fulltext,reserved
+function,reserved
+generated,reserved
+get,reserved
+grant,reserved
+group,reserved
+grouping,type_func_name
+groups,reserved
+having,reserved
+high_priority,reserved
+hour_microsecond,reserved
+hour_minute,reserved
+hour_second,reserved
+if,type_func_name
+ignore,reserved
+in,reserved
+index,reserved
+infile,reserved
+inner,reserved
+inout,reserved
+insensitive,reserved
+insert,type_func_name
+int,reserved
+int1,reserved
+int2,reserved
+int3,reserved
+int4,reserved
+int8,reserved
+integer,reserved
+intersect,reserved
+interval,type_func_name
+into,reserved
+io_after_gtids,reserved
+io_before_gtids,reserved
+is,reserved
+iterate,reserved
+join,reserved
+json_table,reserved
+key,reserved
+keys,reserved
+kill,reserved
+lag,reserved
+last_value,reserved
+lateral,reserved
+lead,reserved
+leading,reserved
+leave,reserved
+left,type_func_name
+like,reserved
+limit,reserved
+linear,reserved
+lines,reserved
+load,reserved
+localtime,reserved
+localtimestamp,reserved
+lock,reserved
+long,reserved
+longblob,reserved
+longtext,reserved
+loop,reserved
+low_priority,reserved
+match,reserved
+maxvalue,reserved
+mediumblob,reserved
+mediumint,reserved
+mediumtext,reserved
+middleint,reserved
+minute_microsecond,reserved
+minute_second,reserved
+mod,type_func_name
+modifies,reserved
+natural,reserved
+no_write_to_binlog,reserved
+not,reserved
+nth_value,reserved
+ntile,reserved
+null,reserved
+numeric,reserved
+of,reserved
+on,reserved
+optimize,reserved
+option,reserved
+optionally,reserved
+or,reserved
+order,reserved
+out,reserved
+outer,reserved
+outfile,reserved
+over,reserved
+parallel,reserved
+partition,reserved
+percent_rank,reserved
+precision,reserved
+primary,reserved
+procedure,reserved
+purge,reserved
+qualify,reserved
+range,reserved
+rank,reserved
+read,reserved
+read_write,reserved
+reads,reserved
+real,reserved
+recursive,reserved
+references,reserved
+regexp,reserved
+release,reserved
+rename,reserved
+repeat,reserved
+replace,type_func_name
+require,reserved
+resignal,reserved
+restrict,reserved
+return,reserved
+revoke,reserved
+right,type_func_name
+rlike,reserved
+row,reserved
+row_number,reserved
+rows,reserved
+schema,reserved
+schemas,reserved
+second_microsecond,reserved
+select,reserved
+sensitive,reserved
+separator,reserved
+set,reserved
+show,reserved
+signal,reserved
+smallint,reserved
+spatial,reserved
+specific,reserved
+sql,reserved
+sql_big_result,reserved
+sql_calc_found_rows,reserved
+sql_small_result,reserved
+sqlexception,reserved
+sqlstate,reserved
+sqlwarning,reserved
+ssl,reserved
+starting,reserved
+stored,reserved
+straight_join,reserved
+system,reserved
+table,reserved
+tablesample,reserved
+terminated,reserved
+then,reserved
+tinyblob,reserved
+tinyint,reserved
+tinytext,reserved
+to,reserved
+trailing,reserved
+trigger,reserved
+true,reserved
+undo,reserved
+union,reserved
+unique,reserved
+unlock,reserved
+unsigned,reserved
+update,reserved
+usage,reserved
+use,reserved
+using,reserved
+utc_date,reserved
+utc_time,reserved
+utc_timestamp,reserved
+values,type_func_name
+varbinary,reserved
+varchar,reserved
+varcharacter,reserved
+varying,reserved
+virtual,reserved
+when,reserved
+where,reserved
+while,reserved
+window,reserved
+with,reserved
+write,reserved
+xor,reserved
+year_month,reserved
+zerofill,reserved

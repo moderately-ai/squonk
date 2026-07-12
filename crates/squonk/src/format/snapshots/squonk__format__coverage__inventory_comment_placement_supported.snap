@@ -1,0 +1,59 @@
+---
+source: crates/squonk/src/format/coverage.rs
+expression: "inventory(fixtures, &FormatOptions::default())"
+---
+[trailing-eol-projection-item]  (Ansi)
+  input:
+    SELECT a, -- keep with a
+    b FROM t
+  output:
+    SELECT
+      a, -- keep with a
+      b
+    FROM t
+
+[trailing-eol-group-item]  (Ansi)
+  input:
+    SELECT a, b FROM t GROUP BY a, -- keep with a
+    b
+  output:
+    SELECT a, b
+    FROM t
+    GROUP BY
+      a, -- keep with a
+      b
+
+[trailing-eol-order-item]  (Ansi)
+  input:
+    SELECT a FROM t ORDER BY a, -- then
+    b
+  output:
+    SELECT a
+    FROM t
+    ORDER BY
+      a, -- then
+      b
+
+[leading-before-clause-keyword]  (Ansi)
+  input:
+    SELECT a FROM t WHERE a = 1
+    -- note
+    GROUP BY a
+  output:
+    SELECT a
+    FROM t
+    WHERE a = 1
+    -- note
+    GROUP BY
+      a
+
+[leading-before-where-predicate]  (Ansi)
+  input:
+    SELECT a FROM t
+    -- filter
+    WHERE a = 1
+  output:
+    SELECT a
+    FROM t
+    -- filter
+    WHERE a = 1

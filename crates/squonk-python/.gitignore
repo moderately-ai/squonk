@@ -1,0 +1,19 @@
+# Compiled extension module. `maturin develop` builds the native module into the
+# source tree (python/squonk/_native.*.so) so the editable install can import it;
+# it is a large build artifact and must never be committed.
+/python/squonk/*.so
+/python/squonk/*.pyd
+/python/squonk/*.dylib
+
+# Python bytecode and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local virtualenv (wheels/build artifacts go to the workspace target/)
+.venv/
+
+# uv lockfile for the dev/test environment: the dev deps float, resolved fresh on each
+# `uv sync`, so the lockfile is not tracked.
+/uv.lock

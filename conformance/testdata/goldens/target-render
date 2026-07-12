@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: MIT
+#
+# Tier-2 dialect-target render goldens (ADR-0010/0011). Each SQL string is parsed
+# once under PostgreSQL (the M1 superset) and then spelled for the ANSI and
+# PostgreSQL targets through the fallible `Renderer<D>`. Shared constructs render
+# for both targets (each in its preferred spelling); a construct a target cannot
+# express is rejected with an unsupported-construct diagnostic. The SQL strings
+# are hand-authored for this repository; the expected blocks are generated.
+# Rewrite with:
+#   REWRITE=1 cargo test -p squonk-conformance goldens::tests::datadriven_golden_corpus --lib
+
+# Shared ANSI/PostgreSQL syntax: one spelling, accepted by both targets.
+target-render
+SELECT a FROM t WHERE a = b
+----
+parse (postgres): accept
+ansi_render:
+  SELECT a FROM t WHERE a = b
+postgres_render:
+  SELECT a FROM t WHERE a = b
+
+# Type-spelling delta: the canonical CAST renders in each target's preferred
+# type spelling (ANSI CHARACTER VARYING vs PostgreSQL VARCHAR), both accepted.
+target-render
+SELECT CAST(a AS VARCHAR(10))
+----
+parse (postgres): accept
+ansi_render:
+  SELECT CAST(a AS CHARACTER VARYING(10))
+postgres_render:
+  SELECT CAST(a AS VARCHAR(10))
+
+# PostgreSQL ONLY inheritance suppression: ANSI cannot express it.
+target-render
+SELECT * FROM ONLY t
+----
+parse (postgres): accept
+ansi_render_error: target does not support ONLY inheritance suppression at bytes 14..20
+postgres_render:
+  SELECT * FROM ONLY t
+
+# TABLESAMPLE: ANSI cannot express it.
+target-render
+SELECT * FROM t TABLESAMPLE BERNOULLI (10)
+----
+parse (postgres): accept
+ansi_render_error: target does not support TABLESAMPLE at bytes 14..42
+postgres_render:
+  SELECT * FROM t TABLESAMPLE BERNOULLI (10)
+
+# Table function in FROM: ANSI cannot express it.
+target-render
+SELECT * FROM generate_series(1, 5)
+----
+parse (postgres): accept
+ansi_render_error: target does not support table functions in FROM at bytes 14..35
+postgres_render:
+  SELECT * FROM generate_series(1, 5)
+
+# JOIN ... USING (...) AS alias: ANSI cannot express the join-level alias.
+target-render
+SELECT * FROM t1 JOIN t2 USING (id) AS j
+----
+parse (postgres): accept
+ansi_render_error: target does not support JOIN ... USING (...) AS alias at bytes 25..40
+postgres_render:
+  SELECT * FROM t1 JOIN t2 USING (id) AS j
+
+# LATERAL derived table: ANSI cannot express it.
+target-render
+SELECT * FROM LATERAL (SELECT 1) AS x
+----
+parse (postgres): accept
+ansi_render_error: target does not support LATERAL derived tables at bytes 14..37
+postgres_render:
+  SELECT * FROM LATERAL (SELECT 1) AS x
+
+# Positional $n parameter: ANSI has no parameter placeholders.
+target-render
+SELECT $1
+----
+parse (postgres): accept
+ansi_render_error: target does not support positional $n parameters at bytes 7..9
+postgres_render:
+  SELECT $1

@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# Cross-platform support matrix. `ci.yml` gates the everyday stack on a single
+# `ubuntu-latest` runner; this workflow enforces the platform tiers documented in
+# `docs/platform-support.md` on the targets that runner cannot cover. Every job here
+# is the cheapest representative check for one promised tier — nothing runs a full
+# stack it does not need to.
+#
+# Two cost classes, split by trigger:
+#
+#   wasm      Compile-checks the `wasm32-unknown-unknown` npm surface. This is the only
+#             place committed CI builds that target, so it is the only place the
+#             `cfg(target_arch = "wasm32")` `#[wasm_bindgen]` code compiles at all — a
+#             native build never touches it. It runs on `ubuntu-latest` (cost 1x) and,
+#             because that wasm-only path can break in any PR, runs on every push/PR as
+#             well as the weekly schedule. Both feature shapes are checked: the ANSI
+#             focused ANSI and full `dialects-full` surfaces. Runtime load
+#             smoke, the variant size budget, and `npm pack` stay in
+#             `stable-release-npm-distribution`.
+#
+#   cross-os  Tests the core crates on `macos-latest` (cost 10x) and `windows-latest`
+#             (cost 2x). Because those multipliers are steep, this job is SKIPPED on
+#             pull_request (`if` below) and runs only on push to `main` (every
+#             landing), the weekly backstop, and manual dispatch — the lean Linux gate
+#             in `ci.yml` covers per-PR iteration, and a cross-OS regression is caught
+#             at merge. Both OSes run the same `cargo nextest` suite: the two former
+#             Windows test hazards (canonicalize UNC prefix, CRLF drift — see the
+#             "Windows" section of `docs/platform-support.md`) are now handled by the
+#             repo `.gitattributes` (`* text=auto eol=lf`) and the UNC/CRLF-aware
+#             sourcegen tests, so a nextest lane runs clean on Windows. This lane is the
+#             prerequisite for promoting Windows to Tier 1 in `docs/platform-support.md`;
+#             that doc flip lands as a follow-up once this lane is confirmed green on a
+#             dispatch run (the tier is never advertised ahead of a green lane). Both
+#             additionally compile-check the pyo3 extension boundary; the wheel
+#             build/install smoke stays in `stable-release-python-distribution`.
+#
+# The core crates are `squonk`, `squonk-ast`, `squonk-sourcegen`, and
+# `squonk-wasm` (its native mirror). The conformance/bench/oracle crates are
+# deliberately excluded: they need a build-time `libduckdb` and a MySQL server, which
+# stay nightly-only on Linux (`oracle-nightly.yml`) and have no place on a lean
+# cross-OS runner.
+#
+# Conventions match `ci.yml`: pinned actions and tool versions, a read-only
+# `GITHUB_TOKEN`, `Swatinem/rust-cache` (which keys per-OS automatically), and a
+# per-ref concurrency group that cancels a superseded run.
+
+name: platform
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Mondays 08:03 UTC — a weekly backstop against toolchain drift when no landing
+    # has triggered the push run. Offset off the top of the hour and clear of the daily
+    # soaks (fuzz 07:19, oracle 07:41) to dodge GitHub's cron congestion.
+    - cron: "3 8 * * 1"
+  workflow_dispatch:
+
+# Least privilege: the jobs only read the tree and build/test it.
+permissions:
+  contents: read
+
+# One run per ref: a newer push / PR update cancels the superseded in-flight run,
+# matching `ci.yml` (the nightly soaks, by contrast, never cancel in progress).
+concurrency:
+  group: platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wasm:
+    name: wasm32 compile check (npm surface)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install stable toolchain (+ wasm32 target)
+        # rust-toolchain.toml pins `stable`; installed explicitly like the other
+        # workflows, with the wasm32 target added so the cross-compile check resolves.
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Compile-check wasm32 (ANSI default)
+        # The focused ANSI package shape. Exercises the wasm-only
+        # `#[wasm_bindgen]` boundary a native build never compiles.
+        run: cargo check --target wasm32-unknown-unknown -p squonk-wasm
+
+      - name: Compile-check wasm32 (full surface)
+        # Every built-in dialect — the largest feature shape,
+        # so feature-gated wasm code cannot rot unnoticed.
+        run: cargo check --target wasm32-unknown-unknown -p squonk-wasm --features dialects-full
+
+  cross-os:
+    # Expensive runners (macOS 10x, Windows 2x): skip per-PR, run on every landing to
+    # `main`, the weekly backstop, and manual dispatch. The per-PR gate is `ci.yml`.
+    if: ${{ github.event_name != 'pull_request' }}
+    name: ${{ matrix.os }} core crates (tested)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Independent OS failure domains: a Windows break must not hide a macOS break.
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Install cargo-nextest
+        # Pinned to the same version as `ci.yml`/`oracle-nightly.yml`.
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        with:
+          tool: cargo-nextest@0.9.140
+
+      - name: Test core crates
+        # macOS aarch64 and Windows x86_64: the full behaviour suite for the portable
+        # core crates. Excludes conformance/bench/oracle (system-dep-gated: they need a
+        # build-time libduckdb and a MySQL server, so no oracle engine is compiled or
+        # skipped here) and the pyo3/wasm-target surfaces.
+        run: cargo nextest run -p squonk -p squonk-ast -p squonk-sourcegen -p squonk-wasm
+
+      - name: Compile-check Python extension boundary (pyo3)
+        # Both OSes: the pyo3 binding is where platform-specific linking bites, so its
+        # boundary is compile-checked per OS. `cargo check` runs the pyo3 build script
+        # (which locates the runner's preinstalled Python) but performs no final
+        # libpython link. Wheel build/install smoke is stable-release-python-distribution.
+        run: cargo check -p squonk-python

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# License-header policy — the single source of truth for the SPDX + copyright header
+# stamped on every first-party source file.
+#
+# `cargo xtask license-headers` (verify/stamp) and the `squonk-sourcegen` header
+# templates both read THIS file, so finalising or swapping the licence is one edit
+# here plus one mechanical run:
+#   1. edit the fields below
+#   2. `cargo run -p squonk-sourcegen`      # restamp generated files
+#   3. `cargo xtask license-headers --write`    # restamp hand-written files
+#
+# `year` is a fixed project year, not wall-clock, so runs are reproducible.
+[license-header]
+spdx = "MIT"
+holder = "Moderately AI Inc."
+year = "2026"

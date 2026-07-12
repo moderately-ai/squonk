@@ -1,0 +1,22 @@
+/target
+**/*.rs.bk
+.DS_Store
+
+# Note: proptest writes failing-seed files to `**/proptest-regressions/`. Those are
+# regression cases and SHOULD be committed, so they are intentionally not ignored.
+# Python bytecode from bench/cross-language runners
+__pycache__/
+*.pyc
+
+# Local JS example installs/builds
+node_modules/
+crates/squonk-wasm/pkg/
+crates/squonk-wasm/pkg-full/
+crates/squonk-wasm/pkg-*/
+crates/squonk-wasm/size-reports/
+crates/squonk-wasm/dist/
+crates/squonk-wasm/*.tgz
+crates/squonk-wasm/package-lock.json
+crates/squonk-wasm/examples/*/dist/
+crates/squonk-wasm/examples/*/test-results/
+crates/squonk-wasm/examples/*/playwright-report/

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# Issues-only at launch. GitHub Discussions is deliberately deferred — the routing
+# decision and its rationale live once in docs/dialect-requests.md. Questions route to
+# opensource@ and security reports to the SECURITY.md private-advisory flow, so a second
+# public forum has no distinct job to do yet.
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability (report privately)
+    url: https://github.com/moderately-ai/squonk/security/advisories/new
+    about: Never file a security issue publicly. Report through a private GitHub Security Advisory (or security@moderately.ai) — see SECURITY.md.
+  - name: Questions & general contact
+    url: mailto:opensource@moderately.ai
+    about: Usage questions and anything that is not a bug or a concrete feature request. We are not currently accepting outside code contributions.

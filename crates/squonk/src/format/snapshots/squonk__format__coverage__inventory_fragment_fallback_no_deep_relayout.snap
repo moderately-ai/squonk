@@ -1,0 +1,77 @@
+---
+source: crates/squonk/src/format/coverage.rs
+expression: "inventory(fixtures, &FormatOptions::default())"
+---
+[nested-arithmetic]  (Ansi)
+  input:
+    SELECT a + b * c - d FROM t
+  output:
+    SELECT a + b * c - d
+    FROM t
+
+[case-expression]  (Ansi)
+  input:
+    SELECT CASE WHEN a > 0 THEN 'p' ELSE 'n' END FROM t
+  output:
+    SELECT CASE WHEN a > 0 THEN 'p' ELSE 'n' END
+    FROM t
+
+[derived-subquery]  (Ansi)
+  input:
+    SELECT x FROM (SELECT a AS x FROM inner_t WHERE a > 0) sub
+  output:
+    SELECT x
+    FROM
+      (
+        SELECT a AS x
+        FROM inner_t
+        WHERE a > 0
+      ) sub
+
+[scalar-subquery-where]  (Ansi)
+  input:
+    SELECT a FROM t WHERE a > (SELECT max(b) FROM u WHERE u.k = t.k)
+  output:
+    SELECT a
+    FROM t
+    WHERE a > (
+      SELECT max(b)
+      FROM u
+      WHERE u.k = t.k
+    )
+
+[in-subquery]  (Ansi)
+  input:
+    SELECT a FROM t WHERE a IN (SELECT id FROM u WHERE u.active AND u.n > 3)
+  output:
+    SELECT a
+    FROM t
+    WHERE a IN (
+      SELECT id
+      FROM u
+      WHERE u.active AND u.n > 3
+    )
+
+[insert-fallback]  (Ansi)
+  input:
+    INSERT INTO t (a, b) VALUES (1, 2), (3, 4)
+  output:
+    INSERT INTO t (a, b) VALUES (1, 2), (3, 4)
+
+[update-fallback]  (Ansi)
+  input:
+    UPDATE t SET a = 1, b = 2 WHERE c = 3
+  output:
+    UPDATE t SET a = 1, b = 2 WHERE c = 3
+
+[create-table-fallback]  (Ansi)
+  input:
+    CREATE TABLE t (a INT NOT NULL, b VARCHAR(10), PRIMARY KEY (a))
+  output:
+    CREATE TABLE t (a INT NOT NULL, b VARCHAR(10), PRIMARY KEY (a))
+
+[values-body-fallback]  (Ansi)
+  input:
+    VALUES (1, 2), (3, 4)
+  output:
+    VALUES (1, 2), (3, 4)

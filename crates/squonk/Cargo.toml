@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[package]
+name = "squonk"
+description = "Extensible, fast, multi-dialect SQL tokenizer and parser for Rust"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/squonk"
+keywords = ["sql", "parser", "ast", "dialect", "transpile"]
+categories = ["parser-implementations", "database"]
+autotests = false
+# Deliberate publish allowlist (not the git-tracked default): the library sources,
+# the runnable API examples, the integration tests, the crate README, and a
+# crate-local MIT LICENSE copy so the tarball is self-contained (the workspace-root
+# LICENSE sits outside the package root and would not otherwise ship). Corpora,
+# corpora and build artifacts live outside the crate directory and never entered the
+# default set; this list freezes the exact shipped inventory instead of tracking
+# whatever happens to be committed here.
+include = ["src/**", "examples/**", "tests/**", "README.md", "LICENSE"]
+
+[lints]
+workspace = true
+
+# docs.rs builds with every feature so the published docs render the full
+# multi-dialect + serde surface (a default build documents ANSI only, and the crate
+# docs cross-link the feature-gated Postgres/MySql/Lenient dialect types).
+[package.metadata.docs.rs]
+all-features = true
+# Set the `docsrs` cfg on the docs.rs rustdoc invocation so the lib.rs
+# `#![cfg_attr(docsrs, feature(doc_cfg))]` activates the "Available on crate
+# feature X" banners on feature-gated items.
+rustdoc-args = ["--cfg", "docsrs"]
+
+# Dialect packaging (ADR-0009/0011): each feature forwards to the matching
+# `squonk-ast` feature that gates the preset data, and additionally gates this
+# crate's concrete `Dialect` impls (`Postgres`/`MySql`) and their runtime
+# `BuiltinDialect` arms. `ansi` is always compiled (the `parse` default). Default is
+# ANSI-only; `full` is the drop-in `sqlparser-rs`-parity build.
+[features]
+default = []
+postgres = ["squonk-ast/postgres"]
+mysql = ["squonk-ast/mysql"]
+sqlite = ["squonk-ast/sqlite"]
+# The DuckDb dialect data. Pure-Rust preset (ADR-0009/0011) — distinct from the
+# conformance crate's `oracle-engines` feature, which links `libduckdb`. Forwards to
+# `squonk-ast/duckdb`, which itself implies `squonk-ast/postgres` (the preset is
+# PostgreSQL-derived).
+duckdb = ["squonk-ast/duckdb"]
+# The BigQuery / ZetaSQL dialect data. Pure-Rust ANSI-derived preset (forwards to
+# `squonk-ast/bigquery`); conservative and standalone, implying no other dialect.
+bigquery = ["squonk-ast/bigquery"]
+# The Hive / HiveQL dialect data. Pure-Rust ANSI-derived preset (forwards to
+# `squonk-ast/hive`); conservative and standalone, implying no other dialect.
+hive = ["squonk-ast/hive"]
+# The ClickHouse dialect data. Pure-Rust ANSI-derived preset (forwards to
+# `squonk-ast/clickhouse`); conservative and standalone, implying no other dialect.
+clickhouse = ["squonk-ast/clickhouse"]
+# The Databricks dialect data. Pure-Rust ANSI-derived preset (forwards to
+# `squonk-ast/databricks`); conservative and standalone, implying no other dialect.
+databricks = ["squonk-ast/databricks"]
+# The MSSQL / T-SQL dialect data. Pure-Rust ANSI-derived preset (forwards to
+# `squonk-ast/mssql`); conservative and standalone, implying no other dialect.
+mssql = ["squonk-ast/mssql"]
+# The Snowflake dialect data. Pure-Rust ANSI-derived preset (forwards to
+# `squonk-ast/snowflake`); conservative and standalone, implying no other dialect.
+snowflake = ["squonk-ast/snowflake"]
+# The Amazon Redshift dialect data. Pure-Rust ANSI-derived preset (forwards to
+# `squonk-ast/redshift`); conservative and standalone, implying no other dialect. Derives
+# from ANSI, not `postgres`, despite Redshift's PostgreSQL-8 ancestry (see the preset module docs).
+redshift = ["squonk-ast/redshift"]
+lenient = ["squonk-ast/lenient"]
+full = ["postgres", "mysql", "sqlite", "duckdb", "bigquery", "hive", "clickhouse", "databricks", "mssql", "snowflake", "redshift", "lenient"]
+# Pass-through to AST serde plus the parse-root (`Parsed`) serde impl this crate
+# owns. Off by default (ADR-0017): the default build stays zero-dep. `serde` is the
+# umbrella that turns on both halves (`serde-serialize` + `serde-deserialize`) for
+# the full round-trip; either half is selectable on its own — this tripartite split
+# is the intended design.
+serde = ["serde-serialize", "serde-deserialize"]
+serde-serialize = ["dep:serde", "squonk-ast/serde-serialize", "thin-vec/serde"]
+serde-deserialize = ["dep:serde", "squonk-ast/serde-deserialize", "thin-vec/serde"]
+# The pretty-printing formatter: a Wadler/Prettier layout-IR renderer over the
+# validated AST, comment re-attachment, and the `format`-family API. Off by
+# default — the serialize-only wasm/parse
+# hot path must not grow — and pure additive: it compiles a new `format` module and
+# touches no canonical render path. Reuses the opt-in trivia + clause-mark capture
+# the parser already ships behind `parse_with_trivia`.
+document-render = []
+
+[dependencies]
+squonk-ast = { workspace = true }
+thin-vec = { workspace = true }
+# Optional: only compiled when the `serde` feature is on (see [features]). Used by
+# the parse-root serialization in `parser::parsed` (the portable, resolver-carrying
+# top-level unit), and forwarded to the AST derives via `squonk-ast/serde`.
+serde = { workspace = true, optional = true }
+
+# Dev-only self-dependency (ADR-0009/0011 lean-default corollary). A standalone
+# `cargo nextest run -p squonk` builds the crate at its default (ANSI-only)
+# features, but the crate's own `#[cfg(test)]` code asserts on `full`-gated dialect
+# impls (`Postgres`/`MySql`) and their preset data, so it fails to compile in
+# isolation. Depending on ourselves with `full` feature-unifies `full` into this
+# crate's *test* build only. Dev-deps never reach `cargo build` or downstream
+# consumers, so the published graph and the lean default are unchanged; this exists
+# purely to make per-crate `-p` testing compile standalone.
+[dev-dependencies]
+squonk = { path = ".", features = ["full"] }
+# Dev-only: the concrete serde format the `serde`-gated parse -> serialize ->
+# deserialize -> render round-trip test uses. Never a runtime dependency.
+# `unbounded_depth` exposes `disable_recursion_limit`, letting the parse-root depth
+# test isolate our guard from serde_json's own JSON-only nesting limit.
+serde_json = { workspace = true, features = ["unbounded_depth"] }
+# Dev-only: the snapshot harness for the `document-render` formatter's measured
+# coverage inventory (`format::coverage`), matching the conformance/bench snapshot
+# idiom. Only reachable under `--features document-render`, so it never touches the
+# default (serialize-only) test or build graph.
+insta = { workspace = true }
+
+[[test]]
+name = "integration"
+path = "tests/main.rs"

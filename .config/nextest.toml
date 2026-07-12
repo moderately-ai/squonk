@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# nextest configuration for the squonk workspace.
+#
+# Run via `cargo nextest run`. Always use nextest, never `cargo test`: this
+# profile carries the hang-terminate behaviour that kills a wedged test instead
+# of letting it stall the run (AGENTS.md § Verification). The heaviest lanes here
+# are the differential oracle tests (`--features oracle-engines,oracle-mysql`):
+# in-process SQLite/DuckDB prepares plus round-trips to an external MySQL server,
+# and the opt-in broad corpus sweeps (`--run-ignored`). Those are the surfaces the
+# timeouts below are sized for.
+
+[profile.default]
+# Use all available cores for test parallelism. Every test runs in its own
+# process, so the suite carries no shared mutable global state to serialize; the
+# in-process embedded oracles (SQLite/DuckDB) hold no cross-test state and the one
+# external dependency — the MySQL server — tolerates parallel connections, so no
+# lane needs `RUST_TEST_THREADS=1` or a serial annotation. Override on tighter CI
+# runners via `[profile.ci]` below.
+test-threads = "num-cpus"
+
+# Compact output: during the run, print a per-test line only when a test
+# FAILS (the live progress bar + the final `N passed` summary still show
+# totals). A green full-workspace run is a multi-thousand-line wall if every passing
+# test is printed, burying the one thing you look for — a
+# failure. `final-status-level = "slow"` still recaps failed AND slow tests
+# at the end, so an oracle lane creeping toward its timeout is
+# never hidden. Bump `status-level` to "slow" to stream slow tests live too,
+# or "pass" to restore the old per-test stream.
+status-level = "fail"
+final-status-level = "slow"
+
+# Tests exceeding 60s wall-clock without producing output get killed
+# after a second 60s window. Stops the suite from hanging when an oracle lane
+# blocks on an unreachable external MySQL server, or when an opt-in broad corpus
+# sweep (`--run-ignored`) wedges instead of terminating.
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+# Grace period for a test's output pipes to reach EOF after its process
+# exits. nextest's 100ms default is too tight under the full-workspace run:
+# a saturated machine can delay the
+# pipe-reader thread for even a pure-compute test that spawns nothing, so a
+# random fast test gets a spurious `LEAK` (observed on a render unit test on one
+# run and a corpus test on another — it moves, which is the tell that it is
+# scheduling jitter, not a real leak; both are clean in isolation). 500ms
+# still let a 0.52s straggler through; 1s is 2x the worst observed. A
+# genuinely-leaked subprocess never closes its end, so it is still flagged
+# regardless of this value.
+leak-timeout = "1s"
+
+# No retries: every test must be deterministic. A test that only passes on a
+# re-run is masking either a real race in the code under test or a
+# nondeterministic test — both are bugs to fix at the source, never to paper
+# over with a retry. nextest defaults to 0 retries; this is explicit so the
+# policy is visible and a future edit re-adding retries is a deliberate choice.
+retries = 0
+
+[profile.ci]
+# No retries on CI either — a flake is a bug, surface it on the first failure.
+# `fail-fast = false` runs the whole suite even if one test fails so we get the
+# full report.
+retries = 0
+fail-fast = false
+# CI runners typically have less RAM than dev boxes; cap parallelism.
+test-threads = 4

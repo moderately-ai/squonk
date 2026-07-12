@@ -1,0 +1,2403 @@
+CREATE TABLE t1(a, b, CHECK(t1.a != t1.b))
+CREATE TABLE t2(a, b)
+CREATE INDEX t2expr ON t2(a) WHERE t2.b>0
+SELECT sql FROM sqlite_master
+ALTER TABLE t1 RENAME TO t1new
+CREATE TABLE t3(c, d)
+ALTER TABLE t3 RENAME TO t3new
+DROP TABLE t3new
+ALTER TABLE t2 RENAME TO t2new
+CREATE TABLE abc(a, b, c)
+INSERT INTO abc VALUES(1, 2, 3)
+CREATE VIRTUAL TABLE eee USING echo('abc')
+CREATE TABLE rr(a, b)
+CREATE VIRTUAL TABLE ff USING fts5(a, b)
+CREATE TRIGGER tr1 AFTER INSERT ON rr BEGIN INSERT INTO ff VALUES(new.a, new.b); END
+INSERT INTO rr VALUES('hello', 'world')
+SELECT * FROM ff
+ALTER TABLE ff RENAME TO ffff
+INSERT INTO rr VALUES('in', 'tcl')
+SELECT * FROM ffff
+CREATE TABLE p1(a PRIMARY KEY, b)
+CREATE TABLE c1(x REFERENCES p1)
+CREATE TABLE c2(x, FOREIGN KEY (x) REFERENCES p1)
+CREATE TABLE c3(x, FOREIGN KEY (x) REFERENCES p1(a))
+CREATE TABLE t1(a, b)
+CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN SELECT sum(b) OVER w FROM t1 WINDOW w AS (ORDER BY a); END
+SELECT sql FROM sqlite_master WHERE name='tr1'
+INSERT INTO t1 VALUES(1, 2)
+CREATE TABLE t1(a,b,c)
+CREATE TABLE t2(a,b,c)
+CREATE TRIGGER r1 AFTER INSERT ON t1 WHEN new.a NOT NULL BEGIN SELECT a,b, a name FROM t1 INTERSECT SELECT a,b,c FROM t1 WHERE b>='d' ORDER BY name; SELECT new.c; END
+ALTER TABLE t1 RENAME TO t1x
+SELECT sql FROM sqlite_master WHERE name = 'r1'
+CREATE TABLE t1(a, b, c, d)
+CREATE VIEW v1 AS SELECT * FROM t1 WHERE a=1 OR (b IN ())
+ALTER TABLE t1 RENAME b TO bbb
+SELECT count(*) FROM sqlite_master WHERE name='sqlite_stat1'
+SELECT * FROM sqlite_stat1 WHERE idx NOT NULL
+SELECT * FROM sqlite_stat1
+CREATE INDEX t1i1 ON t1(a)
+ANALYZE main.t1
+SELECT * FROM sqlite_stat1 ORDER BY idx
+CREATE INDEX t1i2 ON t1(b)
+ANALYZE t1
+CREATE INDEX t1i3 ON t1(a,b)
+INSERT INTO t1 VALUES(1,2)
+INSERT INTO t1 VALUES(1,3)
+SELECT idx, stat FROM sqlite_stat1 ORDER BY idx
+CREATE TABLE t1(x INTEGER, y)
+CREATE INDEX i1 ON t1(x)
+COMMIT
+SELECT count(*)>0 FROM sqlite_stat4
+SELECT count(*) FROM t1 WHERE x>200 AND x<300
+SELECT count(*) FROM t1 WHERE x>0 AND x<1100
+CREATE TABLE t2(x TEXT, y)
+INSERT INTO t2 SELECT * FROM t1
+CREATE INDEX i2 ON t2(x)
+SELECT count(*) FROM t2 WHERE x>1 AND x<2
+SELECT count(*) FROM t2 WHERE x>0 AND x<99
+CREATE TABLE t3(y TEXT, x INTEGER)
+CREATE TABLE t201(x INTEGER PRIMARY KEY, y UNIQUE, z)
+CREATE INDEX t201z ON t201(z)
+INSERT INTO t201 VALUES(1,2,3),(2,3,4),(3,4,5)
+ANALYZE t201
+INSERT INTO t201 VALUES(4,5,7)
+INSERT INTO t201 SELECT x+100, y+100, z+100 FROM t201
+INSERT INTO t201 SELECT x+200, y+200, z+200 FROM t201
+INSERT INTO t201 SELECT x+400, y+400, z+400 FROM t201
+CREATE TABLE t1(a,b,c,d)
+CREATE INDEX t1a ON t1(a)
+CREATE INDEX t1b ON t1(b)
+CREATE INDEX t1cd ON t1(c,d)
+CREATE VIRTUAL TABLE nums USING wholenumber
+INSERT INTO t1 SELECT value, value, value/100, value FROM nums WHERE value BETWEEN 1 AND 256
+ANALYZE t1a
+ANALYZE t1cd
+SELECT count(*) FROM t1 WHERE b BETWEEN 30 AND 34
+SELECT count(*) FROM t1 WHERE c BETWEEN 0 AND 100000
+SELECT count(*) FROM t1 WHERE c BETWEEN 800000 AND 900000
+CREATE TABLE t1(a TEXT, b TEXT)
+INSERT INTO t1 VALUES('(0)', '(0)')
+INSERT INTO t1 VALUES('(1)', '(1)')
+INSERT INTO t1 VALUES('(2)', '(2)')
+INSERT INTO t1 VALUES('(3)', '(3)')
+INSERT INTO t1 VALUES('(4)', '(4)')
+CREATE INDEX i1 ON t1(a, b)
+SELECT tbl,idx,nEq,nLt,nDLt,test_decode(sample) FROM sqlite_stat4
+SELECT tbl,idx,nEq,nLt,nDLt,s(sample) FROM sqlite_stat4
+CREATE TABLE t1(a, b, c)
+INSERT INTO t1 VALUES('some text', 14, NULL)
+INSERT INTO t1 VALUES(22.0, NULL, x'656667')
+INSERT INTO t1(a,b,c) VALUES(1,2,3),(7,8,9),(4,5,6),(10,11,12),(4,8,12),(1,11,111)
+DELETE FROM sqlite_stat1
+INSERT INTO sqlite_stat1(tbl,idx,stat) VALUES('t1','t1a','12345 2'),('t1','t1b','12345 4')
+ANALYZE sqlite_master
+SELECT *, '#' FROM t1 WHERE a BETWEEN 3 AND 8 ORDER BY c
+SELECT c FROM t1 ORDER BY a
+UPDATE sqlite_stat1 SET stat='12345 2 unordered' WHERE idx='t1a'
+UPDATE sqlite_stat1 SET stat='12345 2 whatever=5 unordered xyzzy=11' WHERE idx='t1a'
+DROP INDEX t1a
+CREATE INDEX t1ab ON t1(a,b)
+CREATE INDEX t1ca ON t1(c,a)
+INSERT INTO sqlite_stat1(tbl,idx,stat) VALUES('t1','t1ab','12345 3 2 sz=10'),('t1','t1ca','12345 3 2 sz=20')
+INSERT INTO t1 VALUES(3001, 3001, 3001)
+INSERT INTO t1 VALUES(3001, 3001, 3002)
+INSERT INTO t1 VALUES(3001, 3001, 3003)
+INSERT INTO t1 VALUES(3001, 3001, 3004)
+INSERT INTO t1 VALUES(3001, 3001, 3005)
+INSERT INTO t1 VALUES(3001, 3001, 3006)
+INSERT INTO t1 VALUES(3001, 3001, 3007)
+CREATE INDEX t1_ab ON t1(a, b)
+CREATE INDEX t1_c ON t1(c)
+UPDATE t1 SET a=13 WHERE a = 3001
+WITH RECURSIVE cnt(x) AS (VALUES(1000) UNION ALL SELECT x+1 FROM cnt WHERE x<2000) INSERT INTO t1(a,b) SELECT x, x FROM cnt
+CREATE INDEX t1a ON t1(a DESC)
+DROP TABLE t1
+WITH RECURSIVE cnt(x) AS (VALUES(1000) UNION ALL SELECT x+1 FROM cnt WHERE x<2000) INSERT INTO t1(a,b,c) SELECT x, x, 123 FROM cnt
+DROP INDEX t1ca
+CREATE INDEX t1ca ON t1(c ASC,a DESC)
+PRAGMA encoding = 'UTF-16'
+CREATE TABLE t0 (c1 TEXT)
+INSERT INTO t0 VALUES ('')
+CREATE INDEX i0 ON t0(c1)
+SELECT * FROM t0 WHERE t0.c1 BETWEEN '' AND (ABS(''))
+CREATE TABLE t1(x)
+CREATE TABLE t1(x INTEGER, y INTEGER)
+WITH data(i) AS ( SELECT 1 UNION ALL SELECT i+1 FROM data ) INSERT INTO t1 SELECT isqrt(i), isqrt(i) FROM data LIMIT 400
+CREATE INDEX t1x ON t1(x)
+CREATE INDEX t1y ON t1(y)
+DELETE FROM t1
+DROP TABLE IF EXISTS t1
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b TEXT, c INT)
+WITH RECURSIVE c(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM c WHERE x<10000) INSERT INTO t1(a, c) SELECT x, x FROM c
+UPDATE t1 SET b=printf('x%02x',a/500) WHERE a>4000
+UPDATE t1 SET b='xyz' where a>=9998
+SELECT count(*), b FROM t1 GROUP BY 2 ORDER BY 2
+SELECT * FROM t1 WHERE b='xyz' AND b IS NOT NULL ORDER BY +a
+PRAGMA automatic_index = 0
+CREATE TABLE t1(a, x)
+CREATE TABLE t2(b, y)
+WITH s(i) AS ( SELECT 1 UNION ALL SELECT i+1 FROM s WHERE i<100 ) INSERT INTO t1 SELECT (i%50), NULL FROM s
+WITH s(i) AS ( SELECT 1 UNION ALL SELECT i+1 FROM s WHERE i<100 ) INSERT INTO t2 SELECT (CASE WHEN i<95 THEN 44 ELSE i END), NULL FROM s
+CREATE INDEX t2b ON t2(b)
+INSERT INTO t1 VALUES(3,4)
+SELECT * FROM t1
+CREATE TABLE t2(x,y)
+INSERT INTO t2 VALUES(1,'x')
+INSERT INTO t2 VALUES(2,'y')
+SELECT * FROM t2
+ATTACH DATABASE 'test2.db' AS two
+SELECT * FROM two.t2
+DETACH DATABASE two
+ATTACH 'test.db' AS db2
+ATTACH 'test.db' AS db3
+ATTACH 'test.db' AS db4
+PRAGMA database_list
+rollback
+PRAGMA lock_status
+ATTACH 'test2.db' as file2
+INSERT INTO file2.t1 VALUES(1, 2)
+ATTACH 'test.db2' AS aux
+CREATE TABLE tbl(a, b, c)
+CREATE TABLE aux.tbl(a, b, c)
+DROP TABLE aux.tbl
+DROP TABLE tbl
+ROLLBACK
+PRAGMA encoding = 'utf16'
+CREATE TABLE t2(c, d)
+ATTACH 'test2.db' AS aux
+CREATE TABLE aux.t3(e, f)
+SELECT * FROM sqlite_master WHERE name = 't3'
+SELECT * FROM aux.sqlite_master WHERE name = 't3'
+INSERT INTO t3 VALUES(1, 2)
+SELECT * FROM t3
+CREATE INDEX aux.i1 on t3(e)
+SELECT * FROM sqlite_master WHERE name = 'i1'
+SELECT * FROM aux.sqlite_master WHERE name = 'i1'
+DROP INDEX aux.i1
+DROP INDEX i1
+ATTACH DATABASE '' AS aux
+CREATE TABLE IF NOT EXISTS aux.t1(a, b)
+CREATE TEMPORARY TRIGGER tr1 DELETE ON t1 BEGIN DELETE FROM t1; END
+CREATE TABLE temp.t1(a, b)
+DETACH DATABASE aux
+DROP TRIGGER tr1
+SELECT name FROM sqlite_master WHERE type='table'
+CREATE TABLE t1(x INTEGER PRIMARY KEY AUTOINCREMENT, y)
+SELECT * FROM sqlite_sequence
+INSERT INTO t1 VALUES(12,34)
+INSERT INTO t1 VALUES(1,23)
+INSERT INTO t1 VALUES(123,456)
+INSERT INTO t1 VALUES(NULL,567)
+DELETE FROM t1 WHERE y=567
+INSERT INTO t1 VALUES(125,456)
+INSERT INTO t1 VALUES(-1234567,-1)
+INSERT INTO t1 VALUES(234,5678)
+INSERT INTO t1 VALUES(NULL,1)
+CREATE TABLE t1(w int, x int, y int, z int)
+INSERT INTO t1 VALUES(:w,:x,:y,:z)
+CREATE UNIQUE INDEX i1w ON t1(w)
+CREATE INDEX i1xy ON t1(x,y)
+CREATE INDEX i1zyx ON t1(z,y,x)
+CREATE TABLE t1(x TEXT, y TEXT COLLATE nocase)
+INSERT INTO t1 VALUES('0', 'abc')
+CREATE TABLE t1(x, y)
+INSERT INTO t1 VALUES(4, 4)
+SELECT * FROM t1 LEFT JOIN t2 ON (x BETWEEN 1 AND 3)
+SELECT * FROM t1 LEFT JOIN t2 ON (x BETWEEN 5 AND 7)
+SELECT x'616263'
+SELECT typeof(x'616263')
+SELECT CAST(x'616263' AS text)
+SELECT typeof(CAST(x'616263' AS text))
+SELECT CAST(x'616263' AS numeric)
+SELECT typeof(CAST(x'616263' AS numeric))
+SELECT CAST(x'616263' AS blob)
+SELECT typeof(CAST(x'616263' AS blob))
+SELECT CAST(x'616263' AS integer)
+SELECT typeof(CAST(x'616263' AS integer))
+SELECT null
+SELECT typeof(NULL)
+CREATE TABLE t1( x INTEGER CHECK( x<5 ), y REAL CHECK( y>x ) )
+DELETE FROM t1 WHERE x IS NULL OR x!=3
+UPDATE t1 SET x=2 WHERE x==3
+PRAGMA writable_schema = 1
+CREATE TABLE t2( x INTEGER CONSTRAINT one CHECK( typeof(coalesce(x,0))=="integer" ), y REAL CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='real' ), z TEXT CONSTRAINT three CHECK( typeof(coalesce(z,''))=='text' ) )
+CREATE TABLE t2n( x INTEGER CONSTRAINT one CHECK( typeof(coalesce(x,0))=="integer" ), y NUMERIC CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='real' ), z TEXT CONSTRAINT three CHECK( typeof(coalesce(z,''))=='text' ) )
+PRAGMA writable_schema = 0
+INSERT INTO t2 VALUES(1,2.2,'three')
+INSERT INTO t2 VALUES(NULL, NULL, NULL)
+CREATE TABLE t2b( x INTEGER CHECK( typeof(coalesce(x,0))=='integer' ) CONSTRAINT one, y TEXT PRIMARY KEY constraint two, z INTEGER, UNIQUE(x,z) constraint three )
+CREATE TABLE t2c( x INTEGER CONSTRAINT x_one CONSTRAINT x_two CHECK( typeof(coalesce(x,0))=='integer' ) CONSTRAINT x_two CONSTRAINT x_three, y INTEGER, z INTEGER, CONSTRAINT u_one UNIQUE(x,y,z) CONSTRAINT u_two )
+DROP TABLE IF EXISTS t2b
+CREATE TABLE t1 (Col0 CHECK(1 COLLATE BINARY BETWEEN 1 AND 1) )
+CREATE TABLE t2(b, a CHECK( CASE 'abc' COLLATE nocase WHEN a THEN 1 ELSE 0 END) )
+INSERT INTO t1 VALUES ('ABCDEFG')
+INSERT INTO t2(a) VALUES('abc')
+CREATE TABLE collate1t1(c1, c2)
+INSERT INTO collate1t1 VALUES(45, hex(45))
+INSERT INTO collate1t1 VALUES(NULL, NULL)
+INSERT INTO collate1t1 VALUES(281, hex(281))
+SELECT c2 FROM collate1t1 ORDER BY 1
+SELECT c2 FROM collate1t1 ORDER BY 1 COLLATE hex
+SELECT c2 FROM collate1t1 ORDER BY 1 COLLATE hex DESC
+SELECT c2 FROM collate1t1 ORDER BY 1 COLLATE hex ASC
+SELECT c2 COLLATE hex FROM collate1t1 ORDER BY 1
+SELECT c2 COLLATE hex FROM collate1t1 ORDER BY 1 ASC
+SELECT c2 COLLATE hex FROM collate1t1 ORDER BY 1 DESC
+DROP TABLE collate1t1
+CREATE TABLE collate2t1( a COLLATE BINARY, b COLLATE NOCASE, c COLLATE BACKWARDS )
+INSERT INTO collate2t1 VALUES( NULL, NULL, NULL )
+INSERT INTO collate2t1 VALUES( 'aa', 'aa', 'aa' )
+INSERT INTO collate2t1 VALUES( 'ab', 'ab', 'ab' )
+INSERT INTO collate2t1 VALUES( 'ba', 'ba', 'ba' )
+INSERT INTO collate2t1 VALUES( 'bb', 'bb', 'bb' )
+INSERT INTO collate2t1 VALUES( 'aA', 'aA', 'aA' )
+INSERT INTO collate2t1 VALUES( 'aB', 'aB', 'aB' )
+INSERT INTO collate2t1 VALUES( 'bA', 'bA', 'bA' )
+INSERT INTO collate2t1 VALUES( 'bB', 'bB', 'bB' )
+INSERT INTO collate2t1 VALUES( 'Aa', 'Aa', 'Aa' )
+INSERT INTO collate2t1 VALUES( 'Ab', 'Ab', 'Ab' )
+CREATE TABLE collate3t1(c1 UNIQUE)
+DROP TABLE collate3t1
+CREATE TABLE t1(a COLLATE caseless)
+INSERT INTO t1 VALUES('Abc2')
+INSERT INTO t1 VALUES('abc1')
+INSERT INTO t1 VALUES('aBc3')
+SELECT * FROM t1 ORDER BY a
+CREATE INDEX i1 ON t1(a)
+CREATE TABLE t1(a)
+CREATE INDEX i1 ON t1(a COLLATE caseless)
+SELECT * FROM t1 ORDER BY a COLLATE caseless
+CREATE TABLE collate3t1(c1 COLLATE string_compare, c2)
+CREATE TABLE collate4t1(a COLLATE NOCASE, b COLLATE TEXT)
+INSERT INTO collate4t1 VALUES( 'a', 'a' )
+INSERT INTO collate4t1 VALUES( 'b', 'b' )
+INSERT INTO collate4t1 VALUES( NULL, NULL )
+INSERT INTO collate4t1 VALUES( 'B', 'B' )
+INSERT INTO collate4t1 VALUES( 'A', 'A' )
+CREATE INDEX collate4i1 ON collate4t1(a)
+CREATE INDEX collate4i2 ON collate4t1(b)
+CREATE TABLE collate4t2( a PRIMARY KEY COLLATE NOCASE, b UNIQUE COLLATE TEXT )
+INSERT INTO collate4t2 VALUES( 'a', 'a' )
+INSERT INTO collate4t2 VALUES( NULL, NULL )
+INSERT INTO collate4t2 VALUES( 'B', 'B' )
+CREATE TABLE collate5t1(a COLLATE nocase, b COLLATE text)
+INSERT INTO collate5t1 VALUES('a', 'apple')
+INSERT INTO collate5t1 VALUES('A', 'Apple')
+INSERT INTO collate5t1 VALUES('b', 'banana')
+INSERT INTO collate5t1 VALUES('B', 'banana')
+INSERT INTO collate5t1 VALUES('n', NULL)
+INSERT INTO collate5t1 VALUES('N', NULL)
+SELECT DISTINCT a FROM collate5t1
+SELECT DISTINCT b FROM collate5t1
+SELECT DISTINCT a, b FROM collate5t1
+CREATE TABLE tkt3376(a COLLATE nocase PRIMARY KEY)
+INSERT INTO tkt3376 VALUES('abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz')
+CREATE TABLE collate6log(a, b)
+CREATE TABLE collate6tab(a COLLATE NOCASE, b COLLATE BINARY)
+CREATE TRIGGER collate6trig BEFORE INSERT ON collate6tab WHEN new.a = 'a' BEGIN INSERT INTO collate6log VALUES(new.a, new.b); END
+INSERT INTO collate6tab VALUES('a', 'b')
+SELECT * FROM collate6log
+INSERT INTO collate6tab VALUES('A', 'B')
+DROP TRIGGER collate6trig
+DELETE FROM collate6log
+CREATE TRIGGER collate6trig BEFORE INSERT ON collate6tab BEGIN INSERT INTO collate6log VALUES(new.a='a', new.b='b'); END
+DROP TABLE collate6tab
+CREATE TABLE abc(a COLLATE binary, b, c)
+CREATE TABLE def(a, b, c)
+PRAGMA encoding='utf-16'
+CREATE TABLE abc16(a COLLATE CASELESS, b, c)
+SELECT * FROM abc16 WHERE a < 'abc'
+CREATE TABLE t1(a TEXT COLLATE nocase)
+INSERT INTO t1 VALUES('aaa')
+INSERT INTO t1 VALUES('BBB')
+INSERT INTO t1 VALUES('ccc')
+INSERT INTO t1 VALUES('DDD')
+SELECT a FROM t1 ORDER BY a
+SELECT rowid FROM t1 WHERE a<'ccc' ORDER BY 1
+SELECT rowid FROM t1 WHERE a<'ccc' COLLATE binary ORDER BY 1
+SELECT rowid FROM t1 WHERE +a<'ccc' ORDER BY 1
+SELECT a FROM t1 ORDER BY +a
+SELECT a AS x FROM t1 ORDER BY "x"
+SELECT a AS x FROM t1 WHERE x<'ccc' ORDER BY 1
+CREATE TABLE xy(x COLLATE "reverse sort", y COLLATE binary)
+INSERT INTO xy VALUES('one', 'one')
+INSERT INTO xy VALUES('two', 'two')
+INSERT INTO xy VALUES('three', 'three')
+SELECT x FROM xy ORDER BY x
+SELECT y FROM xy ORDER BY y
+CREATE INDEX xy_i ON xy(x)
+SELECT x, x < 'seven' FROM xy ORDER BY x
+SELECT y, y < 'seven' FROM xy ORDER BY x
+SELECT y, y COLLATE "reverse sort" < 'seven' FROM xy ORDER BY x
+SELECT y FROM xy ORDER BY y COLLATE "reverse sort"
+SELECT y COLLATE "reverse sort" AS aaa FROM xy ORDER BY aaa
+CREATE TABLE t1( a INTEGER PRIMARY KEY, b TEXT COLLATE BINARY, c TEXT COLLATE RTRIM )
+INSERT INTO t1 VALUES(1, 'abcde','abcde')
+INSERT INTO t1 VALUES(2, 'xyzzy ','xyzzy ')
+INSERT INTO t1 VALUES(3, 'xyzzy ','xyzzy ')
+INSERT INTO t1 VALUES(4, 'xyzzy ','xyzzy ')
+INSERT INTO t1 VALUES(5, ' ', ' ')
+INSERT INTO t1 VALUES(6, '', '')
+SELECT count(*) FROM t1
+SELECT a FROM t1 WHERE b='abcde '
+SELECT a FROM t1 WHERE c='abcde '
+SELECT a FROM t1 WHERE b='xyzzy'
+SELECT a FROM t1 WHERE c='xyzzy'
+CREATE TABLE t1(a INTEGER PRIMARY KEY)
+CREATE TABLE t2(b INTEGER PRIMARY KEY, x1 INT COLLATE NOCASE)
+CREATE TABLE t3(x2 INT)
+SELECT * FROM t3, t2, t1 WHERE x2=b AND x1=a AND a=1
+INSERT INTO t1(a) VALUES(1),(2),(3)
+INSERT INTO t2(b,x1) VALUES(11,1),(22,2),(33,3)
+INSERT INTO t3(x2) VALUES(11),(22),(33)
+SELECT *,'|' FROM t3, t2, t1 WHERE x2=b AND x1=a AND a=1
+SELECT *,'|' FROM t3, t1, t2 WHERE x2=b AND x1=a AND a=1
+SELECT *,'|' FROM t2, t3, t1 WHERE x2=b AND x1=a AND a=1
+SELECT *,'|' FROM t2, t1, t3 WHERE x2=b AND x1=a AND a=1
+SELECT *,'|' FROM t1, t2, t3 WHERE x2=b AND x1=a AND a=1
+CREATE TABLE t1(a, b, c, UNIQUE(a,b))
+CREATE TABLE t2(x)
+SELECT c FROM t1 ORDER BY c
+SELECT c FROM t1
+SELECT x FROM t2
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c, UNIQUE(a,b))
+CREATE TABLE t1(a, b, c INTEGER, PRIMARY KEY(c), UNIQUE(a,b))
+INSERT INTO t2 VALUES(1,2,1)
+INSERT INTO t2 VALUES(2,3,2)
+INSERT INTO t2 VALUES(3,4,1)
+INSERT INTO t2 VALUES(4,5,4)
+SELECT c FROM t2 ORDER BY b
+CREATE TABLE t1(a, b, c, PRIMARY KEY(a,b)) WITHOUT rowid
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c, UNIQUE(a,b)) WITHOUT rowid
+CREATE TABLE t1(a, b, c INTEGER, PRIMARY KEY(c), UNIQUE(a,b)) WITHOUT rowid
+CREATE TABLE t3(x)
+INSERT INTO t3 VALUES(1)
+pragma temp_store=file
+SELECT a FROM t1 ORDER BY b
+SELECT x FROM t3
+DROP TABLE t3
+CREATE TABLE t1(a PRIMARY KEY, b) without rowid
+SELECT count(*), min(a), max(b) FROM t1
+PRAGMA count_changes=on
+CREATE TABLE t1( a INTEGER PRIMARY KEY ON CONFLICT REPLACE, b UNIQUE ON CONFLICT IGNORE, c UNIQUE ON CONFLICT FAIL )
+INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4)
+SELECT a,b,c FROM t1 ORDER BY a
+INSERT INTO t1(a,b,c) VALUES(3,2,5)
+CREATE TABLE t1( a INT PRIMARY KEY ON CONFLICT REPLACE, b UNIQUE ON CONFLICT IGNORE, c UNIQUE ON CONFLICT FAIL )
+CREATE TABLE t1( a INT PRIMARY KEY ON CONFLICT REPLACE, b UNIQUE ON CONFLICT IGNORE, c UNIQUE ON CONFLICT FAIL ) WITHOUT ROWID
+CREATE TABLE t1( b UNIQUE ON CONFLICT IGNORE, c UNIQUE ON CONFLICT FAIL, a INT PRIMARY KEY ON CONFLICT REPLACE ) WITHOUT ROWID
+CREATE TABLE t1( b UNIQUE ON CONFLICT IGNORE, a INT PRIMARY KEY ON CONFLICT REPLACE, c UNIQUE ON CONFLICT FAIL )
+CREATE TABLE t1( c UNIQUE ON CONFLICT FAIL, a INT PRIMARY KEY ON CONFLICT REPLACE, b UNIQUE ON CONFLICT IGNORE )
+CREATE TABLE t1( a UNIQUE ON CONFLICT REPLACE, b INTEGER PRIMARY KEY ON CONFLICT IGNORE, c UNIQUE ON CONFLICT FAIL )
+CREATE TABLE t1( a UNIQUE ON CONFLICT REPLACE, b INT PRIMARY KEY ON CONFLICT IGNORE, c UNIQUE ON CONFLICT FAIL )
+CREATE TABLE t1( a UNIQUE ON CONFLICT REPLACE, b INT PRIMARY KEY ON CONFLICT IGNORE, c UNIQUE ON CONFLICT FAIL ) WITHOUT ROWID
+PRAGMA page_size=1024
+CREATE TABLE t1(x INTEGER PRIMARY KEY, y)
+INSERT INTO t1 VALUES(1, hex(randomblob(200)))
+INSERT INTO t1 VALUES(2, hex(randomblob(200)))
+INSERT INTO t1 VALUES(3, hex(randomblob(200)))
+INSERT INTO t1 VALUES(4, hex(randomblob(200)))
+PRAGMA encoding
+CREATE TABLE t2(a,b)
+INSERT INTO t2 VALUES(1,2)
+CREATE TABLE t3(a,b)
+INSERT INTO t3 VALUES(4,5)
+CREATE TABLE t4(a,b)
+CREATE TABLE t1( a INTEGER, b BLOB DEFAULT x'6869' )
+INSERT INTO t1(a) VALUES(1)
+SELECT * from t1
+CREATE TABLE t2( x INTEGER, y INTEGER DEFAULT NULL )
+INSERT INTO t2(x) VALUES(1)
+CREATE TABLE t4(c DEFAULT 'abc')
+PRAGMA table_info(t4)
+INSERT INTO t4 DEFAULT VALUES
+CREATE TABLE t3( a INTEGER PRIMARY KEY AUTOINCREMENT, b INT DEFAULT 12345 UNIQUE NOT NULL CHECK( b>=0 AND b<99999 ), c VARCHAR(123,456) DEFAULT 'hello' NOT NULL ON CONFLICT REPLACE, d REAL, e FLOATING POINT(5,10) DEFAULT 4.36, f NATIONAL CHARACTER(15) COLLATE RTRIM, g LONG INTEGER DEFAULT( 3600*12 ) )
+INSERT INTO t3 VALUES(null, 5, 'row1', '5.25', 'xyz', 321, '432')
+SELECT a, typeof(a), b, typeof(b), c, typeof(c), d, typeof(d), e, typeof(e), f, typeof(f), g, typeof(g) FROM t3
+DELETE FROM t3
+DELETE FROM test1
+DELETE FROM sqlite_master
+CREATE TABLE table1(f1 int, f2 int)
+INSERT INTO table1 VALUES(1,2)
+INSERT INTO table1 VALUES(2,4)
+INSERT INTO table1 VALUES(3,8)
+INSERT INTO table1 VALUES(4,16)
+SELECT * FROM table1 ORDER BY f1
+DELETE FROM table1 WHERE f1=3
+CREATE INDEX index1 ON table1(f1)
+DELETE FROM 'table1' WHERE f1=3
+DELETE FROM table1 WHERE f1=2
+CREATE TABLE q(s string, id string, constraint pk_q primary key(id))
+INSERT INTO q(s,id) VALUES('hello','id.1')
+INSERT INTO q(s,id) VALUES('goodbye','id.2')
+INSERT INTO q(s,id) VALUES('again','id.3')
+SELECT * FROM q
+SELECT * FROM q WHERE id='id.1'
+INSERT INTO t2 VALUES(3, 4)
+INSERT INTO t2 VALUES(5, 6)
+CREATE TABLE t1(x integer primary key)
+INSERT INTO t1 VALUES(1)
+INSERT INTO t1 VALUES(2)
+INSERT INTO t1 SELECT x+2 FROM t1
+INSERT INTO t1 SELECT x+4 FROM t1
+INSERT INTO t1 SELECT x+8 FROM t1
+INSERT INTO t1 SELECT x+16 FROM t1
+INSERT INTO t1 SELECT x+32 FROM t1
+INSERT INTO t1 SELECT x+64 FROM t1
+INSERT INTO t1 SELECT x+128 FROM t1
+INSERT INTO t1 SELECT x+256 FROM t1
+INSERT INTO t1 SELECT x+512 FROM t1
+INSERT INTO t1 VALUES(1, 0)
+INSERT INTO t1 VALUES(2, 1)
+INSERT INTO t1 VALUES(3, 0)
+INSERT INTO t1 VALUES(4, 1)
+INSERT INTO t1 VALUES(5, 0)
+INSERT INTO t1 VALUES(6, 1)
+INSERT INTO t1 VALUES(7, 0)
+INSERT INTO t1 VALUES(8, 1)
+DELETE FROM t1 WHERE y=1
+SELECT x FROM t1
+CREATE TABLE t1(x INTEGER PRIMARY KEY, y, z)
+INSERT INTO t1 VALUES(1, 0, randomblob(200))
+PRAGMA journal_mode = wal
+INSERT INTO t1 VALUES(3, 4)
+PRAGMA auto_vacuum = 0
+CREATE TABLE x1(a, b)
+WITH s(i) AS ( VALUES(1) UNION ALL SELECT i+1 FROM s WHERE i<1000 ) INSERT INTO x1 SELECT randomblob(100), randomblob(100) FROM s
+UPDATE x1 SET a=randomblob(101)
+UPDATE x1 SET a=randomblob(102)
+CREATE UNIQUE INDEX i1 ON t1(b, c)
+CREATE UNIQUE INDEX i2 ON t1(d COLLATE nocase)
+CREATE TABLE t2(x INTEGER PRIMARY KEY, y)
+CREATE TABLE t3(c1 PRIMARY KEY NOT NULL, c2 NOT NULL)
+CREATE INDEX i3 ON t3(c2)
+CREATE TABLE t4(a, b NOT NULL, c NOT NULL, d NOT NULL)
+CREATE UNIQUE INDEX t4i1 ON t4(b, c)
+CREATE UNIQUE INDEX t4i2 ON t4(d COLLATE nocase)
+CREATE INDEX i2 ON t1(b COLLATE nocase, c COLLATE nocase)
+INSERT INTO t1 VALUES('a', 'b', 'c')
+INSERT INTO t1 VALUES('A', 'B', 'C')
+SELECT (SELECT DISTINCT o.a FROM t1 AS i) FROM t1 AS o ORDER BY rowid
+CREATE TABLE t1(x INTEGER PRIMARY KEY)
+INSERT INTO t1 VALUES(0),(1),(2)
+CREATE TABLE t2 AS SELECT DISTINCT a.x AS aa, b.x AS bb FROM t1 a, t1 b
+SELECT *, '|' FROM t2 ORDER BY aa, bb
+CREATE TABLE t2 AS SELECT DISTINCT a.x AS aa, b.x AS bb FROM t1 a, t1 b WHERE a.x IN t1 AND b.x IN t1
+CREATE TABLE t102 (i0 TEXT UNIQUE NOT NULL)
+INSERT INTO t102 VALUES ('0'),('1'),('2')
+CREATE TABLE t2 AS SELECT DISTINCT * FROM t102 AS t0 JOIN t102 AS t4 ON (t2.i0 IN t102) NATURAL JOIN t102 AS t3 JOIN t102 AS t1 ON (t0.i0 IN t102) JOIN t102 AS t2 ON (t2.i0=+t0.i0 OR (t0.i0<>500 AND t2.i0=t1.i0))
+SELECT *, '|' FROM t2 ORDER BY 1, 2, 3, 4, 5
+CREATE TABLE t4(a,b,c,d,e,f,g,h,i,j)
+INSERT INTO t4 VALUES(0,1,2,3,4,5,6,7,8,9)
+INSERT INTO t4 SELECT * FROM t4
+INSERT INTO t1 VALUES(1,2,3)
+INSERT INTO t1 VALUES(1,3,4)
+INSERT INTO t1 VALUES(1,3,5)
+SELECT count(distinct a), count(distinct b), count(distinct c), count(all a) FROM t1
+SELECT b, count(distinct c) FROM t1 GROUP BY b
+INSERT INTO t1 SELECT a+1, b+3, c+5 FROM t1
+INSERT INTO t1 SELECT a+2, b+6, c+10 FROM t1
+INSERT INTO t1 SELECT a+4, b+12, c+20 FROM t1
+SELECT count(*), count(distinct a), count(distinct b) FROM t1
+SELECT a, count(distinct c) FROM t1 GROUP BY a ORDER BY a
+CREATE TABLE t2(d, e, f)
+INSERT INTO t1 VALUES (1, 1, 1)
+CREATE TABLE test1(i1 int, i2 int, r1 real, r2 real, t1 text, t2 text)
+INSERT INTO test1 VALUES(1,2,1.1,2.2,'hello','world')
+CREATE TABLE test1(i1 int, i2 int, t1 text, t2 text)
+INSERT INTO test1 VALUES(1,2,'hello','world')
+UPDATE test1 SET %s
+SELECT %s FROM test1
+DROP TABLE test1
+CREATE TABLE test1(a int, b int)
+SELECT * FROM test1 ORDER BY a
+SELECT a FROM test1 WHERE %s ORDER BY a
+SELECT CURRENT_TIME
+SELECT CURRENT_DATE
+INSERT INTO t0(c0) VALUES ('val')
+SELECT * FROM t0 WHERE ( ( (0 IS NOT FALSE) OR NOT (0 IS FALSE OR (t0.c0 = 1)) ) IS 0 )
+SELECT ( (0 IS NOT FALSE) OR NOT (0 IS FALSE OR (t0.c0 = 1)) ) IS 0 FROM t0
+SELECT ( (0 IS NOT FALSE) OR NOT (0 IS 0 OR (t0.c0 = 1)) ) IS 0 FROM t0
+SELECT ( (0 IS NOT FALSE) OR NOT (0 IS FALSE OR (t0.c0 = 1)) ) FROM t0
+SELECT (0 IS NOT FALSE) FROM t0
+SELECT NOT (0 IS FALSE OR (t0.c0 = 1)) FROM t0
+CREATE TABLE t2(d)
+SELECT a = ( SELECT d FROM (SELECT d FROM t2) ) FROM t1
+SELECT hex ( unhex('ABCDEF') )
+CREATE TABLE t1(a,b,c,d,f,PRIMARY KEY(b,b))
+CREATE TABLE t2(x INT PRIMARY KEY, y, z)
+CREATE TABLE t3(a,b,c,d,e,PRIMARY KEY(a,b))WITHOUT ROWID
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b REAL)
+INSERT INTO t1 VALUES(10, 10.0)
+INSERT INTO t1 VALUES(15, 15.0)
+INSERT INTO t1 VALUES(20, 20.0)
+INSERT INTO t1 VALUES(25, 25.0)
+INSERT INTO t1 VALUES(30, 30.0)
+CREATE INDEX i1 ON t1((b+0.0))
+UPDATE x1 SET b=21.0 WHERE rowid=20
+DELETE FROM t1 WHERE a=20
+UPDATE x1 SET b=26.0 WHERE rowid=25
+DELETE FROM t1 WHERE a=25
+INSERT INTO t1 VALUES(5, 15.0)
+CREATE TABLE tbl1(t1 text)
+SELECT t1 FROM tbl1 ORDER BY t1
+CREATE TABLE t2(a)
+INSERT INTO t2 VALUES(1)
+INSERT INTO t2 VALUES(NULL)
+INSERT INTO t2 VALUES(345)
+INSERT INTO t2 VALUES(67890)
+SELECT length(t1) FROM tbl1 ORDER BY t1
+SELECT octet_length(t1) FROM tbl1 ORDER BY t1
+SELECT length(*) FROM tbl1 ORDER BY t1
+SELECT length(t1,5) FROM tbl1 ORDER BY t1
+SELECT length(t1), count(*) FROM tbl1 GROUP BY length(t1) ORDER BY length(t1)
+SELECT 'Supercalifragilisticexpialidocious'
+SELECT SUBSTR('Supercalifragilisticexpialidocious', 0)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', 1)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', 2)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', 30)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', 34)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', 35)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', 36)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', -0)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', -1)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', -2)
+SELECT SUBSTR('Supercalifragilisticexpialidocious', -30)
+SELECT likelihood(9223372036854775807, 0.5)
+SELECT likelihood(-9223372036854775808, 0.5)
+SELECT likelihood(14.125, 0.5)
+SELECT likelihood(NULL, 0.5)
+SELECT likelihood('test-string', 0.5)
+SELECT quote(likelihood(x'010203000405', 0.5))
+SELECT likelihood(123, 1.0), likelihood(456, 0.0)
+SELECT unlikely(9223372036854775807)
+SELECT unlikely(-9223372036854775808)
+SELECT unlikely(14.125)
+SELECT unlikely(NULL)
+SELECT unlikely('test-string')
+SELECT tointeger(NULL)
+SELECT tointeger('')
+SELECT tointeger(' ')
+SELECT tointeger('1234')
+SELECT tointeger(' 1234')
+SELECT tointeger('bad')
+SELECT tointeger('0xBAD')
+SELECT tointeger('123BAD')
+SELECT tointeger('0x123BAD')
+SELECT tointeger('123NO')
+SELECT tointeger('0x123NO')
+SELECT tointeger('-0x1')
+PRAGMA encoding=UTF16le
+CREATE TABLE t1(x,a,b,c)
+INSERT INTO t1 VALUES(1,'ab','cd',1)
+INSERT INTO t1 VALUES(2,'gh','ef',5)
+INSERT INTO t1 VALUES(3,'pqr','fuzzy',99)
+INSERT INTO t1 VALUES(4,'abcdefg','xy',22)
+INSERT INTO t1 VALUES(5,'shoe','mayer',2953)
+SELECT x FROM t1 WHERE c=instr('abcdefg',b) OR a='abcdefg' ORDER BY +x
+SELECT x FROM t1 WHERE a='abcdefg' OR c=instr('abcdefg',b) ORDER BY +x
+INSERT INTO t2 VALUES(1,2),(3,4),(5,6),(7,8)
+SELECT x, y FROM t2 WHERE x+5=5+x ORDER BY +x
+SELECT x, y FROM t2 WHERE x+counter1('hello')=counter1('hello')+x ORDER BY +x
+PRAGMA page_size=4096
+PRAGMA auto_vacuum=NONE
+WITH RECURSIVE c(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM c WHERE x<100) INSERT INTO t1(a,b,c,d) SELECT printf('abc%03x',x), x, 1000-x, NULL FROM c
+CREATE INDEX t1bc ON t1(b,c)
+CREATE TABLE t2(x TEXT PRIMARY KEY, y) WITHOUT ROWID
+INSERT INTO t2(x,y) SELECT a, b FROM t1
+SELECT sqlite_offset(d) FROM t1 ORDER BY rowid LIMIT 1
+SELECT offrec(sqlite_offset(d), a, b, c, d) FROM t1 ORDER BY rowid
+SELECT a, typeof(sqlite_offset(+a)) FROM t1 ORDER BY rowid LIMIT 2
+SELECT offrec(sqlite_offset(a), a, rowid) FROM t1 ORDER BY a
+SELECT offrec(sqlite_offset(d), a, b, c, d) FROM t1 ORDER BY a
+SELECT offrec(sqlite_offset(a), a, rowid), offrec(sqlite_offset(d), a, b, c, d) FROM t1 ORDER BY a
+SELECT ceil(99.9), ceiling(-99.01), floor(17), floor(-17.99)
+SELECT quote(ceil(NULL)), ceil('-99.99')
+SELECT round(ln(5),2), log(100.0), log(100), log(2,'256')
+SELECT ln(-5), log(-5,100.0)
+SELECT abs(-17.4)
+SELECT ceil(42.2)
+SELECT ceil(-42.2)
+SELECT round(exp(1.0),7)
+SELECT floor(42.8)
+SELECT floor(-42.8)
+SELECT round(ln(2.0),7)
+SELECT log(100.0)
+CREATE TABLE cross(cross,full,inner,left,natural,outer,right)
+CREATE TABLE full(cross,full,inner,left,natural,outer,right)
+CREATE TABLE inner(cross,full,inner,left,natural,outer,right)
+CREATE TABLE left(cross,full,inner,left,natural,outer,right)
+CREATE TABLE natural(cross,full,inner,left,natural,outer,right)
+CREATE TABLE outer(cross,full,inner,left,natural,outer,right)
+CREATE TABLE right(cross,full,inner,left,natural,outer,right)
+INSERT INTO cross VALUES(1,2,3,4,5,6,7)
+INSERT INTO full VALUES(1,2,3,4,5,6,7)
+INSERT INTO inner VALUES(1,2,3,4,5,6,7)
+INSERT INTO left VALUES(1,2,3,4,5,6,7)
+INSERT INTO natural VALUES(1,2,3,4,5,6,7)
+SELECT concat('abc',123,null,'xyz')
+SELECT typeof(concat(null))
+SELECT concat_ws(',',1,2,3,4,5,6,7,8,NULL,9,10,11,12)
+SELECT concat_ws(',',1,2,3,4,'',6,7,8,NULL,9,10,11,12)
+SELECT concat_ws(',','',2,3,4,'',6,7,8,NULL,9,10,11,12)
+SELECT concat_ws(',',NULL,'',3,4,'',6,7,8,NULL,9,10,11,12)
+SELECT concat_ws(',',NULL,NULL,NULL,'',3,4,'',6,7,8,NULL,9,10,11,12)
+SELECT concat_ws(NULL,1,2,3,4,5,6,7,8,NULL,9,10,11,12)
+CREATE TABLE test1(f1 int, f2 int, f3 int)
+CREATE INDEX index1 ON test1(f1)
+SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name
+SELECT name, sql, tbl_name, type FROM sqlite_master WHERE name='index1'
+CREATE INDEX index1 ON test1(f4)
+CREATE INDEX index1 ON test1(f1, f2, f4, f3)
+CREATE TABLE test1(f1 int, f2 int, f3 int, f4 int, f5 int)
+SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='test1' ORDER BY name
+CREATE TABLE test1(cnt int, power int)
+CREATE INDEX index9 ON test1(cnt)
+CREATE INDEX indext ON test1(power)
+SELECT cnt FROM test1 WHERE power=4
+SELECT c123 FROM t1
+SELECT round(sum(c1000)) FROM t1
+SELECT c9 FROM t1 ORDER BY c1, c2, c3, c4, c5, c6 LIMIT 5
+CREATE TABLE t1(a, b, c, d, e, PRIMARY KEY('a'), UNIQUE('b' COLLATE nocase DESC))
+CREATE INDEX t1c ON t1('c')
+CREATE INDEX t1d ON t1('d' COLLATE binary ASC)
+WITH RECURSIVE c(x) AS (VALUES(1) UNION SELECT x+1 FROM c WHERE x<30) INSERT INTO t1(a,b,c,d,e) SELECT x, printf('ab%03xxy',x), x, x, x FROM c
+SELECT a FROM t1 WHERE b='ab005xy' COLLATE nocase
+SELECT name FROM sqlite_master WHERE tbl_name='t1' ORDER BY name
+SELECT name FROM sqlite_master WHERE tbl_name LIKE 't2_' ORDER BY name
+PRAGMA writable_schema=on
+UPDATE sqlite_master SET sql='nonsense' WHERE name='t1d'
+INSERT INTO t1 VALUES(randomblob(102))
+INSERT INTO t1 SELECT randomblob(102) FROM t1
+PRAGMA cache_size = 10
+CREATE INDEX i2 ON t1(x)
+INSERT INTO t1 VALUES('a')
+INSERT INTO t1 VALUES('b')
+INSERT INTO t1 VALUES('c')
+INSERT INTO t1 VALUES('d')
+INSERT INTO t1 VALUES('e')
+INSERT INTO t1 VALUES('f')
+INSERT INTO t1 VALUES('g')
+INSERT INTO t1 VALUES(NULL)
+PRAGMA page_size = 1024
+INSERT INTO t1 VALUES(randstr(100,100))
+DROP INDEX I1
+PRAGMA main.page_size
+CREATE INDEX t1a ON t1(a) WHERE a IS NOT NULL
+CREATE INDEX t1b ON t1(b) WHERE b>10
+INSERT INTO t1(a,b,c) SELECT CASE WHEN value%3!=0 THEN value END, value, value FROM nums WHERE value<=20
+SELECT count(a), count(b) FROM t1
+DROP INDEX IF EXISTS bad1
+UPDATE t1 SET a=b
+UPDATE t1 SET a=NULL WHERE b%3!=0
+UPDATE t1 SET b=b+100
+UPDATE t1 SET a=CASE WHEN b%3!=0 THEN b END
+UPDATE t1 SET b=b-100
+DELETE FROM t1 WHERE b BETWEEN 8 AND 12
+CREATE INDEX t1c ON t1(c)
+CREATE TABLE t1(a,b,c PRIMARY KEY) WITHOUT rowid
+INSERT INTO t1(a,b,c) VALUES('abcde',1,101),('abdef',2,102),('xyz',3,103),('abcz',4,104)
+SELECT c FROM t1 WHERE a NOT LIKE 'abc%' AND a=7 ORDER BY +b
+DELETE FROM t1 WHERE c>=101
+CREATE TABLE t2(a,b PRIMARY KEY) without rowid
+INSERT INTO t2(a,b) SELECT value, value FROM nums WHERE value<1000
+UPDATE t2 SET a=NULL WHERE b%5==0
+CREATE INDEX t2a1 ON t2(a) WHERE a IS NOT NULL
+SELECT count(*) FROM t2 WHERE a IS NOT NULL
+DROP INDEX t2a1
+UPDATE t2 SET a=b, b=b+10000
+SELECT b FROM t2 WHERE a=15
+WITH RECURSIVE c(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM c WHERE x<100) INSERT INTO t1(a,b,c,d) SELECT x/10, x%10, x%19, x FROM c
+CREATE INDEX t1abc ON t1(a,b,c)
+SELECT * FROM t1 WHERE c=4 ORDER BY a, b LIMIT 2
+DROP INDEX t1abc
+CREATE INDEX t1abd ON t1(a,b,d)
+CREATE INDEX t1x ON t1(x) WHERE y=45
+CREATE INDEX t1x2 ON t1(x) WHERE y=-20111000111
+CREATE INDEX t1x3 ON t1(x) WHERE y=9223372036854775807
+CREATE INDEX t1x4 ON t1(x) WHERE y=-9223372036854775808
+CREATE TABLE t1(a TEXT, b, c)
+CREATE INDEX i1 ON t1(b, c) WHERE a='abc'
+INSERT INTO t1 VALUES('abc', 1, 2)
+SELECT * FROM t1 WHERE a='abc'
+CREATE INDEX i2 ON t1(b, c) WHERE a=5
+INSERT INTO t1 VALUES(5, 4, 3)
+SELECT a, typeof(a), b, c FROM t1 WHERE a=5
+INSERT INTO t2 VALUES('v')
+SELECT x, a, b, c FROM t2 LEFT JOIN t1 ON (a=5 AND b=x)
+SELECT x, a, b, c FROM t2 RIGHT JOIN t1 ON (t1.a=5 AND t1.b=t2.x)
+CREATE TABLE x1(a TEXT, b, c)
+INSERT INTO x1 VALUES('2', 'two', 'ii')
+CREATE INDEX i2 ON t1(b)
+CREATE INDEX i3 ON t2(c)
+CREATE INDEX i4 ON t2(d)
+CREATE TABLE t3(e PRIMARY KEY, f)
+CREATE VIEW v1 AS SELECT * FROM t1
+SELECT * FROM t1 NOT INDEXED WHERE a = 'one' AND b = 'two'
+SELECT * FROM main.t1 NOT INDEXED WHERE a = 'one' AND b = 'two'
+SELECT * FROM t1 INDEXED BY i1 WHERE a = 'one' AND b = 'two'
+SELECT * FROM main.t1 INDEXED BY i1 WHERE a = 'one' AND b = 'two'
+SELECT * FROM t1 INDEXED BY i2 WHERE a = 'one' AND b = 'two'
+CREATE VIEW v2 AS SELECT * FROM t1 INDEXED BY i1 WHERE a > 5
+CREATE INDEX i1 ON t1(b)
+INSERT INTO t1(a,b,c) /* 123456789 123456789 123456789 123456789 123456789 123456789 */ VALUES('In_the_beginning_was_the_Word',1,1), ('and_the_Word_was_with_God',1,2), ('and_the_Word_was_God',1,3), ('The_same_was_in_the_beginning_with_God',2,1), ('All_things_were_made_by_him',3,1), ('and_without_him_was_not_any_thing_made_that_was_made',3,2)
+CREATE INDEX t1a1 ON t1(substr(a,1,12))
+SELECT b, c, '|' FROM t1 WHERE substr(a,1,12)=='and_the_Word' ORDER BY b, c
+SELECT b, c, '|' FROM t1 WHERE 'and_the_Word'==substr(a,1,12) ORDER BY b, c
+CREATE INDEX t1ba ON t1(b,substr(a,2,3),c)
+SELECT c FROM t1 WHERE b=1 AND substr(a,2,3)='nd_' ORDER BY c
+SELECT rowid, substr(a,b,3), '|' FROM t1 ORDER BY 2
+CREATE INDEX t1abx ON t1(substr(a,b,3))
+SELECT rowid FROM t1 WHERE substr(a,b,3)<='and' ORDER BY +rowid
+SELECT rowid FROM t1 WHERE +substr(a,b,3)<='and' ORDER BY +rowid
+SELECT rowid FROM t1 WHERE substr(a,b,3) IN ('and','l_t','xyz') ORDER BY +rowid
+ALTER TABLE t1 ADD COLUMN d
+INSERT INTO t1 VALUES(1, 'one')
+INSERT INTO t1 VALUES(2, 'two')
+INSERT INTO t1 VALUES(3, 'three')
+CREATE INDEX i1 ON t1(b || 'x')
+SELECT 'TWOX' == (b || 'x') FROM t1 WHERE (b || 'x')>'onex'
+SELECT 'TWOX' == (b || 'x') COLLATE nocase FROM t1 WHERE (b || 'x')>'onex'
+CREATE INDEX i2 ON t1(a+1)
+SELECT a+1, quote(a+1) FROM t1 ORDER BY 1
+INSERT INTO t2 VALUES('.ABC')
+INSERT INTO t2 VALUES('.abcd')
+INSERT INTO t2 VALUES('.defg')
+INSERT INTO t2 VALUES('.DEF')
+INSERT INTO t1 VALUES(randomblob(202))
+INSERT INTO t1 SELECT randomblob(202) FROM t1
+CREATE TABLE t1(t,u,v,w,x,y,z)
+INSERT INTO t1 VALUES( randomblob(30), randomblob(30), randomblob(30), randomblob(30), randomblob(30), randomblob(30), randomblob(30) )
+INSERT INTO t1 SELECT randomblob(30), randomblob(30), randomblob(30), randomblob(30), randomblob(30), randomblob(30), randomblob(30) FROM t1
+CREATE INDEX i1 ON t1(t,u,v,w,x,y,z)
+INSERT INTO t1 VALUES(randomblob(11000))
+INSERT INTO t1 SELECT randomblob(11001) FROM t1
+INSERT INTO t1 SELECT randomblob(11002) FROM t1
+INSERT INTO t1 SELECT randomblob(11003) FROM t1
+INSERT INTO t1 SELECT randomblob(11004) FROM t1
+INSERT INTO t1 SELECT randomblob(11005) FROM t1
+INSERT INTO test1 VALUES(1,2,3)
+INSERT INTO sqlite_master VALUES(1,2,3,4)
+CREATE TABLE test1(one int, two int, three int)
+INSERT INTO test1 VALUES(1,2)
+INSERT INTO test1 VALUES(1,2,3,4)
+INSERT INTO test1(one,two) VALUES(1,2,3,4)
+INSERT INTO test1(one,two) VALUES(1)
+INSERT INTO test1(one,four) VALUES(1,2)
+SELECT * FROM test1
+INSERT INTO test1 VALUES(4,5,6)
+SELECT * FROM test1 ORDER BY one
+INSERT INTO test1 VALUES(7,8,9)
+CREATE TABLE d1(n int, log int)
+SELECT * FROM d1 ORDER BY n
+CREATE TABLE t1(log int, cnt int)
+INSERT INTO t1 SELECT log, count(*) FROM d1 GROUP BY log
+SELECT * FROM t1 ORDER BY log
+INSERT INTO t1 SELECT log, count(*) FROM d1 GROUP BY log EXCEPT SELECT n-1,log FROM d1
+PRAGMA count_changes=off
+INSERT INTO t1 SELECT log, count(*) FROM d1 GROUP BY log INTERSECT SELECT n-1,log FROM d1
+CREATE INDEX i1 ON t1(log)
+CREATE INDEX i2 ON t1(cnt)
+INSERT INTO t1 SELECT log, count() FROM d1 GROUP BY log
+SELECT cnt FROM t1 WHERE log=3
+CREATE TABLE log(x UNIQUE, y)
+CREATE TRIGGER r1 AFTER INSERT ON t1 BEGIN UPDATE log SET y=y+1 WHERE x=new.a; INSERT OR IGNORE INTO log VALUES(new.a, 1); END
+INSERT INTO t1 VALUES('hello','world')
+INSERT INTO t1 VALUES(5,10)
+SELECT * FROM log ORDER BY x
+INSERT INTO t1 SELECT a, b+10 FROM t1
+CREATE TABLE log2(x PRIMARY KEY,y)
+CREATE TRIGGER r2 BEFORE INSERT ON t1 BEGIN UPDATE log2 SET y=y+1 WHERE x=new.b; INSERT OR IGNORE INTO log2 VALUES(new.b,1); END
+INSERT INTO t1 VALUES(453,'hi')
+SELECT * FROM log2 ORDER BY x
+INSERT INTO t1 SELECT * FROM t1
+SELECT 'a:', x, y FROM log UNION ALL SELECT 'b:', x, y FROM log2 ORDER BY x
+CREATE TABLE t1(a int, b int, check(b>a))
+CREATE TABLE t2(x int, y int)
+CREATE VIEW v2 AS SELECT y, x FROM t2
+CREATE TABLE t3(a int, b int)
+DELETE FROM t2
+INSERT INTO t2 VALUES(9,1)
+INSERT INTO t1 SELECT 4, 8
+INSERT INTO t2 SELECT y, x FROM t2
+INSERT INTO t3 SELECT * FROM t2 LIMIT 1
+INSERT INTO t3 SELECT DISTINCT * FROM t2
+INSERT INTO dest SELECT * FROM src
+SELECT * FROM dest
+CREATE TABLE MAIN(Id INTEGER, Id1 INTEGER)
+CREATE TABLE B(Id INTEGER, Id1 INTEGER)
+CREATE VIEW v1 AS SELECT * FROM B
+CREATE VIEW v2 AS SELECT * FROM MAIN
+INSERT INTO MAIN(Id,Id1) VALUES(2,3)
+INSERT INTO B(Id,Id1) VALUES(2,3)
+INSERT INTO B SELECT * FROM B UNION ALL SELECT * FROM MAIN WHERE exists (select * FROM B WHERE B.Id = MAIN.Id)
+SELECT * FROM B
+INSERT INTO B SELECT * FROM B
+INSERT INTO B SELECT * FROM MAIN WHERE exists (select * FROM B WHERE B.Id = MAIN.Id)
+CREATE TABLE t1(a INT)
+CREATE TABLE t2(c INT, d INT)
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c, d DEFAULT true)
+INSERT INTO t1 DEFAULT VALUES
+INSERT INTO t1 VALUES(2,3,4)
+INSERT INTO t1 VALUES(3,4,5)
+CREATE TABLE t2(b,c,d)
+INSERT INTO t2 VALUES(2,3,4)
+INSERT INTO t2 VALUES(3,4,5)
+SELECT t1.rowid, t2.rowid, '|' FROM t1, t2 ON t1.a=t2.b
+SELECT b FROM t1 NATURAL JOIN t2
+SELECT b FROM t1 JOIN t2 USING(b)
+SELECT * FROM t1 NATURAL CROSS JOIN t2
+SELECT * FROM t1 CROSS JOIN t2 USING(b,c)
+SELECT * FROM t1 NATURAL INNER JOIN t2
+SELECT * FROM t1 INNER JOIN t2 USING(b,c)
+INSERT INTO t1 VALUES(1,11)
+INSERT INTO t1 VALUES(2,22)
+INSERT INTO t1 VALUES(3,33)
+CREATE TABLE t2(b,c)
+INSERT INTO t2 VALUES(11,111)
+INSERT INTO t2 VALUES(33,333)
+INSERT INTO t2 VALUES(44,444)
+CREATE TABLE t3(c,d)
+INSERT INTO t3 VALUES(111,1111)
+INSERT INTO t3 VALUES(444,4444)
+INSERT INTO t3 VALUES(555,5555)
+SELECT * FROM t1 NATURAL JOIN t2 NATURAL JOIN t3
+create temp table t1(a integer, b varchar(10))
+insert into t1 values(1,'one')
+insert into t1 values(2,'two')
+insert into t1 values(3,'three')
+insert into t1 values(4,'four')
+create temp table t2(x integer, y varchar(10), z varchar(10))
+insert into t2 values(2,'niban','ok')
+insert into t2 values(4,'yonban','err')
+select * from t1 left outer join t2 on t1.a=t2.x where t2.z='ok'
+create table t1(a integer, b varchar(10))
+create table t2(x integer, y varchar(10), z varchar(10))
+select * from t1 left outer join t2 on t1.a=t2.x and t2.z='ok'
+CREATE TABLE t1(a integer primary key, b integer, c integer)
+CREATE TABLE t2(x integer primary key, y)
+CREATE TABLE t3(p integer primary key, q)
+INSERT INTO t3 VALUES(11,'t3-11')
+INSERT INTO t3 VALUES(12,'t3-12')
+INSERT INTO t2 VALUES(11,'t2-11')
+INSERT INTO t2 VALUES(12,'t2-12')
+INSERT INTO t1 VALUES(1, 5, 0)
+INSERT INTO t1 VALUES(2, 11, 2)
+INSERT INTO t1 VALUES(3, 12, 1)
+select * from t1 left join t2 on t1.b=t2.x and t1.c=1
+select * from t1 left join t2 on t1.b=t2.x where t1.c=1
+INSERT INTO t3 VALUES(1,2)
+SELECT * FROM t1 LEFT JOIN t2 USING(a) LEFT JOIN t3 USING(a)
+SELECT t1.a, t3.b FROM t1 LEFT JOIN t2 ON t1.a=t2.a LEFT JOIN t3 ON t2.a=t3.a
+SELECT t1.a, t3.b FROM t1 LEFT JOIN t2 ON t1.a=t2.a LEFT JOIN t3 ON t1.a=t3.a
+CREATE TABLE t1(x,y)
+CREATE TABLE t2(y,z)
+CREATE TABLE t3(x,z)
+INSERT INTO t2 VALUES(2,3)
+INSERT INTO t2 VALUES(4,5)
+INSERT INTO t3 VALUES(1,3)
+INSERT INTO t3 VALUES(3,5)
+SELECT * FROM t1 JOIN t2 USING (y) JOIN t3 USING(x)
+SELECT b, d FROM t1 FULL OUTER JOIN t2 ON b=c ORDER BY +b
+SELECT a, c FROM t1 FULL OUTER JOIN t2 ON b=c ORDER BY +b
+SELECT * FROM t1 FULL OUTER JOIN t2 ON b=c ORDER BY +b
+SELECT t1.*, t2.* FROM t2 FULL OUTER JOIN t1 ON b=c ORDER BY +b
+SELECT t1.*, t2.* FROM t2 FULL OUTER JOIN t1 ON b=c WHERE b=c ORDER BY +b
+SELECT t1.*, t2.* FROM t2 FULL OUTER JOIN t1 ON b=c WHERE b>0 ORDER BY +b
+SELECT t1.*, t2.* FROM t2 FULL OUTER JOIN t1 ON b=c WHERE b>0 OR b IS NULL ORDER BY +b
+SELECT t1.*, t2.* FROM t2 FULL OUTER JOIN t1 ON b=c AND b>3 AND c>4 ORDER BY coalesce(b,c,0)
+SELECT t1.*, t2.* FROM t2 FULL OUTER JOIN t1 ON b=c AND b>3 WHERE c>4 ORDER BY coalesce(b,c,0)
+SELECT t1.*, t2.* FROM t2 FULL OUTER JOIN t1 ON b=c WHERE b>3 AND c>4 ORDER BY coalesce(b,c,0)
+SELECT t1.*, t2.* FROM t2 FULL OUTER JOIN t1 ON b=c WHERE b>3 OR c>4 ORDER BY coalesce(b,c,0)
+SELECT t1.*, t2.* FROM t2 FULL OUTER JOIN t1 ON b=c AND (b>3 OR c>4) ORDER BY coalesce(b,c,0)
+CREATE INDEX t2x ON t2(x)
+SELECT avg(DISTINCT b) FROM (SELECT * FROM t2 LEFT RIGHT JOIN t1 ON c)
+CREATE TABLE t1(a INTEGER PRIMARY KEY AUTOINCREMENT,b,c,d,e,f,g,h,j,k,l,m,n,o,p,q,r,s)
+CREATE INDEX t1x1 ON t1(g+h,j,k)
+CREATE INDEX t1x2 ON t1(b)
+CREATE TABLE t1(a int, b int, c int)
+INSERT INTO t1 VALUES(1,2,3),(4,5,6)
+CREATE TABLE t2(d int, e int)
+INSERT INTO t2 VALUES(3,333),(4,444)
+CREATE TABLE t3(f int, g int)
+PRAGMA automatic_index=off
+CREATE TABLE t1(id INTEGER PRIMARY KEY, a INT)
+SELECT *, t4.id, t5.id, t6.id FROM t4 NATURAL LEFT JOIN t5 NATURAL LEFT JOIN t6 ORDER BY 1
+SELECT *, t4.id, t5.id, t6.id FROM t4 NATURAL LEFT JOIN t5 NATURAL LEFT JOIN t6 ORDER BY id
+SELECT *, t4.id, t5.id, t6.id FROM t4 LEFT JOIN t5 USING(id) LEFT JOIN t6 USING(id) ORDER BY id
+SELECT id, x, y, z, t4.id, t5.id, t6.id FROM t5 NATURAL RIGHT JOIN t4 NATURAL LEFT JOIN t6 ORDER BY 1
+SELECT id, x, y, z, t4.id, t5.id, t6.id FROM t5 NATURAL RIGHT JOIN t4 NATURAL LEFT JOIN t6 ORDER BY id
+SELECT *, t4.id, t5.id, t6.id FROM t4 NATURAL RIGHT JOIN t5 NATURAL RIGHT JOIN t6 ORDER BY 1
+SELECT *, t4.id, t5.id, t6.id FROM t4 NATURAL RIGHT JOIN t5 NATURAL RIGHT JOIN t6 ORDER BY id
+SELECT *, t4.id, t5.id, t6.id FROM t4 NATURAL FULL JOIN t5 NATURAL FULL JOIN t6 ORDER BY 1
+SELECT *, t4.id, t5.id, t6.id FROM t4 NATURAL FULL JOIN t5 NATURAL FULL JOIN t6 ORDER BY id
+SELECT id, x, y, z, t4.id, t5.id, t6.id FROM t4 NATURAL FULL JOIN t6 NATURAL FULL JOIN t5 ORDER BY id
+SELECT id, x, y, z, t4.id, t5.id, t6.id FROM t5 NATURAL FULL JOIN t4 NATURAL FULL JOIN t6 ORDER BY id
+SELECT id, x, y, z, t4.id, t5.id, t6.id FROM t5 NATURAL FULL JOIN t6 NATURAL FULL JOIN t4 ORDER BY id
+SELECT a,b,c,d,t2.e,f,t3.e FROM t1 INNER JOIN t2 USING(c,d) INNER JOIN t3 USING(a,b,f) INNER JOIN t4 USING(a,c,d,f) ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e FROM t1 LEFT JOIN t2 USING(c,d) LEFT JOIN t3 USING(a,b,f) LEFT JOIN t4 USING(a,c,d,f) ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e FROM t1 LEFT JOIN t2 USING(c,d) RIGHT JOIN t3 USING(a,b,f) LEFT JOIN t4 USING(a,c,d,f) ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e FROM t1 RIGHT JOIN t2 USING(c,d) LEFT JOIN t3 USING(a,b,f) RIGHT JOIN t4 USING(a,c,d,f) ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e FROM t1 FULL JOIN t2 USING(c,d) LEFT JOIN t3 USING(a,b,f) RIGHT JOIN t4 USING(a,c,d,f) ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e FROM t1 RIGHT JOIN t2 USING(c,d) FULL JOIN t3 USING(a,b,f) RIGHT JOIN t4 USING(a,c,d,f) ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e FROM t1 RIGHT JOIN t2 USING(c,d) LEFT JOIN t3 USING(a,b,f) FULL JOIN t4 USING(a,c,d,f) ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e FROM t1 LEFT JOIN t2 USING(c,d) RIGHT JOIN t3 USING(a,b,f) FULL JOIN t4 USING(a,c,d,f) ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e FROM t1 FULL JOIN t2 USING(c,d) FULL JOIN t3 USING(a,b,f) FULL JOIN t4 USING(a,c,d,f) ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e,t1.a FROM t1 FULL JOIN t2 USING(c,d) FULL JOIN t3 USING(a,b,f) FULL JOIN t4 USING(a,c,d,f) WHERE t1.a!=0 ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e,t3.a FROM t1 FULL JOIN t2 USING(c,d) FULL JOIN t3 USING(a,b,f) FULL JOIN t4 USING(a,c,d,f) WHERE t3.a!=0 ORDER BY 1 nulls first, 3 nulls first
+SELECT a,b,c,d,t2.e,f,t3.e,t4.a FROM t1 FULL JOIN t2 USING(c,d) FULL JOIN t3 USING(a,b,f) FULL JOIN t4 USING(a,c,d,f) WHERE t4.a!=0 ORDER BY 1 nulls first, 3 nulls first
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN t2 USING(a) INNER JOIN t3 USING(a) INNER JOIN t4 USING(a) INNER JOIN t5 USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, c, d, e, f, g FROM t1 INNER JOIN t2 USING(a,b) INNER JOIN t3 USING(a,b) INNER JOIN t4 USING(a,b) INNER JOIN t5 USING(a,b) WHERE a<>13 ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN t2 USING(a) INNER JOIN t3 USING(a) INNER JOIN t4 USING(a) LEFT JOIN t5 USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, c, d, e, f, g FROM t1 INNER JOIN (t2 INNER JOIN t3 USING(a)) USING(a) INNER JOIN (t4 LEFT JOIN t5 USING(a)) USING(a) WHERE a<=18 ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN t2 USING(a) INNER JOIN t3 USING(a) INNER JOIN t4 USING(a) RIGHT JOIN t5 USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, b, c, d, e, f, g FROM t1 INNER JOIN t2 USING(a,b) INNER JOIN t3 USING(a,b) INNER JOIN t4 USING(a,b) RIGHT JOIN t5 USING(a,b) WHERE d<>33 OR d IS NULL ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN t2 USING(a) INNER JOIN t3 USING(a) INNER JOIN t4 USING(a) FULL JOIN t5 USING(a) ORDER BY 1 NULLS FIRST
+SELECT b, c, d, e, f, g FROM t1 NATURAL INNER JOIN t2 NATURAL INNER JOIN t3 NATURAL INNER JOIN t4 NATURAL FULL JOIN t5 WHERE b BETWEEN 12 AND 17 ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN t2 USING(a) INNER JOIN t3 USING(a) LEFT JOIN t4 USING(a) INNER JOIN t5 USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, c, d, e, f, g FROM t1 INNER JOIN t2 USING(a,b) INNER JOIN t3 USING(a,b) LEFT JOIN t4 USING(a,b) INNER JOIN t5 USING(a,b) WHERE a<>13 ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN t2 USING(a) INNER JOIN t3 USING(a) LEFT JOIN t4 USING(a) LEFT JOIN t5 USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, c, d, e, f, g FROM t1 INNER JOIN (t2 INNER JOIN t3 USING(a)) USING(a) LEFT JOIN (t4 LEFT JOIN t5 USING(a)) USING(a) WHERE a<=18 ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 INNER JOIN ( t4 INNER JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 INNER JOIN ( t4 LEFT JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 INNER JOIN ( t4 RIGHT JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 INNER JOIN ( t4 FULL JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 LEFT JOIN ( t4 INNER JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 LEFT JOIN ( t4 LEFT JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 LEFT JOIN ( t4 RIGHT JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 LEFT JOIN ( t4 FULL JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 RIGHT JOIN ( t4 INNER JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 RIGHT JOIN ( t4 LEFT JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 RIGHT JOIN ( t4 RIGHT JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT a, t1.a, t2.a, t3.a, t4.a, t5.a FROM t1 INNER JOIN ( t2 INNER JOIN ( t3 RIGHT JOIN ( t4 FULL JOIN t5 USING(a) ) USING(a) ) USING(a) ) USING(a) ORDER BY 1 NULLS FIRST
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b AND t2.x>0 INNER JOIN t3 ON t1.c=t3.c AND t3.y>0 INNER JOIN t4 ON t1.d=t4.d AND t4.z>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b IS NOT DISTINCT FROM t2.b AND t2.x>0 INNER JOIN t3 ON t1.c=t3.c AND t3.y>0 INNER JOIN t4 ON t1.d=t4.d AND t4.z>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b INNER JOIN t3 ON t1.c=t3.c AND t3.y>0 INNER JOIN t4 ON t1.d=t4.d AND t4.z>0 WHERE t2.x>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b INNER JOIN t3 ON t1.c=t3.c AND t3.y>0 INNER JOIN t4 ON t1.d=t4.d AND t4.z>0 WHERE (t2.x>0 OR t2.x IS NULL) ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON true INNER JOIN t3 ON t1.c=t3.c AND t3.y>0 INNER JOIN t4 ON t1.d=t4.d AND t4.z>0 WHERE t1.b=t2.b AND t2.x>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b AND t2.x>0 INNER JOIN t3 ON t1.c=t3.c INNER JOIN t4 ON t1.d=t4.d AND t4.z>0 WHERE t3.y>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b AND t2.x>0 INNER JOIN t3 ON t1.c=t3.c INNER JOIN t4 ON t1.d=t4.d AND t4.z>0 WHERE t3.y>0 OR t3.y IS NULL ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b AND t2.x>0 INNER JOIN t3 ON t1.c=t3.c AND t3.y>0 INNER JOIN t4 ON t1.d=t4.d WHERE t4.z>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b AND t2.x>0 INNER JOIN t3 ON t1.c=t3.c AND t3.y>0 INNER JOIN t4 ON t1.d=t4.d WHERE t4.z IS NULL OR t4.z>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b INNER JOIN t3 ON t1.c=t3.c AND t3.y>0 INNER JOIN t4 ON t1.d=t4.d WHERE t2.x>0 AND t4.z>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b AND t2.x>0 INNER JOIN t3 ON t1.c=t3.c INNER JOIN t4 ON t1.d=t4.d WHERE t4.z>0 AND t3.y>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT t1.*, t2.*, t3.*, t4.* FROM t1 INNER JOIN t2 ON t1.b=t2.b INNER JOIN t3 ON t1.c=t3.c INNER JOIN t4 ON t1.d=t4.d AND t4.z>0 WHERE t2.x>0 AND t3.y>0 ORDER BY coalesce(t1.a,t2.b,t3.c,t4.d,0)
+SELECT a, b FROM t1 INNER JOIN t2 ON true ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 INNER JOIN t2 ON true WHERE a IS NULL ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 INNER JOIN t2 ON a IS NULL ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 INNER JOIN t2 ON true WHERE b IS NULL ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 INNER JOIN t2 ON b IS NULL ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 LEFT JOIN t2 ON true ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 LEFT JOIN t2 ON true WHERE a IS NULL ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 LEFT JOIN t2 ON a IS NULL ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 LEFT JOIN t2 ON true WHERE b IS NULL ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 LEFT JOIN t2 ON b IS NULL ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 RIGHT JOIN t2 ON true ORDER BY coalesce(a,b,3)
+SELECT a, b FROM t1 RIGHT JOIN t2 ON true WHERE a IS NULL ORDER BY coalesce(a,b,3)
+SELECT * FROM t1 INNER JOIN t2 ON true INNER JOIN t3 ON t2.y IS NOT NULL INNER JOIN t4 ON true ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true INNER JOIN t3 ON t2.y IS NOT NULL INNER JOIN t4 ON true WHERE (t3.z!=400 AND t3.z!=500 AND t3.z!=600) ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true INNER JOIN t3 ON t2.y IS NOT NULL LEFT JOIN t4 ON true ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true INNER JOIN t3 ON t2.y IS NOT NULL LEFT JOIN t4 ON true WHERE (t3.z!=400 AND t3.z!=500 AND t3.z!=600) ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true INNER JOIN t3 ON t2.y IS NOT NULL RIGHT JOIN t4 ON true ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true INNER JOIN t3 ON t2.y IS NOT NULL RIGHT JOIN t4 ON true WHERE (t3.z!=400 AND t3.z!=500 AND t3.z!=600) ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true LEFT JOIN t3 ON t2.y IS NOT NULL INNER JOIN t4 ON true ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true LEFT JOIN t3 ON t2.y IS NOT NULL INNER JOIN t4 ON true WHERE (t3.z!=400 AND t3.z!=500 AND t3.z!=600) ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true LEFT JOIN t3 ON t2.y IS NOT NULL LEFT JOIN t4 ON true ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true LEFT JOIN t3 ON t2.y IS NOT NULL LEFT JOIN t4 ON true WHERE (t3.z!=400 AND t3.z!=500 AND t3.z!=600) ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true LEFT JOIN t3 ON t2.y IS NOT NULL RIGHT JOIN t4 ON true ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+SELECT * FROM t1 INNER JOIN t2 ON true LEFT JOIN t3 ON t2.y IS NOT NULL RIGHT JOIN t4 ON true WHERE (t3.z!=400 AND t3.z!=500 AND t3.z!=600) ORDER BY coalesce(t1.x,t2.y,t3.z,t4.w,0)
+CREATE TABLE t2(b INT)
+INSERT INTO t2(b) VALUES(NULL)
+SELECT DISTINCT a FROM t1 FULL JOIN t2 ON true WHERE (b ISNULL)
+SELECT a FROM t1 FULL JOIN t2 ON true
+SELECT a FROM t1 FULL JOIN t2 ON true WHERE (b ISNULL)
+SELECT DISTINCT a FROM t1 FULL JOIN t2 ON true
+CREATE TABLE r3(x)
+CREATE TABLE r4(y INTEGER PRIMARY KEY)
+INSERT INTO r4 VALUES(55)
+SELECT 'value!' FROM r3 FULL JOIN r4 ON (y=x)
+SELECT 'value!' FROM r3 FULL JOIN r4 ON (y=x) WHERE +y=55
+CREATE TABLE t0 (c0)
+CREATE TABLE t3(c INT)
+CREATE TABLE t0(c0 INT, c1 INT)
+CREATE TABLE t1 (c0 INT)
+CREATE VIEW v1(c0) AS SELECT t0.c0 FROM t0 NATURAL RIGHT JOIN t1
+CREATE VIEW v2(c0) AS SELECT 0 FROM v1
+INSERT INTO t0(c0, c1) VALUES (-1, 0)
+INSERT INTO t1(c0) VALUES (NULL)
+SELECT * FROM v1 INNER JOIN (v2 CROSS JOIN t0) ON (t0.c0 < t0.c1)
+CREATE TABLE t0(c0, c1)
+CREATE TABLE t1(v)
+CREATE TABLE t2(w)
+CREATE TABLE t4(y)
+CREATE TABLE t1(x TEXT)
+SELECT x FROM t1 WHERE x LIKE 'abc' ORDER BY 1
+SELECT x FROM t1 WHERE x GLOB 'abc' ORDER BY 1
+SELECT x FROM t1 WHERE x LIKE 'ABC' ORDER BY 1
+SELECT x FROM t1 WHERE x LIKE 'aBc' ORDER BY 1
+PRAGMA case_sensitive_like
+PRAGMA case_sensitive_like=off
+SELECT x FROM t1 WHERE x REGEXP 'abc' ORDER BY 1
+SELECT x FROM t1 WHERE x REGEXP '^abc' ORDER BY 1
+SELECT x FROM t1 WHERE x MATCH '*abc*' ORDER BY 1
+SELECT x FROM t1 WHERE x MATCH 'abc*' ORDER BY 1
+PRAGMA case_sensitive_like=on
+PRAGMA encoding=UTF8
+CREATE TABLE t1(a,b TEXT COLLATE nocase)
+INSERT INTO t1(a,b) VALUES(1,'abc'), (2,'ABX'), (3,'BCD'), (4,x'616263'), (5,x'414258'), (6,x'424344')
+CREATE INDEX t1ba ON t1(b,a)
+SELECT a, b FROM t1 WHERE b LIKE 'aB%' ORDER BY +a
+SELECT a, b FROM t1 WHERE +b LIKE 'aB%' ORDER BY +a
+CREATE TABLE t2(a, b TEXT)
+INSERT INTO t2 SELECT a, b FROM t1
+CREATE INDEX t2ba ON t2(b,a)
+SELECT a, b FROM t2 WHERE b GLOB 'ab*' ORDER BY +a
+SELECT a, b FROM t2 WHERE +b GLOB 'ab*' ORDER BY +a
+SELECT a, b FROM t2 WHERE b>=x'6162' AND b GLOB 'ab*'
+CREATE TABLE t1(x int, y int)
+SELECT count(*) FROM t1 LIMIT 5
+SELECT x FROM t1 ORDER BY x LIMIT 5
+SELECT x FROM t1 ORDER BY x LIMIT 5 OFFSET 2
+SELECT x FROM t1 ORDER BY x+1 LIMIT 5 OFFSET -2
+SELECT x FROM t1 ORDER BY x+1 LIMIT 2, -5
+SELECT x FROM t1 ORDER BY x+1 LIMIT -2, 5
+SELECT x FROM t1 ORDER BY x+1 LIMIT -2, -5
+SELECT x FROM t1 ORDER BY x LIMIT 2, 5
+SELECT x FROM t1 ORDER BY x LIMIT 5 OFFSET 5
+SELECT x FROM t1 ORDER BY x LIMIT 50 OFFSET 30
+SELECT x FROM t1 ORDER BY x LIMIT 30, 50
+WITH RECURSIVE c(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM c WHERE x<1000) INSERT INTO t1(a,b) SELECT 1, (x*17)%1000 + 1000 FROM c
+INSERT INTO t1(a,b) VALUES(2,2),(3,1006),(4,4),(5,9999)
+SELECT a, b, '|' FROM t1 WHERE a IN (2,4,5,3,1) ORDER BY b LIMIT 5
+SELECT a, b, '|' FROM t1 WHERE a IN (2,4,5,3,1) ORDER BY +b LIMIT 5
+INSERT INTO t2(x,y) VALUES('a',1),('a',2),('a',3),('a',4)
+INSERT INTO t2(x,y) VALUES('b',1),('c',2),('d',3),('e',4)
+CREATE INDEX t2xy ON t2(x,y)
+SELECT a, b, '|' FROM t2, t1 WHERE t2.x='a' AND t1.a=t2.y ORDER BY t1.b LIMIT 5
+SELECT a, b, '|' FROM t2, t1 WHERE t2.x='a' AND t1.a=t2.y ORDER BY +t1.b LIMIT 5
+DROP INDEX t1ab
+CREATE INDEX t1ab ON t1(a,b DESC)
+SELECT a, b, '|' FROM t1 WHERE a IN (2,4,5,3,1) ORDER BY b DESC LIMIT 5
+SELECT 5 UNION ALL SELECT 3 ORDER BY 1
+SELECT 986 AS x GROUP BY X ORDER BY X
+INSERT INTO abc VALUES(4, 5, 6)
+INSERT INTO abc VALUES(7, 8, 9)
+SELECT ( SELECT 'hardware' FROM ( SELECT 'software' ORDER BY 'firmware' ASC, 'sportswear' DESC ) GROUP BY 1 HAVING length(b) ) FROM abc
+CREATE TABLE t7(a,b)
+CREATE INDEX t7a ON t7(a)
+CREATE INDEX t7ab ON t7(a,b)
+PRAGMA cache_size = 5
+WITH cnt(i) AS ( SELECT 1 UNION ALL SELECT i+1 FROM cnt WHERE i<10000 ) INSERT INTO t1 SELECT i%2, randomblob(500) FROM cnt
+INSERT INTO t1 VALUES(1),(2)
+DROP TABLE IF EXISTS t2
+CREATE TABLE t2(b INTEGER PRIMARY KEY, c INTEGER)
+CREATE TABLE t3(d INTEGER)
+INSERT INTO t1 VALUES(1),(2),(3)
+INSERT INTO t2 VALUES(3, 1)
+INSERT INTO t2 VALUES(4, 2)
+INSERT INTO t2 VALUES(5, 3)
+INSERT INTO t3 VALUES(4),(3),(5)
+SELECT t1.a FROM t1, t2, t3 WHERE t1.a=t2.c AND t2.b=t3.d ORDER BY t1.a
+SELECT t1.a FROM t1, t2, t3 WHERE t1.a=t2.c AND t2.b=t3.d ORDER BY t1.a DESC
+SELECT t1.a FROM t1 CROSS JOIN t2 CROSS JOIN t3 WHERE t1.a=t2.c AND t2.b=t3.d ORDER BY t1.a
+SELECT t1.a FROM t1 CROSS JOIN t2 CROSS JOIN t3 WHERE t1.a=t2.c AND t2.b=t3.d ORDER BY t1.a DESC
+SELECT t1.a FROM t1 CROSS JOIN t3 CROSS JOIN t2 WHERE t1.a=t2.c AND t2.b=t3.d ORDER BY t1.a
+CREATE TABLE t1(a, b, PRIMARY KEY(a,b))
+INSERT INTO t1 VALUES(1,1),(1,2)
+CREATE TABLE t2(x, y, PRIMARY KEY(x,y))
+INSERT INTO t2 VALUES(3,3),(4,4)
+SELECT a, x FROM t1, t2 ORDER BY 1, 2
+SELECT a, x FROM t1 CROSS JOIN t2 ORDER BY 1, 2
+SELECT a, x FROM t2 CROSS JOIN t1 ORDER BY 1, 2
+CREATE TABLE t3(a)
+INSERT INTO t3 VALUES(1),(1)
+CREATE INDEX t3a ON t3(a)
+INSERT INTO t4 VALUES(3),(4)
+CREATE INDEX t4x ON t4(x)
+CREATE INDEX t2bc ON t2(b,c)
+INSERT INTO sqlite_stat1 VALUES('t1','t1bc','1000000 10 9')
+INSERT INTO sqlite_stat1 VALUES('t2','t2bc','100 10 5')
+CREATE TABLE t3(a INTEGER PRIMARY KEY, b, c, d, e, f)
+CREATE INDEX t3bcde ON t3(b, c, d, e)
+CREATE TABLE t3(a INTEGER PRIMARY KEY, b, c, d, e, f) WITHOUT rowid
+CREATE TABLE t4(b COLLATE nocase)
+INSERT INTO t4 VALUES('abc')
+INSERT INTO t4 VALUES('ABC')
+INSERT INTO t4 VALUES('aBC')
+SELECT * FROM t4 ORDER BY b COLLATE binary
+SELECT * FROM t4 WHERE b='abc' ORDER BY b COLLATE binary
+SELECT b,a,c FROM t1 ORDER BY b,a,c
+SELECT b,a,c FROM t1 ORDER BY b,c DESC,a
+SELECT b,a,c FROM t1 ORDER BY b DESC,c,a
+SELECT b,a,c FROM t1 ORDER BY b DESC,a,c
+SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20
+SELECT a FROM t1 ORDER BY +b, a LIMIT 10 OFFSET 20
+SELECT a FROM t1 ORDER BY b DESC, a LIMIT 10 OFFSET 20
+SELECT a FROM t1 ORDER BY +b DESC, a LIMIT 10 OFFSET 20
+SELECT a FROM t1 ORDER BY b, a DESC LIMIT 10 OFFSET 45
+SELECT a FROM t1 ORDER BY +b, a DESC LIMIT 10 OFFSET 45
+SELECT a FROM t1 ORDER BY b DESC, a LIMIT 10 OFFSET 45
+SELECT a FROM t1 ORDER BY +b DESC, a LIMIT 10 OFFSET 45
+CREATE VIRTUAL TABLE fts USING fts3(content TEXT)
+INSERT INTO fts(rowid,content) VALUES(1,'this is a test of the fts3 virtual'), (2,'table used as part of a join together'), (3,'with the DISTINCT keyword. There was'), (4,'a bug at one time (2013-06 through 2014-04)'), (5,'that prevented this from working correctly.'), (11,'a row that occurs twice'), (12,'a row that occurs twice')
+CREATE TABLE t1(x TEXT PRIMARY KEY, y)
+INSERT OR IGNORE INTO t1 SELECT content, rowid+100 FROM fts
+SELECT DISTINCT fts.rowid, t1.y FROM fts, t1 WHERE fts MATCH 'that twice' AND content=x ORDER BY y
+SELECT DISTINCT fts.rowid, t1.x FROM fts, t1 WHERE fts MATCH 'that twice' AND content=x ORDER BY 1
+SELECT DISTINCT t1.x FROM fts, t1 WHERE fts MATCH 'that twice' AND content=x ORDER BY 1
+SELECT t1.x FROM fts, t1 WHERE fts MATCH 'that twice' AND content=x ORDER BY 1
+SELECT DISTINCT t1.x FROM fts, t1 WHERE fts MATCH 'that twice' AND content=x
+SELECT t1.x FROM fts, t1 WHERE fts MATCH 'that twice' AND content=x
+SELECT DISTINCT t1.x FROM fts, t1 WHERE fts.rowid=11 AND content=x ORDER BY fts.rowid
+SELECT DISTINCT t1.* FROM fts, t1 WHERE fts.rowid=11 AND content=x ORDER BY fts.rowid
+WITH RECURSIVE c(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM c WHERE x<100) INSERT INTO t1 SELECT x FROM c
+INSERT INTO t1 VALUES('one', 1, 11)
+INSERT INTO t1 VALUES('three', 7, 11)
+INSERT INTO t1 VALUES('one', 2, 11)
+INSERT INTO t1 VALUES('one', 3, 11)
+INSERT INTO t1 VALUES('two', 4, 11)
+INSERT INTO t1 VALUES('two', 6, 11)
+INSERT INTO t1 VALUES('three', 8, 11)
+INSERT INTO t1 VALUES('two', 5, 11)
+INSERT INTO t1 VALUES('three', 9, 11)
+DROP INDEX IF EXISTS i1
+CREATE TABLE t2(a, b, c)
+INSERT INTO t2 VALUES(1, 'one', 1)
+CREATE TABLE t1(a TEXT, b TEXT, c INT)
+INSERT INTO t1 VALUES(NULL,NULL,NULL)
+WITH RECURSIVE c(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM c WHERE n<7) INSERT INTO t1(a,b,c) SELECT char(p,p), char(q,q), n FROM (SELECT ((n-1)%4)+0x61 AS p, abs(n*2-9+(n>=5))+0x60 AS q, n FROM c)
+UPDATE t1 SET b=upper(b) WHERE c=1
+CREATE TABLE t2(k TEXT PRIMARY KEY, v INT) WITHOUT ROWID
+WITH RECURSIVE c(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM c WHERE n<7) INSERT INTO t2(k,v) SELECT char(0x60+n,0x60+n), n FROM c
+WITH RECURSIVE c(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM c WHERE n<7) INSERT INTO t2(k,v) SELECT char(0x40+n,0x40+n), n FROM c
+SELECT a,b,c,tx.v AS 'v-a', ty.v AS 'v-b' FROM t1 LEFT JOIN t2 AS tx ON tx.k=a LEFT JOIN t2 AS ty ON ty.k=b ORDER BY c
+PRAGMA cache_size
+PRAGMA default_cache_size
+PRAGMA synchronous
+PRAGMA synchronous=OFF
+PRAGMA cache_size=1234
+PRAGMA cache_size=-4321
+PRAGMA synchronous=ON
+PRAGMA default_cache_size=-123
+VACUUM
+PRAGMA synchronous=NORMAL
+PRAGMA synchronous=EXTRA
+PRAGMA synchronous=FULL
+PRAGMA freelist_count
+DROP TABLE abc
+PRAGMA main.freelist_count
+PRAGMA aux.auto_vacuum=OFF
+PRAGMA aux.freelist_count
+CREATE TABLE aux.abc(a, b, c)
+DELETE FROM aux.abc
+PRAGMA freelist_count = 500
+PRAGMA aux.freelist_count = 500
+PRAGMA main.cache_size=2000
+PRAGMA temp.cache_size=2000
+PRAGMA cache_spill
+PRAGMA data_version
+PRAGMA temp.data_version
+PRAGMA main.data_version=1234
+PRAGMA main.data_version
+BEGIN IMMEDIATE
+INSERT INTO t1 VALUES(100),(200),(300)
+INSERT INTO t1 VALUES(400),(500)
+PRAGMA shrink_memory
+CREATE TABLE aux.t2(d, e, f)
+PRAGMA table_info = t1
+PRAGMA table_info = t2
+PRAGMA table_info(t2)
+SELECT * FROM pragma_table_info('t1')
+SELECT * FROM pragma_table_info('t2')
+CREATE INDEX aux.i2 ON t2(e)
+SELECT * FROM pragma_index_info('i1')
+SELECT * FROM pragma_index_info('i2')
+DROP INDEX i2
+SELECT * FROM main.sqlite_master, aux.sqlite_master
+CREATE INDEX main.i1 ON t1(b, c)
+PRAGMA table_info(pragma_function_list)
+SELECT DISTINCT name, builtin FROM pragma_function_list WHERE name='upper' AND builtin
+SELECT DISTINCT name, builtin FROM pragma_function_list WHERE name LIKE 'exter%'
+PRAGMA table_info(pragma_module_list)
+SELECT * FROM pragma_module_list WHERE name='fts5'
+PRAGMA table_info(pragma_pragma_list)
+SELECT * FROM pragma_pragma_list WHERE name='pragma_list'
+CREATE TEMP TABLE t2( a t1 PRIMARY KEY default 27, b default(current_timestamp), d TEXT UNIQUE DEFAULT 'ch`arlie', c TEXT UNIQUE DEFAULT 084, UNIQUE(c,b,b,a,b) ) WITHOUT ROWID
+PRAGMA quick_check
+CREATE TABLE t1(a, b, CHECK(a!=b))
+REINDEX t1
+REINDEX i1
+REINDEX main.t1
+REINDEX main.i1
+CREATE TABLE t2( a TEXT PRIMARY KEY COLLATE c1, b TEXT UNIQUE COLLATE c2, c TEXT COLLATE nocase, d TEST COLLATE binary )
+INSERT INTO t2 VALUES('abc','abc','abc','abc')
+INSERT INTO t2 VALUES('ABCD','ABCD','ABCD','ABCD')
+INSERT INTO t2 VALUES('bcd','bcd','bcd','bcd')
+INSERT INTO t2 VALUES('BCDE','BCDE','BCDE','BCDE')
+SELECT a FROM t2 ORDER BY a
+SELECT b FROM t2 ORDER BY b
+SELECT c FROM t2 ORDER BY c
+CREATE TABLE t1(a INTEGER PRIMARY KEY,b,c DEFAULT 'pax')
+INSERT INTO t1(b) VALUES(10),('happy'),(NULL) RETURNING a,b,c
+INSERT INTO t1(b,c) VALUES(5,99) RETURNING b,c,a,rowid
+INSERT INTO t1 DEFAULT VALUES RETURNING *
+CREATE TABLE t2(x,y,z)
+INSERT INTO t2 VALUES(11,12,13),(21,'b','c'),(31,'b-value',4.75)
+INSERT INTO t1 SELECT * FROM t2 RETURNING *
+SELECT *, '|' FROM t1
+UPDATE t1 SET c='bellum' WHERE c='pax' RETURNING rowid, b, '|'
+DELETE FROM t1 WHERE c='bellum' RETURNING rowid, *, '|'
+CREATE TABLE t4(a INT, b INT DEFAULT 1234, c INT DEFAULT -16)
+CREATE UNIQUE INDEX t4a ON t4(a)
+CREATE TABLE t1 (b)
+INSERT INTO t1(b) VALUES(65) RETURNING ( SELECT * FROM sqlite_temp_schema ) AS aaa
+SELECT x FROM t1 ORDER BY y
+SELECT rowid FROM t1 ORDER BY x
+SELECT x, oid FROM t1 order by x
+SELECT x, RowID FROM t1 order by x
+SELECT x, _rowid_ FROM t1 order by x
+SELECT x FROM t1 ORDER BY x
+CREATE INDEX idxt1 ON t1(rowid)
+CREATE INDEX idxt1 ON t1(_rowid_)
+CREATE INDEX idxt1 ON t1(oid)
+CREATE INDEX idxt1 ON t1(x, rowid)
+CREATE TABLE t2(rowid int, x int, y int)
+INSERT INTO t2 VALUES(0,2,3)
+CREATE TABLE test1(f1 int, f2 int)
+SELECT * FROM test1, test2
+SELECT * FROM test2, test1
+INSERT INTO test1(f1,f2) VALUES(11,22)
+SELECT f1 FROM test1
+SELECT f2 FROM test1
+SELECT f2, f1 FROM test1
+SELECT f1, f2 FROM test1
+SELECT *, * FROM test1
+SELECT *, min(f1,f2), max(f1,f2) FROM test1
+SELECT 'one', *, 'two', * FROM test1
+CREATE TABLE test2(r1 real, r2 real)
+CREATE TABLE tbl1(f1 int, f2 int)
+CREATE TABLE tbl2(f1 int, f2 int, f3 int)
+DROP TABLE tbl2
+SELECT count(*) FROM tbl2
+SELECT count(*) FROM tbl2 WHERE f2>1000
+SELECT f1 FROM tbl2 WHERE 1000=f2
+CREATE INDEX idx1 ON tbl2(f2)
+SELECT f1 FROM tbl2 WHERE f2=1000
+SELECT * FROM tbl2 WHERE 1000=f2
+SELECT * FROM tbl2 WHERE f2=1000
+DROP INDEX idx1
+SELECT f1 FROM tbl2 WHERE f2==2000
+CREATE TABLE t1(n int, log int)
+SELECT DISTINCT log FROM t1 ORDER BY log
+SELECT min(n),min(log),max(n),max(log),sum(n),sum(log),avg(n),avg(log) FROM t1
+SELECT max(n)/avg(n), max(log)/avg(log) FROM t1
+SELECT log, count(*) FROM t1 GROUP BY log ORDER BY log
+SELECT log, min(n) FROM t1 GROUP BY log ORDER BY log
+SELECT log, avg(n) FROM t1 GROUP BY log ORDER BY log
+SELECT log, avg(n)+1 FROM t1 GROUP BY log ORDER BY log
+SELECT log, avg(n)-min(n) FROM t1 GROUP BY log ORDER BY log
+SELECT log*2+1, avg(n)-min(n) FROM t1 GROUP BY log ORDER BY log
+SELECT log*2+1 as x, count(*) FROM t1 GROUP BY x ORDER BY x
+SELECT log*2+1 AS x, count(*) AS y FROM t1 GROUP BY x ORDER BY y, x
+SELECT DISTINCT log FROM t1
+SELECT n FROM t1 WHERE log=3
+SELECT DISTINCT log FROM t1 UNION ALL SELECT n FROM t1 WHERE log=3 ORDER BY log
+CREATE TABLE t2 AS SELECT DISTINCT log FROM t1 UNION ALL SELECT n FROM t1 WHERE log=3 ORDER BY log
+CREATE TABLE t2 AS SELECT DISTINCT log FROM t1 UNION ALL SELECT n FROM t1 WHERE log=3 ORDER BY log DESC
+SELECT DISTINCT log FROM t1 UNION ALL SELECT n FROM t1 WHERE log=2
+CREATE TABLE t2 AS SELECT DISTINCT log FROM t1 UNION ALL SELECT n FROM t1 WHERE log=2
+SELECT log FROM t1 WHERE n IN (SELECT DISTINCT log FROM t1 UNION ALL SELECT n FROM t1 WHERE log=3) ORDER BY log
+SELECT DISTINCT log FROM t1 ORDER BY log UNION ALL SELECT n FROM t1 WHERE log=3 ORDER BY log
+SELECT DISTINCT log FROM t1 UNION SELECT n FROM t1 WHERE log=3 ORDER BY log
+SELECT log FROM t1 WHERE n IN (SELECT DISTINCT log FROM t1 UNION SELECT n FROM t1 WHERE log=3) ORDER BY log
+SELECT DISTINCT log FROM t1 ORDER BY log UNION SELECT n FROM t1 WHERE log=3 ORDER BY log
+SELECT DISTINCT y FROM t1 ORDER BY y
+SELECT y, count(*) FROM t1 GROUP BY y ORDER BY y
+SELECT y, count(*) FROM t1 GROUP BY y ORDER BY count(*), y
+SELECT count(*), y FROM t1 GROUP BY y ORDER BY count(*), y
+SELECT y, count(*) FROM t1 GROUP BY z(y) ORDER BY y
+SELECT y, count(*) FROM t1 GROUP BY y HAVING count(*)<3 ORDER BY y
+SELECT y, count(*) FROM t1 GROUP BY y HAVING z(y)<3 ORDER BY y
+SELECT y, count(*) FROM t1 GROUP BY y HAVING count(*)<z ORDER BY y
+SELECT x, count(*), avg(y) FROM t1 GROUP BY x HAVING x<4 ORDER BY x
+SELECT avg(x) FROM t1 WHERE x>100
+SELECT count(x) FROM t1 WHERE x>100
+SELECT min(x) FROM t1 WHERE x>100
+INSERT INTO t1 VALUES(1,1)
+INSERT INTO t1 VALUES(2,2)
+INSERT INTO t1 VALUES(3,2)
+INSERT INTO t1 VALUES(5,3)
+INSERT INTO t1 VALUES(6,3)
+INSERT INTO t1 VALUES(7,3)
+INSERT INTO t1 VALUES(8,4)
+INSERT INTO t1 VALUES(9,4)
+INSERT INTO t1 VALUES(10,4)
+INSERT INTO t1 VALUES(11,4)
+INSERT INTO t1 VALUES(12,4)
+INSERT INTO t1 VALUES(13,4)
+create temp table t1(x)
+insert into t1 values('amx')
+insert into t1 values('anx')
+insert into t1 values('amy')
+insert into t1 values('bmy')
+select * from t1 where x like 'a__' intersect select * from t1 where x like '_m_' intersect select * from t1 where x like '__x'
+CREATE TABLE x(id integer primary key, a TEXT NULL)
+INSERT INTO x (a) VALUES ('first')
+CREATE TABLE tempx(id integer primary key, a TEXT NULL)
+INSERT INTO tempx (a) VALUES ('t-first')
+CREATE VIEW tv1 AS SELECT x.id, tx.id FROM x JOIN tempx tx ON tx.id=x.id
+CREATE VIEW tv1b AS SELECT x.id, tx.id FROM x JOIN tempx tx on tx.id=x.id
+CREATE TABLE songs(songid, artist, timesplayed)
+INSERT INTO songs VALUES(1,'one',1)
+INSERT INTO songs VALUES(2,'one',2)
+INSERT INTO songs VALUES(3,'two',3)
+INSERT INTO songs VALUES(4,'three',5)
+INSERT INTO songs VALUES(5,'one',7)
+INSERT INTO songs VALUES(6,'two',11)
+SELECT DISTINCT artist,sum(timesplayed) AS total FROM songs GROUP BY LOWER(artist)
+SELECT DISTINCT artist,sum(timesplayed) AS total FROM songs GROUP BY LOWER(artist) LIMIT 1 OFFSET 1
+SELECT DISTINCT artist,sum(timesplayed) AS total FROM songs GROUP BY LOWER(artist) LIMIT 2 OFFSET 1
+SELECT DISTINCT artist,sum(timesplayed) AS total FROM songs GROUP BY LOWER(artist) LIMIT -1 OFFSET 2
+INSERT INTO t1 VALUES(1, 'one', 'I')
+INSERT INTO t1 VALUES(3, NULL, NULL)
+INSERT INTO t1 VALUES(5, 'five', 'V')
+INSERT INTO t1 VALUES(7, 'seven', 'VII')
+INSERT INTO t1 VALUES(9, NULL, NULL)
+INSERT INTO t1 VALUES(2, 'two', 'II')
+INSERT INTO t1 VALUES(4, 'four', 'IV')
+INSERT INTO t1 VALUES(6, NULL, NULL)
+INSERT INTO t1 VALUES(8, 'eight', 'VIII')
+INSERT INTO t1 VALUES(10, 'ten', 'X')
+INSERT INTO t2 VALUES(1, 'two', 'IV')
+INSERT INTO t2 VALUES(2, 'four', 'VIII')
+CREATE TABLE t1(a,b,c COLLATE NOCASE)
+INSERT INTO t1 VALUES(1,'a','a')
+INSERT INTO t1 VALUES(9.9, 'b', 'B')
+INSERT INTO t1 VALUES(NULL, 'C', 'c')
+INSERT INTO t1 VALUES('hello', 'd', 'D')
+INSERT INTO t1 VALUES(x'616263', 'e', 'e')
+CREATE TABLE t2(x,y,z COLLATE NOCASE)
+INSERT INTO t2 VALUES(NULL,'U','u')
+INSERT INTO t2 VALUES('mad', 'Z', 'z')
+INSERT INTO t2 VALUES(x'68617265', 'm', 'M')
+INSERT INTO t2 VALUES(5.2e6, 'X', 'x')
+INSERT INTO t2 VALUES(-23, 'Y', 'y')
+INSERT INTO t1 VALUES( 2, 4, 6)
+INSERT INTO t1 VALUES( 8, 10, 12)
+INSERT INTO t1 VALUES(14, 16, 18)
+INSERT INTO t2 VALUES(3, 6, 9)
+INSERT INTO t2 VALUES(12, 15, 18)
+INSERT INTO t2 VALUES(21, 24, 27)
+CREATE INDEX i2 ON t2(d)
+CREATE INDEX i3 ON t1(c)
+CREATE INDEX i5 ON t2(e)
+CREATE INDEX i6 ON t2(f)
+SELECT DISTINCT * FROM (SELECT c FROM t1 UNION ALL SELECT e FROM t2) ORDER BY 1
+SELECT c, count(*) FROM (SELECT c FROM t1 UNION ALL SELECT e FROM t2) GROUP BY c ORDER BY 1
+INSERT INTO t1 VALUES(1,'aaa','bbb')
+INSERT INTO t1 VALUES(2,'ccc','ddd')
+SELECT DISTINCT a AS x, b||c AS y FROM t1 WHERE y IN ('aaabbb','xxx')
+SELECT DISTINCT a AS x, b||c AS y FROM t1 WHERE b||c IN ('aaabbb','xxx')
+SELECT DISTINCT a AS x, b||c AS y FROM t1 WHERE y='aaabbb'
+SELECT DISTINCT a AS x, b||c AS y FROM t1 WHERE b||c='aaabbb'
+SELECT DISTINCT a AS x, b||c AS y FROM t1 WHERE x=2
+SELECT DISTINCT a AS x, b||c AS y FROM t1 WHERE a=2
+SELECT DISTINCT a AS x, b||c AS y FROM t1 WHERE +y='aaabbb'
+SELECT a AS x, b||c AS y FROM t1 GROUP BY x, y HAVING y='aaabbb'
+SELECT a AS x, b||c AS y FROM t1 GROUP BY x, y HAVING b||c='aaabbb'
+SELECT a AS x, b||c AS y FROM t1 WHERE y='aaabbb' GROUP BY x, y
+CREATE TABLE t41(a INTEGER PRIMARY KEY, b INTEGER)
+CREATE TABLE t42(d INTEGER PRIMARY KEY, e INTEGER)
+CREATE TABLE t43(f INTEGER PRIMARY KEY, g INTEGER)
+BEGIN TRANSACTION
+INSERT INTO "t1" VALUES(1,'one','I')
+INSERT INTO "t2" VALUES(5,'ten','XX')
+INSERT INTO "t2" VALUES(6,NULL,NULL)
+CREATE INDEX i1 ON t1(b, a)
+SELECT * FROM t2 UNION ALL SELECT * FROM t1 WHERE a<5 ORDER BY 2, 1
+CREATE TABLE t1( c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30, c31, c32, c33, c34, c35, c36, c37, c38, c39, c40, c41, c42, c43, c44, c45, c46, c47, c48, c49, c50, c51, c52, c53, c54, c55, c56, c57, c58, c59, c60, c61, c62, c63, c64, c65 )
+INSERT INTO t1 VALUES( 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65 )
+CREATE INDEX t1c60 ON t1(c60)
+SELECT DISTINCT c44 FROM ( SELECT c0 AS a, *, counter(1) FROM t1 UNION ALL SELECT c1 AS a, *, counter(1) FROM t1 ) WHERE c60=60
+SELECT a FROM ( SELECT counter(1) AS cnt, c15 AS a, *, c62 AS b FROM t1 UNION ALL SELECT counter(1) AS cnt, c16 AS a, *, c61 AS b FROM t1 ORDER BY b )
+CREATE VIEW v1 AS SELECT c16 AS a, *, counter(1) AS x FROM t1 UNION ALL SELECT c17 AS a, *, counter(1) AS x FROM t1 UNION ALL SELECT c18 AS a, *, counter(1) AS x FROM t1 UNION ALL SELECT c19 AS a, *, counter(1) AS x FROM t1
+SELECT count(*) FROM v1 WHERE c60=60
+SELECT count(a) FROM v1 WHERE c60=60
+SELECT a FROM v1 WHERE c60=60
+SELECT x FROM v1 WHERE c60=60
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b TEXT)
+SELECT 1 FROM (SELECT DISTINCT name COLLATE rtrim FROM sqlite_schema UNION ALL SELECT a FROM t1)
+INSERT INTO t1 VALUES(5,6)
+INSERT INTO t1 VALUES(7,8)
+INSERT INTO t2 VALUES(1,1)
+INSERT INTO t2 VALUES(3,9)
+INSERT INTO t2 VALUES(5,25)
+INSERT INTO t2 VALUES(7,49)
+SELECT a, (SELECT y FROM t2 WHERE x=a) FROM t1 WHERE b<8
+UPDATE t1 SET b=b+(SELECT y FROM t2 WHERE x=a)
+SELECT b FROM t1 WHERE EXISTS(SELECT * FROM t2 WHERE y=a)
+SELECT b FROM t1 WHERE NOT EXISTS(SELECT * FROM t2 WHERE y=a)
+SELECT a, x FROM t1, t2 WHERE t1.a = (SELECT x)
+SELECT a, x FROM t2, t1 WHERE t1.a = (SELECT x)
+CREATE TABLE t2(c,d)
+CREATE TABLE t3(e,f)
+INSERT INTO t3 VALUES(1,1)
+INSERT INTO t3 VALUES(3,27)
+INSERT INTO t3 VALUES(5,125)
+INSERT INTO t3 VALUES(7,343)
+SELECT a FROM t1 WHERE b IN (SELECT x+1 FROM (SELECT DISTINCT f/(a*a) AS x FROM t3))
+SELECT a FROM t1 WHERE +b=(SELECT x+1 FROM (SELECT DISTINCT f/(a*a) AS x FROM t3))
+SELECT a FROM t1 WHERE b=(SELECT x+1 FROM (SELECT DISTINCT f/(a*a) AS x FROM t3))
+SELECT a FROM t1 WHERE +b=(SELECT x+1 FROM (SELECT DISTINCT f/d AS x FROM t2 JOIN t3 ON d*a=f))
+SELECT a FROM t1 WHERE b=(SELECT x+1 FROM (SELECT DISTINCT f/d AS x FROM t2 JOIN t3 ON d*a=f))
+CREATE TABLE t4(a, b)
+CREATE TRIGGER tr1 INSERT ON t1 BEGIN INSERT INTO t1 values(1); END
+DROP TRIGGER tr2
+CREATE TEMP TABLE temp_table(a)
+CREATE TRIGGER temp_trig UPDATE ON temp_table BEGIN SELECT * from sqlite_master; END
+SELECT count(*) FROM sqlite_master WHERE name = 'temp_trig'
+create table t1(a,b)
+insert into t1 values(1,'a')
+insert into t1 values(2,'b')
+insert into t1 values(3,'c')
+insert into t1 values(4,'d')
+create trigger r1 after delete on t1 for each row begin delete from t1 WHERE a=old.a+2; end
+delete from t1 where a=1 OR a=3
+INSERT INTO tbl VALUES(1, 2)
+INSERT INTO tbl VALUES(3, 4)
+CREATE TABLE rlog (idx, old_a, old_b, db_sum_a, db_sum_b, new_a, new_b)
+CREATE TABLE clog (idx, old_a, old_b, db_sum_a, db_sum_b, new_a, new_b)
+CREATE TRIGGER before_update_row BEFORE UPDATE ON tbl FOR EACH ROW BEGIN INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog), old.a, old.b, (SELECT coalesce(sum(a),0) FROM tbl), (SELECT coalesce(sum(b),0) FROM tbl), new.a, new.b); END
+CREATE TRIGGER after_update_row AFTER UPDATE ON tbl FOR EACH ROW BEGIN INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog), old.a, old.b, (SELECT coalesce(sum(a),0) FROM tbl), (SELECT coalesce(sum(b),0) FROM tbl), new.a, new.b); END
+CREATE TRIGGER conditional_update_row AFTER UPDATE ON tbl FOR EACH ROW WHEN old.a = 1 BEGIN INSERT INTO clog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM clog), old.a, old.b, (SELECT coalesce(sum(a),0) FROM tbl), (SELECT coalesce(sum(b),0) FROM tbl), new.a, new.b); END
+UPDATE tbl SET a = a * 10, b = b * 10
+SELECT * FROM rlog ORDER BY idx
+SELECT * FROM clog ORDER BY idx
+DELETE FROM rlog
+DELETE FROM tbl
+CREATE TRIGGER before_tbl_insert BEFORE INSERT ON tbl BEGIN SELECT CASE WHEN (new.a = 4) THEN RAISE(IGNORE) END; END
+CREATE TRIGGER after_tbl_insert AFTER INSERT ON tbl BEGIN SELECT CASE WHEN (new.a = 1) THEN RAISE(ABORT, 'Trigger abort') WHEN (new.a = 2) THEN RAISE(FAIL, 'Trigger fail') WHEN (new.a = 3) THEN RAISE(ROLLBACK, 'Trigger rollback') END; END
+SELECT * FROM tbl
+CREATE TABLE tbl (a, b, c)
+INSERT INTO tbl VALUES(1, 2, 3)
+INSERT INTO tbl VALUES(4, 5, 6)
+CREATE TRIGGER before_tbl_update BEFORE UPDATE ON tbl BEGIN SELECT CASE WHEN (old.a = 1) THEN RAISE(IGNORE) END; END
+CREATE TRIGGER before_tbl_delete BEFORE DELETE ON tbl BEGIN SELECT CASE WHEN (old.a = 1) THEN RAISE(IGNORE) END; END
+UPDATE tbl SET c = 10
+CREATE TABLE tbl2(a, b, c)
+CREATE TRIGGER after_tbl2_insert AFTER INSERT ON tbl2 BEGIN UPDATE tbl SET c = 10; INSERT INTO tbl2 VALUES (new.a, new.b, new.c); END
+INSERT INTO tbl2 VALUES (1, 2, 3)
+create table test1(id integer primary key,a)
+create table test2(id integer,b)
+create view test as select test1.id as id,a as a,b as b from test1 join test2 on test2.id = test1.id
+create trigger I_test instead of insert on test begin insert into test1 (id,a) values (NEW.id,NEW.a); insert into test2 (id,b) values (NEW.id,NEW.b); end
+insert into test values(1,2,3)
+select * from test1
+select * from test2
+insert into test values(4,5,6)
+create trigger U_test instead of update on test begin update test1 set a=NEW.a where id=NEW.id; update test2 set b=NEW.b where id=NEW.id; end
+update test set a=22 where id=1
+update test set b=66 where id=4
+create table test2(id,b)
+CREATE TABLE Item( a integer PRIMARY KEY NOT NULL , b double NULL , c int NOT NULL DEFAULT 0 )
+CREATE TABLE Undo(UndoAction TEXT)
+INSERT INTO Item VALUES (1,38205.60865,340)
+CREATE TRIGGER trigItem_UNDO_AD AFTER DELETE ON Item FOR EACH ROW BEGIN INSERT INTO Undo SELECT 'INSERT INTO Item (a,b,c) VALUES (' || coalesce(old.a,'NULL') || ',' || quote(old.b) || ',' || old.c || ');'; END
+DELETE FROM Item WHERE a = 1
+SELECT * FROM Undo
+CREATE TABLE log(a, b, c)
+CREATE TRIGGER r1 BEFORE INSERT ON t1 BEGIN INSERT INTO log VALUES(1, new.x, new.y); END
+CREATE TRIGGER r2 BEFORE UPDATE ON t1 BEGIN INSERT INTO log VALUES(2, new.x, new.y); END
+INSERT INTO t1 VALUES(1,counter())
+SELECT * FROM log
+DELETE FROM log
+INSERT INTO t1 VALUES(2,counter(2,3)+4)
+UPDATE t1 SET y=counter(5)
+CREATE TRIGGER r1 AFTER UPDATE OF x ON t1 BEGIN SELECT '___update_t1.x___'; END
+CREATE TRIGGER r2 AFTER UPDATE OF y ON t1 BEGIN SELECT '___update_t1.y___'; END
+CREATE TRIGGER t2r1 AFTER INSERT ON t2 BEGIN SELECT 1; END
+CREATE TRIGGER t2r2 BEFORE INSERT ON t2 BEGIN SELECT 1; END
+CREATE TRIGGER t2r3 AFTER UPDATE ON t2 BEGIN SELECT 1; END
+CREATE TRIGGER t2r4 BEFORE UPDATE ON t2 BEGIN SELECT 1; END
+CREATE TRIGGER t2r5 AFTER DELETE ON t2 BEGIN SELECT 1; END
+CREATE TRIGGER t2r6 BEFORE DELETE ON t2 BEGIN SELECT 1; END
+CREATE TRIGGER t2r7 AFTER INSERT ON t2 BEGIN SELECT 1; END
+CREATE TRIGGER t2r8 BEFORE INSERT ON t2 BEGIN SELECT 1; END
+CREATE TRIGGER t2r9 AFTER UPDATE ON t2 BEGIN SELECT 1; END
+CREATE TRIGGER t2r10 BEFORE UPDATE ON t2 BEGIN SELECT 1; END
+CREATE TABLE t2(y)
+INSERT INTO t1 VALUES(5)
+SELECT count(*) FROM t2
+CREATE TABLE t1(x, y, z)
+INSERT INTO t1 VALUES('1', randstr(10000,10000), '2')
+INSERT INTO t1 VALUES('2', randstr(10000,10000), '4')
+INSERT INTO t1 VALUES('3', randstr(10000,10000), '6')
+CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN INSERT INTO t2 VALUES(old.rowid); END
+CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN INSERT INTO t2 VALUES(old.x); END
+CREATE TRIGGER trig1 BEFORE DELETE ON t1 WHEN old.x='1' BEGIN INSERT INTO t2 VALUES(old.rowid); END
+CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN INSERT INTO t2 VALUES(old.rowid); END
+UPDATE t1 SET y = ''
+CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN INSERT INTO t2 VALUES(old.x); END
+CREATE TRIGGER trig1 BEFORE UPDATE ON t1 WHEN old.x>='2' BEGIN INSERT INTO t2 VALUES(old.x); END
+CREATE TABLE t3(a, b)
+CREATE TABLE x(x INTEGER PRIMARY KEY, y INT NOT NULL)
+INSERT INTO x(y) VALUES(1)
+CREATE TEMP VIEW vx AS SELECT x, y, 0 AS yy FROM x
+CREATE TEMP TRIGGER tx INSTEAD OF UPDATE OF y ON vx BEGIN UPDATE x SET y = new.y WHERE x = new.x; END
+SELECT * FROM vx
+UPDATE vx SET y = yy
+CREATE TABLE t2(a INTEGER PRIMARY KEY, b)
+CREATE TABLE changes(x,y)
+CREATE TRIGGER r1t2 AFTER UPDATE ON t2 BEGIN INSERT INTO changes VALUES(new.a, new.b); END
+UPDATE t2 SET a=a+10
+SELECT * FROM changes
+CREATE TRIGGER r2t2 AFTER DELETE ON t2 BEGIN INSERT INTO changes VALUES(old.a, old.c); END
+PRAGMA recursive_triggers = on
+CREATE TABLE log(t, a1, b1, c1, a2, b2, c2)
+CREATE TRIGGER trig1 BEFORE INSERT ON t1 BEGIN INSERT INTO log VALUES('before', NULL, NULL, NULL, new.a, new.b, new.c); END
+CREATE TRIGGER trig2 AFTER INSERT ON t1 BEGIN INSERT INTO log VALUES('after', NULL, NULL, NULL, new.a, new.b, new.c); END
+CREATE TRIGGER trig3 BEFORE UPDATE ON t1 BEGIN INSERT INTO log VALUES('before', old.a,old.b,old.c, new.a,new.b,new.c); END
+CREATE TRIGGER trig4 AFTER UPDATE ON t1 BEGIN INSERT INTO log VALUES('after', old.a,old.b,old.c, new.a,new.b,new.c); END
+CREATE TRIGGER trig5 BEFORE DELETE ON t1 BEGIN INSERT INTO log VALUES('before', old.a,old.b,old.c, NULL,NULL,NULL); END
+CREATE TRIGGER trig6 AFTER DELETE ON t1 BEGIN INSERT INTO log VALUES('after', old.a,old.b,old.c, NULL,NULL,NULL); END
+UPDATE t1 SET a = 'a'
+CREATE TRIGGER t4t AFTER DELETE ON t4 BEGIN SELECT RAISE(ABORT, 'delete is not supported'); END
+INSERT INTO t4 VALUES(1, 2)
+SELECT * FROM t4
+CREATE TABLE t3(e, f)
+INSERT INTO t1 VALUES(5,5)
+INSERT INTO sqlite_master VALUES('trigger', 'tr1', 't1', 0, 'CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(?1, ?2); END' )
+INSERT INTO sqlite_master VALUES('trigger', 'tr2', 't3', 0, 'CREATE TRIGGER tr2 AFTER INSERT ON t3 WHEN ?1 IS NULL BEGIN UPDATE t2 SET c=d WHERE c IS ?2; END' )
+INSERT INTO t2 VALUES('x', 'y')
+INSERT INTO t2 VALUES(NULL, 'z')
+CREATE TABLE t1(a INT PRIMARY KEY, b) WITHOUT ROWID
+CREATE TABLE log(t)
+DELETE FROM t1 WHERE a=1
+INSERT OR REPLACE INTO t1 VALUES(2, 'three')
+UPDATE OR REPLACE t1 SET a=3 WHERE a=2
+SELECT * FROM log ORDER BY rowid
+PRAGMA recursive_triggers = 1
+INSERT INTO t1(a) VALUES(0),(2),(3),(8),(9)
+CREATE TABLE t2(b)
+CREATE TABLE t3(c)
+CREATE TRIGGER tr AFTER INSERT ON t3 BEGIN INSERT INTO t3 SELECT new.c+1 WHERE new.c<5; INSERT INTO t2 SELECT new.c*100+a FROM t1 WHERE a IN (1, 2, 3, 4); END
+INSERT INTO t3 VALUES(2)
+SELECT c FROM t3 ORDER BY c
+DROP TRIGGER tr
+CREATE TRIGGER tr AFTER INSERT ON t3 BEGIN INSERT INTO t3 SELECT new.c+1 WHERE new.c<5; INSERT INTO t2 SELECT new.c*10000+xx.a*100+yy.a FROM t1 AS xx, t1 AS yy WHERE xx.a IN (1,2,3,4) AND yy.a IN (2,3,4,5); END
+CREATE TRIGGER tr4 AFTER INSERT ON t4 BEGIN SELECT 0x2147483648e0e0099 AS y WHERE y; END
+CREATE VIEW v0(a) AS SELECT 1234
+CREATE TRIGGER t0001 INSTEAD OF DELETE ON v0 BEGIN SELECT old.a; END
+CREATE TABLE map(k, v)
+INSERT INTO map VALUES(1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c)
+CREATE TRIGGER tr AFTER INSERT ON t1 BEGIN UPDATE t1 SET c = v FROM map WHERE k=new.a AND a=new.a; END
+SELECT a, c FROM t1 ORDER BY a
+INSERT INTO t1(a) VALUES(2), (3), (4), (5)
+CREATE TABLE aux.t3(x, y)
+INSERT INTO aux.t3 VALUES('x', 'y')
+CREATE TEMP TRIGGER tr2 AFTER INSERT ON t1 BEGIN UPDATE t1 SET b = y FROM aux.t3 WHERE a=new.a; END
+INSERT INTO t1(a) VALUES(10), (20)
+CREATE TABLE link(f, t)
+INSERT INTO link VALUES(5, 2), (20, 10), (2, 1)
+UPDATE test1 SET f2=5 WHERE f1<1
+UPDATE sqlite_master SET name='xyz' WHERE name='123'
+CREATE TABLE test1(f1 int,f2 int)
+SELECT * FROM test1 ORDER BY f1
+UPDATE test1 SET f1=f3*2 WHERE f2==32
+UPDATE test1 SET f1=test2.f1*2 WHERE f2==32
+UPDATE test1 SET f3=f1*2 WHERE f2==32
+UPDATE test1 SET f2=f2*3
+UPDATE test1 SET f2=f2/3 WHERE f1<=5
+UPDATE test1 SET f2=f2/3 WHERE f1>5
+UPDATE test1 SET F2=f1, F1=f2
+SELECT * FROM test1 ORDER BY F1
+UPDATE t1 SET b = repeat(b, 100)
+CREATE TABLE t3(a PRIMARY KEY, b, c)
+CREATE INDEX t3i ON t3(b)
+UPDATE t3 SET c=1 WHERE b=?
+UPDATE t3 SET c=1 WHERE rowid=?
+CREATE TABLE t4(a PRIMARY KEY, b, c) WITHOUT ROWID
+CREATE INDEX t4c ON t4(c)
+INSERT INTO t4 VALUES(1, 2, 3)
+INSERT INTO t4 VALUES(2, 3, 4)
+UPDATE t4 SET c=c+2 WHERE c>2
+SELECT a, c FROM t4 ORDER BY a
+DROP TABLE IF EXISTS b1
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b TEXT, c DEFAULT 0)
+CREATE UNIQUE INDEX t1x1 ON t1(b)
+INSERT INTO t1(a,b) VALUES(1,2) ON CONFLICT DO NOTHING
+INSERT INTO t1(a,b) VALUES(1,99),(99,2) ON CONFLICT DO NOTHING
+INSERT INTO t1(a,b) VALUES(2,3) ON CONFLICT(a) DO NOTHING
+INSERT INTO t1(a,b) VALUES(2,99) ON CONFLICT(a) DO NOTHING
+INSERT INTO t1(a,b) VALUES(3,4) ON CONFLICT(b) DO NOTHING
+INSERT INTO t1(a,b) VALUES(99,4) ON CONFLICT(b) DO NOTHING
+INSERT INTO t1(a,b) VALUES(5,6) ON CONFLICT(b COLLATE binary) DO NOTHING
+INSERT INTO t1(a,b) VALUES(1,2),(3,2),(4,20),(5,20) ON CONFLICT(b) WHERE b>10 DO NOTHING
+SELECT *, 'x' FROM t1 ORDER BY b, a
+CREATE TABLE t2(a TEXT UNIQUE, b INT DEFAULT 1)
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b int, c DEFAULT 0)
+INSERT INTO t1(a,b) VALUES(1,2),(3,4)
+INSERT INTO t1(a,b) VALUES(1,8),(2,11),(3,1) ON CONFLICT(a) DO UPDATE SET b=excluded.b, c=c+1 WHERE t1.b<excluded.b
+SELECT *, 'x' FROM t1 ORDER BY a
+CREATE TABLE t1(a INT PRIMARY KEY, b int, c DEFAULT 0) WITHOUT ROWID
+WITH nx(a,b) AS (VALUES(1,8),(2,11),(3,1),(2,15),(1,4),(1,99)) INSERT INTO t1(a,b) SELECT a, b FROM nx WHERE true ON CONFLICT(a) DO UPDATE SET b=excluded.b, c=c+1 WHERE t1.b<excluded.b
+WITH nx(a,b) AS (VALUES(1,8),(2,11),(3,1),(2,15),(1,4),(1,99)) INSERT INTO main.t1 AS t2(a,b) SELECT a, b FROM nx WHERE true ON CONFLICT(a) DO UPDATE SET b=excluded.b, c=t2.c+1 WHERE t2.b<excluded.b
+CREATE TABLE record(x TEXT, y TEXT)
+CREATE TRIGGER r1 BEFORE INSERT ON t1 BEGIN INSERT INTO record(x,y) VALUES('before-insert',format('%d,%d,%d',new.a,new.b,new.c)); END
+CREATE TRIGGER r2 AFTER INSERT ON t1 BEGIN INSERT INTO record(x,y) VALUES('after-insert',printf('%d,%d,%d',new.a,new.b,new.c)); END
+CREATE TRIGGER r3 BEFORE UPDATE ON t1 BEGIN INSERT INTO record(x,y) VALUES('before-update',format('%d,%d,%d/%d,%d,%d', old.a,old.b,old.c,new.a,new.b,new.c)); END
+CREATE TRIGGER r4 AFTER UPDATE ON t1 BEGIN INSERT INTO record(x,y) VALUES('after-update',printf('%d,%d,%d/%d,%d,%d', old.a,old.b,old.c,new.a,new.b,new.c)); END
+CREATE TABLE t1(k int, v text)
+CREATE UNIQUE INDEX x1 ON t1(k, v)
+INSERT INTO t1 VALUES(0, 'abcdefghij') ON CONFLICT(k,v) DO NOTHING
+INSERT INTO t1 VALUES(0, 'abcdefghij') ON CONFLICT(v,k) DO NOTHING
+CREATE TABLE excluded(a INT, b INT, c INT DEFAULT 0)
+CREATE UNIQUE INDEX excludedab ON excluded(a,b)
+INSERT INTO excluded(a,b) VALUES(1,2),(1,2),(3,4),(1,2),(5,6),(3,4) ON CONFLICT(b,a) DO UPDATE SET c=excluded.c+1
+SELECT *, 'x' FROM excluded ORDER BY a
+INSERT INTO excluded AS base(a,b,c) VALUES(1,2,8),(1,2,3) ON CONFLICT(b,a) DO UPDATE SET c=excluded.c+1 WHERE base.c<excluded.c
+INSERT INTO t1 VALUES(1, NULL, 'one')
+INSERT INTO t1 VALUES(2, NULL, 'two')
+INSERT INTO t1 VALUES(3, NULL, 'three')
+INSERT INTO t1 VALUES(1, NULL, 'xyz') ON CONFLICT DO NOTHING
+INSERT INTO t1 VALUES(4, NULL, 'two') ON CONFLICT DO NOTHING
+INSERT INTO t1 VALUES(4, NULL, 'two') ON CONFLICT (c) DO UPDATE SET b = 1
+INSERT INTO t1 VALUES(2, NULL, 'zero') ON CONFLICT (a) DO UPDATE SET b=2
+INSERT INTO t1 VALUES(2, NULL, 'zero') ON CONFLICT (a) DO UPDATE SET (b, c) = (SELECT 'x', 'y')
+INSERT INTO t1 VALUES(1, NULL, NULL) ON CONFLICT (a) DO UPDATE SET (c, a) = ('four', 4)
+SELECT * FROM t1 ORDER BY 1
+INSERT INTO xyz VALUES(10, 1, 1, 'one')
+SELECT * FROM xyz
+INSERT INTO t1(a,b,c,d,e) VALUES(1,2,3,4,5)
+INSERT INTO t1(a,b,c,d,e) VALUES(1,NULL,3,4,5) ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(e) DO UPDATE SET b='e'
+SELECT a,b,c,d,e FROM t1
+INSERT INTO t1(a,b,c,d,e) VALUES(91,NULL,3,4,5) ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(e) DO UPDATE SET b='e'
+INSERT INTO t1(a,b,c,d,e) VALUES(91,NULL,93,4,5) ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(e) DO UPDATE SET b='e'
+INSERT INTO t1(a,b,c,d,e) VALUES(91,NULL,93,94,5) ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(e) DO UPDATE SET b='e'
+INSERT INTO t1(a,b,c,d,e) VALUES(1,NULL,93,94,95) ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(e) DO UPDATE SET b='e'
+INSERT INTO t1(a,b,c,d,e) VALUES(1,NULL,3,94,95) ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(e) DO UPDATE SET b='e'
+INSERT INTO t1(a,b,c,d,e) VALUES(1,NULL,3,4,5) ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(e) DO UPDATE SET b='e'
+INSERT INTO t1(a,b,c,d,e) VALUES(1,NULL,93,94,5) ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(e) DO UPDATE SET b='e'
+INSERT INTO t1(a,b,c,d,e) VALUES(1,NULL,93,4,95) ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(e) DO UPDATE SET b='e'
+INSERT INTO t1(a,b,c,d,e) VALUES(1,NULL,93,94,95) ON CONFLICT(c) DO UPDATE SET b='c' ON CONFLICT(d) DO UPDATE SET b='d' ON CONFLICT(a) DO UPDATE SET b='a' ON CONFLICT(e) DO UPDATE SET b='e'
+CREATE TABLE t1(a PRIMARY KEY, b, c, d, UNIQUE(b, c))
+INSERT INTO t1 VALUES(1, 1, 1, 1)
+INSERT INTO t1 VALUES(2, 2, 2, 2)
+INSERT INTO t1 VALUES(3, 2, 2, NULL) ON CONFLICT(b, c) DO UPDATE SET d=d+1
+CREATE TABLE t1( a INTEGER PRIMARY KEY, b ANY, c INT AS (b+1), CHECK( typeof(b)!='integer' OR b>a-5 ) )
+WITH RECURSIVE c(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM c WHERE x<100) INSERT INTO t1(a,b) SELECT x, randomblob(600) FROM c
+DELETE FROM t1 WHERE a%2
+SELECT count(*), sum(a), sum(length(b)) FROM t1
+VACUUM main INTO 'out.db'
+CREATE TABLE t2(name TEXT)
+INSERT INTO t2 VALUES(':memory:')
+VACUUM main INTO (SELECT name FROM t2)
+VACUUM INTO target()
+VACUUM INTO 'test.db2'
+PRAGMA page_size
+INSERT INTO t1 VALUES(NULL,randstr(10,100),randstr(5,50))
+INSERT INTO t1 VALUES(123456,randstr(10,100),randstr(5,50))
+INSERT INTO t1 SELECT NULL, b||'-'||rowid, c||'-'||rowid FROM t1
+CREATE INDEX i1 ON t1(b,c)
+CREATE UNIQUE INDEX i2 ON t1(c,a)
+CREATE TABLE t2 AS SELECT * FROM t1
+CREATE TABLE t4 AS SELECT * FROM t1
+CREATE TABLE t5 AS SELECT * FROM t1
+DROP TABLE t4
+DROP TABLE t5
+CREATE TABLE t6 AS SELECT * FROM t1
+CREATE TABLE t7 AS SELECT * FROM t1
+INSERT INTO t1 VALUES('hello')
+INSERT INTO t2 VALUES('out there')
+PRAGMA auto_vacuum=FULL
+pragma auto_vacuum=1
+create table t(a, b)
+insert into t values(1, 2)
+pragma auto_vacuum=0
+vacuum
+pragma auto_vacuum
+pragma integrity_check
+pragma auto_vacuum=2
+CREATE TABLE t1(a PRIMARY KEY, b UNIQUE)
+PRAGMA auto_vacuum=OFF
+INSERT INTO t1 VALUES(1, 2, 3)
+INSERT INTO t1 VALUES(1, 2, 3, NULL)
+UPDATE t1 SET d = randomblob(1000)
+SELECT * FROM abc
+PRAGMA page_size = 2048
+PRAGMA page_size=16384
+CREATE TABLE main.t1(a,b)
+WITH RECURSIVE c(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM c WHERE x<1000) INSERT INTO t1(a,b) SELECT x, randomblob(1000) FROM c
+CREATE TEMP TABLE ttemp(x,y)
+INSERT INTO ttemp SELECT * FROM t1
+ATTACH 'test2.db' AS x2
+ATTACH 'test3.db' AS x3
+CREATE TABLE x2.t2(c,d)
+CREATE TABLE x3.t3(e,f)
+INSERT INTO t3 SELECT * FROM t1
+DELETE FROM t1 WHERE (rowid%3)!=0
+DELETE FROM t2 WHERE (rowid%4)!=0
+DELETE FROM t3 WHERE (rowid%5)!=0
+INSERT INTO t1 VALUES(1, 1)
+CREATE TABLE t1(x,b)
+CREATE INDEX x1 ON t1(x)
+CREATE INDEX x2 ON t1(x)
+CREATE INDEX x3 ON t1(x)
+INSERT INTO t1 SELECT 2,''
+INSERT INTO t1 VALUES(2, randomblob(1200))
+PRAGMA page_size = 512
+CREATE TABLE tx(a, b)
+CREATE INDEX i1 ON tx(b)
+WITH s(i) AS ( SELECT 8000 UNION ALL SELECT i+1 FROM s WHERE i<10000 ) INSERT INTO tx SELECT i, randomblob(i) FROM s
+SELECT sum(length(b)) FROM tx
+PRAGMA cache_size = -2000
+WITH r(i) AS ( SELECT 1 UNION ALL SELECT i+1 FROM r WHERE i<100000 ) INSERT INTO t1 SELECT randomblob(100),randomblob(100),randomblob(100) FROM r
+SELECT count(*) FROM t1 WHERE +a IS NOT NULL
+INSERT INTO t1 VALUES(4,5,6)
+INSERT INTO t1 VALUES(7,8,9)
+CREATE VIEW IF NOT EXISTS v1 AS SELECT a,b FROM t1
+SELECT * FROM v1 ORDER BY a
+CREATE TEMP VIEW v1temp AS SELECT a, b FROM t1
+SELECT * FROM v1temp ORDER BY a
+SELECT name, type FROM pragma_table_list('v1')
+CREATE VIEW v1 AS SELECT a,b FROM t1
+INSERT INTO t1 VALUES(1,2,3,4)
+INSERT INTO t1 VALUES(4,5,6,7)
+INSERT INTO t1 VALUES(7,8,9,10)
+CREATE TABLE t9(x INTEGER)
+CREATE VIEW v1 AS SELECT * FROM ( WITH x1 AS (SELECT y, x FROM t1) SELECT * FROM x1 )
+SELECT * FROM v1
+CREATE VIEW v3 AS SELECT * FROM main.t1
+WITH t1(a, b) AS ( SELECT 3, 4 ) SELECT * FROM v3
+CREATE VIEW v2 AS SELECT * FROM t1
+WITH t1(a, b) AS ( SELECT 3, 4 ) SELECT * FROM v2
+CREATE TABLE t1(w int, x int, y int)
+CREATE TABLE t2(p int, q int, r int, s int)
+INSERT INTO t2 SELECT 101-w, x, (SELECT max(y) FROM t1)+1-y, y FROM t1
+select max(y) from t1
+CREATE INDEX i1w ON t1("w")
+CREATE INDEX i1xy ON t1(`x`,'y' ASC)
+CREATE INDEX i2p ON t2(p)
+CREATE INDEX i2r ON t2(r)
+CREATE INDEX i2qs ON t2(q, s)
+SELECT 99 WHERE 0
+SELECT 99 WHERE 1
+SELECT 99 WHERE 0.1
+CREATE TABLE t2249a(a TEXT UNIQUE, x CHAR(100))
+CREATE TABLE t2249b(b INTEGER)
+INSERT INTO t2249a(a) VALUES('0123')
+INSERT INTO t2249b VALUES(123)
+SELECT * FROM t1 WHERE x IN (20,21) AND y IN (1,2)
+SELECT * FROM t1 WHERE x IN (1,2) AND y IN (-5,-6)
+CREATE TABLE tx AS SELECT * FROM t1
+SELECT w FROM t1 WHERE x IN (SELECT x FROM tx WHERE rowid<0) AND +y IN (SELECT y FROM tx WHERE rowid=1)
+SELECT w FROM t1 WHERE x IN (SELECT x FROM tx WHERE rowid=1) AND y IN (SELECT y FROM tx WHERE rowid<0)
+CREATE INDEX tx_xyz ON tx(x, y, z, w)
+SELECT w FROM tx WHERE x IN (SELECT x FROM t1 WHERE w BETWEEN 10 AND 20) AND y IN (SELECT y FROM t1 WHERE w BETWEEN 10 AND 20) AND z IN (SELECT z FROM t1 WHERE w BETWEEN 12 AND 14)
+SELECT w FROM tx WHERE x IN (SELECT x FROM t1 WHERE w BETWEEN 10 AND 20) AND y IN (SELECT y FROM t1 WHERE w BETWEEN 12 AND 14) AND z IN (SELECT z FROM t1 WHERE w BETWEEN 10 AND 20)
+CREATE TABLE t2(p, q)
+CREATE TABLE t3(x, y)
+INSERT INTO t1 VALUES(111,'one')
+INSERT INTO t1 VALUES(222,'two')
+INSERT INTO t1 VALUES(333,'three')
+INSERT INTO t2 VALUES(1,111)
+INSERT INTO t2 VALUES(2,222)
+INSERT INTO t2 VALUES(4,444)
+CREATE INDEX t2i1 ON t2(p)
+INSERT INTO t3 VALUES(999,'nine')
+CREATE INDEX t3i1 ON t3(x)
+SELECT * FROM t1, t2 LEFT JOIN t3 ON q=x WHERE p=2 AND a=q
+CREATE TABLE t1(w, x, y)
+CREATE INDEX i1wxy ON t1(w,x,y)
+INSERT INTO t1 VALUES(1,NULL,3)
+INSERT INTO t1 VALUES('a','b','c')
+INSERT INTO t1 VALUES('a',NULL,'c')
+INSERT INTO t1 VALUES(X'78',x'79',x'7a')
+INSERT INTO t1 VALUES(X'78',NULL,X'7A')
+SELECT rowid FROM t1 ORDER BY w, x, y
+SELECT rowid FROM t1 ORDER BY w DESC, x, y
+SELECT rowid FROM t1 ORDER BY w, x DESC, y
+INSERT INTO t2 VALUES(2)
+INSERT INTO t2 VALUES(3)
+CREATE TABLE t2(x INTEGER)
+CREATE TABLE t3(x INTEGER PRIMARY KEY)
+INSERT INTO t1 VALUES(-1)
+INSERT INTO t1 VALUES(0)
+INSERT INTO t3 SELECT * FROM t2
+SELECT * FROM t1 WHERE x<0
+SELECT * FROM t1 WHERE x<=0
+SELECT * FROM t1 WHERE x=0
+SELECT * FROM t1 WHERE x>=0
+SELECT * FROM t1 WHERE x>0
+SELECT * FROM t1 WHERE x<>0
+SELECT * FROM t1 WHERE x<NULL
+CREATE TABLE t1(a INTEGER PRIMARY KEY,b,c)
+INSERT INTO t1 VALUES(1,3,1)
+INSERT INTO t1 VALUES(2,4,2)
+CREATE TABLE t2(x INTEGER PRIMARY KEY)
+SELECT * FROM t1 LEFT JOIN t2 ON b=x AND c=1
+SELECT * FROM t1 LEFT JOIN t2 ON x=b AND c=1
+SELECT * FROM t1 LEFT JOIN t2 ON x=b AND 1=c
+SELECT * FROM t1 LEFT JOIN t2 ON b=x AND 1=c
+SELECT * FROM t1 LEFT JOIN t2 ON b=x WHERE c=1
+SELECT * FROM t1 LEFT JOIN t2 ON x=b WHERE c=1
+SELECT * FROM t1 LEFT JOIN t2 ON b=x WHERE 1=c
+CREATE INDEX i1 ON t1(c)
+CREATE TABLE t1(a INTEGER PRIMARY KEY,b,c,d)
+INSERT INTO t1 VALUES(2,3,4,5)
+INSERT INTO t1 VALUES(3,4,6,8)
+INSERT INTO t1 VALUES(4,5,10,15)
+INSERT INTO t1 VALUES(5,10,100,1000)
+CREATE TABLE t(a)
+CREATE INDEX ta ON t(a)
+INSERT INTO t(a) VALUES(1),(2)
+SELECT * FROM t ORDER BY a
+SELECT * FROM t WHERE a<2 OR a<3 ORDER BY a
+PRAGMA count_changes=ON
+DELETE FROM t WHERE a<2 OR a<3
+CREATE TABLE t1(a, b TEXT, c)
+INSERT INTO t1 VALUES(3, 'three', 'III')
+INSERT INTO t1 VALUES(6, 'six', 'VI')
+INSERT INTO t1 VALUES(9, 'nine', 'IX')
+CREATE VIRTUAL TABLE e1 USING echo(t1)
+SELECT b FROM e1
+SELECT c FROM e1 WHERE a=1 OR b='three'
+CREATE INDEX i3 ON t2(d)
+CREATE INDEX i4 ON t2(e)
+INSERT INTO t2 VALUES(1, NULL, 'I')
+INSERT INTO t2 VALUES(2, 'four', 'IV')
+INSERT INTO t2 VALUES(3, NULL, 'IX')
+CREATE TABLE t5(a, b, c, d, e, f, g, x, y)
+INSERT INTO t5 SELECT a, b, c, e, d, f, g, CASE WHEN (a&1)!=0 THEN 'y' ELSE 'n' END, CASE WHEN (a&2)!=0 THEN 'y' ELSE 'n' END FROM t1
+CREATE INDEX t5xb ON t5(x, b)
+CREATE INDEX t5xc ON t5(x, c)
+CREATE INDEX t5xd ON t5(x, d)
+CREATE INDEX t5xe ON t5(x, e)
+CREATE INDEX t5xf ON t5(x, f)
+CREATE INDEX t5xg ON t5(x, g)
+CREATE INDEX t5yb ON t5(y, b)
+CREATE INDEX t5yc ON t5(y, c)
+CREATE INDEX t5yd ON t5(y, d)
+CREATE INDEX t5ye ON t5(y, e)
+SELECT * FROM t1 WHERE b=2 AND a IS NULL
+SELECT * FROM t1 WHERE b=2 AND a IS NOT NULL
+PRAGMA reverse_unordered_selects=on
+SELECT a FROM t1 WHERE b=-99 OR b>1
+CREATE INDEX t1aa ON t1(a,a)
+UPDATE sqlite_stat1 SET stat='27 3 3' WHERE idx='t1aa'
+ANALYZE sqlite_schema
+PRAGMA reverse_unordered_selects (1)
+SELECT a FROM t1 WHERE a=1 OR a=2
+CREATE TABLE t1(i INTEGER PRIMARY KEY, a, b INTEGER)
+INSERT INTO t1 VALUES(1, 1, 1)
+INSERT INTO t1 VALUES(2, 1, 1)
+INSERT INTO t1 VALUES(3, 1, 2)
+INSERT INTO t1 VALUES(4, 1, 2)
+INSERT INTO t1 VALUES(5, 1, 2)
+INSERT INTO t1 VALUES(6, 1, 3)
+INSERT INTO t1 VALUES(7, 1, 3)
+INSERT INTO t1 VALUES(8, 2, 1)
+INSERT INTO t1 VALUES(9, 2, 1)
+INSERT INTO t1 VALUES(10, 2, 2)
+INSERT INTO t1 VALUES(11, 2, 2)
+CREATE TABLE t(i,j,k,m,n)
+CREATE INDEX ijk ON t(i,j,k)
+CREATE INDEX jmn ON t(j,m,n)
+INSERT INTO t VALUES(3, 3, 'three', 3, 'tres')
+INSERT INTO t VALUES(2, 2, 'two', 2, 'dos')
+INSERT INTO t VALUES(1, 1, 'one', 1, 'uno')
+INSERT INTO t VALUES(4, 4, 'four', 4, 'cuatro')
+SELECT k FROM t WHERE (i=1 AND j=1) OR (i=2 AND j=2)
+SELECT k FROM t WHERE (i=1 AND j=1) OR (+i=2 AND j=2)
+SELECT n FROM t WHERE (i=1 AND j=1) OR (i=2 AND j=2)
+SELECT k, n FROM t WHERE (i=1 AND j=1) OR (i=2 AND j=2)
+SELECT k FROM t WHERE (i=1 AND j=1) OR (i=2 AND j=2) OR (i=3 AND j=3)
+INSERT INTO t1 VALUES(1,10), (2,20), (3,30), (2,22), (3, 33)
+ALTER TABLE t1 ADD COLUMN c
+UPDATE t1 SET c=a*rowid+10000
+INSERT INTO t2 VALUES(4,44),(5,55),(6,66),(7,77)
+INSERT INTO t2 SELECT x+4, (x+4)*11 FROM t2
+INSERT INTO t2 SELECT x+8, (x+8)*11 FROM t2
+INSERT INTO t2 SELECT x+16, (x+16)*11 FROM t2
+INSERT INTO t2 SELECT x+32, (x+32)*11 FROM t2
+INSERT INTO t2 SELECT x+64, (x+32)*11 FROM t2
+ALTER TABLE t2 ADD COLUMN z
+UPDATE t2 SET z=2
+CREATE UNIQUE INDEX t2zx ON t2(z,x)
+CREATE UNIQUE INDEX i2 ON t2(d)
+CREATE UNIQUE INDEX i2 ON t1(b)
+CREATE UNIQUE INDEX i3 ON t2(d)
+CREATE UNIQUE INDEX i1 ON t1(a, b)
+CREATE TABLE t4(a,b,c,d,e, PRIMARY KEY(a,b,c))
+CREATE INDEX t4adc ON t4(a,d,c)
+CREATE UNIQUE INDEX t4aebc ON t4(a,e,b,c)
+CREATE TABLE t1(f1)
+CREATE TABLE t2(f2)
+CREATE INDEX t2f ON t2(f2)
+WITH w(i) AS ( SELECT 1 UNION ALL SELECT i+1 FROM w WHERE i<1000 ) INSERT INTO t2 SELECT -1 FROM w
+SELECT count(*) FROM t1, t2 WHERE t2.rowid = +t1.rowid
+CREATE TABLE composer( cid INTEGER PRIMARY KEY, cname TEXT )
+CREATE TABLE album( aid INTEGER PRIMARY KEY, aname TEXT )
+CREATE TABLE track( tid INTEGER PRIMARY KEY, cid INTEGER REFERENCES composer, aid INTEGER REFERENCES album, title TEXT )
+CREATE INDEX track_i1 ON track(cid)
+CREATE INDEX track_i2 ON track(aid)
+INSERT INTO composer VALUES(1, 'W. A. Mozart')
+INSERT INTO composer VALUES(2, 'Beethoven')
+INSERT INTO composer VALUES(3, 'Thomas Tallis')
+INSERT INTO composer VALUES(4, 'Joseph Hayden')
+INSERT INTO composer VALUES(5, 'Thomas Weelkes')
+INSERT INTO composer VALUES(6, 'J. S. Bach')
+INSERT INTO composer VALUES(7, 'Orlando Gibbons')
+CREATE TABLE t1(a,b,c,d,e)
+CREATE INDEX t1bcd ON t1(b,c,d)
+CREATE INDEX t1abcd ON t1(a,b,c,d)
+CREATE TABLE t1(a, b, c, PRIMARY KEY(a)) WITHOUT ROWID
+INSERT INTO t1 VALUES(1, 'a', 'z')
+INSERT INTO t1 VALUES(2, 'b', 'y')
+INSERT INTO t1 VALUES(3, 'c', 'x')
+INSERT INTO t1 VALUES(4, 'd', 'w')
+CREATE INDEX i2 ON t1(c)
+SELECT a FROM t1 WHERE b='b' OR c='x'
+SELECT a FROM t1 WHERE b='a' OR c='z'
+CREATE TABLE t2(a, b, c, PRIMARY KEY(a)) WITHOUT ROWID
+INSERT INTO t2 VALUES('i', 'a', 'z')
+INSERT INTO t2 VALUES('ii', 'b', 'y')
+INSERT INTO t2 VALUES('iii', 'c', 'x')
+CREATE TABLE tx1 ( est, cid, sid, fid, aid, edate, rstat, ftype, cx, fyear, fp, acode, a1, curx, tdate, gstat, trgtpx, effdate, adate, ytime, mstat )
+CREATE INDEX ix0 on tx1(a1,curx,aid,cid,sid,ftype,fp,fyear DESC,edate DESC,fid)
+CREATE INDEX ix1 on tx1(a1,curx,aid,ftype,fp,fyear DESC,fid,edate DESC,cid,sid)
+CREATE INDEX ix2 on tx1(a1,curx,cid,sid,ftype,fp,fyear DESC,edate DESC,aid,fid)
+CREATE INDEX ix3 on tx1(a1,curx,fid,ftype,fp,fyear DESC,cid,sid,aid,edate DESC)
+CREATE INDEX ix4 on tx1(a1,curx,ftype,cid,sid,aid,edate DESC,fid,fp,fyear DESC)
+CREATE INDEX ix5 on tx1(a1,curx,ftype,aid,fid,cid,sid,edate DESC,fp,fyear DESC)
+CREATE INDEX ix6 on tx1(ftype,fp,fyear DESC,cid,sid,edate DESC,a1,fid,aid,curx,est,rstat,cx,acode,tdate,gstat,trgtpx,effdate,adate,ytime,mstat)
+CREATE INDEX ix7 on tx1(cid,a1,curx,sid,ftype,est,fid,aid,edate,rstat,cx,fyear,fp,acode,tdate,gstat,trgtpx,effdate,adate,ytime,mstat)
+CREATE INDEX ix8 on tx1(cid,sid,edate DESC,aid,est)
+CREATE INDEX ix9 on tx1(aid,edate DESC,a1,curx)
+DELETE FROM sqlite_stat4
+WITH RECURSIVE c(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM c WHERE x<99) INSERT INTO t1(a,b,c) SELECT x, x/10, x%10 FROM c
+SELECT a FROM t1 WHERE b>9 OR b=9 ORDER BY +a
+SELECT a FROM t1 WHERE b>8 OR (b=8 AND c>7) ORDER BY +a
+SELECT a FROM t1 WHERE (b=8 AND c>7) OR b>8 ORDER BY +a
+SELECT a FROM t1 WHERE (b=8 AND c>7) OR 8<b ORDER BY +a
+SELECT a FROM t1 WHERE (b=8 AND c>7) OR (b>8 AND c NOT IN (4,5,6)) ORDER BY +a
+CREATE TABLE t0(x COLLATE NOCASE)
+CREATE INDEX t0x ON t0(x)
+CREATE TABLE t1(y)
+INSERT INTO t0 VALUES('a')
+INSERT INTO t1 VALUES('AB')
+SELECT count(*) FROM t0, t1 WHERE (y BETWEEN 1 AND x) OR (x>=y AND x)
+CREATE TABLE t1(a INT PRIMARY KEY, b, c, d, e)
+CREATE TABLE t2(a INT PRIMARY KEY, f, g, h, i)
+CREATE TABLE t3(a INT PRIMARY KEY, j, k, l, m)
+CREATE VIEW v4 AS SELECT * FROM t2 UNION ALL SELECT * FROM t3
+CREATE TABLE c3(x COLLATE binary, y COLLATE nocase, z COLLATE binary)
+CREATE INDEX c3x ON c3(x)
+INSERT INTO c3 VALUES('ABC', 'ABC', 'abc')
+SELECT * FROM c3 WHERE x=y AND y=z AND z='abc'
+SELECT * FROM c3 WHERE x='abc' AND y='abc' AND z='abc'
+CREATE TABLE A(id INTEGER PRIMARY KEY, label TEXT)
+CREATE TABLE B(id INTEGER PRIMARY KEY, label TEXT, Aid INTEGER)
+CREATE TABLE C( id INTEGER PRIMARY KEY, xx INTEGER NOT NULL, yy INTEGER, zz INTEGER )
+CREATE TABLE t1(a, b INTEGER, c TEXT, d REAL, e BLOB)
+INSERT INTO t1 VALUES(10.0, 10.0, 10.0, 10.0, 10.0)
+SELECT a=10, a = '10.0', a LIKE '10.0' FROM t1
+SELECT count(*) FROM t1 WHERE a=10 AND a = '10.0'
+SELECT count(*) FROM t1 WHERE a=10 AND a LIKE '10.0'
+SELECT count(*) FROM t1 WHERE a='10.0' AND a LIKE '10.0'
+SELECT b=10, b = '10.0', b LIKE '10.0', b LIKE '10' FROM t1
+SELECT count(*) FROM t1 WHERE b=10 AND b = '10.0'
+SELECT count(*) FROM t1 WHERE b=10 AND b LIKE '10.0'
+SELECT count(*) FROM t1 WHERE b='10.0' AND b LIKE '10.0'
+SELECT count(*) FROM t1 WHERE b=10 AND b LIKE '10'
+SELECT count(*) FROM t1 WHERE b='10.0' AND b LIKE '10'
+CREATE TABLE datasource(dsid INT, name TEXT)
+INSERT INTO datasource VALUES(1,'ds-one'),(2,'ds-two'),(3,'ds-three')
+CREATE INDEX ds1 ON datasource(name, dsid)
+CREATE TABLE rule(rid INT, team_id INT, dsid INT)
+WITH RECURSIVE c(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM c WHERE n<9) INSERT INTO rule(rid,team_id,dsid) SELECT n, 1, 1 FROM c
+WITH RECURSIVE c(n) AS (VALUES(10) UNION ALL SELECT n+1 FROM c WHERE n<24) INSERT INTO rule(rid,team_id,dsid) SELECT n, 2, 2 FROM c
+CREATE INDEX rule2 ON rule(dsid, rid)
+CREATE TABLE violation(vid INT, rid INT, vx BLOB)
+CREATE INDEX v2 ON violation(vid)
+DROP TABLE IF EXISTS sqlite_stat4
+INSERT INTO sqlite_stat1 VALUES ('violation','v2','376661 1'), ('violation','v1','376661 28974 1'), ('rule','rule2','24 12 1'), ('datasource','ds1','3 1 1')
+CREATE TABLE t1( a INT AS (c*11), b TEXT AS (substr(d,1,3)) STORED, c INTEGEB PRIMARI KEY, d TEXT )
+INSERT INTO t1 VALUES(1, 'f')
+INSERT INTO t1 VALUES(2, 'e')
+INSERT INTO t1 VALUES(3, 'd')
+INSERT INTO t1 VALUES(4, 'c')
+INSERT INTO t1 VALUES(5, 'b')
+INSERT INTO t1 VALUES(6, 'a')
+CREATE TABLE log(op, a)
+CREATE TRIGGER v1del INSTEAD OF DELETE ON v1 BEGIN INSERT INTO log VALUES('delete', old.a); END
+CREATE TRIGGER v1upd INSTEAD OF UPDATE ON v1 BEGIN INSERT INTO log VALUES('update', old.a); END
+DELETE FROM v1 ORDER BY a LIMIT 3
+UPDATE v1 SET b = 555 ORDER BY a LIMIT 3
+CREATE TABLE t2(a, b, c, PRIMARY KEY(a, b)) WITHOUT ROWID
+DELETE FROM t1 LIMIT 5
+DELETE FROM t1 ORDER BY x LIMIT 5
+DELETE FROM t1 RETURNING x, y, '|' ORDER BY x, y LIMIT 5
+DELETE FROM t1 RETURNING x, y, '|' ORDER BY x LIMIT 5 OFFSET 2
+DELETE FROM t1 ORDER BY x LIMIT 5 OFFSET -2
+DELETE FROM t1 ORDER BY x LIMIT 2, -5
+DELETE FROM t1 ORDER BY x LIMIT -2, 5
+DELETE FROM t1 ORDER BY x LIMIT -2, -5
+DELETE FROM t1 ORDER BY x LIMIT 2, 5
+DELETE FROM t1 ORDER BY x LIMIT 5 OFFSET 5
+DELETE FROM t1 ORDER BY x LIMIT 50 OFFSET 30
+DELETE FROM t1 ORDER BY x LIMIT 30, 50
+DELETE FROM v1 ORDER BY b LIMIT 3
+UPDATE v1 SET b = 555 ORDER BY b LIMIT 3
+INSERT INTO t2 VALUES(1, 1, 'h')
+INSERT INTO t2 VALUES(1, 2, 'g')
+INSERT INTO t2 VALUES(2, 1, 'f')
+INSERT INTO t2 VALUES(2, 2, 'e')
+INSERT INTO t2 VALUES(3, 1, 'd')
+INSERT INTO t2 VALUES(3, 2, 'c')
+INSERT INTO t2 VALUES(4, 1, 'b')
+INSERT INTO t2 VALUES(4, 2, 'a')
+DELETE FROM t2 WHERE b=1 ORDER BY c LIMIT 2
+SELECT c FROM t2 ORDER BY 1
+CREATE TABLE t1(a INT, b INT)
+WITH RECURSIVE c(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM c WHERE n<1000) INSERT INTO t1 SELECT n, n FROM c
+INSERT INTO t1 VALUES(1, 2, 3, 4)
+INSERT INTO t1 VALUES(5, 6, 7, 8)
+INSERT INTO t1 VALUES(9, 10, 11, 12)
+SELECT sum(b) OVER () FROM t1
+SELECT a, sum(b) OVER () FROM t1
+SELECT a, 4 + sum(b) OVER () FROM t1
+SELECT a + 4 + sum(b) OVER () FROM t1
+SELECT a, sum(b) OVER (PARTITION BY c) FROM t1
+INSERT INTO t2 VALUES(0, 0, 0)
+INSERT INTO t2 VALUES(1, 1, 1)
+INSERT INTO t2 VALUES(2, 0, 2)
+INSERT INTO t2 VALUES(3, 1, 0)
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b TEXT, c TEXT, d INTEGER)
+INSERT INTO t1 VALUES(1, 'odd', 'one', 1)
+INSERT INTO t1 VALUES(2, 'even', 'two', 2)
+INSERT INTO t1 VALUES(3, 'odd', 'three', 3)
+INSERT INTO t1 VALUES(4, 'even', 'four', 4)
+INSERT INTO t1 VALUES(5, 'odd', 'five', 5)
+INSERT INTO t1 VALUES(6, 'even', 'six', 6)
+SELECT c, sum(d) OVER (PARTITION BY b ORDER BY c) FROM t1
+SELECT sum(d) OVER () FROM t1
+SELECT sum(d) OVER (PARTITION BY b) FROM t1
+SELECT a, sum(d) OVER ( ORDER BY d ROWS BETWEEN 1000 PRECEDING AND 1 FOLLOWING ) FROM t1
+SELECT a, sum(d) OVER ( ORDER BY d ROWS BETWEEN 1000 PRECEDING AND 1000 FOLLOWING ) FROM t1
+CREATE TABLE t2(a INTEGER PRIMARY KEY, b INTEGER)
+SELECT max(b) OVER ( ORDER BY a ) FROM t2
+SELECT max(b) OVER ( ORDER BY a RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+SELECT min(b) OVER ( ORDER BY a RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+SELECT row_number() OVER ( ORDER BY a RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+SELECT row_number() OVER ( PARTITION BY b%10 ORDER BY a RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+SELECT row_number() OVER ( RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+SELECT dense_rank() OVER ( ORDER BY a RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+SELECT dense_rank() OVER ( PARTITION BY b%10 ORDER BY a RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+SELECT dense_rank() OVER ( ORDER BY b RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+SELECT dense_rank() OVER ( PARTITION BY b%10 ORDER BY b RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+SELECT dense_rank() OVER ( ORDER BY b%10 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t2
+DROP TABLE IF EXISTS t3
+CREATE TABLE t3(a TEXT PRIMARY KEY)
+INSERT INTO t3 VALUES('a'), ('b'), ('c'), ('d'), ('e')
+INSERT INTO t3 VALUES('f'), ('g'), ('h'), ('i'), ('j')
+SELECT a, ntile(1) OVER (ORDER BY a) FROM t3
+SELECT a, ntile(2) OVER (ORDER BY a) FROM t3
+SELECT a, ntile(3) OVER (ORDER BY a) FROM t3
+SELECT a, ntile(4) OVER (ORDER BY a) FROM t3
+SELECT a, ntile(5) OVER (ORDER BY a) FROM t3
+SELECT a, ntile(6) OVER (ORDER BY a) FROM t3
+SELECT a, ntile(7) OVER (ORDER BY a) FROM t3
+SELECT a, ntile(8) OVER (ORDER BY a) FROM t3
+INSERT INTO t1 VALUES(4, 'a')
+INSERT INTO t1 VALUES(6, 'b')
+INSERT INTO t1 VALUES(1, 'c')
+INSERT INTO t1 VALUES(5, 'd')
+INSERT INTO t1 VALUES(3, 'f')
+SELECT win(a) OVER (ORDER BY b), median(a) OVER (ORDER BY b) FROM t1
+SELECT sumint(a) OVER (ORDER BY rowid) FROM t1 ORDER BY rowid
+SELECT sumint(a) OVER (ORDER BY rowid ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) FROM t1 ORDER BY rowid
+SELECT sum(a) FROM t1
+SELECT group_concat(%x, '.') OVER (ORDER BY %y) FROM %t1
+SELECT sum(%x) OVER %w FROM %t1 WINDOW %w AS (ORDER BY %y)
+SELECT sum(%alias.%x) OVER %w FROM %t1 %alias WINDOW %w AS (ORDER BY %y)
+SELECT sum(%x) %alias FROM %t1
+SELECT window('hello world')
+CREATE TABLE window(x COLLATE window)
+INSERT INTO window VALUES('bob'), ('alice'), ('cate')
+SELECT * FROM window ORDER BY x COLLATE window
+DROP TABLE window
+CREATE TABLE x1(x)
+INSERT INTO x1 VALUES('bob'), ('alice'), ('cate')
+CREATE INDEX window ON x1(x COLLATE window)
+CREATE TABLE t3(a INTEGER, b INTEGER)
+SELECT a, sum(b) FROM t3 GROUP BY a ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a GROUPS BETWEEN CURRENT ROW AND CURRENT ROW ) FROM t3 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a GROUPS BETWEEN 0 PRECEDING AND 0 FOLLOWING ) FROM t3 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a GROUPS BETWEEN 2 PRECEDING AND 2 FOLLOWING ) FROM t3 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a RANGE BETWEEN 0 PRECEDING AND 0 FOLLOWING ) FROM t3 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a RANGE BETWEEN 2 PRECEDING AND 2 FOLLOWING ) FROM t3 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a RANGE BETWEEN 2 PRECEDING AND 1 FOLLOWING ) FROM t3 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a RANGE BETWEEN 0 PRECEDING AND 1 FOLLOWING ) FROM t3 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a DESC RANGE BETWEEN 0 PRECEDING AND 1 FOLLOWING ) FROM t3 ORDER BY 1
+CREATE TABLE t3(a TEXT, b TEXT, c INTEGER)
+SELECT a, b, sum(c) OVER (ORDER BY a GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING ) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, sum(c) OVER (ORDER BY a,b GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING ) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, rank() OVER (ORDER BY a GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING ) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, max(c) OVER (ORDER BY a,b GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING ) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, min(c) OVER (ORDER BY a,b GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING ) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, sum(c) OVER (ORDER BY a GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING EXCLUDE CURRENT ROW) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, sum(c) OVER (ORDER BY a,b GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING EXCLUDE CURRENT ROW) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, sum(c) OVER (ORDER BY a GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING EXCLUDE CURRENT ROW), sum(c) OVER (ORDER BY a GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING ), sum(c) OVER (ORDER BY a,b GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING EXCLUDE CURRENT ROW), sum(c) OVER (ORDER BY a,b GROUPS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING ) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, sum(c) OVER (ORDER BY a GROUPS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, sum(c) OVER (ORDER BY a,b GROUPS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t3 ORDER BY 1, 2, 3
+SELECT a, b, rank() OVER (ORDER BY a GROUPS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t3 ORDER BY 1, 2, 3
+CREATE TABLE fruits( name TEXT COLLATE NOCASE, color TEXT COLLATE NOCASE )
+INSERT INTO fruits (name, color) VALUES ('apple', 'RED')
+INSERT INTO fruits (name, color) VALUES ('APPLE', 'yellow')
+INSERT INTO fruits (name, color) VALUES ('pear', 'YELLOW')
+INSERT INTO fruits (name, color) VALUES ('PEAR', 'green')
+SELECT name, color, dense_rank() OVER (ORDER BY name) FROM fruits
+SELECT name, color, dense_rank() OVER (PARTITION BY name ORDER BY color) FROM fruits
+SELECT name, color, dense_rank() OVER (ORDER BY name), dense_rank() OVER (PARTITION BY name ORDER BY color) FROM fruits
+SELECT name, color, dense_rank() OVER (ORDER BY name), dense_rank() OVER (PARTITION BY name ORDER BY color) FROM fruits ORDER BY color
+CREATE TABLE t1(a BLOB, b INTEGER, c COLLATE nocase)
+INSERT INTO t1 VALUES(1, 2, 'abc')
+INSERT INTO t1 VALUES(3, 4, 'ABC')
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b CHAR(1), d FLOAT)
+INSERT INTO t1 VALUES (1, 'A', 5.4), (2, 'B', 5.55), (3, 'C', 8.0), (4, 'D', 10.25), (5, 'E', 10.26), (6, 'N', NULL), (7, 'N', NULL)
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS LAST RANGE BETWEEN 2.50 PRECEDING AND 2.25 FOLLOWING) ORDER BY +d DESC NULLS LAST, +a
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS FIRST RANGE BETWEEN 2.50 PRECEDING AND 2.25 FOLLOWING) ORDER BY +d DESC NULLS FIRST, +a
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS LAST RANGE BETWEEN 2.50 PRECEDING AND UNBOUNDED FOLLOWING) ORDER BY +d DESC NULLS LAST, +a
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS FIRST RANGE BETWEEN 2.50 PRECEDING AND UNBOUNDED FOLLOWING) ORDER BY +d DESC NULLS FIRST, +a
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS LAST RANGE BETWEEN 2.50 PRECEDING AND CURRENT ROW) ORDER BY +d DESC NULLS LAST, +a
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS FIRST RANGE BETWEEN 2.50 PRECEDING AND CURRENT ROW) ORDER BY +d DESC NULLS FIRST, +a
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS LAST RANGE BETWEEN UNBOUNDED PRECEDING AND 2.25 FOLLOWING) ORDER BY +d DESC NULLS LAST, +a
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS FIRST RANGE BETWEEN UNBOUNDED PRECEDING AND 2.25 FOLLOWING) ORDER BY +d DESC NULLS FIRST, +a
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS LAST RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) ORDER BY +d DESC NULLS LAST, +a
+SELECT a, b, quote(d), group_concat(b,'') OVER w1 FROM t1 WINDOW w1 AS (ORDER BY d DESC NULLS FIRST RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) ORDER BY +d DESC NULLS FIRST, +a
+INSERT INTO t1 VALUES(NULL, 1)
+INSERT INTO t1 VALUES(NULL, 2)
+INSERT INTO t1 VALUES(NULL, 3)
+SELECT sum(b) OVER win FROM t1 WINDOW win AS ( ORDER BY a DESC NULLS FIRST RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING )
+INSERT INTO t1 VALUES(1, NULL)
+INSERT INTO t1 VALUES(2, 45)
+INSERT INTO t1 VALUES(3, 66.2)
+INSERT INTO t1 VALUES(4, 'hello world')
+INSERT INTO t1 VALUES(5, 'hello world')
+INSERT INTO t1 VALUES(6, X'1234')
+INSERT INTO t1 VALUES(7, X'1234')
+INSERT INTO t1 VALUES(8, NULL)
+CREATE TABLE x1(i INTEGER PRIMARY KEY, x)
+DELETE FROM x1
+WITH separator(x) AS (VALUES(',a,'),(',bc,')), value(y) AS (VALUES(1),(x'5585d09013455178cd11ce4a')) SELECT group_concat(y,x) OVER (ORDER BY x ROWS BETWEEN 1 PRECEDING AND 1 PRECEDING) FROM separator, value
+PRAGMA encoding=UTF16be
+CREATE TABLE t0(c0 TEXT)
+CREATE VIEW v0(c0, c1) AS SELECT CUME_DIST() OVER (PARTITION BY t0.c0), TRUE FROM t0
+INSERT INTO t0 VALUES ('x')
+SELECT ('500') IS (v0.c1) FROM v0
+SELECT (('500') IS (v0.c1)) FROM v0, t0
+SELECT (('500') IS (v0.c1)) IS FALSE FROM v0
+SELECT * FROM v0
+SELECT * FROM v0 WHERE ('500' IS v0.c1) IS FALSE
+INSERT INTO t1 VALUES('value')
+CREATE VIEW v1(a, b, c, d) AS SELECT 1, 2, TRUE, FALSE FROM t1
+SELECT 500 IS a, 500 IS b, 500 IS c, 500 IS d FROM v1
+SELECT * FROM v1 WHERE 500 IS c
+CREATE TABLE t1(a INTEGER PRIMARY KEY, b TEXT COLLATE custom)
+INSERT INTO t1 VALUES(4, 'four')
+INSERT INTO t1 VALUES(5, 'five')
+INSERT INTO t1 VALUES(6, 'six')
+SELECT group_concat(a,',') OVER win FROM t1 WINDOW win AS ( ORDER BY b RANGE BETWEEN 1 PRECEDING AND 2 PRECEDING )
+CREATE TABLE t2(c1 INT, c2 REAL)
+select c1, max(c2) over (order by c1 range 366.0 preceding) from t2
+INSERT INTO t1 VALUES(2, 9223372036854775807)
+INSERT INTO t1 VALUES(3, 3)
+SELECT a, total(b) OVER (ORDER BY a ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) FROM t1
+SELECT a, total(b) OVER (ORDER BY a ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING) FROM t1
+CREATE TABLE t(id, x)
+CREATE TABLE t1(a INTEGER, b INTEGER)
+INSERT INTO t1 VALUES(2, 2)
+INSERT INTO t1 VALUES(5, 5)
+SELECT a, sum(b) OVER ( ORDER BY a ROWS BETWEEN -1 PRECEDING AND 1 FOLLOWING ) FROM t1 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a ROWS BETWEEN 1 PRECEDING AND -1 FOLLOWING ) FROM t1 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a RANGE BETWEEN -1 PRECEDING AND 1 FOLLOWING ) FROM t1 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a RANGE BETWEEN 1 PRECEDING AND -1 FOLLOWING ) FROM t1 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a GROUPS BETWEEN -1 PRECEDING AND 1 FOLLOWING ) FROM t1 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a GROUPS BETWEEN 1 PRECEDING AND -1 FOLLOWING ) FROM t1 ORDER BY 1
+SELECT a, sum(b) OVER ( ORDER BY a,b RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING ) FROM t1 ORDER BY 1
+SELECT a, sum(b) OVER ( PARTITION BY a RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING ) FROM t1 ORDER BY 1
+SELECT sum( sum(a) OVER () ) FROM t1
+SELECT row_number() OVER win, rank() OVER win, dense_rank() OVER win, ntile(2) OVER win, first_value(d) OVER win, last_value(d) OVER win, nth_value(d,2) OVER win, lead(d) OVER win, lag(d) OVER win, max(d) OVER win, min(d) OVER win FROM t1 WINDOW win AS (ORDER BY a)
+SELECT row_number() OVER win, rank() OVER win, dense_rank() OVER win FROM t1 WINDOW win AS (PARTITION BY c<7 ORDER BY a)
+SELECT ntile(105) OVER ( RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) FROM t1
+SELECT round(percent_rank() OVER win, 2), round(cume_dist() OVER win, 2) FROM t1 WINDOW win AS (ORDER BY a)
+SELECT min(d) OVER win, max(d) OVER win FROM t1 WINDOW win AS (ORDER BY a RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)
+CREATE VIEW aaa AS SELECT min(d) OVER w, max(d) OVER w FROM t1 WINDOW w AS (ORDER BY a RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)
+SELECT * FROM aaa
+SELECT last_value(a) OVER win1, last_value(a) OVER win2 FROM t1 WINDOW win1 AS (ORDER BY a ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING), win2 AS (ORDER BY a)
+SELECT percent_rank() OVER (), cume_dist() OVER () FROM t1
+SELECT a, sum(b) OVER win1 FROM t1 WINDOW win1 AS (PARTITION BY a ), win2 AS (PARTITION BY b ) ORDER BY a
+SELECT sum(y) OVER win FROM t WINDOW win AS ( ORDER BY x ROWS BETWEEN UNBOUNDED PRECEDING AND 1800 FOLLOWING )
+CREATE TABLE t2(a, b, c, d)
+CREATE TABLE t1(id INTEGER PRIMARY KEY, grp_id)
+CREATE INDEX i1 ON t1(grp_id)
+CREATE VIEW lll AS SELECT row_number() OVER (PARTITION BY grp_id), grp_id, id FROM t1
+INSERT INTO t1 VALUES (1, 2), (2, 3), (3, 3), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 3), (10, 3), (11, 2), (12, 3), (13, 3), (14, 2), (15, 1), (16, 2), (17, 1), (18, 2), (19, 3), (20, 2)
+SELECT * FROM lll
+SELECT * FROM lll WHERE grp_id=2
+INSERT INTO t1 VALUES('A', 'C', 1, 0.1)
+INSERT INTO t1 VALUES('A', 'D', 2, 0.2)
+INSERT INTO t1 VALUES('A', 'E', 3, 0.3)
+INSERT INTO t1 VALUES('A', 'C', 4, 0.4)
+INSERT INTO t1 VALUES('B', 'D', 5, 0.5)
+INSERT INTO t1 VALUES('B', 'E', 6, 0.6)
+WITH x(a) AS ( SELECT * FROM t1) SELECT 10
+SELECT * FROM ( WITH x AS ( SELECT * FROM t1) SELECT 10 )
+WITH x(a) AS ( SELECT * FROM t1) INSERT INTO t1 VALUES(1,2)
+WITH x(a) AS ( SELECT * FROM t1) DELETE FROM t1
+WITH x(a) AS ( SELECT * FROM t1) UPDATE t1 SET x = y
+WITH tmp AS ( SELECT * FROM t1 ) SELECT x FROM tmp
+WITH tmp(a) AS ( SELECT * FROM t1 ) SELECT a FROM tmp
+SELECT * FROM ( WITH tmp(a) AS ( SELECT * FROM t1 ) SELECT a FROM tmp )
+WITH tmp1(a) AS ( SELECT * FROM t1 ), tmp2(x) AS ( SELECT * FROM tmp1) SELECT * FROM tmp2
+WITH tmp2(x) AS ( SELECT * FROM tmp1), tmp1(a) AS ( SELECT * FROM t1 ) SELECT * FROM tmp2
+INSERT INTO t3 VALUES('T3')
+INSERT INTO t4 VALUES('T4')
+WITH x1 AS (SELECT * FROM t1) SELECT sum(a) FROM x1
+WITH x1 AS (SELECT * FROM t1) SELECT (SELECT sum(a) FROM x1)
+CREATE TABLE t2(i)
+INSERT INTO t2 VALUES(5)
+WITH x1 AS (SELECT i FROM t2), i(a) AS ( SELECT min(i)-1 FROM x1 UNION SELECT a+1 FROM i WHERE a<10 ) SELECT a FROM i WHERE a NOT IN x1
+WITH x1 AS (SELECT a FROM t1), x2 AS (SELECT i FROM t2), x3 AS (SELECT * FROM x1, x2 WHERE x1.a IN x2 AND x2.i IN x1) SELECT * FROM x3
+CREATE TABLE t3 AS SELECT 3 AS x
+CREATE TABLE t4 AS SELECT 4 AS x
+WITH x1 AS (SELECT * FROM t3), x2 AS ( WITH t3 AS (SELECT * FROM t4) SELECT * FROM x1 ) SELECT * FROM x2
+WITH x2 AS ( WITH t3 AS (SELECT * FROM t4) SELECT * FROM t3 ) SELECT * FROM x2
+WITH x2 AS ( WITH t3 AS (SELECT * FROM t4) SELECT * FROM main.t3 ) SELECT * FROM x2
+WITH x1 AS (SELECT * FROM t1) SELECT (SELECT sum(a) FROM x1), (SELECT max(a) FROM x1)
+WITH x1 AS (SELECT 10), x2 AS (SELECT 11), x3 AS ( SELECT * FROM x1 UNION ALL SELECT * FROM x2 ), x4 AS ( WITH x1 AS (SELECT 12), x2 AS (SELECT 13) SELECT * FROM x3 ) SELECT * FROM x4
+WITH x1(a) AS (values(100)) INSERT INTO t1(x) SELECT * FROM (WITH x2(y) AS (SELECT * FROM x1) SELECT y+a FROM x1, x2)
+CREATE TABLE y1(a, b)
+CREATE INDEX y1a ON y1(a)
+WITH cnt(i) AS ( SELECT 1 UNION ALL SELECT i+1 FROM cnt LIMIT 1000) INSERT INTO y1 SELECT i%10, i FROM cnt
+CREATE TABLE w1(pk INTEGER PRIMARY KEY, x INTEGER)
+CREATE TABLE w2(pk INTEGER PRIMARY KEY)
+WITH t5(t5col1) AS ( SELECT ( WITH t3(t3col1) AS ( WITH t2 AS ( WITH t1 AS (SELECT 1 AS c1 GROUP BY 1) SELECT a.c1 FROM t1 AS a, t1 AS b WHERE anoncol1 = 1 ) SELECT (SELECT 1 FROM t2) FROM t2 ) SELECT t3col1 FROM t3 WHERE t3col1 ) FROM (SELECT 1 AS anoncol1) ) SELECT t5col1, t5col1 FROM t5
+SELECT ( WITH t1(a) AS (VALUES(1)) SELECT ( WITH t2(b) AS ( WITH t3(c) AS ( WITH t4(d) AS (VALUES('elvis')) SELECT t4a.d FROM t4 AS t4a JOIN t4 AS t4b LEFT JOIN t4 AS t4c ) SELECT c FROM t3 WHERE a = 1 ) SELECT t2a.b FROM t2 AS t2a JOIN t2 AS t2x ) FROM t1 GROUP BY 1 ) GROUP BY 1
+WITH RECURSIVE c(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM c WHERE x<1) SELECT x1.x||x2.x||x3.x||x4.x FROM c AS x1, c AS x2, c AS x3, c AS x4 ORDER BY 1
+ATTACH ':memory:' AS aux
+CREATE TABLE aux.t2(x,y)
+INSERT INTO t2 VALUES(3,4)
+CREATE TABLE link(aa INT, bb INT)
+CREATE INDEX link_f ON link(aa,bb)
+CREATE INDEX link_t ON link(bb,aa)
+INSERT INTO link(aa,bb) VALUES (1,3), (5,3), (7,1), (7,9), (9,9), (5,11), (11,7), (2,4), (4,6), (8,6)
+WITH RECURSIVE closure(x) AS ( VALUES(1) UNION SELECT aa FROM closure, link WHERE link.bb=closure.x UNION SELECT bb FROM closure, link WHERE link.aa=closure.x ) SELECT x FROM closure ORDER BY x
+WITH RECURSIVE closure(x) AS ( VALUES(1) UNION SELECT aa FROM link, closure WHERE link.bb=closure.x UNION SELECT bb FROM closure, link WHERE link.aa=closure.x ) SELECT x FROM closure ORDER BY x
+WITH RECURSIVE closure(x) AS ( VALUES(1) UNION SELECT bb FROM closure, link WHERE link.aa=closure.x UNION SELECT aa FROM link, closure WHERE link.bb=closure.x ) SELECT x FROM closure ORDER BY x
+WITH RECURSIVE closure(x) AS ( VALUES(1),(200),(300),(400) INTERSECT VALUES(1) UNION SELECT bb FROM closure, link WHERE link.aa=closure.x UNION SELECT aa FROM link, closure WHERE link.bb=closure.x ) SELECT x FROM closure ORDER BY x
+WITH RECURSIVE closure(x) AS ( VALUES(1),(200),(300),(400) UNION ALL VALUES(2) UNION SELECT bb FROM closure, link WHERE link.aa=closure.x UNION SELECT aa FROM link, closure WHERE link.bb=closure.x ) SELECT x FROM closure ORDER BY x
+WITH RECURSIVE closure(x) AS ( SELECT 1 AS x UNION SELECT aa FROM link JOIN closure ON bb=x UNION SELECT bb FROM link JOIN closure on aa=x ORDER BY x LIMIT 4 ) SELECT * FROM closure
+WITH RECURSIVE closure(x) AS ( SELECT 1 AS x UNION ALL SELECT 2 UNION SELECT aa FROM link JOIN closure ON bb=x UNION SELECT bb FROM link JOIN closure on aa=x ORDER BY x LIMIT 4 ) SELECT * FROM closure
+CREATE TABLE linkA(aa1,aa2)
+WITH c(x) AS (VALUES(0),(1)) SELECT c1.x||c2.x||c3.x FROM c c1, c c2, c c3
+WITH c(x) AS MATERIALIZED (VALUES(0),(1)) SELECT c1.x||c2.x||c3.x FROM c c1, c c2, c c3
+WITH c(x) AS NOT MATERIALIZED (VALUES(0),(1)) SELECT c1.x||c2.x||c3.x FROM c c1, c c2, c c3
+WITH c(x) AS NOT MATERIALIZED (VALUES(0),(1)) SELECT c1.x||c2.x||c3.x FROM (SELECT x FROM c LIMIT 5) AS c1, (SELECT x FROM c LIMIT 5) AS c2, (SELECT x FROM c LIMIT 5) AS c3
+WITH c(x) AS MATERIALIZED (VALUES(0),(1)) SELECT c1.x||c2.x||c3.x FROM (SELECT x FROM c LIMIT 5) AS c1, (SELECT x FROM c LIMIT 6) AS c2, (SELECT x FROM c LIMIT 7) AS c3
+WITH c(x) AS (VALUES(0),(1)) SELECT c1.x||c2.x||c3.x FROM (SELECT x FROM c LIMIT 5) AS c1, (SELECT x FROM c LIMIT 6) AS c2, (SELECT x FROM c LIMIT 7) AS c3
+WITH c(x) AS (VALUES(0),(1)) SELECT c2.x + 100*(SELECT sum(x+1) FROM c WHERE c.x<=c2.x) FROM c AS c2 WHERE c2.x<10
+WITH c(x) AS NOT MATERIALIZED (VALUES(0),(1)) SELECT c2.x + 100*(SELECT sum(x+1) FROM c WHERE c.x<=c2.x) FROM c AS c2 WHERE c2.x<10
+INSERT INTO t1(x) VALUES(4)
+CREATE VIEW t2(y) AS WITH c(z) AS (VALUES(4),(5),(6)) SELECT c1.z+c2.z*100+t1.x*10000 FROM t1, (SELECT z FROM c LIMIT 5) AS c1, (SELECT z FROM c LIMIT 5) AS c2
+SELECT y FROM t2 ORDER BY y
+DROP VIEW t2
+INSERT INTO t1 VALUES(123, 456)
+WITH tmp AS ( SELECT * FROM t1 ) SELECT * FROM tmp
+WITH w1 AS ( SELECT * FROM t1 ), w2 AS ( WITH w3 AS ( SELECT * FROM w1 ) SELECT * FROM w3 ) SELECT * FROM w2
+WITH w1(a,b) AS ( SELECT 1, 1 UNION ALL SELECT a+1, b + 2*a + 1 FROM w1 ) SELECT * FROM w1 LIMIT 5
+CREATE TABLE t1(a,b,c,d, PRIMARY KEY(c,a)) WITHOUT ROWID
+CREATE INDEX t1bd ON t1(b, d)
+INSERT INTO t1 VALUES('journal','sherman','ammonia','helena')
+INSERT INTO t1 VALUES('dynamic','juliet','flipper','command')
+INSERT INTO t1 VALUES('journal','sherman','gamma','patriot')
+INSERT INTO t1 VALUES('arctic','sleep','ammonia','helena')
+SELECT *, '|' FROM t1 ORDER BY c, a
+SELECT *, '|' FROM t1 ORDER BY +c, a
+SELECT *, '|' FROM t1 ORDER BY c DESC, a DESC
+SELECT *, '|' FROM t1 ORDER BY b, d
+SELECT *, '|' FROM t1 ORDER BY +b, d
+REPLACE INTO t1 VALUES('dynamic','phone','flipper','harvard')
+CREATE TABLE t1( a INT PRIMARY KEY, b INT REFERENCES t1 ON DELETE CASCADE REFERENCES t2, c TEXT, FOREIGN KEY (b,c) REFERENCES t2(x,y) ON UPDATE CASCADE ) WITHOUT rowid
+CREATE TABLE t2( x INT PRIMARY KEY, y TEXT ) WITHOUT rowid
+CREATE TABLE t3( a INT REFERENCES t2, b INT REFERENCES t1, FOREIGN KEY (a,b) REFERENCES t2(x,y) )
+CREATE TABLE t4(a int primary key) WITHOUT rowid
+CREATE TABLE t5(x references t4)
+CREATE TABLE t6(x references t4)
+CREATE TABLE t7(x references t4)
+CREATE TABLE t8(x references t4)
+CREATE TABLE t9(x references t4)
+CREATE TABLE t10(x references t4)
+DROP TABLE t7
+DROP TABLE t9
+PRAGMA foreign_keys = on
+PRAGMA foreign_key_check(t1)
+PRAGMA foreign_key_check(t2)
+PRAGMA foreign_key_check(t3)
+PRAGMA foreign_key_check(t4)
+PRAGMA foreign_key_check(t7)
+PRAGMA foreign_key_check(t8)
+PRAGMA count_changes = 1
+PRAGMA count_changes = 0
+CREATE TABLE i(i INT PRIMARY KEY) WITHOUT rowid
+CREATE TABLE j(j REFERENCES i)
+INSERT INTO i VALUES(35)
+INSERT INTO tbl VALUES (100, 100)
+INSERT INTO tbl VALUES (300, 200)
+CREATE TRIGGER delete_before_row BEFORE DELETE ON tbl FOR EACH ROW BEGIN INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog), old.a, old.b, (SELECT coalesce(sum(a),0) FROM tbl), (SELECT coalesce(sum(b),0) FROM tbl), 0, 0); END
+CREATE TRIGGER delete_after_row AFTER DELETE ON tbl FOR EACH ROW BEGIN INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog), old.a, old.b, (SELECT coalesce(sum(a),0) FROM tbl), (SELECT coalesce(sum(b),0) FROM tbl), 0, 0); END
+SELECT * FROM rlog
+CREATE TRIGGER insert_before_row BEFORE INSERT ON tbl FOR EACH ROW BEGIN INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog), 0, 0, (SELECT coalesce(sum(a),0) FROM tbl), (SELECT coalesce(sum(b),0) FROM tbl), new.a, new.b); END
+CREATE TRIGGER insert_after_row AFTER INSERT ON tbl FOR EACH ROW BEGIN INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog), 0, 0, (SELECT coalesce(sum(a),0) FROM tbl), (SELECT coalesce(sum(b),0) FROM tbl), new.a, new.b); END
+CREATE TABLE other_tbl(a, b)
+INSERT INTO other_tbl VALUES(1, 2)
+INSERT INTO other_tbl VALUES(3, 4)
+INSERT INTO tbl VALUES(5, 6)
+CREATE TABLE tbl(a PRIMARY KEY, b, c) WITHOUT rowid
+CREATE TABLE t1(a PRIMARY KEY,b,c)
+CREATE TABLE t1w(a PRIMARY KEY,b,c) WITHOUT ROWID
+INSERT INTO t1 VALUES(1565,681,1148),(1429,1190,1619),(425,358,1306)
+INSERT INTO t1w SELECT a,b,c FROM t1
+SELECT rowid, _rowid_, oid FROM t1 ORDER BY a DESC
+CREATE TABLE IF NOT EXISTS wordcount( word TEXT PRIMARY KEY, cnt INTEGER ) WITHOUT ROWID
+INSERT INTO wordcount VALUES('one',1)
+CREATE TABLE IF NOT EXISTS wordcount_b( word TEXT PRIMARY KEY, cnt INTEGER ) WITHOUT rowid
+INSERT INTO wordcount_b VALUES('one',1)
+CREATE TABLE IF NOT EXISTS wordcount_c( word TEXT PRIMARY KEY, cnt INTEGER ) without rowid
+INSERT INTO wordcount_c VALUES('one',1)
+CREATE TABLE IF NOT EXISTS wordcount_d( word TEXT PRIMARY KEY, cnt INTEGER ) WITHOUT rowid
+CREATE TABLE t1(a,b,c,d,e, PRIMARY KEY(a,b,c,a,b,c,d,a,b,c)) WITHOUT ROWID
+CREATE INDEX t1a ON t1(b, b)
+WITH RECURSIVE c(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM c WHERE i<1000) INSERT INTO t1(a,b,c,d,e) SELECT i, i+1000, printf('x%dy',i), 0, 0 FROM c
+SELECT c FROM t1 WHERE a=123
+SELECT c FROM t1 WHERE b=1123
+SELECT c FROM t1 ORDER BY a DESC LIMIT 5
+SELECT c FROM t1 ORDER BY b LIMIT 5
+CREATE TABLE t1( a UNIQUE, b UNIQUE, c UNIQUE, PRIMARY KEY(b) ) WITHOUT ROWID
+INSERT INTO t1(a,b,c) VALUES(1,8,3),(4,5,6),(7,2,9)
+SELECT a FROM t1 WHERE b>3 ORDER BY b
+PRAGMA index_list(t1)
+CREATE TABLE t1( a UNIQUE, b PRIMARY KEY, c UNIQUE, UNIQUE(b) ) WITHOUT ROWID
+CREATE TABLE t1(a, b COLLATE nocase, PRIMARY KEY(a, a, b)) WITHOUT ROWID
+CREATE TABLE t2(a, b, PRIMARY KEY(a COLLATE nocase, a)) WITHOUT ROWID
+INSERT INTO t2 VALUES(1, 'one')
+SELECT b FROM t2
+PRAGMA index_info(t2)
+PRAGMA index_xinfo(t2)
+CREATE TABLE t3(a, b, PRIMARY KEY(a COLLATE nocase, a))
+PRAGMA index_info(t3)
+CREATE TABLE t1( a PRIMARY KEY COLLATE mysort, b COLLATE mysort2 ) WITHOUT ROWID

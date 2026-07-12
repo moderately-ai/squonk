@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the vendored PostgreSQL reference artifacts (keyword
+# categories + ISO feature-conformance list), enforced by `cargo xtask license`
+# (ADR-0015 corpus licensing; ADR-0017 local-runnable checks). The SPDX header
+# above covers this metadata file; the vendored content is under the PostgreSQL
+# licence (the machine-checked `license` field, verbatim in LICENSE). This group
+# is part of the dialect docs/spec reference library
+# (dialect-docs-reference-library); see ../../manifest.toml for the manifest
+# entries (ids `postgres/kwlist`, `postgres/sql_features`) and README.md for the
+# consumption seams. The pinned reference matches the conformance/corpus/postgres
+# corpus so the reference library and the regression corpus never drift apart.
+source = "https://github.com/postgres/postgres (src/include/parser/kwlist.h, src/backend/catalog/sql_features.txt)"
+reference = "4b0bf0788b066a4ca1d4f959566678e44ec93422 (REL_18_BETA1-3053-g4b0bf0788b0)"
+license = "PostgreSQL"
+regenerate = "Re-copy src/include/parser/kwlist.h and src/backend/catalog/sql_features.txt from a PostgreSQL checkout at the pinned commit into this directory, keeping the .license companions. Bumping the pin is a deliberate commit per the manifest version/bump protocol; re-cite the manifest version in any consumer (e.g. crates/squonk-ast/src/dialect/ansi.rs)."

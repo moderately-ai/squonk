@@ -1,0 +1,365 @@
+{
+  "source": "SELECT a + 1 AS n, b FROM t WHERE a IN (1, 2) ORDER BY b",
+  "statements": [
+    {
+      "Query": {
+        "meta": {
+          "node_id": 27,
+          "span": {
+            "end": 56,
+            "start": 0
+          }
+        },
+        "query": {
+          "body": {
+            "Select": {
+              "meta": {
+                "node_id": 22,
+                "span": {
+                  "end": 45,
+                  "start": 0
+                }
+              },
+              "select": {
+                "connect_by": null,
+                "distinct": null,
+                "from": [
+                  {
+                    "joins": [],
+                    "meta": {
+                      "node_id": 13,
+                      "span": {
+                        "end": 27,
+                        "start": 26
+                      }
+                    },
+                    "relation": {
+                      "Table": {
+                        "alias": null,
+                        "index_hints": [],
+                        "indexed_by": null,
+                        "inheritance": "Plain",
+                        "json_path": [],
+                        "meta": {
+                          "node_id": 12,
+                          "span": {
+                            "end": 27,
+                            "start": 26
+                          }
+                        },
+                        "name": [
+                          {
+                            "meta": {
+                              "node_id": 11,
+                              "span": {
+                                "end": 27,
+                                "start": 26
+                              }
+                            },
+                            "quote": "None",
+                            "sym": 758
+                          }
+                        ],
+                        "partition": [],
+                        "sample": null,
+                        "table_hints": [],
+                        "version": null
+                      }
+                    }
+                  }
+                ],
+                "group_by": [],
+                "group_by_all": null,
+                "group_by_quantifier": null,
+                "having": null,
+                "into": null,
+                "lateral_views": [],
+                "meta": {
+                  "node_id": 21,
+                  "span": {
+                    "end": 45,
+                    "start": 0
+                  }
+                },
+                "projection": [
+                  {
+                    "Expr": {
+                      "alias": {
+                        "meta": {
+                          "node_id": 6,
+                          "span": {
+                            "end": 17,
+                            "start": 16
+                          }
+                        },
+                        "quote": "None",
+                        "sym": 895
+                      },
+                      "alias_spelling": "As",
+                      "expr": {
+                        "BinaryOp": {
+                          "left": {
+                            "Column": {
+                              "meta": {
+                                "node_id": 2,
+                                "span": {
+                                  "end": 8,
+                                  "start": 7
+                                }
+                              },
+                              "name": [
+                                {
+                                  "meta": {
+                                    "node_id": 1,
+                                    "span": {
+                                      "end": 8,
+                                      "start": 7
+                                    }
+                                  },
+                                  "quote": "None",
+                                  "sym": 1
+                                }
+                              ]
+                            }
+                          },
+                          "meta": {
+                            "node_id": 5,
+                            "span": {
+                              "end": 12,
+                              "start": 7
+                            }
+                          },
+                          "op": "Plus",
+                          "right": {
+                            "Literal": {
+                              "literal": {
+                                "kind": "Integer",
+                                "meta": {
+                                  "node_id": 3,
+                                  "span": {
+                                    "end": 12,
+                                    "start": 11
+                                  }
+                                }
+                              },
+                              "meta": {
+                                "node_id": 4,
+                                "span": {
+                                  "end": 12,
+                                  "start": 11
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "meta": {
+                        "node_id": 7,
+                        "span": {
+                          "end": 17,
+                          "start": 7
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "Expr": {
+                      "alias": null,
+                      "alias_spelling": "As",
+                      "expr": {
+                        "Column": {
+                          "meta": {
+                            "node_id": 9,
+                            "span": {
+                              "end": 20,
+                              "start": 19
+                            }
+                          },
+                          "name": [
+                            {
+                              "meta": {
+                                "node_id": 8,
+                                "span": {
+                                  "end": 20,
+                                  "start": 19
+                                }
+                              },
+                              "quote": "None",
+                              "sym": 896
+                            }
+                          ]
+                        }
+                      },
+                      "meta": {
+                        "node_id": 10,
+                        "span": {
+                          "end": 20,
+                          "start": 19
+                        }
+                      }
+                    }
+                  }
+                ],
+                "qualify": null,
+                "sample": null,
+                "selection": {
+                  "InList": {
+                    "expr": {
+                      "Column": {
+                        "meta": {
+                          "node_id": 15,
+                          "span": {
+                            "end": 35,
+                            "start": 34
+                          }
+                        },
+                        "name": [
+                          {
+                            "meta": {
+                              "node_id": 14,
+                              "span": {
+                                "end": 35,
+                                "start": 34
+                              }
+                            },
+                            "quote": "None",
+                            "sym": 1
+                          }
+                        ]
+                      }
+                    },
+                    "list": [
+                      {
+                        "Literal": {
+                          "literal": {
+                            "kind": "Integer",
+                            "meta": {
+                              "node_id": 16,
+                              "span": {
+                                "end": 41,
+                                "start": 40
+                              }
+                            }
+                          },
+                          "meta": {
+                            "node_id": 17,
+                            "span": {
+                              "end": 41,
+                              "start": 40
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "Literal": {
+                          "literal": {
+                            "kind": "Integer",
+                            "meta": {
+                              "node_id": 18,
+                              "span": {
+                                "end": 44,
+                                "start": 43
+                              }
+                            }
+                          },
+                          "meta": {
+                            "node_id": 19,
+                            "span": {
+                              "end": 44,
+                              "start": 43
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "meta": {
+                      "node_id": 20,
+                      "span": {
+                        "end": 45,
+                        "start": 34
+                      }
+                    },
+                    "negated": false
+                  }
+                },
+                "spelling": "Select",
+                "straight_join": false,
+                "windows": []
+              }
+            }
+          },
+          "for_clause": null,
+          "format": null,
+          "limit": null,
+          "limit_by": null,
+          "locking": [],
+          "meta": {
+            "node_id": 26,
+            "span": {
+              "end": 56,
+              "start": 0
+            }
+          },
+          "order_by": [
+            {
+              "asc": null,
+              "expr": {
+                "Column": {
+                  "meta": {
+                    "node_id": 24,
+                    "span": {
+                      "end": 56,
+                      "start": 55
+                    }
+                  },
+                  "name": [
+                    {
+                      "meta": {
+                        "node_id": 23,
+                        "span": {
+                          "end": 56,
+                          "start": 55
+                        }
+                      },
+                      "quote": "None",
+                      "sym": 896
+                    }
+                  ]
+                }
+              },
+              "meta": {
+                "node_id": 25,
+                "span": {
+                  "end": 56,
+                  "start": 55
+                }
+              },
+              "nulls_first": null,
+              "using": null
+            }
+          ],
+          "order_by_all": null,
+          "pipe_operators": [],
+          "settings": [],
+          "with": null
+        }
+      }
+    }
+  ],
+  "string_literals": {
+    "backslash_escapes": false,
+    "bit_string_literals": false,
+    "blob_literals": false,
+    "charset_introducers": false,
+    "dollar_quoted_strings": false,
+    "double_quoted_strings": false,
+    "escape_strings": false,
+    "national_strings": false,
+    "same_line_adjacent_concat": false,
+    "unicode_strings": false
+  },
+  "symbols": [
+    "n",
+    "b"
+  ]
+}

@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: PostgreSQL
+#
+# Provenance record for the PostgreSQL regression spec-audit corpus, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the corpus content is
+# under the PostgreSQL licence (the machine-checked `license` field, verbatim in
+# LICENSE). See README.md for the extraction narrative.
+#
+# This is the spec-audit-pg-regress-corpus tranche: the FULL src/test/regress/sql
+# statement set (227 files) — PostgreSQL's executable spec — pinned to the newest
+# REL_17_* tag so the corpus aligns with our in-process pg_query oracle (PostgreSQL
+# 17). It is a pure measurement surface, distinct from the small hand-curated
+# `corpus/postgres/` structural-oracle group.
+source = "https://github.com/postgres/postgres (src/test/regress/sql/*.sql — full set; src/backend/parser/gram.y — derived top-level stmt alternative list)"
+reference = "REL_17_10 (25c49f3a4a742ba283f5cc43cc7f1d361552e917) — PostgreSQL 17.10; newest REL_17_* tag, aligned with the pg_query 6.1.1 / libpg_query (PostgreSQL 17) oracle"
+license = "PostgreSQL"
+regenerate = "Run `python3 extract_pg_regress.py <postgres-REL_17_10-checkout>/src/test/regress/sql <postgres-REL_17_10-checkout> statements.sql` and `python3 extract_stmt_productions.py <postgres-REL_17_10-checkout>/src/backend/parser/gram.y stmt-productions.txt` (obtain the tree without a full clone via `git archive REL_17_10 src/test/regress/sql src/backend/parser/gram.y | tar -x -C <tmp>` against a postgres clone; grab COPYRIGHT into LICENSE). statements.sql is the flat statement corpus grouped under `# file:` markers; stmt-productions.txt is the sorted set of direct *Stmt alternatives in the top-level stmt production. Then re-baseline the sweep pins: cargo nextest run -p squonk-conformance pg_regress --no-capture"

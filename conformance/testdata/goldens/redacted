@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MIT
+#
+# Identifier-redaction goldens (ADR-0010). Each SQL string is parsed under the M1
+# superset (PostgreSQL) and rendered in Canonical and Redacted modes. The redacted
+# block proves no original identifier text survives: simple, qualified (per dotted
+# part), and keyword-as-identifier names all collapse to the `id` placeholder and
+# literals to `?`, while keywords, operators, punctuation, and qualified-name arity
+# remain. Quoted-identifier masking (every quote style) is proven at the render
+# layer by the squonk-ast render unit tests; the M1 parser does not yet accept
+# quoted identifiers, so it cannot be exercised end-to-end here. The SQL strings
+# are hand-authored for this repository; the expected blocks are generated.
+# Rewrite with:
+#   REWRITE=1 cargo test -p squonk-conformance goldens::tests::datadriven_golden_corpus --lib
+
+redacted
+SELECT secret_col FROM secret_table
+----
+parse: accept
+canonical:
+  SELECT secret_col FROM secret_table
+redacted:
+  SELECT id FROM id
+
+redacted
+SELECT secret_schema.secret_table.secret_column FROM secret_schema.secret_table
+----
+parse: accept
+canonical:
+  SELECT secret_schema.secret_table.secret_column FROM secret_schema.secret_table
+redacted:
+  SELECT id.id.id FROM id.id
+
+redacted
+SELECT nulls AS first FROM rows
+----
+parse: accept
+canonical:
+  SELECT nulls AS first FROM rows
+redacted:
+  SELECT id AS id FROM id
+
+redacted
+SELECT u.email AS contact FROM customers AS u WHERE u.email = 'person@example.com'
+----
+parse: accept
+canonical:
+  SELECT u.email AS contact FROM customers AS u WHERE u.email = 'person@example.com'
+redacted:
+  SELECT id.id AS id FROM id AS id WHERE id.id = ?
+
+redacted
+CREATE TABLE secret_table (secret_column INTEGER, other_column TEXT)
+----
+parse: accept
+canonical:
+  CREATE TABLE secret_table (secret_column INTEGER, other_column TEXT)
+redacted:
+  CREATE TABLE id (id INTEGER, id TEXT)

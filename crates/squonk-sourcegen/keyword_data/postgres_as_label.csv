@@ -1,0 +1,62 @@
+# PostgreSQL AS_LABEL keywords — the bare-label reservation axis.
+#
+# @generated-source: provenance data for the keyword codegen (ADR-0004, ADR-0015).
+# DO derive the Rust tables from this file via `cargo run -p squonk-sourcegen`;
+# do NOT hand-edit the generated `dialect/keyword/generated.rs`.
+#
+# Source: PostgreSQL 17 src/include/parser/kwlist.h (PostgreSQL License). Each
+# PG_KEYWORD carries an independent BARE_LABEL / AS_LABEL designation orthogonal to
+# its reservation class: a BARE_LABEL keyword may be a column alias without `AS`
+# (`SELECT a <kw>`), while an AS_LABEL keyword may only be an alias after `AS`. This
+# file lists exactly the AS_LABEL keywords — the bare-alias reject set the
+# `BareColLabel` grammar position consults.
+#
+# This is the axis behind the OVER / FILTER divergence: both are unreserved yet
+# AS_LABEL, so `SELECT a over` / `SELECT a filter` reject as bare aliases while
+# `SELECT a select` accepts (SELECT is reserved-as-ColId but BARE_LABEL).
+#
+# Verified empirically against libpg_query: a keyword is listed here iff
+# `pg_query::parse("SELECT a <kw>")` rejects it (the conformance keyword-position
+# differential re-checks this every run). Only spellings PostgreSQL itself knows
+# carry the designation; spellings unique to the SQL:2016 inventory are plain
+# identifiers to PostgreSQL and so are bare labels.
+#
+# Format: one `keyword` per line, sorted, lower case.
+keyword
+array
+as
+char
+character
+create
+day
+except
+fetch
+filter
+for
+from
+grant
+group
+having
+hour
+intersect
+into
+limit
+minute
+month
+offset
+on
+order
+over
+overlaps
+precision
+returning
+second
+to
+union
+varying
+where
+window
+with
+within
+without
+year

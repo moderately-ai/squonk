@@ -1,0 +1,51 @@
+---
+source: crates/squonk/src/format/coverage.rs
+expression: body
+---
+[width-40-breaks-projection]  (Ansi)
+  input:
+    SELECT alpha, bravo, charlie, delta, echo, foxtrot, golf, hotel, india FROM t
+  output:
+    SELECT
+      alpha,
+      bravo,
+      charlie,
+      delta,
+      echo,
+      foxtrot,
+      golf,
+      hotel,
+      india
+    FROM t
+
+[indent-width-4]  (Ansi)
+  input:
+    SELECT alpha, bravo, charlie, delta, echo, foxtrot, golf, hotel, india FROM t
+  output:
+    SELECT
+        alpha,
+        bravo,
+        charlie,
+        delta,
+        echo,
+        foxtrot,
+        golf,
+        hotel,
+        india
+    FROM t
+
+[keyword-case-lower]  (Ansi)
+  input:
+    SELECT a FROM t WHERE a IS NOT NULL
+  output:
+    select a
+    from t
+    where a is not null
+
+[keyword-case-preserve-lower-dominant]  (Ansi)
+  input:
+    select a from t where a = 1
+  output:
+    select a
+    from t
+    where a = 1

@@ -1,0 +1,12 @@
+# Normalize line endings so a Windows checkout under the default core.autocrlf=true
+# does not rewrite the checked-in generated files to CRLF: the sourcegen drift gate
+# (crates/squonk-sourcegen, generated_files_are_up_to_date) compares on-disk bytes
+# against fresh LF-emitting generation, and CRLF in the working tree would fail it
+# spuriously. See the "Windows" section of docs/platform-support.md.
+#
+# `text=auto` lets git auto-detect binary content and leave it untouched (the tree
+# currently carries no binary files); `eol=lf` forces LF in the working tree on every
+# platform. The `\r\n` byte sequences some Rust tests rely on are source-level escape
+# sequences ("\r\n"), not real CR bytes on disk, so newline normalization never
+# perturbs them.
+* text=auto eol=lf

@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[package]
+name = "squonk-python"
+description = "squonk — Python bindings exposing the SQL parser as parse → AST (sync)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+name = "squonk_python"
+# cdylib only: the Python extension module maturin packages into the wheel. Adding
+# `rlib` would stop cargo uplifting the cdylib to the profile root, which breaks
+# maturin's artifact staging, and nothing depends on this crate as a Rust library
+# (`cargo check`/clippy still cover it via the workspace). `test`/`doctest` off: the
+# binding contract is pytest-against-the-built-module, and with the `extension-module`
+# feature on the cdylib deliberately does not link libpython, so a cargo test/doctest
+# binary could not resolve the interpreter symbols.
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[features]
+# NON-default on purpose. Enabling it tells PyO3 to omit libpython — symbols resolve
+# against the host interpreter at import time, which on macOS needs maturin's
+# `-undefined dynamic_lookup` link arg. A bare `cargo build --workspace` (the CI gate)
+# builds the cdylib WITHOUT this feature, so PyO3 links libpython normally and the
+# link succeeds; maturin turns it on for the wheel via `[tool.maturin] features`.
+extension-module = ["pyo3/extension-module"]
+# The pretty-printing formatter surface (`format(...)`). Non-default, mirroring the
+# wasm crate: the formatter compiles into the extension only when a build opts in.
+
+[dependencies]
+# `serde` gives the JSON boundary representation of the parse root; `full` (postgres +
+# mysql + lenient) makes every `BuiltinDialect` arm available so the `dialect=`
+# argument can select any stock dialect at runtime.
+squonk = { workspace = true, features = ["serde", "full", "document-render"] }
+# PyO3 pin rationale: 0.28.x carries a soundness advisory, and `abi3-py311`
+# builds one stable-ABI module usable across CPython >= 3.11. Declared directly
+# (not via the workspace) because PyO3 is a bindings-only dependency the shipped
+# crates never carry.
+pyo3 = { version = "=0.29.0", features = ["abi3", "abi3-py311"] }
+serde = { workspace = true }
+# Serializes the parse root and the recovering result into the JSON string handed
+# across the boundary and `json.loads`-ed in the thin Python wrapper — the whole
+# reason the Rust side needs no pyo3 dict-building and stays this small.
+serde_json = { workspace = true }

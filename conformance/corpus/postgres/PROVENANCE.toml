@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+#
+# Provenance record for the PostgreSQL regression-derived corpus, enforced by
+# `cargo xtask license` (ADR-0015 corpus licensing; ADR-0017 local-runnable
+# checks). The SPDX header above covers this metadata file; the corpus content is
+# under the PostgreSQL licence (the machine-checked `license` field). See
+# README.md for the full narrative.
+source = "https://github.com/postgres/postgres (src/test/regress/sql)"
+reference = "4b0bf0788b066a4ca1d4f959566678e44ec93422"
+license = "PostgreSQL"
+regenerate = "Re-derive regress-supported.sql and regress-guide.sql from the pinned src/test/regress/sql files (see README.md); refresh the PG goldens: REWRITE=1 cargo nextest run -p squonk-conformance"

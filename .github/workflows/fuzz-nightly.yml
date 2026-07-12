@@ -1,0 +1,228 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+# Nightly, time-bounded cargo-fuzz soak over the pure-Rust libFuzzer targets, so
+# `main` accumulates a crash-free fuzzing record. That record is the ADR-0019
+# criterion-2 evidence ("a crash-free record exists") that must be in place before
+# OSS-Fuzz onboarding can flip to a GO. This is the cheap in-repo intermediate
+# step: no external service, no 90-day disclosure clock, no maintainer-triage
+# commitment. Each green run is one unit of the accumulating crash-free record; the
+# per-run exec count / duration is printed via -print_final_stats=1.
+#
+# Harness: conformance/fuzz/ is a standalone, nightly-only cargo-fuzz crate reusing
+# the stable Bolero bodies from conformance/src/fuzz.rs (one harness, two engines —
+# ADR-0014). Run the same commands locally with:
+#   cd conformance && cargo +nightly fuzz run <target> -- -max_total_time=<N>
+#
+# NOTE: this workflow intentionally covers only the nightly fuzz soak; the sibling
+# `oracle-nightly.yml` carries the SQLite/DuckDB oracle suite + the Linux bench build,
+# and standing up general lint/test/build CI remains out of scope for both — every
+# gate is local-runnable (ADR-0017) and CI merely invokes a slice of them.
+
+name: fuzz-nightly
+
+on:
+  schedule:
+    # 07:19 UTC daily. Off the top of the hour to dodge GitHub's cron congestion;
+    # scheduled runs fire only on the default branch.
+    - cron: "19 7 * * *"
+  # Manual trigger: run an on-demand soak, or exercise the job without waiting for
+  # the nightly cron (e.g. after touching the parser or the fuzz harness).
+  workflow_dispatch:
+
+# Least privilege: the job only reads the tree and uploads a crash artifact.
+permissions:
+  contents: read
+
+# One soak at a time; never cancel an in-flight run when the next night triggers.
+concurrency:
+  group: fuzz-nightly
+  cancel-in-progress: false
+
+jobs:
+  soak:
+    name: fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Fuzz every target even when one crashes: each gets its own runner, budget,
+      # and crash artifact, so one failing target never masks another.
+      fail-fast: false
+      matrix:
+        # The two raw-byte panic/structure targets (parse_no_panic, roundtrip), plus:
+        #
+        # - `recover_invariants`: raw bytes into the recovering parser, asserting
+        #   panic-freedom and the whole-tree invariants (unique NodeIds, non-synthetic
+        #   spans, symbol resolvability) across the resync boundaries the resilient
+        #   path introduces. No oracle, so it is as cheap as parse_no_panic — a natural
+        #   nightly sibling.
+        #
+        # - `pg_differential_raw_bytes`: the over-acceptance hunter. It DOES run
+        #   pg_query (the real PostgreSQL parser) as a live oracle on every input, but
+        #   it earns the runtime + triage load the generated `differential` does not:
+        #   it searches the UNBOUNDED raw-input space for the validator-correctness
+        #   class (accepting SQL PostgreSQL rejects, or rejecting SQL it accepts) that
+        #   no other target can reach, so a coverage-guided nightly soak is exactly its
+        #   purpose, and a red run is a genuine new finding to triage, not noise.
+        #
+        # - `sqlite_differential_raw_bytes` / `duckdb_differential_raw_bytes`: the
+        #   SQLite and DuckDB arms of the same raw-byte over-acceptance + statement-
+        #   splitter hunt, each driving its real in-process engine as a parse-only,
+        #   never-execute oracle (SQLite via `sqlite3_prepare_v2` + `pzTail`; DuckDB
+        #   via `duckdb_extract_statements`). They need the conformance crate's
+        #   `oracle-engines` feature, which links rusqlite (bundled) AND system
+        #   libduckdb — so BOTH carry `needs_libduckdb` (the feature is one bundle) and
+        #   pass `--features oracle-engines`. A red run is an accept/reject or
+        #   segmentation divergence to triage, exactly like the pg arm.
+        #
+        # The generated `differential` stays OUT: it only ever renders
+        # legal-by-construction trees — a space the stable gate already validates
+        # divergence-free at 200k iterations — so an unattended oracle soak over it
+        # would re-tread cleared ground for no new coverage (ADR-0019). The pg_query
+        # native (libpg_query C) build is in the conformance closure regardless of
+        # target, so the trade-off is oracle runtime + triage value, not build
+        # availability.
+        include:
+          - target: parse_no_panic
+          - target: roundtrip
+          - target: recover_invariants
+          - target: pg_differential_raw_bytes
+          - target: sqlite_differential_raw_bytes
+            features: oracle-engines
+            needs_libduckdb: true
+          - target: duckdb_differential_raw_bytes
+            features: oracle-engines
+            needs_libduckdb: true
+    env:
+      # Per-target wall-clock budget (seconds). A few minutes each keeps a nightly
+      # run cheap while still accumulating CPU-time toward the crash-free record.
+      # Raise it for a longer soak.
+      FUZZ_MAX_TOTAL_TIME: "300"
+      # DuckDB C-library version installed for the oracle-engines fuzz entries. Pinned
+      # to the same release `oracle-nightly.yml` uses (verified to link against the
+      # `libduckdb-sys` crate pin in `conformance/Cargo.toml`).
+      DUCKDB_VERSION: "1.5.4"
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install nightly toolchain
+        # libFuzzer requires nightly; the crates themselves stay on stable
+        # (rust-toolchain.toml), so every fuzz command passes `+nightly` explicitly
+        # to override the checked-in stable pin.
+        #
+        # The Fuzz step pins `--target x86_64-unknown-linux-gnu` on the `cargo fuzz`
+        # invocation; `targets:` installs the matching rust-std so the two stay in
+        # lockstep. That pin is load-bearing: cargo-fuzz defaults `--target` to its OWN
+        # binary's triple, and install-action ships the prebuilt musl-static cargo-fuzz,
+        # so without the pin the build targets x86_64-unknown-linux-musl. cargo-fuzz
+        # always injects `-Zsanitizer=address`, and current nightlies (since ~2026-07)
+        # reject ASAN against musl's default `+crt-static` libc as a HARD ERROR
+        # ("sanitizer is incompatible with statically linked libc"). gnu is the standard
+        # sanitizer target on a glibc runner; it is also the runner's host std, so this
+        # `targets:` is belt-and-suspenders today, but it keeps the installed std and the
+        # build `--target` in visible lockstep and survives a host-arch change.
+        uses: dtolnay/rust-toolchain@efcb852328a9f50117170cc43094fb6f09eaf1ae # nightly
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          # The fuzz crate declares its own `[workspace]`, outside the repo-root one.
+          workspaces: conformance/fuzz
+
+      - name: Install cargo-fuzz
+        # Prebuilt binary instead of a from-source `cargo install` compile (minutes on
+        # each of the 4 matrix runners). install-action has no native manifest for
+        # cargo-fuzz, so it fetches the prebuilt release binary via its cargo-binstall
+        # fallback — still no compile. It also sidesteps the old `cargo +nightly install`
+        # dance whose only purpose was to keep rust-toolchain.toml from pulling a second
+        # (stable) toolchain: no `cargo install` runs at all now. Version pinned so a
+        # nightly tool bump is a deliberate, reviewable change.
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        with:
+          tool: cargo-fuzz@0.13.2
+
+      - name: Install libduckdb
+        # Only the oracle-engines entries (sqlite/duckdb differentials) link libduckdb;
+        # `oracle-engines` is one bundle (rusqlite + libduckdb-sys), so both need it at
+        # build AND run time. Same prebuilt release asset + env wiring as
+        # `oracle-nightly.yml` (DUCKDB_LIB_DIR/INCLUDE_DIR for the build,
+        # LD_LIBRARY_PATH so the fuzz binary finds the shared lib at run time).
+        if: ${{ matrix.needs_libduckdb }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/libduckdb.zip" \
+            "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/libduckdb-linux-amd64.zip"
+          mkdir -p "$RUNNER_TEMP/libduckdb"
+          unzip -q "$RUNNER_TEMP/libduckdb.zip" -d "$RUNNER_TEMP/libduckdb"
+          test -f "$RUNNER_TEMP/libduckdb/duckdb.h"
+          test -f "$RUNNER_TEMP/libduckdb/libduckdb.so"
+          {
+            echo "DUCKDB_LIB_DIR=$RUNNER_TEMP/libduckdb"
+            echo "DUCKDB_INCLUDE_DIR=$RUNNER_TEMP/libduckdb"
+            echo "LD_LIBRARY_PATH=$RUNNER_TEMP/libduckdb:${LD_LIBRARY_PATH}"
+          } >> "$GITHUB_ENV"
+
+      - name: Fuzz ${{ matrix.target }}
+        working-directory: conformance
+        # `cargo fuzz` operates on the ./fuzz subdirectory, so run it from the crate
+        # that owns fuzz/ (conformance/). `--target x86_64-unknown-linux-gnu` pins the
+        # build triple (see the toolchain step for the full why — ASAN vs. musl
+        # crt-static); without it cargo-fuzz defaults to its own musl binary triple.
+        # `matrix.features` (only the sqlite/duckdb entries set it) adds
+        # `--features oracle-engines` so the in-process engine oracles link in; the
+        # other targets pass nothing and build with no system library, exactly as
+        # before. Bounded by -max_total_time so the job terminates on its own; a crash
+        # makes libFuzzer exit non-zero, which fails the step (and thus the job) —
+        # satisfying "fail on a new crash".
+        env:
+          FUZZ_FEATURES: ${{ matrix.features }}
+        run: |
+          features_arg=()
+          if [ -n "$FUZZ_FEATURES" ]; then
+            features_arg=(--features "$FUZZ_FEATURES")
+          fi
+          cargo +nightly fuzz run "${{ matrix.target }}" \
+            "${features_arg[@]}" \
+            --target x86_64-unknown-linux-gnu -- \
+            -max_total_time="${FUZZ_MAX_TOTAL_TIME}" \
+            -print_final_stats=1
+
+      - name: Crash -> replay instructions
+        # A crash (or a build failure) fails the fuzz step; surface how to promote a
+        # crash into the stable replay suite so it re-runs without nightly.
+        if: failure()
+        run: |
+          echo "::error title=cargo-fuzz crash in ${{ matrix.target }}::A fuzz crash (or build failure) occurred. If it is a crash, promote the reproducer to a stable replay:"
+          echo "  1. Download the 'fuzz-crash-${{ matrix.target }}' artifact from this run"
+          echo "     (the crash-<hash> file under ${{ matrix.target }}/)."
+          echo "  2. cd conformance && cargo +nightly fuzz fmt  ${{ matrix.target }} <crash-file>   # inspect the input"
+          echo "  3.                   cargo +nightly fuzz tmin ${{ matrix.target }} <crash-file>   # minimize it"
+          echo "  4. Commit the minimized bytes into the matching *_REPLAYS constant so the"
+          echo "     stable *_replays_committed_inputs test replays it on every 'cargo nextest"
+          echo "     run' — no nightly required:"
+          echo "       parse_no_panic                 -> PARSE_NO_PANIC_REPLAYS                (conformance/src/fuzz.rs)"
+          echo "       roundtrip                      -> ROUNDTRIP_REPLAYS                     (conformance/src/fuzz.rs)"
+          echo "       pg_differential_raw_bytes      -> PG_DIFFERENTIAL_RAW_BYTES_REPLAYS     (conformance/src/fuzz.rs)"
+          echo "       sqlite_differential_raw_bytes  -> SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS (conformance/src/fuzz.rs)"
+          echo "       duckdb_differential_raw_bytes  -> DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS (conformance/src/fuzz.rs)"
+          echo "       recover_invariants             -> RECOVER_INVARIANTS_REPLAYS            (conformance/src/recovery_invariants.rs)"
+          echo "     A pg_differential_raw_bytes crash is an accept/reject divergence: triage it into"
+          echo "     PG_DIVERGENCE_ALLOWLIST (naming a ticket) or fix the parser/mapping before pinning it."
+          echo "     A sqlite_/duckdb_differential_raw_bytes crash is an accept/reject or segmentation"
+          echo "     divergence: triage into M2_DIVERGENCE_ALLOWLIST (conformance/src/m2.rs, naming a"
+          echo "     ticket) or fix the parser; replay them with --features oracle-engines."
+          echo "  See conformance/fuzz/README.md, section 'Crash -> replay workflow'."
+
+      - name: Upload crash reproducer
+        # cargo-fuzz writes the failing input to
+        # conformance/fuzz/artifacts/<target>/crash-<hash>; upload it so a maintainer
+        # can shrink and commit it per the instructions above. `if-no-files-found:
+        # ignore` keeps non-crash failures (e.g. a build error) from erroring here.
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: conformance/fuzz/artifacts/
+          if-no-files-found: ignore
+          retention-days: 30
