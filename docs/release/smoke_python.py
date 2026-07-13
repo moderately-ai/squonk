@@ -35,10 +35,12 @@ def main() -> None:
 
     # The import must resolve to an installed distribution, not a checkout on sys.path —
     # a release smoke that accidentally imports the source tree proves nothing about the
-    # wheel. Reject a squonk imported from anywhere under this repository.
+    # wheel. Reject only the checkout's importable package directory; a virtualenv may
+    # deliberately live under the repository while still containing the installed wheel.
     module_path = Path(squonk.__file__).resolve()
     repo_root = Path(__file__).resolve().parents[2]
-    if repo_root in module_path.parents:
+    source_package = (repo_root / "crates" / "squonk-python" / "python" / "squonk").resolve()
+    if module_path == source_package or source_package in module_path.parents:
         _fail(
             f"imported squonk from the source tree ({module_path}); "
             "run this from a clean venv with only the wheel installed"
