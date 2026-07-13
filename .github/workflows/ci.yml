@@ -162,7 +162,9 @@ jobs:
           mypy
           timeout 60s mypy --config-file=/dev/null python/tests/consumer_types.py
           timeout 60s pyright python/tests/consumer_types.py
-          timeout 60s python -m mypy.stubtest squonk._ast squonk._exceptions squonk._native
+          # Run outside the binding crate so its `python/` source directory cannot
+          # shadow the installed wheel that stubtest is meant to inspect.
+          (cd /tmp && timeout 60s python -m mypy.stubtest squonk._ast squonk._exceptions squonk._native)
           pytest
 
   ci-success:
