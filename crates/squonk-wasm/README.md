@@ -7,17 +7,17 @@ Typed WebAssembly bindings for Squonk's SQL parser, renderer, formatter, tokeniz
 Install only the dialect surface you need:
 
 ```sh
-npm install @squonk/postgres
+npm install @squonk-sql/postgres
 ```
 
 | Package | Default dialect | Accepted dialects |
 |---|---|---|
-| `@squonk/ansi` | ANSI | ANSI |
-| `@squonk/postgres` | PostgreSQL | ANSI, PostgreSQL |
-| `@squonk/mysql` | MySQL | ANSI, MySQL |
-| `@squonk/sqlite` | SQLite | ANSI, SQLite |
-| `@squonk/duckdb` | DuckDB | ANSI, DuckDB |
-| `@squonk/lenient` | Lenient | ANSI, Lenient |
+| `@squonk-sql/ansi` | ANSI | ANSI |
+| `@squonk-sql/postgres` | PostgreSQL | ANSI, PostgreSQL |
+| `@squonk-sql/mysql` | MySQL | ANSI, MySQL |
+| `@squonk-sql/sqlite` | SQLite | ANSI, SQLite |
+| `@squonk-sql/duckdb` | DuckDB | ANSI, DuckDB |
+| `@squonk-sql/lenient` | Lenient | ANSI, Lenient |
 | `squonk` | ANSI | Every built-in dialect |
 
 The `squonk` umbrella additionally includes BigQuery, Hive, ClickHouse, Databricks, MSSQL, Snowflake, and Redshift. Every package has the complete document API; there are no `full` variants.
@@ -27,7 +27,7 @@ The `squonk` umbrella additionally includes BigQuery, Hive, ClickHouse, Databric
 Node initializes its colocated WASM synchronously when the module loads. Consumers do not call `init()`:
 
 ```ts
-import { format, parse, parseRecovering, tokenize } from "@squonk/postgres";
+import { format, parse, parseRecovering, tokenize } from "@squonk-sql/postgres";
 
 const document = parse("select $1");
 document.dialect; // typed as "postgres"
@@ -49,7 +49,7 @@ A focused package defaults to its named dialect. Pass `{ dialect: "ansi" }` when
 Browsers load WASM asynchronously through the explicit `browser` entrypoint:
 
 ```ts
-import { createSquonk } from "@squonk/postgres/browser";
+import { createSquonk } from "@squonk-sql/postgres/browser";
 
 const sql = await createSquonk();
 const document = sql.parse("select $1");

@@ -77,18 +77,18 @@ See [crates/squonk-python](./crates/squonk-python/README.md).
 ### TypeScript
 
 ```sh
-npm install @squonk/postgres
+npm install @squonk-sql/postgres
 ```
 
 ```ts
-import { parse } from "@squonk/postgres";
+import { parse } from "@squonk-sql/postgres";
 
 const doc = parse("select id, name from users where id = $1");
 
 console.log(doc.toSQL());
 ```
 
-Node exposes a synchronous API with automatic initialization. Browsers use the explicit async factory from `@squonk/postgres/browser`. Focused `@squonk/*` packages ship one dialect-sized artifact; the unscoped `squonk` package includes every built-in dialect.
+Node exposes a synchronous API with automatic initialization. Browsers use the explicit async factory from `@squonk-sql/postgres/browser`. Focused `@squonk-sql/*` packages ship one dialect-sized artifact; the unscoped `squonk` package includes every built-in dialect.
 
 The parser is pure Rust, so building it does not require a C toolchain.
 

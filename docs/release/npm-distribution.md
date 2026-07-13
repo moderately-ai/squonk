@@ -2,15 +2,15 @@
 
 Squonk publishes six focused scoped packages and one batteries-included umbrella at the same workspace version:
 
-- `@squonk/ansi`
-- `@squonk/postgres`
-- `@squonk/mysql`
-- `@squonk/sqlite`
-- `@squonk/duckdb`
-- `@squonk/lenient`
+- `@squonk-sql/ansi`
+- `@squonk-sql/postgres`
+- `@squonk-sql/mysql`
+- `@squonk-sql/sqlite`
+- `@squonk-sql/duckdb`
+- `@squonk-sql/lenient`
 - `squonk`
 
-The focused packages contain ANSI plus their named dialect and default to the named dialect. `squonk` defaults to ANSI and contains all 13 built-in presets. There is no `@squonk/all` package and no public `full` or `lite` build mode.
+The focused packages contain ANSI plus their named dialect and default to the named dialect. `squonk` defaults to ANSI and contains all 13 built-in presets. There is no `@squonk-sql/all` package and no public `full` or `lite` build mode.
 
 ## Runtime contract
 
@@ -43,7 +43,7 @@ Size ceilings are per package. Raw and gzip WASM sizes plus packed and unpacked 
 
 Before the first release:
 
-1. Create or confirm control of the `@squonk` npm organization.
+1. Create or confirm control of the `@squonk-sql` npm organization.
 2. Confirm all seven names are still available.
 3. Configure the protected GitHub `npm` environment.
 4. Provide a short-lived granular bootstrap token permitted to create all seven packages.

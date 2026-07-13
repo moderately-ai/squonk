@@ -12,7 +12,7 @@ Operational, no-surprises procedure for publishing the two Rust crates to crates
 | `squonk-ast` | crates.io | yes | The dialect-agnostic AST. Published **first** — `squonk` depends on it. |
 | `squonk` | crates.io | yes | The tokenizer/parser. Published **second**, after `squonk-ast` is live (or coordinated in one `cargo publish` invocation, see below). |
 | `squonk-python` | PyPI (via `maturin`) | no (`publish = false`) | Python wheel surface, not a crates.io crate. |
-| `squonk-wasm` | npm package family | no (`publish = false`) | Six `@squonk/*` dialect packages plus the `squonk` umbrella; not a crates.io crate. |
+| `squonk-wasm` | npm package family | no (`publish = false`) | Six `@squonk-sql/*` dialect packages plus the `squonk` umbrella; not a crates.io crate. |
 | `squonk-sourcegen` | — | no (`publish = false`) | Internal dev codegen tool; never shipped. |
 
 Only `squonk-ast` and `squonk` go to crates.io. `release/semver-baseline.toml` and `xtask/src/semver.rs` already encode exactly this published set.

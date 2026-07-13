@@ -233,16 +233,17 @@ squonk-1.0.0/python/squonk/…            (__init__, _ast, _ast_metadata, _excep
 
 ## 5. npm package family (wasm bindings)
 
-Fresh `npm pack --dry-run --json` measurements after the scoped-package migration:
+The WASM columns are the last fresh measurements; scope-sensitive tarball values for
+the final `@squonk-sql/*` names are filled from the clean release build before publish.
 
 | Package | WASM raw | WASM gzip | Tarball | Unpacked | Entries |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `@squonk/ansi` | 3,791,951 | 701,117 | 764,504 | 4,114,368 | 18 |
-| `@squonk/postgres` | 4,190,614 | 784,354 | 847,345 | 4,513,563 | 18 |
-| `@squonk/mysql` | 4,366,116 | 843,011 | 905,828 | 4,688,887 | 18 |
-| `@squonk/sqlite` | 3,991,065 | 736,840 | 798,633 | 4,313,894 | 18 |
-| `@squonk/duckdb` | 4,212,244 | 793,417 | 855,350 | 4,535,073 | 18 |
-| `@squonk/lenient` | 4,744,331 | 945,647 | 1,007,623 | 5,067,218 | 18 |
+| `@squonk-sql/ansi` | 3,791,951 | 701,117 | pending | pending | 18 |
+| `@squonk-sql/postgres` | 4,190,614 | 784,354 | pending | pending | 18 |
+| `@squonk-sql/mysql` | 4,366,116 | 843,011 | pending | pending | 18 |
+| `@squonk-sql/sqlite` | 3,991,065 | 736,840 | pending | pending | 18 |
+| `@squonk-sql/duckdb` | 4,212,244 | 793,417 | pending | pending | 18 |
+| `@squonk-sql/lenient` | 4,744,331 | 945,647 | pending | pending | 18 |
 | `squonk` | 7,546,770 | 1,136,337 | 1,199,000 | 7,876,590 | 18 |
 
 Each self-contained package contains one WASM artifact, matching Node and browser entrypoints, the shared runtime, generated AST declarations and metadata, manifest, README, and LICENSE. No TypeScript sources, maps, reports, build tools, or `node_modules` ship. Per-package raw/gzip/packed/unpacked ceilings have 10% measured headroom; entry count is pinned exactly at 18.
@@ -256,7 +257,7 @@ The six focused packages contain ANSI plus their named dialect. The `squonk` umb
 ## Cross-artifact facts
 
 - **Version:** every artifact is `1.0.0` — workspace `[workspace.package] version`, the two `[workspace.dependencies]` pins, the wheel (dynamic, derived), and `package.json`.
-- **Name:** Rust and Python use `squonk`; npm adds six `@squonk/*` focused packages alongside the `squonk` umbrella. `squonk-ast` is the second crates.io crate; `squonk-wasm` stays internal.
+- **Name:** Rust and Python use `squonk`; npm adds six `@squonk-sql/*` focused packages alongside the `squonk` umbrella. `squonk-ast` is the second crates.io crate; `squonk-wasm` stays internal.
 - **License:** MIT everywhere; each artifact carries its own LICENSE copy (crate-local, `dist-info/licenses/`, npm root).
 - **Not shipped:** `squonk-sourcegen`, `squonk-bench` (`publish = false`); test corpora and CI/build artifacts.
 - **Pending before publish:** the human-gated `v1.0.0` tag and registry uploads.

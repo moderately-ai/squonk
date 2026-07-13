@@ -17,7 +17,7 @@
 #
 #   manylinux x86_64   ubuntu-latest    manylinux2014 container, host-native smoke
 #   macOS arm64        macos-14         Apple silicon, native
-#   macOS x86_64       macos-13         Intel, native
+#   macOS x86_64       macos-15-intel   Intel, native
 #   Windows x86_64     windows-latest   native
 #
 # Linux aarch64 (manylinux/musllinux) and musllinux x86_64 are deliberately NOT in the
@@ -38,11 +38,6 @@ on:
         description: "Publish to PyPI after the build (still requires `pypi` environment approval)"
         type: boolean
         default: false
-      repository:
-        description: "Package index to publish to"
-        type: choice
-        default: testpypi
-        options: [testpypi, pypi]
   push:
     tags: ["python-v*"]
 
@@ -73,7 +68,7 @@ jobs:
             target: aarch64-apple-darwin
             manylinux: auto
           - name: macos-x86_64
-            runner: macos-13
+            runner: macos-15-intel
             target: x86_64-apple-darwin
             manylinux: auto
           - name: windows-x86_64
@@ -167,17 +162,17 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: publish to ${{ github.event.inputs.repository || 'testpypi' }}
+    name: publish to PyPI
     # HUMAN GATE. This job runs only when a maintainer dispatches with `publish: true`,
     # and even then it is pinned to a protected GitHub Environment: configure the `pypi`
-    # / `testpypi` environments in repo settings with a required reviewer so the run
-    # PAUSES for manual approval before this job starts. No token lives here — PyPI
+    # environment in repo settings with a required reviewer, so the run PAUSES for
+    # manual approval before this job starts. No token lives here — PyPI
     # Trusted Publishing (OIDC) exchanges the `id-token` for a short-lived upload
     # credential, which is why `id-token: write` is the only extra permission.
     needs: [build-wheels, build-sdist]
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true' }}
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.repository || 'testpypi' }}
+    environment: pypi
     permissions:
       id-token: write
     steps:
@@ -187,12 +182,7 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Publish with maturin (Trusted Publishing)
-        # `maturin upload` sends every wheel + the sdist. `--repository` selects PyPI vs
-        # TestPyPI; the rehearsal path in the runbook publishes to TestPyPI first. No
-        # `MATURIN_PYPI_TOKEN` — the OIDC id-token above is exchanged for the upload
-        # credential by the index's Trusted Publishing configuration.
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
+      - name: Publish with PyPI Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
         with:
-          command: upload
-          args: --repository ${{ github.event.inputs.repository || 'testpypi' }} --non-interactive dist/*
+          packages-dir: dist

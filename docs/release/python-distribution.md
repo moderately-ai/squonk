@@ -17,7 +17,7 @@ Every wheel is `cp311-abi3` and is built **and** install-smoked on a native GitH
 |---|---|---|---|---|
 | `manylinux2014_x86_64` | `x86_64-unknown-linux-gnu` | `ubuntu-latest` | 1 — built + native smoke | glibc 2.17 floor (manylinux2014 container) |
 | `macosx_11_0_arm64` | `aarch64-apple-darwin` | `macos-14` | 1 — built + native smoke | Apple silicon |
-| `macosx_10_12_x86_64` | `x86_64-apple-darwin` | `macos-13` | 1 — built + native smoke | Intel Mac |
+| `macosx_10_12_x86_64` | `x86_64-apple-darwin` | `macos-15-intel` | 1 — built + native smoke | Intel Mac |
 | `win_amd64` | `x86_64-pc-windows-msvc` | `windows-latest` | 1 — built + native smoke | |
 | sdist (`.tar.gz`) | — | `ubuntu-latest` | source fallback | compiled from source on install; needs a Rust toolchain on the target |
 
@@ -46,9 +46,8 @@ The `[project.urls]` and workspace repository metadata point at the public
 The distribution name must be ours before anything is published. This is a re-check even if reserved earlier — squatting happens.
 
 - Confirm the PyPI project `squonk` is registered/reserved to the Moderately AI org (or is free): `curl -sS -o /dev/null -w '%{http_code}\n' https://pypi.org/pypi/squonk/json` (404 = free, 200 = exists — verify it is *ours*).
-- Same check on TestPyPI (`https://test.pypi.org/pypi/squonk/json`) for the rehearsal.
-- Confirm PyPI **Trusted Publishing** is configured for the `squonk` project pointing at this repo + the `release-python.yml` workflow + the `pypi` (and `testpypi`) environment. No API token is stored — the workflow uses OIDC.
-- **Gate:** do not proceed unless the name is ours on both indexes and Trusted Publishing is wired.
+- Confirm PyPI **Trusted Publishing** is configured for the `squonk` project pointing at this repo + the `release-python.yml` workflow + the `pypi` environment. No API token is stored — the workflow uses OIDC.
+- **Gate:** do not proceed unless the name is ours and Trusted Publishing is wired.
 
 ### 1. Version + metadata (maintainer gate #1)
 
@@ -89,25 +88,9 @@ The smoke script refuses to pass if it imported the source tree instead of the i
 - Every matrix leg builds its wheel and runs the native install-smoke; `build-sdist` additionally compiles the sdist from source and smokes it.
 - **Gate:** all four wheel legs + the sdist leg green, and the wheel/sdist artifacts present on the run, before considering a publish.
 
-### 4. Publish to TestPyPI (maintainer gate #4 — rehearsal upload)
+### 4. Publish to PyPI (maintainer gate #4 — the real, irreversible upload)
 
-- Re-dispatch `release-python.yml` with `publish: true` and `repository: testpypi`.
-- The `publish` job is pinned to the protected `testpypi` environment: **the run pauses for required-reviewer approval — approve it deliberately.**
-- Post-upload smoke from TestPyPI in a clean venv:
-
-```bash
-python -m venv /tmp/squonk-testpypi
-/tmp/squonk-testpypi/bin/pip install \
-  --index-url https://test.pypi.org/simple/ \
-  --extra-index-url https://pypi.org/simple/ squonk
-/tmp/squonk-testpypi/bin/python docs/release/smoke_python.py
-```
-
-- **Gate:** TestPyPI install + smoke green before touching real PyPI.
-
-### 5. Publish to PyPI (maintainer gate #5 — the real, irreversible upload)
-
-- Re-dispatch `release-python.yml` with `publish: true` and `repository: pypi`.
+- Re-dispatch `release-python.yml` with `publish: true`.
 - The `publish` job targets the protected `pypi` environment: **approve the required-reviewer prompt only when everything above is green.** A PyPI version is immutable and cannot be re-uploaded.
 - Post-publish smoke in a clean venv against real PyPI:
 
