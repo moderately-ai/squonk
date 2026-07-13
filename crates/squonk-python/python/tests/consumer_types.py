@@ -22,6 +22,7 @@ document = parse("select 1", "pg")
 assert_type(document, Document[Literal["postgres"]])
 assert_type(document.dialect, Literal["postgres"])
 assert_type(document.statements[0], Node[StatementJson])
+generic_document: Document[str] = document
 
 raw = parse_dict("select 1")
 assert_type(raw, ParseDocumentJson)

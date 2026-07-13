@@ -181,7 +181,7 @@ def parse(
     parse_float_as_decimal: bool = False,
 ) -> Document[CanonicalDialectName]: ...
 
-def parse_with_limit(sql: str, dialect: DialectName | ValidatedDialectName = "ansi", limit: int = 128) -> Document: ...
+def parse_with_limit(sql: str, dialect: DialectName | ValidatedDialectName = "ansi", limit: int = 128) -> Document[CanonicalDialectName]: ...
 
 def parse_dict(
     sql: str,
@@ -199,7 +199,7 @@ def parse_recovering(
     recursion_limit: Optional[int] = None,
     capture_trivia: bool = False,
     parse_float_as_decimal: bool = False,
-) -> RecoveredDocument: ...
+) -> RecoveredDocument[CanonicalDialectName]: ...
 
 def parse_recovering_dict(
     sql: str,
@@ -229,14 +229,14 @@ def format(
 ) -> str: ...
 
 def render(
-    sql_or_document: Union[str, Document],
+    sql_or_document: Union[str, Document[str]],
     dialect: Optional[DialectName | ValidatedDialectName] = None,
     *,
     mode: RenderMode = "canonical",
     recursion_limit: Optional[int] = None,
 ) -> str: ...
 
-def redact(sql_or_document: Union[str, Document], dialect: Optional[DialectName | ValidatedDialectName] = None) -> str: ...
+def redact(sql_or_document: Union[str, Document[str]], dialect: Optional[DialectName | ValidatedDialectName] = None) -> str: ...
 
 def transpile(
     sql: str,

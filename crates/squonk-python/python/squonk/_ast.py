@@ -8,13 +8,14 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 import json
-from typing import Any, Optional, Union, cast
+from typing import Any, Generic, Optional, TypeVar, Union, cast
 
 import squonk._native as _native
 from ._ast_metadata import AST_FIELD_TYPES
 
 
 JsonDict = dict[str, Any]
+_TDialect = TypeVar("_TDialect", bound=str, covariant=True)
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,7 @@ class Span:
     end: int
 
 
-class Document(Mapping[str, Any]):
+class Document(Mapping[str, Any], Generic[_TDialect]):
     """A live typed view over a parsed SQL document."""
 
     def __init__(self, raw: JsonDict):
@@ -53,8 +54,8 @@ class Document(Mapping[str, Any]):
         return cast(str, self._raw["source"])
 
     @property
-    def dialect(self) -> str:
-        return cast(str, self._raw.get("dialect", "ansi"))
+    def dialect(self) -> _TDialect:
+        return cast(_TDialect, self._raw.get("dialect", "ansi"))
 
     @property
     def statements(self) -> list[Node]:
@@ -172,14 +173,14 @@ class Document(Mapping[str, Any]):
         return self._line_starts
 
 
-class RecoveredDocument(Document):
+class RecoveredDocument(Document[_TDialect], Generic[_TDialect]):
     """A parsed document plus statement-level recovery diagnostics."""
 
 
 class Node:
     """A typed view over one AST node or enum variant."""
 
-    def __init__(self, raw: JsonDict, document: Document, type_name: Optional[str] = None):
+    def __init__(self, raw: JsonDict, document: Document[str], type_name: Optional[str] = None):
         self._raw = raw
         self.document = document
         self.type_name = type_name
@@ -307,7 +308,7 @@ class Node:
 class Ident(Node):
     """An identifier node with resolved text."""
 
-    def __init__(self, raw: JsonDict, document: Document):
+    def __init__(self, raw: JsonDict, document: Document[str]):
         super().__init__(raw, document, "Ident")
         self.kind = "Ident"
         self._data = raw
@@ -328,7 +329,7 @@ class Ident(Node):
 class ObjectName:
     """A qualified object name backed by one or more identifiers."""
 
-    def __init__(self, raw: list[Any], document: Document):
+    def __init__(self, raw: list[Any], document: Document[str]):
         self._raw = raw
         self.document = document
         self.parts = [Ident(part, document) for part in raw]
@@ -356,7 +357,7 @@ class ObjectName:
 class Diagnostic(Mapping[str, Any]):
     """A parse diagnostic with byte-span helpers."""
 
-    def __init__(self, raw: JsonDict, document: Document):
+    def __init__(self, raw: JsonDict, document: Document[str]):
         self.raw = raw
         self.document = document
 
@@ -396,7 +397,7 @@ class Diagnostic(Mapping[str, Any]):
 class Trivia(Mapping[str, Any]):
     """A captured whitespace/comment run with byte-span helpers."""
 
-    def __init__(self, raw: JsonDict, document: Document):
+    def __init__(self, raw: JsonDict, document: Document[str]):
         self.raw = raw
         self.document = document
 
@@ -425,13 +426,13 @@ class Trivia(Mapping[str, Any]):
         return len(self.raw)
 
 
-def document_from_json(text: str, *, recovered: bool = False) -> Document:
+def document_from_json(text: str, *, recovered: bool = False) -> Document[str]:
     raw = json.loads(text)
     cls = RecoveredDocument if recovered else Document
     return cls(raw)
 
 
-def _wrap(value: Any, document: Document, type_spec: Optional[str] = None) -> Any:
+def _wrap(value: Any, document: Document[str], type_spec: Optional[str] = None) -> Any:
     if value is None:
         return None
     if type_spec == "ObjectName":
@@ -447,7 +448,7 @@ def _wrap(value: Any, document: Document, type_spec: Optional[str] = None) -> An
     return value
 
 
-def _wrap_node(value: Any, document: Document, type_spec: Optional[str] = None) -> Node:
+def _wrap_node(value: Any, document: Document[str], type_spec: Optional[str] = None) -> Node:
     wrapped = _wrap(value, document, type_spec)
     if isinstance(wrapped, Node):
         return wrapped

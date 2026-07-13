@@ -12,7 +12,7 @@ from ._types import ParseDocumentJson, RecoveredDocumentJson
 
 JsonDict = dict[str, Any]
 _TRaw = TypeVar("_TRaw")
-_TDialect = TypeVar("_TDialect", bound=str)
+_TDialect = TypeVar("_TDialect", bound=str, covariant=True)
 
 @dataclass(frozen=True)
 class SourceLocation:
