@@ -13,10 +13,8 @@ on:
   push:
     tags: ["npm-v*"]
 
-# Builds need only the source tree. The publish job widens this to OIDC locally.
-# The first real package cannot configure npm Trusted Publishing before it exists,
-# so v1.0.0 also receives the protected Environment's one-time bootstrap token;
-# after that publish the token is deleted and npm uses OIDC for later versions.
+# Builds need only the source tree. The publish job widens this to OIDC locally;
+# every public package trusts this workflow and the protected `npm` environment.
 permissions:
   contents: read
 
@@ -40,6 +38,7 @@ jobs:
         with:
           node-version: "24"
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
       - name: Install Rust toolchain and wasm target
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
@@ -157,7 +156,7 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Install the OIDC-capable npm CLI
-        run: npm install --global npm@11.5.1
+        run: npm install --global npm@11.18.0
 
       - name: Enable publishing in the verified artifacts
         run: |
@@ -172,13 +171,6 @@ jobs:
           done
 
       - name: Publish with OIDC provenance
-        env:
-          # Bootstrap only: npm requires the package to exist before its Trusted
-          # Publisher can be configured. For v1.0.0 this is a short-expiry,
-          # package-scoped granular token held by the protected npm Environment.
-          # Delete it immediately after configuring Trusted Publishing; npm 11.5.1+
-          # then detects OIDC automatically on subsequent releases.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
         run: |
           for label in ansi postgres mysql sqlite duckdb lenient all; do
             NAME=$(node -p "require('./$label/package.json').name")

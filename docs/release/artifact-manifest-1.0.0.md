@@ -233,18 +233,17 @@ squonk-1.0.0/python/squonk/…            (__init__, _ast, _ast_metadata, _excep
 
 ## 5. npm package family (wasm bindings)
 
-The WASM columns are the last fresh measurements; scope-sensitive tarball values for
-the final `@squonk-sql/*` names are filled from the clean release build before publish.
+Fresh measurements from the exact npm registry tarballs published by the release build:
 
 | Package | WASM raw | WASM gzip | Tarball | Unpacked | Entries |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `@squonk-sql/ansi` | 3,791,951 | 701,117 | pending | pending | 18 |
-| `@squonk-sql/postgres` | 4,190,614 | 784,354 | pending | pending | 18 |
-| `@squonk-sql/mysql` | 4,366,116 | 843,011 | pending | pending | 18 |
-| `@squonk-sql/sqlite` | 3,991,065 | 736,840 | pending | pending | 18 |
-| `@squonk-sql/duckdb` | 4,212,244 | 793,417 | pending | pending | 18 |
-| `@squonk-sql/lenient` | 4,744,331 | 945,647 | pending | pending | 18 |
-| `squonk` | 7,546,770 | 1,136,337 | 1,199,000 | 7,876,590 | 18 |
+| `@squonk-sql/ansi` | 3,778,544 | 680,359 | 748,950 | 4,104,121 | 18 |
+| `@squonk-sql/postgres` | 4,163,252 | 761,532 | 830,243 | 4,489,360 | 18 |
+| `@squonk-sql/mysql` | 4,335,554 | 819,499 | 888,852 | 4,661,484 | 18 |
+| `@squonk-sql/sqlite` | 3,970,167 | 714,612 | 782,584 | 4,296,155 | 18 |
+| `@squonk-sql/duckdb` | 4,184,756 | 770,241 | 838,848 | 4,510,744 | 18 |
+| `@squonk-sql/lenient` | 4,702,263 | 919,477 | 988,759 | 5,028,309 | 18 |
+| `squonk` | 7,426,957 | 1,108,524 | 1,180,586 | 7,760,094 | 18 |
 
 Each self-contained package contains one WASM artifact, matching Node and browser entrypoints, the shared runtime, generated AST declarations and metadata, manifest, README, and LICENSE. No TypeScript sources, maps, reports, build tools, or `node_modules` ship. Per-package raw/gzip/packed/unpacked ceilings have 10% measured headroom; entry count is pinned exactly at 18.
 

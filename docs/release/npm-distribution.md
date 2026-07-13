@@ -41,16 +41,13 @@ Size ceilings are per package. Raw and gzip WASM sizes plus packed and unpacked 
 
 ## Release
 
-Before the first release:
-
-1. Create or confirm control of the `@squonk-sql` npm organization.
-2. Confirm all seven names are still available.
-3. Configure the protected GitHub `npm` environment.
-4. Provide a short-lived granular bootstrap token permitted to create all seven packages.
+All seven packages trust the `moderately-ai/squonk` GitHub repository,
+`release-npm.yml` workflow, and protected `npm` environment. Publishing uses npm OIDC;
+there is no npm token in GitHub.
 
 The release workflow builds and verifies every package before uploading one immutable artifact containing all staged trees. The protected publish job enables publishing only in those ephemeral manifests, repeats every dry-run, then publishes focused packages first and `squonk` last.
 
-Publishing is resumable. If an exact version already exists, its registry integrity must match the verified local tarball or the job stops. After the first release, configure npm Trusted Publishing for every package and delete the bootstrap token; later releases use OIDC provenance.
+Publishing is resumable. If an exact version already exists, its registry integrity must match the verified local tarball or the job stops. npm attaches signed provenance to every new package version.
 
 No local implementation or rehearsal command publishes externally. A real workflow publish requires an explicit dispatch choice and protected-environment approval.
 
