@@ -1,2 +1,2 @@
-squonk==1.0.0
+maturin==1.14.1
 sqlglot==30.12.0

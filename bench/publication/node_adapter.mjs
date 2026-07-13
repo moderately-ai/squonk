@@ -30,7 +30,9 @@ async function loadCorpus(url) {
 
 async function adapter(tool) {
   if (tool === "squonk") {
-    const module = await import("@squonk-sql/ansi");
+    // Exercise the exact checked-out release candidate. `run_on_builder.sh`
+    // builds this generated entrypoint and its native addon before measurement.
+    const module = await import("../../crates/squonk-wasm/js/ansi.js");
     return {
       version: module.version(),
       parse: (sql) => module.parse(sql),

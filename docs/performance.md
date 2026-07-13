@@ -26,8 +26,8 @@ The suite uses one direct alternative in each shipped language ecosystem:
 | Ecosystem | Squonk surface | Direct alternative | Comparison boundary |
 | --- | --- | --- | --- |
 | Rust | `squonk` with `Ansi` | `datafusion-sqlparser-rs` with `AnsiDialect` | Native owned AST returned by each Rust library |
-| Python | `squonk==1.0.0` | `sqlglot==30.12.0` | Installed package returns its public Python document/AST |
-| Node | `@squonk-sql/ansi@1.0.0` | `node-sql-parser==5.4.0` | Installed package returns its public JavaScript document/AST |
+| Python | `squonk` built from the recorded commit | `sqlglot==30.12.0` | Candidate wheel returns its public Python document/AST |
+| Node | `@squonk-sql/ansi` built from the recorded commit | `node-sql-parser==5.4.0` | Generated candidate entrypoint returns its public JavaScript document/AST |
 
 `node-sql-parser` has no ANSI mode, so it uses its MySQL grammar. This does not change the
 workload: all statements were frozen first and independently accepted by MySQL as well as
@@ -247,7 +247,11 @@ python3 bench/plot_performance.py
 python3 -m unittest bench.publication.test_publication
 ```
 
-The runner installs the exact public Python and npm package versions, builds the Rust adapter
-in release mode, fixes CPU affinity, and writes the complete raw result. Pull-request CI
-validates deterministic corpus generation, result structure, and successful graphic
-generation; it does not publish noisy wall-clock measurements from a shared runner.
+The runner builds the Rust adapter, Python wheel, Node-API addon, and generated TypeScript
+entrypoint from the exact recorded source commit. It installs the pinned peer versions,
+fixes CPU affinity, and writes the complete raw result. This release-candidate procedure
+avoids benchmarking an older registry artifact while a new version is being prepared. The
+registry artifacts are built from the same source after the release gate; rerun the suite
+if their source differs. Pull-request CI validates deterministic corpus generation, result
+structure, and successful graphic generation; it does not publish noisy wall-clock
+measurements from a shared runner.

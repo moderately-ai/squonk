@@ -12,7 +12,17 @@ fi
 python -m venv --clear .publication-venv
 .publication-venv/bin/python -m pip install --disable-pip-version-check \
     --requirement bench/publication/requirements.txt
+rm -rf target/publication-python
+.publication-venv/bin/maturin build --release \
+    --out target/publication-python \
+    --manifest-path crates/squonk-python/Cargo.toml
+.publication-venv/bin/python -m pip install --disable-pip-version-check \
+    --force-reinstall --no-deps target/publication-python/squonk-*.whl
+
 npm ci --prefix bench/publication --ignore-scripts
+npm install --prefix crates/squonk-wasm --ignore-scripts --no-package-lock
+npm run --prefix crates/squonk-wasm build:native
+npm run --prefix crates/squonk-wasm build:ts
 cargo build --release -p squonk-bench --example publication_adapter
 
 .publication-venv/bin/python bench/publication/run.py \
