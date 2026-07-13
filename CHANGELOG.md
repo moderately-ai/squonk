@@ -9,7 +9,7 @@ All notable changes to this project are documented here. The format is based on 
 
 _No unreleased changes yet._
 
-## [1.0.0] — unreleased (first stable release)
+## [1.0.0] — 2026-07-12 (first stable release)
 
 First stable release of `squonk`, a lightweight, high-performance, multi-dialect SQL parser with a Rust core and Python and TypeScript/WASM bindings. `1.0.0` freezes the public API: from this tag forward, no breaking change to the surface described in [docs/stable-api.md](docs/stable-api.md) lands without a major-version bump, and the machine-checked SemVer gate (`cargo xtask semver`) enforces it against the `v1.0.0` baseline.
 
@@ -28,14 +28,14 @@ First stable release of `squonk`, a lightweight, high-performance, multi-dialect
 ### Distribution surfaces
 
 - **Rust crates** (crates.io): `squonk` (parser) and `squonk-ast` (dialect-agnostic AST). Default build is ANSI-only with a single micro-dependency (`thin-vec`); every other dialect and `serde` are opt-in features.
-- **Python wheel** (`squonk` on PyPI, via `maturin`): `cp311-abi3`, one stable-ABI wheel per platform on CPython >= 3.11. v1 wheel matrix is Linux `x86_64` (manylinux2014), macOS `arm64` (macos-14), macOS `x86_64` (macos-13), Windows `x86_64`, plus an sdist — all built and install-smoked on native runners.
-- **TypeScript / WASM package** (`squonk` on npm, via `wasm-pack`): a single package exposing 14 wasm variants through conditional subpath exports (ANSI-only default plus per-dialect and all-dialect builds, each in a serialize-only and a document-rendering flavour); pure Rust, no C toolchain in the build.
+- **Python wheel** (`squonk` on PyPI, via `maturin`): `cp311-abi3`, one stable-ABI wheel per platform on CPython >= 3.11. v1 wheel matrix is Linux `x86_64` (manylinux2014), macOS `arm64` (macos-14), macOS `x86_64` (macos-15-intel), Windows `x86_64`, plus an sdist — all built and install-smoked on native runners.
+- **TypeScript / WASM packages** (npm): six focused `@squonk-sql/*` dialect packages plus the batteries-included `squonk` umbrella. Node imports initialize synchronously; browser subpaths expose the explicit async factory. Each package is pure Rust/WASM and requires no C toolchain.
 - **`serde` AST wire schema v1** (`release/schema/wire-schema.v1.json`): the stable, drift-gated serialization contract. **The first publish freezes it** — per the documented pre-release convention, the schema stayed `v1` through development and crystallizes as immutable at this release; a breaking wire change becomes `v2`.
 
-### Performance and leanness (honest framing; see [docs/performance.md](docs/performance.md))
+### Performance and leanness (see [docs/performance.md](docs/performance.md))
 
-- **~2.8–3.2x faster** parses and a **~15–19x lighter** AST than `datafusion-sqlparser-rs`, holding a linear cost curve on adversarial inputs that degrade allocation-heavy parsers.
-- Against PostgreSQL's own C parser (`libpg_query`, in-process): a ~1.8x instruction tax on a raw parse — the cost of a full owned AST with spans and node ids instead of a throwaway C tree — and **~16x faster** on the full parse-and-serialize path a Rust consumer actually uses.
+- Added deterministic instruction/allocation regression gates, adversarial scaling suites, and direct `datafusion-sqlparser-rs`/`libpg_query` engineering comparisons.
+- Added a frozen, oracle-qualified publication workload and public-package adapters. Current results, comparison boundaries, uncertainty, and limitations are maintained in the performance report rather than copied into release notes.
 
 ### Platform support
 

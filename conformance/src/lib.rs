@@ -178,6 +178,8 @@ pub mod duckdb_structural;
 // vendors a GPL server — it speaks the wire protocol to an external `mysqld` (see [`m3`]).
 #[cfg(feature = "oracle-mysql")]
 pub mod m3;
+#[cfg(all(test, feature = "oracle-engines", feature = "oracle-mysql"))]
+mod publication_oracles;
 // ClickHouse external-process ParseOnly oracle (oracle-parity-clickhouse).
 #[cfg(feature = "oracle-clickhouse")]
 pub mod clickhouse;

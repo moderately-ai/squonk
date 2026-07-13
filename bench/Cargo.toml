@@ -125,6 +125,7 @@ sqlparser = "=0.62.0"
 # `upstream/mod.rs` for byte-stable diffs; only the read side uses serde.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 
 # `libpg_query` (the real PostgreSQL parser, statically linked) for the
 # apples-to-apples COMPUTE comparison (ours vs the reference C parser). SAME
@@ -161,6 +162,10 @@ path = "tests/main.rs"
 
 [[bench]]
 name = "ast"
+harness = false
+
+[[bench]]
+name = "publication"
 harness = false
 
 [[bench]]

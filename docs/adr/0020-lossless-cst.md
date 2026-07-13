@@ -56,7 +56,7 @@ for stmt in parsed.statements() {
 
 ## Cost of a GO (what a lossless CST would entail)
 
-- **~2× the nodes and memory.** Every keyword, every punctuation mark, and every trivia run becomes a node — a parallel tree roughly doubling node count against the project's measured **~16×-lighter-than-`sqlparser-rs`** position (perf baseline), the borrow-free **12-byte `Token`** (`{ kind, span }`), and the compile-time per-enum size budgets ([ADR-0007](0007-ast-memory-layout.md)).
+- **~2× the nodes and memory.** Every keyword, every punctuation mark, and every trivia run becomes a node — a parallel tree roughly doubling node count against the compact-AST constraint established by the then-current native-Rust heap baseline, the borrow-free **12-byte `Token`** (`{ kind, span }`), and the compile-time per-enum size budgets ([ADR-0007](0007-ast-memory-layout.md)). Current publication measurements live separately in [`docs/performance.md`](../performance.md).
 - **Its own builder, threaded through the parser.** Either every hand-RD + Pratt production emits CST nodes alongside the AST, or a green/red split is adopted — but [ADR-0007](0007-ast-memory-layout.md) already **rejected `rowan`/`cstree`** as immutable (fighting in-place rewrites by downstream consumers) and CST-shaped (wrong for a semantic AST). So a GO is likely a *bespoke* green/red layer, not an off-the-shelf crate.
 - **A second public tree to maintain.** Render, structural-equality, round-trip, proptest, and fuzz surfaces all roughly double, against the dependency-and-surface minimalism of [ADR-0017](0017-engineering-policies.md).
 - **Phase-6 scale.** [ADR-0005](0005-tokenizer.md) already placed it there; nothing in the current roadmap pulls it earlier.

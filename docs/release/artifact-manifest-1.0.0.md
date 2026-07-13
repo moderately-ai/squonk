@@ -259,4 +259,4 @@ The six focused packages contain ANSI plus their named dialect. The `squonk` umb
 - **Name:** Rust and Python use `squonk`; npm adds six `@squonk-sql/*` focused packages alongside the `squonk` umbrella. `squonk-ast` is the second crates.io crate; `squonk-wasm` stays internal.
 - **License:** MIT everywhere; each artifact carries its own LICENSE copy (crate-local, `dist-info/licenses/`, npm root).
 - **Not shipped:** `squonk-sourcegen`, `squonk-bench` (`publish = false`); test corpora and CI/build artifacts.
-- **Pending before publish:** the human-gated `v1.0.0` tag and registry uploads.
+- **Published:** the human-gated `v1.0.0` tag and crates.io, PyPI, and npm artifacts were published on 2026-07-12. Registry artifacts are immutable; subsequent changes require a new version.

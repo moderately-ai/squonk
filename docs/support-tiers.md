@@ -34,5 +34,5 @@ Every shipped dialect preset and optional product surface carries a release-cont
 | --- | --- | --- |
 | document-render | preview | constructed — documented v1 preview: parse-back + spelling fidelity guaranteed and pinned by the format::coverage fixtures; full-fidelity layout remains future work (see the format module docs) |
 | serde-ast-schema | stable | contract_gate — release/schema/wire-schema.v1.json; wire schema v1, drift-gated by the wire_schema test and a frozen compat baseline (docs/schema-contract.md) |
-| wasm-bindings | preview | constructed — wraps the stable parser and wire schema v1; npm distribution not yet cut |
-| python-bindings | preview | constructed — wraps the stable parser and wire schema v1; wheel distribution not yet cut |
+| wasm-bindings | preview | constructed — published npm v1 packages wrap the stable parser and wire schema v1; binding-specific compatibility remains preview |
+| python-bindings | preview | constructed — published PyPI v1 wheels wrap the stable parser and wire schema v1; binding-specific compatibility remains preview |
