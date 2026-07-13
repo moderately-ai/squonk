@@ -192,7 +192,7 @@ impl ProductSurface {
             Self::DocumentRender => SupportTier::Preview,
             // Frozen, versioned, drift-gated wire contract.
             Self::SerdeAstSchema => SupportTier::Stable,
-            // Wrap the stable parser + wire schema, but distribution is not yet cut.
+            // Published bindings remain preview while binding-specific compatibility matures.
             Self::WasmBindings => SupportTier::Preview,
             Self::PythonBindings => SupportTier::Preview,
         }
@@ -212,10 +212,12 @@ impl ProductSurface {
                        baseline (docs/schema-contract.md)",
             },
             Self::WasmBindings => SupportEvidence::Constructed {
-                note: "wraps the stable parser and wire schema v1; npm distribution not yet cut",
+                note: "published npm v1 packages wrap the stable parser and wire schema v1; \
+                       binding-specific compatibility remains preview",
             },
             Self::PythonBindings => SupportEvidence::Constructed {
-                note: "wraps the stable parser and wire schema v1; wheel distribution not yet cut",
+                note: "published PyPI v1 wheels wrap the stable parser and wire schema v1; \
+                       binding-specific compatibility remains preview",
             },
         }
     }

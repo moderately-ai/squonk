@@ -35,6 +35,10 @@ The single wire-schema version is `WIRE_SCHEMA_VERSION` in [`crates/squonk/src/b
 
 ### Pre-release convention (before the first published release)
 
+This convention is retained to explain how the initial snapshot was developed. Version 1
+became a published, frozen contract with the 1.0.0 release on 2026-07-12; the compatibility
+rules below now apply.
+
 `WIRE_SCHEMA_VERSION` is held at `1` and stays there until the first published release. Until then the schema is **unpublished with zero external consumers**, so the version number cannot mean anything to anyone: a pre-first-publish shape change reshapes v1 in place — regenerate the snapshot and, if the deserialized surface changed, rewrite `compat/parsed.baseline.json` — but do **not** bump the version. There is no prior wire to stay compatible with while nothing has shipped.
 
 The Compatibility rules and the version-bump procedure below apply **from the first published release onward** — the moment a real consumer can pin `schema_version == 1`, v1 is frozen and every subsequent breaking change bumps and preserves the prior baseline as specified. In short: before first publish the bump rule is dormant and the drift gate exists only to force a deliberate, reviewed snapshot regeneration; after first publish the full versioning contract is live.

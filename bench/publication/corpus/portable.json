@@ -1,0 +1,2070 @@
+{
+  "schema": "squonk.publication-corpus/1",
+  "name": "portable-full-ast-v1",
+  "description": "Portable statement-only SQL used to compare complete AST parsers.",
+  "license": "MIT",
+  "statement_count": 256,
+  "sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+  "qualification": {
+    "status": "gated",
+    "required_oracles": [
+      "squonk-ansi",
+      "libpg_query-postgresql-17",
+      "mysql-8.4.10",
+      "sqlite-3.53.2",
+      "duckdb-1.5.4"
+    ],
+    "gate": "squonk-conformance publication_oracles::portable_publication_corpus_is_accepted_by_stable_engine_oracles",
+    "rule": "The corpus is frozen before competitor qualification and is never intersected down."
+  },
+  "statements": [
+    {
+      "id": "portable:000",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT 0 AS value_0",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:001",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT 1 AS value_1",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:002",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT 2 AS value_2",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:003",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT 3 AS value_3",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:004",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT 4 AS value_4",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:005",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT 5 AS value_5",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:006",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT 6 AS value_6",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:007",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT 7 AS value_7",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:008",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT 8 AS value_8",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:009",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT 9 AS value_9",
+      "bytes": 19,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:010",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT 10 AS value_10",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:011",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT 11 AS value_11",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:012",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT 12 AS value_12",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:013",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT 13 AS value_13",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:014",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT 14 AS value_14",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:015",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT 15 AS value_15",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:016",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT 16 AS value_16",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:017",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT 17 AS value_17",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:018",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT 18 AS value_18",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:019",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT 19 AS value_19",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:020",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT 20 AS value_20",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:021",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT 21 AS value_21",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:022",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT 22 AS value_22",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:023",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT 23 AS value_23",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:024",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT 24 AS value_24",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:025",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT 25 AS value_25",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:026",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT 26 AS value_26",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:027",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT 27 AS value_27",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:028",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT 28 AS value_28",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:029",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT 29 AS value_29",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:030",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT 30 AS value_30",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:031",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT 31 AS value_31",
+      "bytes": 21,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:032",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 0 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:033",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 1 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:034",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 2 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:035",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 3 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:036",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 4 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:037",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 5 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:038",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 6 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:039",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 7 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:040",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 8 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:041",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 9 ORDER BY id",
+      "bytes": 64,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:042",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 10 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:043",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 11 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:044",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 12 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:045",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 13 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:046",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 14 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:047",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 15 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:048",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 16 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:049",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 17 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:050",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 18 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:051",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 19 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:052",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 20 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:053",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 21 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:054",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 22 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:055",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 23 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:056",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 24 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:057",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 25 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:058",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 26 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:059",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 27 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:060",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 28 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:061",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 29 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:062",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 30 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:063",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value >= 31 ORDER BY id",
+      "bytes": 65,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:064",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 0 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:065",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 1 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:066",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 2 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:067",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 3 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:068",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 4 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:069",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 5 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:070",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 6 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:071",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 7 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:072",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 8 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:073",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 9 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 180,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:074",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 10 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:075",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 11 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:076",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 12 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:077",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 13 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:078",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 14 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:079",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 15 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:080",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 16 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:081",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 17 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:082",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 18 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:083",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 19 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:084",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 20 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:085",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 21 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:086",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 22 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:087",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 23 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:088",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 24 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:089",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 25 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:090",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 26 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:091",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 27 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:092",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 28 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:093",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 29 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:094",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 30 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:095",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT l.id, COUNT(r.id) AS matches FROM portable_left AS l LEFT JOIN portable_right AS r ON l.id = r.left_id WHERE l.value >= 31 GROUP BY l.id HAVING COUNT(r.id) >= 0 ORDER BY l.id",
+      "bytes": 181,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:096",
+      "family": "query",
+      "complexity": "small",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 0), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:097",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 1), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:098",
+      "family": "query",
+      "complexity": "large",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 2), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:099",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 3), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:100",
+      "family": "query",
+      "complexity": "small",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 4), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:101",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 5), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:102",
+      "family": "query",
+      "complexity": "large",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 6), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:103",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 7), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:104",
+      "family": "query",
+      "complexity": "small",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 8), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:105",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 9), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 235,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:106",
+      "family": "query",
+      "complexity": "large",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 10), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:107",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 11), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:108",
+      "family": "query",
+      "complexity": "small",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 12), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:109",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 13), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:110",
+      "family": "query",
+      "complexity": "large",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 14), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:111",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 15), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:112",
+      "family": "query",
+      "complexity": "small",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 16), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:113",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 17), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:114",
+      "family": "query",
+      "complexity": "large",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 18), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:115",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 19), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:116",
+      "family": "query",
+      "complexity": "small",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 20), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:117",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 21), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:118",
+      "family": "query",
+      "complexity": "large",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 22), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:119",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 23), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:120",
+      "family": "query",
+      "complexity": "small",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 24), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:121",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 25), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:122",
+      "family": "query",
+      "complexity": "large",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 26), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:123",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 27), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:124",
+      "family": "query",
+      "complexity": "small",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 28), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:125",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 29), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:126",
+      "family": "query",
+      "complexity": "large",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 30), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:127",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "WITH filtered AS (SELECT id, value FROM portable_left WHERE value >= 31), ranked AS (SELECT id, value, ROW_NUMBER() OVER (ORDER BY value, id) AS position FROM filtered) SELECT id, value FROM ranked WHERE position <= 10 ORDER BY position",
+      "bytes": 236,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:128",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 0 UNION ALL SELECT id, value FROM portable_left WHERE value = 1 ORDER BY id",
+      "bytes": 125,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:129",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 1 UNION ALL SELECT id, value FROM portable_left WHERE value = 2 ORDER BY id",
+      "bytes": 125,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:130",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 2 UNION ALL SELECT id, value FROM portable_left WHERE value = 3 ORDER BY id",
+      "bytes": 125,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:131",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 3 UNION ALL SELECT id, value FROM portable_left WHERE value = 4 ORDER BY id",
+      "bytes": 125,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:132",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 4 UNION ALL SELECT id, value FROM portable_left WHERE value = 5 ORDER BY id",
+      "bytes": 125,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:133",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 5 UNION ALL SELECT id, value FROM portable_left WHERE value = 6 ORDER BY id",
+      "bytes": 125,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:134",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 6 UNION ALL SELECT id, value FROM portable_left WHERE value = 7 ORDER BY id",
+      "bytes": 125,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:135",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 7 UNION ALL SELECT id, value FROM portable_left WHERE value = 8 ORDER BY id",
+      "bytes": 125,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:136",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 8 UNION ALL SELECT id, value FROM portable_left WHERE value = 9 ORDER BY id",
+      "bytes": 125,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:137",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 9 UNION ALL SELECT id, value FROM portable_left WHERE value = 10 ORDER BY id",
+      "bytes": 126,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:138",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 10 UNION ALL SELECT id, value FROM portable_left WHERE value = 11 ORDER BY id",
+      "bytes": 127,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:139",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 11 UNION ALL SELECT id, value FROM portable_left WHERE value = 12 ORDER BY id",
+      "bytes": 127,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:140",
+      "family": "query",
+      "complexity": "small",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 12 UNION ALL SELECT id, value FROM portable_left WHERE value = 13 ORDER BY id",
+      "bytes": 127,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:141",
+      "family": "query",
+      "complexity": "medium",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 13 UNION ALL SELECT id, value FROM portable_left WHERE value = 14 ORDER BY id",
+      "bytes": 127,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:142",
+      "family": "query",
+      "complexity": "large",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 14 UNION ALL SELECT id, value FROM portable_left WHERE value = 15 ORDER BY id",
+      "bytes": 127,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:143",
+      "family": "query",
+      "complexity": "complex",
+      "sql": "SELECT id, value FROM portable_left WHERE value = 15 UNION ALL SELECT id, value FROM portable_left WHERE value = 16 ORDER BY id",
+      "bytes": 127,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:144",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "INSERT INTO portable_values_0 (id, value, label) VALUES (0, 0, 'row_0')",
+      "bytes": 71,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:145",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "INSERT INTO portable_values_1 (id, value, label) VALUES (1, 2, 'row_1')",
+      "bytes": 71,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:146",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "INSERT INTO portable_values_2 (id, value, label) VALUES (2, 4, 'row_2')",
+      "bytes": 71,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:147",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "INSERT INTO portable_values_3 (id, value, label) VALUES (3, 6, 'row_3')",
+      "bytes": 71,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:148",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "INSERT INTO portable_values_4 (id, value, label) VALUES (4, 8, 'row_4')",
+      "bytes": 71,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:149",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "INSERT INTO portable_values_5 (id, value, label) VALUES (5, 10, 'row_5')",
+      "bytes": 72,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:150",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "INSERT INTO portable_values_6 (id, value, label) VALUES (6, 12, 'row_6')",
+      "bytes": 72,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:151",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "INSERT INTO portable_values_7 (id, value, label) VALUES (7, 14, 'row_7')",
+      "bytes": 72,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:152",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "INSERT INTO portable_values_8 (id, value, label) VALUES (8, 16, 'row_8')",
+      "bytes": 72,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:153",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "INSERT INTO portable_values_9 (id, value, label) VALUES (9, 18, 'row_9')",
+      "bytes": 72,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:154",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "INSERT INTO portable_values_10 (id, value, label) VALUES (10, 20, 'row_10')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:155",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "INSERT INTO portable_values_11 (id, value, label) VALUES (11, 22, 'row_11')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:156",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "INSERT INTO portable_values_12 (id, value, label) VALUES (12, 24, 'row_12')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:157",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "INSERT INTO portable_values_13 (id, value, label) VALUES (13, 26, 'row_13')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:158",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "INSERT INTO portable_values_14 (id, value, label) VALUES (14, 28, 'row_14')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:159",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "INSERT INTO portable_values_15 (id, value, label) VALUES (15, 30, 'row_15')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:160",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "INSERT INTO portable_values_16 (id, value, label) VALUES (16, 32, 'row_16')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:161",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "INSERT INTO portable_values_17 (id, value, label) VALUES (17, 34, 'row_17')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:162",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "INSERT INTO portable_values_18 (id, value, label) VALUES (18, 36, 'row_18')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:163",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "INSERT INTO portable_values_19 (id, value, label) VALUES (19, 38, 'row_19')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:164",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "INSERT INTO portable_values_20 (id, value, label) VALUES (20, 40, 'row_20')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:165",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "INSERT INTO portable_values_21 (id, value, label) VALUES (21, 42, 'row_21')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:166",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "INSERT INTO portable_values_22 (id, value, label) VALUES (22, 44, 'row_22')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:167",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "INSERT INTO portable_values_23 (id, value, label) VALUES (23, 46, 'row_23')",
+      "bytes": 75,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:168",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "UPDATE portable_values_0 SET value = value + 1, label = 'updated_0' WHERE id = 0",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:169",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "UPDATE portable_values_1 SET value = value + 1, label = 'updated_1' WHERE id = 1",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:170",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "UPDATE portable_values_2 SET value = value + 1, label = 'updated_2' WHERE id = 2",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:171",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "UPDATE portable_values_3 SET value = value + 1, label = 'updated_3' WHERE id = 3",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:172",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "UPDATE portable_values_4 SET value = value + 1, label = 'updated_4' WHERE id = 4",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:173",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "UPDATE portable_values_5 SET value = value + 1, label = 'updated_5' WHERE id = 5",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:174",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "UPDATE portable_values_6 SET value = value + 1, label = 'updated_6' WHERE id = 6",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:175",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "UPDATE portable_values_7 SET value = value + 1, label = 'updated_7' WHERE id = 7",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:176",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "UPDATE portable_values_8 SET value = value + 1, label = 'updated_8' WHERE id = 8",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:177",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "UPDATE portable_values_9 SET value = value + 1, label = 'updated_9' WHERE id = 9",
+      "bytes": 80,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:178",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "UPDATE portable_values_10 SET value = value + 1, label = 'updated_10' WHERE id = 10",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:179",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "UPDATE portable_values_11 SET value = value + 1, label = 'updated_11' WHERE id = 11",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:180",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "UPDATE portable_values_12 SET value = value + 1, label = 'updated_12' WHERE id = 12",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:181",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "UPDATE portable_values_13 SET value = value + 1, label = 'updated_13' WHERE id = 13",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:182",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "UPDATE portable_values_14 SET value = value + 1, label = 'updated_14' WHERE id = 14",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:183",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "UPDATE portable_values_15 SET value = value + 1, label = 'updated_15' WHERE id = 15",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:184",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "UPDATE portable_values_16 SET value = value + 1, label = 'updated_16' WHERE id = 16",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:185",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "UPDATE portable_values_17 SET value = value + 1, label = 'updated_17' WHERE id = 17",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:186",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "UPDATE portable_values_18 SET value = value + 1, label = 'updated_18' WHERE id = 18",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:187",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "UPDATE portable_values_19 SET value = value + 1, label = 'updated_19' WHERE id = 19",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:188",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "DELETE FROM portable_values_0 WHERE id = 0",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:189",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "DELETE FROM portable_values_1 WHERE id = 1",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:190",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "DELETE FROM portable_values_2 WHERE id = 2",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:191",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "DELETE FROM portable_values_3 WHERE id = 3",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:192",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "DELETE FROM portable_values_4 WHERE id = 4",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:193",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "DELETE FROM portable_values_5 WHERE id = 5",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:194",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "DELETE FROM portable_values_6 WHERE id = 6",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:195",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "DELETE FROM portable_values_7 WHERE id = 7",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:196",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "DELETE FROM portable_values_8 WHERE id = 8",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:197",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "DELETE FROM portable_values_9 WHERE id = 9",
+      "bytes": 42,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:198",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "DELETE FROM portable_values_10 WHERE id = 10",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:199",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "DELETE FROM portable_values_11 WHERE id = 11",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:200",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "DELETE FROM portable_values_12 WHERE id = 12",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:201",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "DELETE FROM portable_values_13 WHERE id = 13",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:202",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "DELETE FROM portable_values_14 WHERE id = 14",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:203",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "DELETE FROM portable_values_15 WHERE id = 15",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:204",
+      "family": "dml",
+      "complexity": "small",
+      "sql": "DELETE FROM portable_values_16 WHERE id = 16",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:205",
+      "family": "dml",
+      "complexity": "medium",
+      "sql": "DELETE FROM portable_values_17 WHERE id = 17",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:206",
+      "family": "dml",
+      "complexity": "large",
+      "sql": "DELETE FROM portable_values_18 WHERE id = 18",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:207",
+      "family": "dml",
+      "complexity": "complex",
+      "sql": "DELETE FROM portable_values_19 WHERE id = 19",
+      "bytes": 44,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:208",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "CREATE TABLE portable_table_0 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:209",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "CREATE TABLE portable_table_1 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:210",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "CREATE TABLE portable_table_2 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:211",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "CREATE TABLE portable_table_3 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:212",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "CREATE TABLE portable_table_4 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:213",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "CREATE TABLE portable_table_5 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:214",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "CREATE TABLE portable_table_6 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:215",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "CREATE TABLE portable_table_7 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:216",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "CREATE TABLE portable_table_8 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:217",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "CREATE TABLE portable_table_9 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 103,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:218",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "CREATE TABLE portable_table_10 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:219",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "CREATE TABLE portable_table_11 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:220",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "CREATE TABLE portable_table_12 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:221",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "CREATE TABLE portable_table_13 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:222",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "CREATE TABLE portable_table_14 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:223",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "CREATE TABLE portable_table_15 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:224",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "CREATE TABLE portable_table_16 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:225",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "CREATE TABLE portable_table_17 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:226",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "CREATE TABLE portable_table_18 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:227",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "CREATE TABLE portable_table_19 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:228",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "CREATE TABLE portable_table_20 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:229",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "CREATE TABLE portable_table_21 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:230",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "CREATE TABLE portable_table_22 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:231",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "CREATE TABLE portable_table_23 (id INTEGER NOT NULL, value INTEGER, label VARCHAR(64), PRIMARY KEY (id))",
+      "bytes": 104,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:232",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "CREATE VIEW portable_view_0 AS SELECT id, value FROM portable_left WHERE value >= 0",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:233",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "CREATE VIEW portable_view_1 AS SELECT id, value FROM portable_left WHERE value >= 1",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:234",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "CREATE VIEW portable_view_2 AS SELECT id, value FROM portable_left WHERE value >= 2",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:235",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "CREATE VIEW portable_view_3 AS SELECT id, value FROM portable_left WHERE value >= 3",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:236",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "CREATE VIEW portable_view_4 AS SELECT id, value FROM portable_left WHERE value >= 4",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:237",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "CREATE VIEW portable_view_5 AS SELECT id, value FROM portable_left WHERE value >= 5",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:238",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "CREATE VIEW portable_view_6 AS SELECT id, value FROM portable_left WHERE value >= 6",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:239",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "CREATE VIEW portable_view_7 AS SELECT id, value FROM portable_left WHERE value >= 7",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:240",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "CREATE VIEW portable_view_8 AS SELECT id, value FROM portable_left WHERE value >= 8",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:241",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "CREATE VIEW portable_view_9 AS SELECT id, value FROM portable_left WHERE value >= 9",
+      "bytes": 83,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:242",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "CREATE VIEW portable_view_10 AS SELECT id, value FROM portable_left WHERE value >= 10",
+      "bytes": 85,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:243",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "CREATE VIEW portable_view_11 AS SELECT id, value FROM portable_left WHERE value >= 11",
+      "bytes": 85,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:244",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "DROP TABLE portable_old_0",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:245",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "DROP TABLE portable_old_1",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:246",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "DROP TABLE portable_old_2",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:247",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "DROP TABLE portable_old_3",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:248",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "DROP TABLE portable_old_4",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:249",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "DROP TABLE portable_old_5",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:250",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "DROP TABLE portable_old_6",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:251",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "DROP TABLE portable_old_7",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:252",
+      "family": "ddl",
+      "complexity": "small",
+      "sql": "DROP TABLE portable_old_8",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:253",
+      "family": "ddl",
+      "complexity": "medium",
+      "sql": "DROP TABLE portable_old_9",
+      "bytes": 25,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:254",
+      "family": "ddl",
+      "complexity": "large",
+      "sql": "DROP TABLE portable_old_10",
+      "bytes": 26,
+      "provenance": "self-authored"
+    },
+    {
+      "id": "portable:255",
+      "family": "ddl",
+      "complexity": "complex",
+      "sql": "DROP TABLE portable_old_11",
+      "bytes": 26,
+      "provenance": "self-authored"
+    }
+  ]
+}

@@ -5,6 +5,10 @@
 
 Operational, no-surprises procedure for publishing the two Rust crates to crates.io. Every real `cargo publish` is individually human-gated: the maintainer confirms each upload. Nothing in this file should be automated end-to-end.
 
+Version 1.0.0 completed this procedure on 2026-07-12. For a later release, update the
+version-specific checks and examples before using the runbook; do not rerun the literal
+1.0.0 publish commands.
+
 ## What publishes where
 
 | Crate | Registry | Publishable | Notes |

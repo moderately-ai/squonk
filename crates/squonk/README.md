@@ -38,7 +38,10 @@ squonk = { version = "1.0", features = ["postgres"] }
 
 Stable (1.0) — the public API is frozen and covered by the SemVer contract in [docs/stable-api.md](https://github.com/moderately-ai/squonk/blob/main/docs/stable-api.md); no breaking change lands without a major bump. The engine-backed dialects (ANSI, PostgreSQL, MySQL, SQLite, DuckDB) are the strongest surface, each held to its real engine by a differential oracle; the conservative presets reject unmodelled syntax cleanly. The per-dialect conformance work continues additively under `1.x`, with design rationale recorded in `docs/adr/`.
 
-`squonk` parses roughly 3x faster than the prior art it learns from (`apache/datafusion-sqlparser-rs`) while building an AST many times lighter in heap; full numbers, methodology, and fairness caveats live in the repository's benchmark sources.
+On the repository's frozen 256-statement publication workload, the Rust API measured 2.37×
+the full-AST throughput of `datafusion-sqlparser-rs` on the recorded Linux host. The exact
+work unit, versions, retained-memory results, uncertainty, and limitations are documented in
+the [performance report](https://github.com/moderately-ai/squonk/blob/main/docs/performance.md).
 
 ## Documentation
 

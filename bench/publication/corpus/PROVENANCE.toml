@@ -1,0 +1,4 @@
+source = "https://github.com/moderately-ai/squonk"
+reference = "portable-full-ast-v1"
+license = "MIT"
+regenerate = "python3 bench/publication/build_portable_corpus.py"

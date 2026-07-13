@@ -1,0 +1,4239 @@
+{
+  "schema": "squonk.publication-benchmark/1",
+  "generated_at": "2026-07-13T12:42:10Z",
+  "source_commit": "0487adf31caf695ecd181f4f6c98e96d8777121a",
+  "environment": {
+    "platform": "Linux-5.15.0-177-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpu_model": "AMD Ryzen 9 7950X3D 16-Core Processor",
+    "logical_cpus": 32,
+    "cpu_governors": [
+      "schedutil"
+    ],
+    "load_average_at_start": [
+      0.88818359375,
+      0.91845703125,
+      0.88623046875
+    ],
+    "python": "3.11.9",
+    "node": "v22.22.3",
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)",
+    "cargo": "cargo 1.96.1 (356927216 2026-06-26)"
+  },
+  "workload": {
+    "name": "portable-full-ast-v1",
+    "sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+    "statement_count": 256,
+    "input_bytes": 26102
+  },
+  "policy": {
+    "process_runs": 10,
+    "memory_repetitions": 3,
+    "timing_cv_limit": 0.05,
+    "memory_slope_cv_limit": 0.1,
+    "memory_minimum_r_squared": 0.98,
+    "timing_schedule": "blocked randomized interleaving",
+    "timing_seed": 20260713,
+    "settle_seconds": 1.0,
+    "cpu_affinity": [
+      0
+    ],
+    "quick": false
+  },
+  "tools": [
+    {
+      "ecosystem": "rust",
+      "tool": "squonk",
+      "version": "1.0.0",
+      "qualification": {
+        "accepted": 256,
+        "ast_digest": "a3f0d6f589cd7af00f3a672a03b866c0ddf82e82162f60d3f6fffb0de3caeb24",
+        "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+        "ecosystem": "rust",
+        "failures": [],
+        "mode": "qualify",
+        "requested": 256,
+        "schema": "squonk.publication-adapter/1",
+        "tool": "squonk",
+        "version": "1.0.0"
+      },
+      "status": "qualified",
+      "timing": {
+        "process_runs": [
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1447,
+            "samples": [
+              {
+                "mib_per_second": 36.07674959817707,
+                "seconds": 0.998423975,
+                "statements_per_second": 371016.73164449
+              },
+              {
+                "mib_per_second": 36.05315481215916,
+                "seconds": 0.999077388,
+                "statements_per_second": 370774.08061606536
+              },
+              {
+                "mib_per_second": 35.98925243278996,
+                "seconds": 1.000851346,
+                "statements_per_second": 370116.9024555621
+              },
+              {
+                "mib_per_second": 36.02344909051274,
+                "seconds": 0.999901249,
+                "statements_per_second": 370468.58414315275
+              },
+              {
+                "mib_per_second": 36.05303045868619,
+                "seconds": 0.999080834,
+                "statements_per_second": 370772.80175309617
+              },
+              {
+                "mib_per_second": 36.02112477801388,
+                "seconds": 0.999965769,
+                "statements_per_second": 370444.68069186475
+              },
+              {
+                "mib_per_second": 36.04832528804245,
+                "seconds": 0.999211238,
+                "statements_per_second": 370724.41332970676
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "squonk",
+            "version": "1.0.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1437,
+            "samples": [
+              {
+                "mib_per_second": 35.671790917662456,
+                "seconds": 1.002780145,
+                "statements_per_second": 366852.09797407786
+              },
+              {
+                "mib_per_second": 35.47757360760054,
+                "seconds": 1.008269733,
+                "statements_per_second": 364854.74864492443
+              },
+              {
+                "mib_per_second": 35.643194649545244,
+                "seconds": 1.003584668,
+                "statements_per_second": 366558.01122701087
+              },
+              {
+                "mib_per_second": 35.50699899269868,
+                "seconds": 1.007434159,
+                "statements_per_second": 365157.3621100533
+              },
+              {
+                "mib_per_second": 35.63617805727872,
+                "seconds": 1.003782269,
+                "statements_per_second": 366485.8519233318
+              },
+              {
+                "mib_per_second": 35.47509062855355,
+                "seconds": 1.008340304,
+                "statements_per_second": 364829.21345173166
+              },
+              {
+                "mib_per_second": 35.69370635471637,
+                "seconds": 1.002164452,
+                "statements_per_second": 367077.4784176839
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "squonk",
+            "version": "1.0.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1448,
+            "samples": [
+              {
+                "mib_per_second": 35.93585506331342,
+                "seconds": 1.00303122,
+                "statements_per_second": 369567.75881811534
+              },
+              {
+                "mib_per_second": 35.67419035424147,
+                "seconds": 1.0103883,
+                "statements_per_second": 366876.7740085668
+              },
+              {
+                "mib_per_second": 35.87245306613401,
+                "seconds": 1.004804006,
+                "statements_per_second": 368915.7266357475
+              },
+              {
+                "mib_per_second": 35.671217435930906,
+                "seconds": 1.010472508,
+                "statements_per_second": 366846.20023328724
+              },
+              {
+                "mib_per_second": 35.86751102257487,
+                "seconds": 1.004942454,
+                "statements_per_second": 368864.90218871774
+              },
+              {
+                "mib_per_second": 35.706444100000695,
+                "seconds": 1.009475613,
+                "statements_per_second": 367208.47460432904
+              },
+              {
+                "mib_per_second": 35.90723455884493,
+                "seconds": 1.003830704,
+                "statements_per_second": 369273.4228221017
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 0,
+            "tool": "squonk",
+            "version": "1.0.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1451,
+            "samples": [
+              {
+                "mib_per_second": 35.98108708212395,
+                "seconds": 1.003845795,
+                "statements_per_second": 370032.929211005
+              },
+              {
+                "mib_per_second": 36.119830558434536,
+                "seconds": 0.999989823,
+                "statements_per_second": 371459.78034618456
+              },
+              {
+                "mib_per_second": 35.95619183257886,
+                "seconds": 1.004540835,
+                "statements_per_second": 369776.9040917087
+              },
+              {
+                "mib_per_second": 36.15126031404581,
+                "seconds": 0.999120436,
+                "statements_per_second": 371783.00694872387
+              },
+              {
+                "mib_per_second": 35.932220918290376,
+                "seconds": 1.005210979,
+                "statements_per_second": 369530.3849242976
+              },
+              {
+                "mib_per_second": 36.15186751260453,
+                "seconds": 0.999103655,
+                "statements_per_second": 371789.2514365789
+              },
+              {
+                "mib_per_second": 35.909693011949415,
+                "seconds": 1.005841597,
+                "statements_per_second": 369298.70578816393
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "squonk",
+            "version": "1.0.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1461,
+            "samples": [
+              {
+                "mib_per_second": 36.09375936091782,
+                "seconds": 1.007608841,
+                "statements_per_second": 371191.6616658587
+              },
+              {
+                "mib_per_second": 36.279213175638695,
+                "seconds": 1.002458098,
+                "statements_per_second": 373098.88637360284
+              },
+              {
+                "mib_per_second": 36.05231966548592,
+                "seconds": 1.008767019,
+                "statements_per_second": 370765.4918880729
+              },
+              {
+                "mib_per_second": 36.25938108750151,
+                "seconds": 1.003006393,
+                "statements_per_second": 372894.9312888378
+              },
+              {
+                "mib_per_second": 36.063443749775104,
+                "seconds": 1.008455856,
+                "statements_per_second": 370879.89303123247
+              },
+              {
+                "mib_per_second": 36.24365646362298,
+                "seconds": 1.003441556,
+                "statements_per_second": 372733.2177580255
+              },
+              {
+                "mib_per_second": 36.07649703744625,
+                "seconds": 1.008090974,
+                "statements_per_second": 371014.13428586064
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "squonk",
+            "version": "1.0.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1451,
+            "samples": [
+              {
+                "mib_per_second": 35.87112651239337,
+                "seconds": 1.006923018,
+                "statements_per_second": 368902.0842306338
+              },
+              {
+                "mib_per_second": 36.02477814190911,
+                "seconds": 1.002628325,
+                "statements_per_second": 370482.252234396
+              },
+              {
+                "mib_per_second": 35.8949823162946,
+                "seconds": 1.006253817,
+                "statements_per_second": 369147.41959185037
+              },
+              {
+                "mib_per_second": 35.99413638720366,
+                "seconds": 1.003481861,
+                "statements_per_second": 370167.12950828316
+              },
+              {
+                "mib_per_second": 35.97614117971107,
+                "seconds": 1.003983801,
+                "statements_per_second": 369982.0650791556
+              },
+              {
+                "mib_per_second": 35.99155237299126,
+                "seconds": 1.003553906,
+                "statements_per_second": 370140.5552598188
+              },
+              {
+                "mib_per_second": 36.002802438128235,
+                "seconds": 1.003240318,
+                "statements_per_second": 370256.2520020253
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "squonk",
+            "version": "1.0.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1434,
+            "samples": [
+              {
+                "mib_per_second": 35.70723955045926,
+                "seconds": 0.999693219,
+                "statements_per_second": 367216.655092666
+              },
+              {
+                "mib_per_second": 35.708813827969536,
+                "seconds": 0.999649146,
+                "statements_per_second": 367232.84511263913
+              },
+              {
+                "mib_per_second": 35.696451843143485,
+                "seconds": 0.999995333,
+                "statements_per_second": 367105.7132823639
+              },
+              {
+                "mib_per_second": 35.68531426184202,
+                "seconds": 1.000307437,
+                "statements_per_second": 366991.17333464354
+              },
+              {
+                "mib_per_second": 35.67024140578561,
+                "seconds": 1.000730128,
+                "statements_per_second": 366836.1626462394
+              },
+              {
+                "mib_per_second": 35.66904658038163,
+                "seconds": 1.00076365,
+                "statements_per_second": 366823.87494789605
+              },
+              {
+                "mib_per_second": 35.645806508290214,
+                "seconds": 1.00141612,
+                "statements_per_second": 366584.87183130224
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 0,
+            "tool": "squonk",
+            "version": "1.0.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1450,
+            "samples": [
+              {
+                "mib_per_second": 35.974249820580205,
+                "seconds": 1.003344624,
+                "statements_per_second": 369962.6141615725
+              },
+              {
+                "mib_per_second": 35.98917349006101,
+                "seconds": 1.002928566,
+                "statements_per_second": 370116.0906010129
+              },
+              {
+                "mib_per_second": 35.94562235644495,
+                "seconds": 1.004143698,
+                "statements_per_second": 369668.20659168245
+              },
+              {
+                "mib_per_second": 35.92456184119171,
+                "seconds": 1.00473237,
+                "statements_per_second": 369451.6182453642
+              },
+              {
+                "mib_per_second": 35.90893618522345,
+                "seconds": 1.005169576,
+                "statements_per_second": 369290.9225099746
+              },
+              {
+                "mib_per_second": 35.92338585033158,
+                "seconds": 1.004765261,
+                "statements_per_second": 369439.52424326504
+              },
+              {
+                "mib_per_second": 35.943863650084126,
+                "seconds": 1.00419283,
+                "statements_per_second": 369650.1198878307
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 0,
+            "tool": "squonk",
+            "version": "1.0.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1451,
+            "samples": [
+              {
+                "mib_per_second": 36.0850783978406,
+                "seconds": 1.000952875,
+                "statements_per_second": 371102.3858141173
+              },
+              {
+                "mib_per_second": 35.99395184088606,
+                "seconds": 1.003487006,
+                "statements_per_second": 370165.23161636235
+              },
+              {
+                "mib_per_second": 35.98814592920232,
+                "seconds": 1.003648897,
+                "statements_per_second": 370105.5230671967
+              },
+              {
+                "mib_per_second": 35.9736931733898,
+                "seconds": 1.004052122,
+                "statements_per_second": 369956.8895488077
+              },
+              {
+                "mib_per_second": 36.002980184932916,
+                "seconds": 1.003235365,
+                "statements_per_second": 370258.07996710716
+              },
+              {
+                "mib_per_second": 36.015720368695604,
+                "seconds": 1.002880481,
+                "statements_per_second": 370389.10123129614
+              },
+              {
+                "mib_per_second": 35.9860950798739,
+                "seconds": 1.003706095,
+                "statements_per_second": 370084.4319372196
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "squonk",
+            "version": "1.0.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 1455,
+            "samples": [
+              {
+                "mib_per_second": 36.15624172225972,
+                "seconds": 1.001736698,
+                "statements_per_second": 371834.23622561543
+              },
+              {
+                "mib_per_second": 36.105875816619815,
+                "seconds": 1.003134071,
+                "statements_per_second": 371316.2684512188
+              },
+              {
+                "mib_per_second": 36.042055340797994,
+                "seconds": 1.004910343,
+                "statements_per_second": 370659.9325946036
+              },
+              {
+                "mib_per_second": 36.126782829286476,
+                "seconds": 1.002553545,
+                "statements_per_second": 371531.278162305
+              },
+              {
+                "mib_per_second": 36.13959466771934,
+                "seconds": 1.00219813,
+                "statements_per_second": 371663.036329952
+              },
+              {
+                "mib_per_second": 36.13595514069692,
+                "seconds": 1.002299069,
+                "statements_per_second": 371625.6070871398
+              },
+              {
+                "mib_per_second": 36.120761954967406,
+                "seconds": 1.002720658,
+                "statements_per_second": 371469.3589169078
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "squonk",
+            "version": "1.0.0"
+          }
+        ],
+        "median_mib_per_second": 35.9863197275576,
+        "confidence_interval_95": [
+          35.814588955963075,
+          36.04832528804245
+        ],
+        "process_median_cv": 0.004542764278157742,
+        "stable": true
+      },
+      "cold_start": {
+        "samples_ms": [
+          2.441996708512306,
+          2.290274016559124,
+          2.2656572982668877,
+          2.336539328098297,
+          2.7002906426787376,
+          2.271438017487526,
+          2.366146072745323,
+          2.558165229856968,
+          2.337763085961342,
+          2.7325814589858055
+        ],
+        "median_ms": 2.3519545793533325,
+        "confidence_interval_95": [
+          2.290274016559124,
+          2.571143675595522
+        ]
+      },
+      "retained_memory": {
+        "counts": [
+          0,
+          32,
+          64,
+          128,
+          256,
+          512,
+          1024,
+          2048,
+          4096,
+          8192
+        ],
+        "observations": [
+          {
+            "retained_documents": 128,
+            "rss_bytes": 9986048,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 9916416,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 8531968,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 10051584,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 18395136,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 10518528,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 10510336,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 18243584,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 27394048,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 18391040,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 14159872,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 9801728,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 8531968,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 13983744,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 11493376,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 11661312,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 8687616,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 11726848,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 9773056,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 10473472,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 9998336,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 10047488,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 8544256,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 14041088,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 9875456,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 8646656,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 8585216,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 8523776,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 27168768,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 27414528,
+            "repetition": 1
+          }
+        ],
+        "fits": [
+          {
+            "bytes_per_document": 2201.1807491239433,
+            "documents_per_mib": 476.36978490627223,
+            "intercept_bytes": 9244046.839032527,
+            "r_squared": 0.9949465608060649
+          },
+          {
+            "bytes_per_document": 2229.268970064747,
+            "documents_per_mib": 470.36764700921,
+            "intercept_bytes": 9256280.180150125,
+            "r_squared": 0.9945011214467426
+          },
+          {
+            "bytes_per_document": 2257.950718880215,
+            "documents_per_mib": 464.39277493178423,
+            "intercept_bytes": 9070525.384487074,
+            "r_squared": 0.9948261610854631
+          }
+        ],
+        "summary": {
+          "bytes_per_document": 2229.268970064747,
+          "documents_per_mib": 470.36764700921,
+          "slope_cv": 0.012731968837186204,
+          "minimum_r_squared": 0.9945011214467426,
+          "stable": true
+        }
+      }
+    },
+    {
+      "ecosystem": "rust",
+      "tool": "datafusion-sqlparser-rs",
+      "version": "0.62.0",
+      "qualification": {
+        "accepted": 256,
+        "ast_digest": "a3f0d6f589cd7af00f3a672a03b866c0ddf82e82162f60d3f6fffb0de3caeb24",
+        "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+        "ecosystem": "rust",
+        "failures": [],
+        "mode": "qualify",
+        "requested": 256,
+        "schema": "squonk.publication-adapter/1",
+        "tool": "datafusion-sqlparser-rs",
+        "version": "0.62.0"
+      },
+      "status": "qualified",
+      "timing": {
+        "process_runs": [
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 604,
+            "samples": [
+              {
+                "mib_per_second": 15.116912883726494,
+                "seconds": 0.994598272,
+                "statements_per_second": 155463.77301568448
+              },
+              {
+                "mib_per_second": 15.107694470313723,
+                "seconds": 0.995205156,
+                "statements_per_second": 155368.96997346345
+              },
+              {
+                "mib_per_second": 15.108194547140675,
+                "seconds": 0.995172215,
+                "statements_per_second": 155374.1128112183
+              },
+              {
+                "mib_per_second": 15.127388443514196,
+                "seconds": 0.993909523,
+                "statements_per_second": 155571.50467105446
+              },
+              {
+                "mib_per_second": 15.09791219046086,
+                "seconds": 0.995849972,
+                "statements_per_second": 155268.36807502565
+              },
+              {
+                "mib_per_second": 15.108606143661342,
+                "seconds": 0.995145104,
+                "statements_per_second": 155378.34570906957
+              },
+              {
+                "mib_per_second": 15.097023969685388,
+                "seconds": 0.995908562,
+                "statements_per_second": 155259.23352790697
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 0,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 613,
+            "samples": [
+              {
+                "mib_per_second": 15.3220705041603,
+                "seconds": 0.995902655,
+                "statements_per_second": 157573.63353951497
+              },
+              {
+                "mib_per_second": 15.315539940891483,
+                "seconds": 0.996327309,
+                "statements_per_second": 157506.47260437583
+              },
+              {
+                "mib_per_second": 15.314914080257072,
+                "seconds": 0.996368025,
+                "statements_per_second": 157500.03619395554
+              },
+              {
+                "mib_per_second": 15.318720560089087,
+                "seconds": 0.996120442,
+                "statements_per_second": 157539.18239537542
+              },
+              {
+                "mib_per_second": 15.305833899378372,
+                "seconds": 0.99695912,
+                "statements_per_second": 157406.65474829098
+              },
+              {
+                "mib_per_second": 15.283068582349042,
+                "seconds": 0.998444168,
+                "statements_per_second": 157172.53405800855
+              },
+              {
+                "mib_per_second": 15.291400648670553,
+                "seconds": 0.99790013,
+                "statements_per_second": 157258.2218222579
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 611,
+            "samples": [
+              {
+                "mib_per_second": 15.21930081673514,
+                "seconds": 0.999356361,
+                "statements_per_second": 156516.7402781959
+              },
+              {
+                "mib_per_second": 15.209957136312806,
+                "seconds": 0.999970279,
+                "statements_per_second": 156420.64897810828
+              },
+              {
+                "mib_per_second": 15.219292455962261,
+                "seconds": 0.99935691,
+                "statements_per_second": 156516.6542952107
+              },
+              {
+                "mib_per_second": 15.220824138372203,
+                "seconds": 0.999256344,
+                "statements_per_second": 156532.406263112
+              },
+              {
+                "mib_per_second": 15.22472548283756,
+                "seconds": 0.999000284,
+                "statements_per_second": 156572.5280614635
+              },
+              {
+                "mib_per_second": 15.23475159353601,
+                "seconds": 0.998342834,
+                "statements_per_second": 156675.63753955887
+              },
+              {
+                "mib_per_second": 15.230058807039798,
+                "seconds": 0.99865045,
+                "statements_per_second": 156627.37647592308
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 606,
+            "samples": [
+              {
+                "mib_per_second": 15.065679192674285,
+                "seconds": 1.001285163,
+                "statements_per_second": 154936.88085339183
+              },
+              {
+                "mib_per_second": 15.13935317286316,
+                "seconds": 0.99641252,
+                "statements_per_second": 155694.55108813767
+              },
+              {
+                "mib_per_second": 15.050669516104591,
+                "seconds": 1.002283721,
+                "statements_per_second": 154782.51990885125
+              },
+              {
+                "mib_per_second": 15.124521385915868,
+                "seconds": 0.997389647,
+                "statements_per_second": 155542.01957743
+              },
+              {
+                "mib_per_second": 15.047994343723783,
+                "seconds": 1.002461903,
+                "statements_per_second": 154755.00818109396
+              },
+              {
+                "mib_per_second": 15.115370384472541,
+                "seconds": 0.997993477,
+                "statements_per_second": 155447.90980632833
+              },
+              {
+                "mib_per_second": 15.030803009744837,
+                "seconds": 1.003608459,
+                "statements_per_second": 154578.2108638046
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 0,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 607,
+            "samples": [
+              {
+                "mib_per_second": 15.145697904565193,
+                "seconds": 0.997638666,
+                "statements_per_second": 155759.80091373084
+              },
+              {
+                "mib_per_second": 15.069090409673947,
+                "seconds": 1.002710412,
+                "statements_per_second": 154971.962134168
+              },
+              {
+                "mib_per_second": 15.146621059589446,
+                "seconds": 0.997577862,
+                "statements_per_second": 155769.29472799387
+              },
+              {
+                "mib_per_second": 15.037373428686411,
+                "seconds": 1.004825339,
+                "statements_per_second": 154645.78167848135
+              },
+              {
+                "mib_per_second": 15.119061623747273,
+                "seconds": 0.999396274,
+                "statements_per_second": 155485.87086287257
+              },
+              {
+                "mib_per_second": 15.02296588859736,
+                "seconds": 1.005789001,
+                "statements_per_second": 154497.61316290236
+              },
+              {
+                "mib_per_second": 15.096196555822761,
+                "seconds": 1.000909984,
+                "statements_per_second": 155250.72432487595
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 599,
+            "samples": [
+              {
+                "mib_per_second": 14.83443156116329,
+                "seconds": 1.005147473,
+                "statements_per_second": 152558.70816878628
+              },
+              {
+                "mib_per_second": 14.840150677135291,
+                "seconds": 1.004760108,
+                "statements_per_second": 152617.52410257913
+              },
+              {
+                "mib_per_second": 14.847064795883705,
+                "seconds": 1.004292202,
+                "statements_per_second": 152688.62955883032
+              },
+              {
+                "mib_per_second": 14.838328154462502,
+                "seconds": 1.004883518,
+                "statements_per_second": 152598.7811056923
+              },
+              {
+                "mib_per_second": 14.840698658604548,
+                "seconds": 1.004723008,
+                "statements_per_second": 152623.15959624166
+              },
+              {
+                "mib_per_second": 14.830576354103131,
+                "seconds": 1.005408761,
+                "statements_per_second": 152519.0608519076
+              },
+              {
+                "mib_per_second": 14.826943239017949,
+                "seconds": 1.005655121,
+                "statements_per_second": 152481.69755006896
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 603,
+            "samples": [
+              {
+                "mib_per_second": 15.070006924578271,
+                "seconds": 0.996042185,
+                "statements_per_second": 154981.38766080476
+              },
+              {
+                "mib_per_second": 15.032230190767342,
+                "seconds": 0.998545288,
+                "statements_per_second": 154592.8881294766
+              },
+              {
+                "mib_per_second": 15.021592617547023,
+                "seconds": 0.99925241,
+                "statements_per_second": 154483.49031252274
+              },
+              {
+                "mib_per_second": 15.018693479376388,
+                "seconds": 0.999445301,
+                "statements_per_second": 154453.6752992348
+              },
+              {
+                "mib_per_second": 15.007478968053316,
+                "seconds": 1.000192148,
+                "statements_per_second": 154338.34419583945
+              },
+              {
+                "mib_per_second": 15.002853321963093,
+                "seconds": 1.000500525,
+                "statements_per_second": 154290.77361053857
+              },
+              {
+                "mib_per_second": 15.00966503592986,
+                "seconds": 1.000046476,
+                "statements_per_second": 154360.82592625424
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 612,
+            "samples": [
+              {
+                "mib_per_second": 15.286971571995359,
+                "seconds": 0.996560883,
+                "statements_per_second": 157212.67277555785
+              },
+              {
+                "mib_per_second": 15.278714395156607,
+                "seconds": 0.997099461,
+                "statements_per_second": 157127.7551818875
+              },
+              {
+                "mib_per_second": 15.234309285440789,
+                "seconds": 1.000005816,
+                "statements_per_second": 156671.08880094753
+              },
+              {
+                "mib_per_second": 15.21693628640864,
+                "seconds": 1.001147511,
+                "statements_per_second": 156492.423222935
+              },
+              {
+                "mib_per_second": 15.245175556514326,
+                "seconds": 0.999293044,
+                "statements_per_second": 156782.83856842297
+              },
+              {
+                "mib_per_second": 15.246934420813222,
+                "seconds": 0.999177767,
+                "statements_per_second": 156800.9268965249
+              },
+              {
+                "mib_per_second": 15.255379801944832,
+                "seconds": 0.998624622,
+                "statements_per_second": 156887.7800010823
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 0,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 618,
+            "samples": [
+              {
+                "mib_per_second": 15.33160084035595,
+                "seconds": 1.003401725,
+                "statements_per_second": 157671.64442536712
+              },
+              {
+                "mib_per_second": 15.333170554565587,
+                "seconds": 1.003299003,
+                "statements_per_second": 157687.7875159216
+              },
+              {
+                "mib_per_second": 15.326814984159045,
+                "seconds": 1.003715041,
+                "statements_per_second": 157622.42622405814
+              },
+              {
+                "mib_per_second": 15.311621329971821,
+                "seconds": 1.004711023,
+                "statements_per_second": 157466.17323616246
+              },
+              {
+                "mib_per_second": 15.317442473585405,
+                "seconds": 1.004329199,
+                "statements_per_second": 157526.03843194645
+              },
+              {
+                "mib_per_second": 15.300187751657537,
+                "seconds": 1.005461827,
+                "statements_per_second": 157348.58922694836
+              },
+              {
+                "mib_per_second": 15.27628863663495,
+                "seconds": 1.00703483,
+                "statements_per_second": 157102.80845003144
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 0,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          },
+          {
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "ecosystem": "rust",
+            "mode": "throughput",
+            "passes_per_sample": 619,
+            "samples": [
+              {
+                "mib_per_second": 15.306498684563591,
+                "seconds": 1.006673561,
+                "statements_per_second": 157413.49146250202
+              },
+              {
+                "mib_per_second": 15.309009278991391,
+                "seconds": 1.006508472,
+                "statements_per_second": 157439.31065490327
+              },
+              {
+                "mib_per_second": 15.302177708523175,
+                "seconds": 1.006957822,
+                "statements_per_second": 157369.054133034
+              },
+              {
+                "mib_per_second": 15.260462328575583,
+                "seconds": 1.009710401,
+                "statements_per_second": 156940.0491894111
+              },
+              {
+                "mib_per_second": 15.30554485663587,
+                "seconds": 1.006736296,
+                "statements_per_second": 157403.682205176
+              },
+              {
+                "mib_per_second": 15.278190899962581,
+                "seconds": 1.008538749,
+                "statements_per_second": 157122.37150741345
+              },
+              {
+                "mib_per_second": 15.281706314989643,
+                "seconds": 1.008306744,
+                "statements_per_second": 157158.52437063536
+              }
+            ],
+            "schema": "squonk.publication-adapter/1",
+            "sink": 256,
+            "tool": "datafusion-sqlparser-rs",
+            "version": "0.62.0"
+          }
+        ],
+        "median_mib_per_second": 15.164509342756439,
+        "confidence_interval_95": [
+          15.057445017599575,
+          15.302177708523175
+        ],
+        "process_median_cv": 0.010290964623792805,
+        "stable": true
+      },
+      "cold_start": {
+        "samples_ms": [
+          2.4069715291261673,
+          2.3605143651366234,
+          2.960667945444584,
+          2.3964131250977516,
+          2.4453140795230865,
+          2.487041987478733,
+          2.422812394797802,
+          2.4543805047869682,
+          2.4344632402062416,
+          2.436508424580097
+        ],
+        "median_ms": 2.4354858323931694,
+        "confidence_interval_95": [
+          2.4069715291261673,
+          2.46617803350091
+        ]
+      },
+      "retained_memory": {
+        "counts": [
+          0,
+          32,
+          64,
+          128,
+          256,
+          512,
+          1024,
+          2048,
+          4096,
+          8192
+        ],
+        "observations": [
+          {
+            "retained_documents": 128,
+            "rss_bytes": 14610432,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 14348288,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 10584064,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 16588800,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 101142528,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 21843968,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 21594112,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 100851712,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 191463424,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 101179392,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 56029184,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 16371712,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 8617984,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 55873536,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 33091584,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 33042432,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 8585216,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 33067008,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 11804672,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 21647360,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 16310272,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 14749696,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 10907648,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 56102912,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 11522048,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 8589312,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 11808768,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 10579968,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 191270912,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 191340544,
+            "repetition": 1
+          }
+        ],
+        "fits": [
+          {
+            "bytes_per_document": 22101.919270625058,
+            "documents_per_mib": 47.4427576700829,
+            "intercept_bytes": 10347722.408673905,
+            "r_squared": 0.999817947057056
+          },
+          {
+            "bytes_per_document": 22114.604388196945,
+            "documents_per_mib": 47.41554411706539,
+            "intercept_bytes": 10397021.304420352,
+            "r_squared": 0.9997946515268807
+          },
+          {
+            "bytes_per_document": 22139.45546925113,
+            "documents_per_mib": 47.36232114906068,
+            "intercept_bytes": 10301908.016680554,
+            "r_squared": 0.9998410342545971
+          }
+        ],
+        "summary": {
+          "bytes_per_document": 22114.604388196945,
+          "documents_per_mib": 47.41554411706539,
+          "slope_cv": 0.0008632470366031153,
+          "minimum_r_squared": 0.9997946515268807,
+          "stable": true
+        }
+      }
+    },
+    {
+      "ecosystem": "python",
+      "tool": "squonk",
+      "version": "1.0.0",
+      "qualification": {
+        "schema": "squonk.publication-adapter/1",
+        "ecosystem": "python",
+        "tool": "squonk",
+        "version": "1.0.0",
+        "mode": "qualify",
+        "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+        "requested": 256,
+        "accepted": 256,
+        "ast_digest": "b54c22860cd8c04e3036c1f843f88a6da4fcdac51787992ac2abb6c9cd73fd95",
+        "failures": []
+      },
+      "status": "qualified",
+      "timing": {
+        "process_runs": [
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0435583470389247,
+                "statements_per_second": 3925.0320900813217,
+                "mib_per_second": 0.3816604152891884
+              },
+              {
+                "seconds": 1.0413517588749528,
+                "statements_per_second": 3933.349096586924,
+                "mib_per_second": 0.38246914043691715
+              },
+              {
+                "seconds": 1.0431867614388466,
+                "statements_per_second": 3926.430195826555,
+                "mib_per_second": 0.3817963636348573
+              },
+              {
+                "seconds": 1.044975838623941,
+                "statements_per_second": 3919.7078521870417,
+                "mib_per_second": 0.3811426995612165
+              },
+              {
+                "seconds": 1.0457951398566365,
+                "statements_per_second": 3916.6370581541455,
+                "mib_per_second": 0.38084410314239375
+              },
+              {
+                "seconds": 1.045732842758298,
+                "statements_per_second": 3916.870382684075,
+                "mib_per_second": 0.380866791042759
+              },
+              {
+                "seconds": 1.0335231348872185,
+                "statements_per_second": 3963.143021899524,
+                "mib_per_second": 0.3853662280649743
+              }
+            ],
+            "median_mib_per_second": 0.3816604152891884,
+            "sink": 42828800
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.020364592783153,
+                "statements_per_second": 4014.2514048118073,
+                "mib_per_second": 0.39033588084726706
+              },
+              {
+                "seconds": 1.0119373612105846,
+                "statements_per_second": 4047.6813654749726,
+                "mib_per_second": 0.39358652756224477
+              },
+              {
+                "seconds": 1.0137683050706983,
+                "statements_per_second": 4040.3709402952313,
+                "mib_per_second": 0.39287567989374
+              },
+              {
+                "seconds": 1.0190549930557609,
+                "statements_per_second": 4019.410167176203,
+                "mib_per_second": 0.39083750614387264
+              },
+              {
+                "seconds": 1.0150956166908145,
+                "statements_per_second": 4035.087860346451,
+                "mib_per_second": 0.3923619662626202
+              },
+              {
+                "seconds": 1.017471912316978,
+                "statements_per_second": 4025.663952405944,
+                "mib_per_second": 0.3914456087563185
+              },
+              {
+                "seconds": 1.0122807212173939,
+                "statements_per_second": 4046.3084144031204,
+                "mib_per_second": 0.3934530251948172
+              }
+            ],
+            "median_mib_per_second": 0.3923619662626202,
+            "sink": 13872448
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.034092916175723,
+                "statements_per_second": 3960.95934507298,
+                "mib_per_second": 0.385153892729785
+              },
+              {
+                "seconds": 1.0331178233027458,
+                "statements_per_second": 3964.697837566688,
+                "mib_per_second": 0.38551741449596616
+              },
+              {
+                "seconds": 1.0331321693956852,
+                "statements_per_second": 3964.6427836971648,
+                "mib_per_second": 0.38551206119382153
+              },
+              {
+                "seconds": 1.0334868421778083,
+                "statements_per_second": 3963.282194641909,
+                "mib_per_second": 0.38537976087832115
+              },
+              {
+                "seconds": 1.0231009759008884,
+                "statements_per_second": 4003.5148988038836,
+                "mib_per_second": 0.3892918895504585
+              },
+              {
+                "seconds": 1.0248068859800696,
+                "statements_per_second": 3996.8505833006852,
+                "mib_per_second": 0.38864386798931094
+              },
+              {
+                "seconds": 1.028218137100339,
+                "statements_per_second": 3983.590497198447,
+                "mib_per_second": 0.38735449000400995
+              }
+            ],
+            "median_mib_per_second": 0.38551741449596616,
+            "sink": 528649472
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0198588324710727,
+                "statements_per_second": 4016.242120564445,
+                "mib_per_second": 0.39052945312475096
+              },
+              {
+                "seconds": 1.013011934235692,
+                "statements_per_second": 4043.387705091938,
+                "mib_per_second": 0.39316902264323
+              },
+              {
+                "seconds": 1.0196395330131054,
+                "statements_per_second": 4017.1059157504774,
+                "mib_per_second": 0.3906134464327952
+              },
+              {
+                "seconds": 1.0143789825960994,
+                "statements_per_second": 4037.9385518389886,
+                "mib_per_second": 0.3926391604546505
+              },
+              {
+                "seconds": 1.0226369192823768,
+                "statements_per_second": 4005.3316311661415,
+                "mib_per_second": 0.3894685441132584
+              },
+              {
+                "seconds": 1.0133025189861655,
+                "statements_per_second": 4042.2281828512087,
+                "mib_per_second": 0.3930562735676104
+              },
+              {
+                "seconds": 1.0153835508972406,
+                "statements_per_second": 4033.9436229596017,
+                "mib_per_second": 0.39225070344839813
+              }
+            ],
+            "median_mib_per_second": 0.39225070344839813,
+            "sink": 126020608
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 14,
+            "samples": [
+              {
+                "seconds": 1.0135870864614844,
+                "statements_per_second": 3535.956651255333,
+                "mib_per_second": 0.34382768165717537
+              },
+              {
+                "seconds": 1.0158904949203134,
+                "statements_per_second": 3527.939298498043,
+                "mib_per_second": 0.3430480940989998
+              },
+              {
+                "seconds": 1.0069339107722044,
+                "statements_per_second": 3559.3199927604755,
+                "mib_per_second": 0.3460994752162469
+              },
+              {
+                "seconds": 1.0122887371107936,
+                "statements_per_second": 3540.491826698785,
+                "mib_per_second": 0.34426867090348784
+              },
+              {
+                "seconds": 1.00631657615304,
+                "statements_per_second": 3561.503491973631,
+                "mib_per_second": 0.34631179328074946
+              },
+              {
+                "seconds": 1.0136927822604775,
+                "statements_per_second": 3535.5879638482606,
+                "mib_per_second": 0.34379183140533903
+              },
+              {
+                "seconds": 1.009711797349155,
+                "statements_per_second": 3549.5277062318655,
+                "mib_per_second": 0.3451472974869018
+              }
+            ],
+            "median_mib_per_second": 0.34426867090348784,
+            "sink": 45218624
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0114295473322272,
+                "statements_per_second": 4049.7136066508197,
+                "mib_per_second": 0.39378413766920456
+              },
+              {
+                "seconds": 1.011034868657589,
+                "statements_per_second": 4051.294497328764,
+                "mib_per_second": 0.39393785956977084
+              },
+              {
+                "seconds": 1.0116334967315197,
+                "statements_per_second": 4048.89716802947,
+                "mib_per_second": 0.39370474919641474
+              },
+              {
+                "seconds": 1.0138149289414287,
+                "statements_per_second": 4040.18512952539,
+                "mib_per_second": 0.39285761211392184
+              },
+              {
+                "seconds": 1.0113232070580125,
+                "statements_per_second": 4050.1394325909514,
+                "mib_per_second": 0.3938255439307131
+              },
+              {
+                "seconds": 1.0116622317582369,
+                "statements_per_second": 4048.782164064069,
+                "mib_per_second": 0.39369356649518134
+              },
+              {
+                "seconds": 1.0129426857456565,
+                "statements_per_second": 4043.664125956757,
+                "mib_per_second": 0.3931959011246386
+              }
+            ],
+            "median_mib_per_second": 0.39370474919641474,
+            "sink": 15121664
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0261993976309896,
+                "statements_per_second": 3991.427016480162,
+                "mib_per_second": 0.38811649376215485
+              },
+              {
+                "seconds": 1.027528784237802,
+                "statements_per_second": 3986.2630252624226,
+                "mib_per_second": 0.3876143600247791
+              },
+              {
+                "seconds": 1.0294102411717176,
+                "statements_per_second": 3978.97731747623,
+                "mib_per_second": 0.3869059158145061
+              },
+              {
+                "seconds": 1.0254237670451403,
+                "statements_per_second": 3994.446132064042,
+                "mib_per_second": 0.38841006509637693
+              },
+              {
+                "seconds": 1.0181415136903524,
+                "statements_per_second": 4023.0163930293456,
+                "mib_per_second": 0.39118816662897166
+              },
+              {
+                "seconds": 1.0184797663241625,
+                "statements_per_second": 4021.680288046412,
+                "mib_per_second": 0.3910582470841238
+              },
+              {
+                "seconds": 1.0237761847674847,
+                "statements_per_second": 4000.874469384404,
+                "mib_per_second": 0.38903514072251216
+              }
+            ],
+            "median_mib_per_second": 0.38841006509637693,
+            "sink": 559680
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0218426818028092,
+                "statements_per_second": 4008.4448153736726,
+                "mib_per_second": 0.38977126244784743
+              },
+              {
+                "seconds": 1.0237703071907163,
+                "statements_per_second": 4000.897438840218,
+                "mib_per_second": 0.38903737421560053
+              },
+              {
+                "seconds": 1.025729731656611,
+                "statements_per_second": 3993.2546299352466,
+                "mib_per_second": 0.38829420637551626
+              },
+              {
+                "seconds": 1.0243784645572305,
+                "statements_per_second": 3998.522169021216,
+                "mib_per_second": 0.3888064088515631
+              },
+              {
+                "seconds": 1.024739290587604,
+                "statements_per_second": 3997.114229562994,
+                "mib_per_second": 0.38866950429995833
+              },
+              {
+                "seconds": 1.0226434590294957,
+                "statements_per_second": 4005.3060172967485,
+                "mib_per_second": 0.3894660534839322
+              },
+              {
+                "seconds": 1.0248760245740414,
+                "statements_per_second": 3996.5809539767292,
+                "mib_per_second": 0.38861764990054287
+              }
+            ],
+            "median_mib_per_second": 0.3888064088515631,
+            "sink": 24316288
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0185962170362473,
+                "statements_per_second": 4021.220510633648,
+                "mib_per_second": 0.3910135394653658
+              },
+              {
+                "seconds": 1.0219619730487466,
+                "statements_per_second": 4007.976918926537,
+                "mib_per_second": 0.38972576535426257
+              },
+              {
+                "seconds": 1.0101354625076056,
+                "statements_per_second": 4054.901695889288,
+                "mib_per_second": 0.39428861463853043
+              },
+              {
+                "seconds": 1.0121447201818228,
+                "statements_per_second": 4046.8521134647526,
+                "mib_per_second": 0.39350589314720397
+              },
+              {
+                "seconds": 1.013062915764749,
+                "statements_per_second": 4043.1842250468508,
+                "mib_per_second": 0.3931492367467765
+              },
+              {
+                "seconds": 1.0116806915029883,
+                "statements_per_second": 4048.7082875080264,
+                "mib_per_second": 0.3936863829215411
+              },
+              {
+                "seconds": 1.009172580204904,
+                "statements_per_second": 4058.7706011278483,
+                "mib_per_second": 0.3946648174175586
+              }
+            ],
+            "median_mib_per_second": 0.39350589314720397,
+            "sink": 32617920
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0182382045313716,
+                "statements_per_second": 4022.6343715762664,
+                "mib_per_second": 0.39115101980747174
+              },
+              {
+                "seconds": 1.0159354666247964,
+                "statements_per_second": 4031.752148202862,
+                "mib_per_second": 0.392037609861758
+              },
+              {
+                "seconds": 1.0176673159003258,
+                "statements_per_second": 4024.8909795990517,
+                "mib_per_second": 0.39137044679185173
+              },
+              {
+                "seconds": 1.0173735665157437,
+                "statements_per_second": 4026.0530986939248,
+                "mib_per_second": 0.39148344837914717
+              },
+              {
+                "seconds": 1.0128421802073717,
+                "statements_per_second": 4044.065383573752,
+                "mib_per_second": 0.3932349184231537
+              },
+              {
+                "seconds": 1.0135307889431715,
+                "statements_per_second": 4041.317782038945,
+                "mib_per_second": 0.39296774844370985
+              },
+              {
+                "seconds": 1.0170760191977024,
+                "statements_per_second": 4027.2309273706383,
+                "mib_per_second": 0.39159797752733677
+              }
+            ],
+            "median_mib_per_second": 0.39159797752733677,
+            "sink": 10793344
+          }
+        ],
+        "median_mib_per_second": 0.39020219318944993,
+        "confidence_interval_95": [
+          0.3850352401927827,
+          0.3928782982978011
+        ],
+        "process_median_cv": 0.03864629173882026,
+        "stable": true
+      },
+      "cold_start": {
+        "samples_ms": [
+          35.97070090472698,
+          36.69847268611193,
+          36.66229359805584,
+          36.21882572770119,
+          36.482167430222034,
+          36.16239968687296,
+          36.35638300329447,
+          36.365761421620846,
+          36.23430337756872,
+          36.16879228502512
+        ],
+        "median_ms": 36.295343190431595,
+        "confidence_interval_95": [
+          36.16879228502512,
+          36.51402750983834
+        ]
+      },
+      "retained_memory": {
+        "counts": [
+          0,
+          32,
+          64,
+          128,
+          256,
+          512
+        ],
+        "observations": [
+          {
+            "retained_documents": 64,
+            "rss_bytes": 49086464,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 180957184,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 28160000,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 69758976,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 106631168,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 106381312,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 39411712,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 39559168,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 39260160,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 28422144,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 48910336,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 69799936,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 28241920,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 180592640,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 49082368,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 180359168,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 106217472,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 69799936,
+            "repetition": 1
+          }
+        ],
+        "fits": [
+          {
+            "bytes_per_document": 295390.73179723497,
+            "documents_per_mib": 3.549793162501029,
+            "intercept_bytes": 29992316.342857152,
+            "r_squared": 0.999471673545439
+          },
+          {
+            "bytes_per_document": 295678.9382488479,
+            "documents_per_mib": 3.5463330807739255,
+            "intercept_bytes": 29980847.54285714,
+            "r_squared": 0.999513708366755
+          },
+          {
+            "bytes_per_document": 296189.99447004613,
+            "documents_per_mib": 3.5402141178879125,
+            "intercept_bytes": 30105248.914285704,
+            "r_squared": 0.9995607804306724
+          }
+        ],
+        "summary": {
+          "bytes_per_document": 295678.9382488479,
+          "documents_per_mib": 3.5463330807739255,
+          "slope_cv": 0.001368627929582038,
+          "minimum_r_squared": 0.999471673545439,
+          "stable": true
+        }
+      }
+    },
+    {
+      "ecosystem": "python",
+      "tool": "sqlglot",
+      "version": "30.12.0",
+      "qualification": {
+        "schema": "squonk.publication-adapter/1",
+        "ecosystem": "python",
+        "tool": "sqlglot",
+        "version": "30.12.0",
+        "mode": "qualify",
+        "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+        "requested": 256,
+        "accepted": 256,
+        "ast_digest": "26b49030979a1418fda40fdd0ce60d53aaf016ee43fe8079ad74ed143f0d565f",
+        "failures": []
+      },
+      "status": "qualified",
+      "timing": {
+        "process_runs": [
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 26,
+            "samples": [
+              {
+                "seconds": 1.0109404306858778,
+                "statements_per_second": 6583.9685484576,
+                "mib_per_second": 0.6402088219368468
+              },
+              {
+                "seconds": 1.0116436863318086,
+                "statements_per_second": 6579.391627633706,
+                "mib_per_second": 0.639763773472961
+              },
+              {
+                "seconds": 1.010869387537241,
+                "statements_per_second": 6584.431264869804,
+                "mib_per_second": 0.6402538153366433
+              },
+              {
+                "seconds": 1.0123430639505386,
+                "statements_per_second": 6574.846252243598,
+                "mib_per_second": 0.6393217924090564
+              },
+              {
+                "seconds": 1.0125289224088192,
+                "statements_per_second": 6573.639382236402,
+                "mib_per_second": 0.6392044393536991
+              },
+              {
+                "seconds": 1.0135140251368284,
+                "statements_per_second": 6567.250018174552,
+                "mib_per_second": 0.6385831533908553
+              },
+              {
+                "seconds": 1.0159224206581712,
+                "statements_per_second": 6551.68137315827,
+                "mib_per_second": 0.6370692968449635
+              }
+            ],
+            "median_mib_per_second": 0.6393217924090564,
+            "sink": 2832128
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 23,
+            "samples": [
+              {
+                "seconds": 0.8888761345297098,
+                "statements_per_second": 6624.095046848397,
+                "mib_per_second": 0.6441106234224023
+              },
+              {
+                "seconds": 0.8888856926932931,
+                "statements_per_second": 6624.023818135223,
+                "mib_per_second": 0.6441036973184555
+              },
+              {
+                "seconds": 0.8943970324471593,
+                "statements_per_second": 6583.206100192267,
+                "mib_per_second": 0.6401346833527779
+              },
+              {
+                "seconds": 0.8860640255734324,
+                "statements_per_second": 6645.117993803522,
+                "mib_per_second": 0.6461548428023589
+              },
+              {
+                "seconds": 0.8971240520477295,
+                "statements_per_second": 6563.194896581306,
+                "mib_per_second": 0.6381888433939414
+              },
+              {
+                "seconds": 0.8859928715974092,
+                "statements_per_second": 6645.651662393372,
+                "mib_per_second": 0.6462067354164712
+              },
+              {
+                "seconds": 0.8938964251428843,
+                "statements_per_second": 6586.892881978845,
+                "mib_per_second": 0.6404931768976593
+              }
+            ],
+            "median_mib_per_second": 0.6441036973184555,
+            "sink": 150144
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 27,
+            "samples": [
+              {
+                "seconds": 1.03598737064749,
+                "statements_per_second": 6671.896005527571,
+                "mib_per_second": 0.6487586704503024
+              },
+              {
+                "seconds": 1.044831265695393,
+                "statements_per_second": 6615.422247533606,
+                "mib_per_second": 0.6432673018616519
+              },
+              {
+                "seconds": 1.0333201820030808,
+                "statements_per_second": 6689.117391088943,
+                "mib_per_second": 0.6504332354001835
+              },
+              {
+                "seconds": 1.040795624256134,
+                "statements_per_second": 6641.073270211016,
+                "mib_per_second": 0.6457615438813267
+              },
+              {
+                "seconds": 1.0334486411884427,
+                "statements_per_second": 6688.285923963628,
+                "mib_per_second": 0.650352385592828
+              },
+              {
+                "seconds": 1.0435968451201916,
+                "statements_per_second": 6623.247312714846,
+                "mib_per_second": 0.6440281918513883
+              },
+              {
+                "seconds": 1.036167087033391,
+                "statements_per_second": 6670.738808920744,
+                "mib_per_second": 0.6486461475135732
+              }
+            ],
+            "median_mib_per_second": 0.6486461475135732,
+            "sink": 7452288
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 25,
+            "samples": [
+              {
+                "seconds": 1.0315188150852919,
+                "statements_per_second": 6204.443298953119,
+                "mib_per_second": 0.6033047251003768
+              },
+              {
+                "seconds": 1.025950811803341,
+                "statements_per_second": 6238.115830085996,
+                "mib_per_second": 0.6065789587680425
+              },
+              {
+                "seconds": 1.0333535773679614,
+                "statements_per_second": 6193.427051659645,
+                "mib_per_second": 0.602233532452658
+              },
+              {
+                "seconds": 1.0250329039990902,
+                "statements_per_second": 6243.70200705838,
+                "mib_per_second": 0.6071221448042909
+              },
+              {
+                "seconds": 1.0321004334837198,
+                "statements_per_second": 6200.946915987273,
+                "mib_per_second": 0.6029647454660378
+              },
+              {
+                "seconds": 1.0270110042765737,
+                "statements_per_second": 6231.6761683660425,
+                "mib_per_second": 0.605952781985292
+              },
+              {
+                "seconds": 1.0353094059973955,
+                "statements_per_second": 6181.726895289214,
+                "mib_per_second": 0.6010958381773497
+              }
+            ],
+            "median_mib_per_second": 0.6033047251003768,
+            "sink": 2982272
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 27,
+            "samples": [
+              {
+                "seconds": 1.0324872126802802,
+                "statements_per_second": 6694.51390304082,
+                "mib_per_second": 0.6509579788788091
+              },
+              {
+                "seconds": 1.0391751322895288,
+                "statements_per_second": 6651.429374345555,
+                "mib_per_second": 0.6467685458405602
+              },
+              {
+                "seconds": 1.034420296549797,
+                "statements_per_second": 6682.003459381325,
+                "mib_per_second": 0.6497414942710524
+              },
+              {
+                "seconds": 1.0375371174886823,
+                "statements_per_second": 6661.9303381938025,
+                "mib_per_second": 0.6477896336001703
+              },
+              {
+                "seconds": 1.0328764589503407,
+                "statements_per_second": 6691.991031555032,
+                "mib_per_second": 0.6507126610936577
+              },
+              {
+                "seconds": 1.0412176521494985,
+                "statements_per_second": 6638.381500477647,
+                "mib_per_second": 0.6454998028482032
+              },
+              {
+                "seconds": 1.0318373152986169,
+                "statements_per_second": 6698.730407903155,
+                "mib_per_second": 0.651367981385768
+              }
+            ],
+            "median_mib_per_second": 0.6497414942710524,
+            "sink": 13632640
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 26,
+            "samples": [
+              {
+                "seconds": 1.0329822096973658,
+                "statements_per_second": 6443.479798117741,
+                "mib_per_second": 0.626548043230434
+              },
+              {
+                "seconds": 1.0415406273677945,
+                "statements_per_second": 6390.533239995829,
+                "mib_per_second": 0.6213996508358833
+              },
+              {
+                "seconds": 1.0415110513567924,
+                "statements_per_second": 6390.714713328415,
+                "mib_per_second": 0.6214172968540277
+              },
+              {
+                "seconds": 1.0426758211106062,
+                "statements_per_second": 6383.575666797722,
+                "mib_per_second": 0.6207231136216005
+              },
+              {
+                "seconds": 1.0400016577914357,
+                "statements_per_second": 6399.989798222811,
+                "mib_per_second": 0.6223191831753099
+              },
+              {
+                "seconds": 1.0433789258822799,
+                "statements_per_second": 6379.273948217514,
+                "mib_per_second": 0.6203048251434174
+              },
+              {
+                "seconds": 1.0442696223035455,
+                "statements_per_second": 6373.832828075173,
+                "mib_per_second": 0.6197757440746507
+              }
+            ],
+            "median_mib_per_second": 0.6213996508358833,
+            "sink": 2739584
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 27,
+            "samples": [
+              {
+                "seconds": 1.0317605268210173,
+                "statements_per_second": 6699.228958968544,
+                "mib_per_second": 0.6514164592586343
+              },
+              {
+                "seconds": 1.0363390622660518,
+                "statements_per_second": 6669.631833510423,
+                "mib_per_second": 0.6485385079618137
+              },
+              {
+                "seconds": 1.0350011382251978,
+                "statements_per_second": 6678.253525259479,
+                "mib_per_second": 0.649376859949242
+              },
+              {
+                "seconds": 1.0346210394054651,
+                "statements_per_second": 6680.706980376035,
+                "mib_per_second": 0.6496154278582904
+              },
+              {
+                "seconds": 1.0357945831492543,
+                "statements_per_second": 6673.137813662427,
+                "mib_per_second": 0.6488794208028044
+              },
+              {
+                "seconds": 1.0361622404307127,
+                "statements_per_second": 6670.770011004082,
+                "mib_per_second": 0.6486491815270057
+              },
+              {
+                "seconds": 1.027466875500977,
+                "statements_per_second": 6727.224171221885,
+                "mib_per_second": 0.6541386444763603
+              }
+            ],
+            "median_mib_per_second": 0.649376859949242,
+            "sink": 13446272
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 24,
+            "samples": [
+              {
+                "seconds": 1.0122311236336827,
+                "statements_per_second": 6069.760014831808,
+                "mib_per_second": 0.5902084555742885
+              },
+              {
+                "seconds": 1.0110471211373806,
+                "statements_per_second": 6076.868101941963,
+                "mib_per_second": 0.5908996283892137
+              },
+              {
+                "seconds": 1.001803600229323,
+                "statements_per_second": 6132.9386304796435,
+                "mib_per_second": 0.5963517879425722
+              },
+              {
+                "seconds": 1.0018380545079708,
+                "statements_per_second": 6132.727712182465,
+                "mib_per_second": 0.5963312787688774
+              },
+              {
+                "seconds": 0.9985990757122636,
+                "statements_per_second": 6152.619353886056,
+                "mib_per_second": 0.5982654928234735
+              },
+              {
+                "seconds": 1.0031385160982609,
+                "statements_per_second": 6124.777287883714,
+                "mib_per_second": 0.5955581991685208
+              },
+              {
+                "seconds": 1.0041491677984595,
+                "statements_per_second": 6118.6128485973595,
+                "mib_per_second": 0.5949587843346904
+              }
+            ],
+            "median_mib_per_second": 0.5955581991685208,
+            "sink": 1209984
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 27,
+            "samples": [
+              {
+                "seconds": 1.0348730897530913,
+                "statements_per_second": 6679.0798489591825,
+                "mib_per_second": 0.6494572096226088
+              },
+              {
+                "seconds": 1.0359717551618814,
+                "statements_per_second": 6671.996572840857,
+                "mib_per_second": 0.6487684493671806
+              },
+              {
+                "seconds": 1.0392940491437912,
+                "statements_per_second": 6650.668312489965,
+                "mib_per_second": 0.6466945420675466
+              },
+              {
+                "seconds": 1.0364606194198132,
+                "statements_per_second": 6668.849612317329,
+                "mib_per_second": 0.6484624467071404
+              },
+              {
+                "seconds": 1.0352096892893314,
+                "statements_per_second": 6676.90813901198,
+                "mib_per_second": 0.649246037917177
+              },
+              {
+                "seconds": 1.0362400272861123,
+                "statements_per_second": 6670.269260011468,
+                "mib_per_second": 0.6486004897386556
+              },
+              {
+                "seconds": 1.0341863250359893,
+                "statements_per_second": 6683.515177750455,
+                "mib_per_second": 0.6498884900273472
+              }
+            ],
+            "median_mib_per_second": 0.6487684493671806,
+            "sink": 449664
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "python",
+            "tool": "sqlglot",
+            "version": "30.12.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 26,
+            "samples": [
+              {
+                "seconds": 1.0107113439589739,
+                "statements_per_second": 6585.460863562026,
+                "mib_per_second": 0.6403539309676588
+              },
+              {
+                "seconds": 1.0118605149909854,
+                "statements_per_second": 6577.98174885725,
+                "mib_per_second": 0.6396266803468463
+              },
+              {
+                "seconds": 1.0023071942850947,
+                "statements_per_second": 6640.678664136953,
+                "mib_per_second": 0.6457231733623994
+              },
+              {
+                "seconds": 1.0088873039931059,
+                "statements_per_second": 6597.367192208698,
+                "mib_per_second": 0.6415116729253211
+              },
+              {
+                "seconds": 1.0001843022182584,
+                "statements_per_second": 6654.773510480011,
+                "mib_per_second": 0.6470937213694649
+              },
+              {
+                "seconds": 1.0044358866289258,
+                "statements_per_second": 6626.605130904649,
+                "mib_per_second": 0.6443546977895243
+              },
+              {
+                "seconds": 1.0127842212095857,
+                "statements_per_second": 6571.982324182169,
+                "mib_per_second": 0.6390433111257962
+              }
+            ],
+            "median_mib_per_second": 0.6415116729253211,
+            "sink": 3225344
+          }
+        ],
+        "median_mib_per_second": 0.6428076851218882,
+        "confidence_interval_95": [
+          0.6213132587547165,
+          0.6490115037314076
+        ],
+        "process_median_cv": 0.031894840795959285,
+        "stable": true
+      },
+      "cold_start": {
+        "samples_ms": [
+          76.09717734158039,
+          74.9600101262331,
+          76.71728730201721,
+          75.53536538034678,
+          75.5950165912509,
+          75.40368754416704,
+          75.33670496195555,
+          76.60234160721302,
+          75.978584587574,
+          75.30406396836042
+        ],
+        "median_ms": 75.56519098579884,
+        "confidence_interval_95": [
+          75.33670496195555,
+          76.29046309739351
+        ]
+      },
+      "retained_memory": {
+        "counts": [
+          0,
+          32,
+          64,
+          128,
+          256,
+          512,
+          1024,
+          2048,
+          4096,
+          8192
+        ],
+        "observations": [
+          {
+            "retained_documents": 128,
+            "rss_bytes": 39817216,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 39567360,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 37933056,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 40452096,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 83222528,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 43327488,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 43581440,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 83271680,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 128860160,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 83148800,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 60522496,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 40464384,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 37580800,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 60645376,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 49381376,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 49098752,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 37404672,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 49332224,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 38232064,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 43352064,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 40505344,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 39698432,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 37957632,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 60391424,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 37904384,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 37371904,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 38027264,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 37761024,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 128634880,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 128839680,
+            "repetition": 1
+          }
+        ],
+        "fits": [
+          {
+            "bytes_per_document": 11110.454485065015,
+            "documents_per_mib": 94.3774173603362,
+            "intercept_bytes": 37703263.226021685,
+            "r_squared": 0.9998770614470835
+          },
+          {
+            "bytes_per_document": 11120.790978783689,
+            "documents_per_mib": 94.28969593983733,
+            "intercept_bytes": 37724453.79149291,
+            "r_squared": 0.9999263739104052
+          },
+          {
+            "bytes_per_document": 11136.686912936255,
+            "documents_per_mib": 94.15511167706309,
+            "intercept_bytes": 37637839.95996663,
+            "r_squared": 0.9999373352328114
+          }
+        ],
+        "summary": {
+          "bytes_per_document": 11120.790978783689,
+          "documents_per_mib": 94.28969593983733,
+          "slope_cv": 0.0011880298791654427,
+          "minimum_r_squared": 0.9998770614470835,
+          "stable": true
+        }
+      }
+    },
+    {
+      "ecosystem": "node",
+      "tool": "squonk",
+      "version": "1.0.0",
+      "qualification": {
+        "schema": "squonk.publication-adapter/1",
+        "ecosystem": "node",
+        "tool": "squonk",
+        "version": "1.0.0",
+        "mode": "qualify",
+        "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+        "requested": 256,
+        "accepted": 256,
+        "ast_digest": "b54c22860cd8c04e3036c1f843f88a6da4fcdac51787992ac2abb6c9cd73fd95",
+        "failures": []
+      },
+      "status": "qualified",
+      "timing": {
+        "process_runs": [
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0444765629999997,
+                "statements_per_second": 3921.581531935247,
+                "mib_per_second": 0.3813248915470161
+              },
+              {
+                "seconds": 1.037769608,
+                "statements_per_second": 3946.9261466365856,
+                "mib_per_second": 0.3837893392127311
+              },
+              {
+                "seconds": 1.0406900700000006,
+                "statements_per_second": 3935.8499884600587,
+                "mib_per_second": 0.38271232097888164
+              },
+              {
+                "seconds": 1.0429230969999999,
+                "statements_per_second": 3927.4228481297127,
+                "mib_per_second": 0.3818928866903549
+              },
+              {
+                "seconds": 1.0417551409999997,
+                "statements_per_second": 3931.8260489390773,
+                "mib_per_second": 0.38232104304957315
+              },
+              {
+                "seconds": 1.038318233000001,
+                "statements_per_second": 3944.840675835456,
+                "mib_per_second": 0.383586553188626
+              },
+              {
+                "seconds": 1.0432623509999994,
+                "statements_per_second": 3926.1457063737193,
+                "mib_per_second": 0.3817687005839006
+              }
+            ],
+            "median_mib_per_second": 0.38232104304957315,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0332033150000002,
+                "statements_per_second": 3964.3697813726035,
+                "mib_per_second": 0.38548551512281487
+              },
+              {
+                "seconds": 1.0309419939999998,
+                "statements_per_second": 3973.0654332041895,
+                "mib_per_second": 0.3863310588057926
+              },
+              {
+                "seconds": 1.0306644050000004,
+                "statements_per_second": 3974.135499517904,
+                "mib_per_second": 0.3864351094082606
+              },
+              {
+                "seconds": 1.0316607389999999,
+                "statements_per_second": 3970.297448723597,
+                "mib_per_second": 0.38606190683909997
+              },
+              {
+                "seconds": 1.0319954740000004,
+                "statements_per_second": 3969.009654784589,
+                "mib_per_second": 0.38593668494070826
+              },
+              {
+                "seconds": 1.0309947629999996,
+                "statements_per_second": 3972.862081356665,
+                "mib_per_second": 0.38631128537495313
+              },
+              {
+                "seconds": 1.0281143650000013,
+                "statements_per_second": 3983.9925784910074,
+                "mib_per_second": 0.3873935873947005
+              }
+            ],
+            "median_mib_per_second": 0.38631128537495313,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0611175290000001,
+                "statements_per_second": 3860.0813652188754,
+                "mib_per_second": 0.3753447674026455
+              },
+              {
+                "seconds": 1.06939455,
+                "statements_per_second": 3830.2046704838735,
+                "mib_per_second": 0.3724396314806121
+              },
+              {
+                "seconds": 1.0650652829999998,
+                "statements_per_second": 3845.7736491632513,
+                "mib_per_second": 0.3739535204710781
+              },
+              {
+                "seconds": 1.0649476919999998,
+                "statements_per_second": 3846.1982975967617,
+                "mib_per_second": 0.3739948122347544
+              },
+              {
+                "seconds": 1.0639740709999996,
+                "statements_per_second": 3849.7178753146527,
+                "mib_per_second": 0.37433704726943023
+              },
+              {
+                "seconds": 1.0675585569999995,
+                "statements_per_second": 3836.791877262806,
+                "mib_per_second": 0.37308015518007337
+              },
+              {
+                "seconds": 1.0561137479999998,
+                "statements_per_second": 3878.370116624976,
+                "mib_per_second": 0.37712312036806767
+              }
+            ],
+            "median_mib_per_second": 0.3739948122347544,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 15,
+            "samples": [
+              {
+                "seconds": 0.993701685,
+                "statements_per_second": 3864.338823175086,
+                "mib_per_second": 0.3757587520871911
+              },
+              {
+                "seconds": 0.9954558669999997,
+                "statements_per_second": 3857.52912539718,
+                "mib_per_second": 0.37509659391312744
+              },
+              {
+                "seconds": 0.9912154039999996,
+                "statements_per_second": 3874.0318042918566,
+                "mib_per_second": 0.3767012736038344
+              },
+              {
+                "seconds": 0.9955712009999997,
+                "statements_per_second": 3857.082241976183,
+                "mib_per_second": 0.37505314007424684
+              },
+              {
+                "seconds": 0.9912372850000002,
+                "statements_per_second": 3873.946287240395,
+                "mib_per_second": 0.3766929581372022
+              },
+              {
+                "seconds": 0.9962693580000005,
+                "statements_per_second": 3854.3793093353356,
+                "mib_per_second": 0.37479031358760195
+              },
+              {
+                "seconds": 0.9903167740000008,
+                "statements_per_second": 3877.547165529478,
+                "mib_per_second": 0.37704309863839464
+              }
+            ],
+            "median_mib_per_second": 0.3757587520871911,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0538875899999998,
+                "statements_per_second": 3886.5625128008205,
+                "mib_per_second": 0.37791972871544594
+              },
+              {
+                "seconds": 1.0566665569999996,
+                "statements_per_second": 3876.341096314267,
+                "mib_per_second": 0.37692582345006986
+              },
+              {
+                "seconds": 1.0522263830000003,
+                "statements_per_second": 3892.6984403507386,
+                "mib_per_second": 0.3785163711385242
+              },
+              {
+                "seconds": 1.0585586859999994,
+                "statements_per_second": 3869.4123001131393,
+                "mib_per_second": 0.37625208443981845
+              },
+              {
+                "seconds": 1.0527335210000002,
+                "statements_per_second": 3890.8231934223736,
+                "mib_per_second": 0.3783340267640009
+              },
+              {
+                "seconds": 1.0560526680000002,
+                "statements_per_second": 3878.594433890488,
+                "mib_per_second": 0.3771449324243125
+              },
+              {
+                "seconds": 1.0494988700000012,
+                "statements_per_second": 3902.8150644888215,
+                "mib_per_second": 0.3795000866550476
+              }
+            ],
+            "median_mib_per_second": 0.37791972871544594,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.102086006,
+                "statements_per_second": 3716.588340384026,
+                "mib_per_second": 0.3613918604727978
+              },
+              {
+                "seconds": 1.0524474269999997,
+                "statements_per_second": 3891.8808625677802,
+                "mib_per_second": 0.3784368718964763
+              },
+              {
+                "seconds": 1.054932546,
+                "statements_per_second": 3882.7127056899044,
+                "mib_per_second": 0.3775453829911273
+              },
+              {
+                "seconds": 1.0596523739999992,
+                "statements_per_second": 3865.4186037807176,
+                "mib_per_second": 0.3758637472833853
+              },
+              {
+                "seconds": 1.054659785,
+                "statements_per_second": 3883.7168708390645,
+                "mib_per_second": 0.3776430255273031
+              },
+              {
+                "seconds": 1.0529373620000007,
+                "statements_per_second": 3890.0699584065073,
+                "mib_per_second": 0.37826078405352925
+              },
+              {
+                "seconds": 1.0581273920000003,
+                "statements_per_second": 3870.989477229221,
+                "mib_per_second": 0.37640544524281144
+              }
+            ],
+            "median_mib_per_second": 0.3775453829911273,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.028883025,
+                "statements_per_second": 3981.0162093013437,
+                "mib_per_second": 0.387104172614156
+              },
+              {
+                "seconds": 1.0291019929999998,
+                "statements_per_second": 3980.169145391987,
+                "mib_per_second": 0.3870218062140854
+              },
+              {
+                "seconds": 1.02767717,
+                "statements_per_second": 3985.687450855797,
+                "mib_per_second": 0.38755839259266117
+              },
+              {
+                "seconds": 1.030818034,
+                "statements_per_second": 3973.5432102461646,
+                "mib_per_second": 0.3863775166639887
+              },
+              {
+                "seconds": 1.0277988669999996,
+                "statements_per_second": 3985.2155236905915,
+                "mib_per_second": 0.3875125035620176
+              },
+              {
+                "seconds": 1.0254264480000002,
+                "statements_per_second": 3994.435688672621,
+                "mib_per_second": 0.38840904960681777
+              },
+              {
+                "seconds": 1.026872233,
+                "statements_per_second": 3988.811722012937,
+                "mib_per_second": 0.3878621889948163
+              }
+            ],
+            "median_mib_per_second": 0.3875125035620176,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0532409539999998,
+                "statements_per_second": 3888.9486631185446,
+                "mib_per_second": 0.37815175207227564
+              },
+              {
+                "seconds": 1.0464777240000003,
+                "statements_per_second": 3914.0823603427216,
+                "mib_per_second": 0.3805956906440322
+              },
+              {
+                "seconds": 1.0493367009999992,
+                "statements_per_second": 3903.4182222889804,
+                "mib_per_second": 0.37955873622814923
+              },
+              {
+                "seconds": 1.0497058420000003,
+                "statements_per_second": 3902.0455408687712,
+                "mib_per_second": 0.37942526008098076
+              },
+              {
+                "seconds": 1.0495384379999997,
+                "statements_per_second": 3902.6679268701555,
+                "mib_per_second": 0.37948577935682537
+              },
+              {
+                "seconds": 1.0466942879999996,
+                "statements_per_second": 3913.272525664152,
+                "mib_per_second": 0.38051694432230926
+              },
+              {
+                "seconds": 1.0486267009999992,
+                "statements_per_second": 3906.0611331887144,
+                "mib_per_second": 0.3798157263490998
+              }
+            ],
+            "median_mib_per_second": 0.37955873622814923,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 15,
+            "samples": [
+              {
+                "seconds": 1.004687789,
+                "statements_per_second": 3822.082881909098,
+                "mib_per_second": 0.3716498888417753
+              },
+              {
+                "seconds": 1.001588311,
+                "statements_per_second": 3833.910557688208,
+                "mib_per_second": 0.3727999827890754
+              },
+              {
+                "seconds": 1.0040739709999997,
+                "statements_per_second": 3824.419426165964,
+                "mib_per_second": 0.37187708862790464
+              },
+              {
+                "seconds": 1.001403996,
+                "statements_per_second": 3834.6162141737645,
+                "mib_per_second": 0.37286859908090386
+              },
+              {
+                "seconds": 1.0059604689999997,
+                "statements_per_second": 3817.247415116867,
+                "mib_per_second": 0.37117970000721684
+              },
+              {
+                "seconds": 1.0037602939999997,
+                "statements_per_second": 3825.614564506774,
+                "mib_per_second": 0.3719933009250306
+              },
+              {
+                "seconds": 1.003770592,
+                "statements_per_second": 3825.5753163168984,
+                "mib_per_second": 0.37198948452809333
+              }
+            ],
+            "median_mib_per_second": 0.37198948452809333,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "squonk",
+            "version": "1.0.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 16,
+            "samples": [
+              {
+                "seconds": 1.0491714599999995,
+                "statements_per_second": 3904.032997618904,
+                "mib_per_second": 0.37961851546111935
+              },
+              {
+                "seconds": 1.043367705,
+                "statements_per_second": 3925.749264014262,
+                "mib_per_second": 0.38173015150912204
+              },
+              {
+                "seconds": 1.0459481510000006,
+                "statements_per_second": 3916.0640956092648,
+                "mib_per_second": 0.38078838968125367
+              },
+              {
+                "seconds": 1.0444869180000005,
+                "statements_per_second": 3921.5426535385272,
+                "mib_per_second": 0.38132111110785094
+              },
+              {
+                "seconds": 1.0459878449999997,
+                "statements_per_second": 3915.9154856144633,
+                "mib_per_second": 0.38077393921281666
+              },
+              {
+                "seconds": 1.0429971409999998,
+                "statements_per_second": 3927.1440342327846,
+                "mib_per_second": 0.38186577551642115
+              },
+              {
+                "seconds": 1.0431368129999992,
+                "statements_per_second": 3926.618204778095,
+                "mib_per_second": 0.38181464516042857
+              }
+            ],
+            "median_mib_per_second": 0.38132111110785094,
+            "sink_type": "object"
+          }
+        ],
+        "median_mib_per_second": 0.3787392324717976,
+        "confidence_interval_95": [
+          0.3757587520871911,
+          0.383816198241402
+        ],
+        "process_median_cv": 0.013289951518958619,
+        "stable": true
+      },
+      "cold_start": {
+        "samples_ms": [
+          45.785089023411274,
+          46.613157726824284,
+          45.70926818996668,
+          45.90666573494673,
+          46.12970259040594,
+          45.81467527896166,
+          47.48432710766792,
+          46.625872142612934,
+          45.95574829727411,
+          45.74035480618477
+        ],
+        "median_ms": 45.93120701611042,
+        "confidence_interval_95": [
+          45.777515042573214,
+          46.613157726824284
+        ]
+      },
+      "retained_memory": {
+        "counts": [
+          0,
+          32,
+          64,
+          128,
+          256,
+          512,
+          1024
+        ],
+        "observations": [
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 207237120,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 134201344,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 105152512,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 206999552,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 69861376,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 206696448,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 84590592,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 70553600,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 89255936,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 82255872,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 104972288,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 70127616,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 82452480,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 158814208,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 89505792,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 159383552,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 104828928,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 89169920,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 158892032,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 129888256,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 130281472,
+            "repetition": 0
+          }
+        ],
+        "fits": [
+          {
+            "bytes_per_document": 129127.93984962405,
+            "documents_per_mib": 8.12044241719584,
+            "intercept_bytes": 83144611.60902256,
+            "r_squared": 0.9580057704512175
+          },
+          {
+            "bytes_per_document": 128797.03258145363,
+            "documents_per_mib": 8.14130557966746,
+            "intercept_bytes": 83665311.7593985,
+            "r_squared": 0.9596279344217633
+          },
+          {
+            "bytes_per_document": 129259.9498746867,
+            "documents_per_mib": 8.112149207984068,
+            "intercept_bytes": 83840947.0075188,
+            "r_squared": 0.9516848500894085
+          }
+        ],
+        "summary": {
+          "bytes_per_document": 129127.93984962405,
+          "documents_per_mib": 8.12044241719584,
+          "slope_cv": 0.0018477516410917538,
+          "minimum_r_squared": 0.9516848500894085,
+          "stable": false
+        }
+      }
+    },
+    {
+      "ecosystem": "node",
+      "tool": "node-sql-parser",
+      "version": "5.4.0",
+      "qualification": {
+        "schema": "squonk.publication-adapter/1",
+        "ecosystem": "node",
+        "tool": "node-sql-parser",
+        "version": "5.4.0",
+        "mode": "qualify",
+        "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+        "requested": 256,
+        "accepted": 256,
+        "ast_digest": "6da883c70a633d14cc0130b64b474c4071f2e40597db84be3723bde720d2bf64",
+        "failures": []
+      },
+      "status": "qualified",
+      "timing": {
+        "process_runs": [
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 62,
+            "samples": [
+              {
+                "seconds": 1.0687445599999996,
+                "statements_per_second": 14851.069744860273,
+                "mib_per_second": 1.4440813007963555
+              },
+              {
+                "seconds": 1.012785668,
+                "statements_per_second": 15671.627770309246,
+                "mib_per_second": 1.5238703342549946
+              },
+              {
+                "seconds": 1.0298732,
+                "statements_per_second": 15411.60601130314,
+                "mib_per_second": 1.4985864613467252
+              },
+              {
+                "seconds": 1.00974536,
+                "statements_per_second": 15718.81449398292,
+                "mib_per_second": 1.5284586545897356
+              },
+              {
+                "seconds": 1.0137303549999996,
+                "statements_per_second": 15657.023508978387,
+                "mib_per_second": 1.52245025199411
+              },
+              {
+                "seconds": 1.0153313089999991,
+                "statements_per_second": 15632.335829013635,
+                "mib_per_second": 1.5200496830378245
+              },
+              {
+                "seconds": 1.0140529480000005,
+                "statements_per_second": 15652.042658427332,
+                "mib_per_second": 1.5219659264023238
+              }
+            ],
+            "median_mib_per_second": 1.5219659264023238,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 62,
+            "samples": [
+              {
+                "seconds": 1.059929434,
+                "statements_per_second": 14974.581788998605,
+                "mib_per_second": 1.4560913065688372
+              },
+              {
+                "seconds": 1.0165870819999996,
+                "statements_per_second": 15613.025466322035,
+                "mib_per_second": 1.5181719911170668
+              },
+              {
+                "seconds": 1.022901914,
+                "statements_per_second": 15516.639262051474,
+                "mib_per_second": 1.508799634941174
+              },
+              {
+                "seconds": 1.0042207399999998,
+                "statements_per_second": 15805.289980368263,
+                "mib_per_second": 1.5368673170640037
+              },
+              {
+                "seconds": 0.9967184769999995,
+                "statements_per_second": 15924.255811703999,
+                "mib_per_second": 1.548435260344661
+              },
+              {
+                "seconds": 1.0068797639999993,
+                "statements_per_second": 15763.550492807412,
+                "mib_per_second": 1.5328086724998766
+              },
+              {
+                "seconds": 1.0077081030000008,
+                "statements_per_second": 15750.592808322379,
+                "mib_per_second": 1.5315486993001057
+              }
+            ],
+            "median_mib_per_second": 1.5315486993001057,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 62,
+            "samples": [
+              {
+                "seconds": 1.059077007,
+                "statements_per_second": 14986.634489365324,
+                "mib_per_second": 1.4572632813506339
+              },
+              {
+                "seconds": 1.0082168029999998,
+                "statements_per_second": 15742.645780919407,
+                "mib_per_second": 1.5307759500054954
+              },
+              {
+                "seconds": 1.0220999910000002,
+                "statements_per_second": 15528.813364405947,
+                "mib_per_second": 1.5099834145520776
+              },
+              {
+                "seconds": 1.0012330500000006,
+                "statements_per_second": 15852.453132664758,
+                "mib_per_second": 1.5414533453763108
+              },
+              {
+                "seconds": 1.001631735,
+                "statements_per_second": 15846.143293373188,
+                "mib_per_second": 1.5408397922054937
+              },
+              {
+                "seconds": 1.0000585029999993,
+                "statements_per_second": 15871.071494704356,
+                "mib_per_second": 1.5432637488647294
+              },
+              {
+                "seconds": 0.9925473829999991,
+                "statements_per_second": 15991.176110934357,
+                "mib_per_second": 1.554942424772712
+              }
+            ],
+            "median_mib_per_second": 1.5408397922054937,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 61,
+            "samples": [
+              {
+                "seconds": 1.0632216939999999,
+                "statements_per_second": 14687.435450315408,
+                "mib_per_second": 1.4281699066018045
+              },
+              {
+                "seconds": 1.0022343980000001,
+                "statements_per_second": 15581.1854304366,
+                "mib_per_second": 1.5150759447561806
+              },
+              {
+                "seconds": 1.0213870329999999,
+                "statements_per_second": 15289.013366591273,
+                "mib_per_second": 1.486665855701139
+              },
+              {
+                "seconds": 0.9893126380000004,
+                "statements_per_second": 15784.696768424375,
+                "mib_per_second": 1.5348648840539645
+              },
+              {
+                "seconds": 0.9996267389999993,
+                "statements_per_second": 15621.831020268468,
+                "mib_per_second": 1.5190282214099449
+              },
+              {
+                "seconds": 0.9939568439999994,
+                "statements_per_second": 15710.943683587142,
+                "mib_per_second": 1.5276933164484485
+              },
+              {
+                "seconds": 0.9993138149999995,
+                "statements_per_second": 15626.722822800171,
+                "mib_per_second": 1.5195038881925123
+              }
+            ],
+            "median_mib_per_second": 1.5190282214099449,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 62,
+            "samples": [
+              {
+                "seconds": 1.0576124850000002,
+                "statements_per_second": 15007.387133861224,
+                "mib_per_second": 1.4592812171878133
+              },
+              {
+                "seconds": 1.0159998180000003,
+                "statements_per_second": 15622.050042532583,
+                "mib_per_second": 1.5190495185933466
+              },
+              {
+                "seconds": 1.0229760370000003,
+                "statements_per_second": 15515.514954335138,
+                "mib_per_second": 1.508690310038834
+              },
+              {
+                "seconds": 1.0108475209999996,
+                "statements_per_second": 15701.675742646457,
+                "mib_per_second": 1.526792124787561
+              },
+              {
+                "seconds": 1.0001172290000004,
+                "statements_per_second": 15870.139559409583,
+                "mib_per_second": 1.5431731297809963
+              },
+              {
+                "seconds": 1.0076565120000005,
+                "statements_per_second": 15751.399222833576,
+                "mib_per_second": 1.5316271130532102
+              },
+              {
+                "seconds": 0.996110263999999,
+                "statements_per_second": 15933.978971629205,
+                "mib_per_second": 1.5493807163740154
+              }
+            ],
+            "median_mib_per_second": 1.526792124787561,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 62,
+            "samples": [
+              {
+                "seconds": 1.0646354139999998,
+                "statements_per_second": 14908.390037831301,
+                "mib_per_second": 1.4496549843530082
+              },
+              {
+                "seconds": 1.0110842169999996,
+                "statements_per_second": 15697.999961955697,
+                "mib_per_second": 1.5264347009620354
+              },
+              {
+                "seconds": 1.0285741420000003,
+                "statements_per_second": 15431.070403090102,
+                "mib_per_second": 1.5004791306758591
+              },
+              {
+                "seconds": 1.0058549670000003,
+                "statements_per_second": 15779.610898914014,
+                "mib_per_second": 1.534370346678248
+              },
+              {
+                "seconds": 1.0074619520000005,
+                "statements_per_second": 15754.441116601087,
+                "mib_per_second": 1.5319228992816865
+              },
+              {
+                "seconds": 1.0053638070000006,
+                "statements_per_second": 15787.319863206485,
+                "mib_per_second": 1.5351199473046349
+              },
+              {
+                "seconds": 1.006864595000001,
+                "statements_per_second": 15763.787979852428,
+                "mib_per_second": 1.5328317651529166
+              }
+            ],
+            "median_mib_per_second": 1.5319228992816865,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 62,
+            "samples": [
+              {
+                "seconds": 1.0638975720000003,
+                "statements_per_second": 14918.72941317324,
+                "mib_per_second": 1.4506603596458134
+              },
+              {
+                "seconds": 1.009088192,
+                "statements_per_second": 15729.051361251088,
+                "mib_per_second": 1.5294540622509116
+              },
+              {
+                "seconds": 1.0254091010000002,
+                "statements_per_second": 15478.70014467523,
+                "mib_per_second": 1.5051105289768907
+              },
+              {
+                "seconds": 1.0027346479999997,
+                "statements_per_second": 15828.714038811198,
+                "mib_per_second": 1.5391450145879757
+              },
+              {
+                "seconds": 1.0056298539999997,
+                "statements_per_second": 15783.143208077438,
+                "mib_per_second": 1.5347138196872072
+              },
+              {
+                "seconds": 1.0082393140000003,
+                "statements_per_second": 15742.29429422943,
+                "mib_per_second": 1.5307417723088583
+              },
+              {
+                "seconds": 1.0044262010000002,
+                "statements_per_second": 15802.056919859258,
+                "mib_per_second": 1.536552942254269
+              }
+            ],
+            "median_mib_per_second": 1.5307417723088583,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 63,
+            "samples": [
+              {
+                "seconds": 1.066956013,
+                "statements_per_second": 15115.899628000878,
+                "mib_per_second": 1.469832703806754
+              },
+              {
+                "seconds": 1.0151715629999998,
+                "statements_per_second": 15886.969836250233,
+                "mib_per_second": 1.5448096642859415
+              },
+              {
+                "seconds": 1.0283656209999998,
+                "statements_per_second": 15683.138049983492,
+                "mib_per_second": 1.5249895653898609
+              },
+              {
+                "seconds": 1.0054990309999994,
+                "statements_per_second": 16039.796660927872,
+                "mib_per_second": 1.5596701668334727
+              },
+              {
+                "seconds": 1.0058998100000007,
+                "statements_per_second": 16033.405951234834,
+                "mib_per_second": 1.5590487500247792
+              },
+              {
+                "seconds": 1.009301743,
+                "statements_per_second": 15979.364062190072,
+                "mib_per_second": 1.5537938503596382
+              },
+              {
+                "seconds": 1.0087713699999985,
+                "statements_per_second": 15987.765394253827,
+                "mib_per_second": 1.554610775116136
+              }
+            ],
+            "median_mib_per_second": 1.5537938503596382,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 62,
+            "samples": [
+              {
+                "seconds": 1.0605485169999997,
+                "statements_per_second": 14965.840549093902,
+                "mib_per_second": 1.4552413300143519
+              },
+              {
+                "seconds": 1.0070270170000004,
+                "statements_per_second": 15761.245460209926,
+                "mib_per_second": 1.532584536829589
+              },
+              {
+                "seconds": 1.022054193,
+                "statements_per_second": 15529.509206758863,
+                "mib_per_second": 1.510051076541915
+              },
+              {
+                "seconds": 0.9969596550000006,
+                "statements_per_second": 15920.403519237687,
+                "mib_per_second": 1.5480606729505288
+              },
+              {
+                "seconds": 1.000701916,
+                "statements_per_second": 15860.867003676249,
+                "mib_per_second": 1.5422714893890823
+              },
+              {
+                "seconds": 1.0000158710000004,
+                "statements_per_second": 15871.748099485905,
+                "mib_per_second": 1.5433295402406944
+              },
+              {
+                "seconds": 1.0050559799999992,
+                "statements_per_second": 15792.155179256793,
+                "mib_per_second": 1.5355901214814218
+              }
+            ],
+            "median_mib_per_second": 1.5355901214814218,
+            "sink_type": "object"
+          },
+          {
+            "schema": "squonk.publication-adapter/1",
+            "ecosystem": "node",
+            "tool": "node-sql-parser",
+            "version": "5.4.0",
+            "mode": "throughput",
+            "corpus_sha256": "06f44227c6f1566b7caaa43362e89c91ade96d5533a70b846f77c6178739b0a6",
+            "passes_per_sample": 63,
+            "samples": [
+              {
+                "seconds": 1.065560216,
+                "statements_per_second": 15135.700224003109,
+                "mib_per_second": 1.4717580648024722
+              },
+              {
+                "seconds": 1.012975699,
+                "statements_per_second": 15921.408594422755,
+                "mib_per_second": 1.5481584039763465
+              },
+              {
+                "seconds": 1.0283387439999996,
+                "statements_per_second": 15683.54794964334,
+                "mib_per_second": 1.5250294230192543
+              },
+              {
+                "seconds": 1.0050611660000004,
+                "statements_per_second": 16046.784559577734,
+                "mib_per_second": 1.5603496528197005
+              },
+              {
+                "seconds": 1.0046770870000001,
+                "statements_per_second": 16052.919100761774,
+                "mib_per_second": 1.5609461604359889
+              },
+              {
+                "seconds": 1.0033706120000006,
+                "statements_per_second": 16073.821384754681,
+                "mib_per_second": 1.5629786468478541
+              },
+              {
+                "seconds": 1.0056681799999987,
+                "statements_per_second": 16037.098837113472,
+                "mib_per_second": 1.5594078371164792
+              }
+            ],
+            "median_mib_per_second": 1.5594078371164792,
+            "sink_type": "object"
+          }
+        ],
+        "median_mib_per_second": 1.531735799290896,
+        "confidence_interval_95": [
+          1.526353849355591,
+          1.5428583748206623
+        ],
+        "process_median_cv": 0.008451445336857441,
+        "stable": true
+      },
+      "cold_start": {
+        "samples_ms": [
+          117.61026456952095,
+          112.56111972033978,
+          114.08410873264074,
+          113.18416614085436,
+          112.35497519373894,
+          112.18221113085747,
+          112.417072057724,
+          112.61937860399485,
+          114.43839222192764,
+          111.3720964640379
+        ],
+        "median_ms": 112.59024916216731,
+        "confidence_interval_95": [
+          112.29964159429073,
+          114.08410873264074
+        ]
+      },
+      "retained_memory": {
+        "counts": [
+          0,
+          32,
+          64,
+          128,
+          256,
+          512,
+          1024,
+          2048,
+          4096,
+          8192
+        ],
+        "observations": [
+          {
+            "retained_documents": 128,
+            "rss_bytes": 91607040,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 89186304,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 86323200,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 92631040,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 153522176,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 99143680,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 97632256,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 152891392,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 159956992,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 4096,
+            "rss_bytes": 152211456,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 125059072,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 92483584,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 84217856,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 126038016,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 105197568,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 105910272,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 81195008,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 1024,
+            "rss_bytes": 105168896,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 90460160,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 512,
+            "rss_bytes": 97628160,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 256,
+            "rss_bytes": 92319744,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 128,
+            "rss_bytes": 91877376,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 86491136,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 2048,
+            "rss_bytes": 126521344,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 91435008,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 0,
+            "rss_bytes": 84480000,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 64,
+            "rss_bytes": 90755072,
+            "repetition": 2
+          },
+          {
+            "retained_documents": 32,
+            "rss_bytes": 86532096,
+            "repetition": 1
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 160337920,
+            "repetition": 0
+          },
+          {
+            "retained_documents": 8192,
+            "rss_bytes": 160182272,
+            "repetition": 1
+          }
+        ],
+        "fits": [
+          {
+            "bytes_per_document": 9953.747000517391,
+            "documents_per_mib": 105.34485153636068,
+            "intercept_bytes": 92156221.70475397,
+            "r_squared": 0.8725369310517795
+          },
+          {
+            "bytes_per_document": 9906.89381399046,
+            "documents_per_mib": 105.84306440422394,
+            "intercept_bytes": 92674794.4353628,
+            "r_squared": 0.8701663668434673
+          },
+          {
+            "bytes_per_document": 9857.090745875967,
+            "documents_per_mib": 106.37783774474286,
+            "intercept_bytes": 92514158.81234361,
+            "r_squared": 0.8735077072543096
+          }
+        ],
+        "summary": {
+          "bytes_per_document": 9906.89381399046,
+          "documents_per_mib": 105.84306440422394,
+          "slope_cv": 0.004879473623475731,
+          "minimum_r_squared": 0.8701663668434673,
+          "stable": false
+        }
+      }
+    }
+  ]
+}

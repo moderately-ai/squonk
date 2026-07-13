@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Moderately AI Inc.
 
 # Per-push / per-PR gate: the core lint/test/doc stack plus the supply-chain gate,
-# on every push to `scaffold` and every pull request targeting it. Until now
+# on every push to `main` and every pull request targeting it. Until now
 # `.github/workflows/` held only the nightly soaks (`fuzz-nightly.yml`,
 # `oracle-nightly.yml`); nothing enforced the everyday gates on a landing, so
 # CI and local verification use the same fixed command.
@@ -166,6 +166,10 @@ jobs:
           # shadow the installed wheel that stubtest is meant to inspect.
           (cd /tmp && timeout 60s python -m mypy.stubtest squonk._ast squonk._exceptions squonk._native)
           pytest
+      - name: Validate publication benchmark artifacts
+        run: |
+          python -m pip install 'matplotlib>=3.9,<4'
+          python -m unittest bench.publication.test_publication
 
   ci-success:
     # Aggregate gate: branch protection on the public `main` requires only this one

@@ -2708,6 +2708,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "sha2",
  "sqlparser",
  "squonk",
  "squonk-ast",

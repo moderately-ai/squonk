@@ -120,19 +120,25 @@ Each dialect’s support tier and source of truth are listed in [docs/support-ti
 
 ## Performance
 
-The goal is to be best in class on both compute and memory.
+The publication benchmark measures one operation: parsing the same frozen SQL into a
+complete AST through each tool's public API. Results are compared within an ecosystem so
+language-runtime costs are not mistaken for parser-core differences.
 
-Against `datafusion-sqlparser-rs`, current benchmarks measure:
+<img
+  src="./docs/assets/performance-summary.png"
+  alt="Horizontal bars compare Squonk's full-AST throughput with a direct Rust, Python, and Node peer. Rust Squonk is 2.37 times its peer; the Python and Node bindings are 0.61 and 0.25 times their peers."
+  width="1200"
+/>
 
-* approximately **2.8–3.2× faster parsing**
-* approximately **15–19× less AST memory**
-* linear behaviour on adversarial inputs that degrade allocation-heavy parsers
+On the controlled Linux snapshot, Rust Squonk delivered **2.37×** the full-AST throughput
+of `datafusion-sqlparser-rs`. Through the Python and Node APIs it delivered **0.61×** and
+**0.25×** the throughput of sqlglot and `node-sql-parser`, respectively. Those binding
+measurements include materializing Squonk documents with source spans and node IDs; they are
+product costs, not Rust-core measurements.
 
-Against [`libpg_query`](https://github.com/pganalyze/libpg_query), PostgreSQL’s C parser running in process, `squonk` uses approximately **1.8× as many instructions** for a raw parse. That additional work produces a complete, owned AST with spans and node IDs rather than a temporary C tree.
-
-For the full parse-and-serialize path commonly used by Rust applications, `squonk` measures approximately **16× faster**.
-
-Benchmarks have been known to become adventurous when left unsupervised. Methodology, datasets, fairness caveats, and allocator guidance are documented in [docs/performance.md](./docs/performance.md).
+Why this metric is useful, which comparisons are valid, cold-start and retained-memory
+results, uncertainty, limitations, and the raw observations are documented in
+[docs/performance.md](./docs/performance.md).
 
 ## Feature flags
 

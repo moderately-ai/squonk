@@ -1,13 +1,11 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Benchmarks
 
-The measurement crate behind the project's headline performance claims — `~2.8–3.2×
-faster` parses and a `~15–19×` lighter AST than `datafusion-sqlparser-rs`, and the
-`libpg_query` instruction-tax numbers. It is `publish = false`: a private harness, never
-a shipped crate. The synthesized numbers and their caveats live in [`docs/performance.md`](../docs/performance.md);
-the raw method and every not-adopted-dependency measurement live in [`notes/`](notes/),
-indexed by [`notes/competitive-perf-index.md`](notes/competitive-perf-index.md) (every
-parser measured faster than us on any axis, with mechanism and pursuable lever).
+The measurement crate behind the project's publication benchmark, deterministic regression
+gates, and focused engineering probes. It is `publish = false`: a private harness, never a
+shipped crate. Publication results and comparison boundaries live in
+[`docs/performance.md`](../docs/performance.md); checked-in baselines and benchmark sources
+beside each family are the evidence for narrower engineering probes.
 
 ## Two signals, one honest stance
 
@@ -65,16 +63,34 @@ the `cargo nextest` / `clippy` gates — pull in none of them. Add `--features c
 to any wall-clock `compare_*` binary that carries both modes (`compare_upstream`,
 `compare_tokenizer_logos`, `compare_interner`) to switch it to the dhat heap comparison.
 
+### Publication benchmark
+
+[`publication/`](publication/) owns the frozen portable corpus, public-package adapters,
+raw result, stability policy, and controlled-host runner. The matching Rust Criterion target
+is [`benches/publication.rs`](benches/publication.rs). The headline run compares direct
+complete-AST alternatives within Rust, Python, and Node; it never intersects the corpus down
+to competitor successes.
+
+Run the publication measurement only on an otherwise idle Linux x86_64 host:
+
+```sh
+bench/publication/run_on_builder.sh
+python3 bench/plot_performance.py
+python3 -m unittest bench.publication.test_publication
+```
+
+For a fast harness smoke while developing the adapters, build the Rust adapter, install the
+pinned Python/npm dependencies, and pass `--quick` directly to `publication/run.py`. Quick
+results are diagnostic and must never replace `publication/results/headline.json`.
+
 ### Cross-language positioning
 
 [`cross-language/`](cross-language/) holds the sqlglot (Python), Apache Calcite / JSQLParser
 (Java), and sql-formatter (Node) throughput harnesses. These run in a real environment with
 the peer toolchains installed, **not** in the sandboxed build — they compare across runtimes
 (JVM JIT, CPython), so they are honest *positioning* throughput, not per-parse algorithm
-ratios. The Node harness has an npm entry point (`cd cross-language && npm run
-throughput:postgres`); the workup and every runtime caveat are in
-[`notes/cross-language-comparison.md`](notes/cross-language-comparison.md) and
-[`notes/js-sql-formatter-comparison.md`](notes/js-sql-formatter-comparison.md).
+ratios. These exploratory harnesses are not inputs to the publication result or README
+graphic.
 
 ## No oracle, no external engine required
 

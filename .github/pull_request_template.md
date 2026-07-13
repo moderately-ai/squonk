@@ -1,11 +1,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 Moderately AI Inc. -->
 
-<!--
-squonk is not currently accepting outside code contributions (see CONTRIBUTING.md); this
-template is for maintainers. Keep the description prose — motivation first, then what
-changed and why this shape.
--->
+<!-- Keep the description prose — motivation first, then what changed and why this shape. -->
 
 ## Motivation
 
@@ -18,4 +14,4 @@ changed and why this shape.
 
 ---
 
-Ran `cargo xtask preflight` (the full gate stack) locally — see [CONTRIBUTING.md](CONTRIBUTING.md#the-gate-stack).
+Ran `cargo xtask preflight` (the full gate stack) locally — see [CONTRIBUTING.md](../CONTRIBUTING.md#the-gate-stack).
