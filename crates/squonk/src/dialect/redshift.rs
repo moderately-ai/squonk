@@ -13,7 +13,7 @@ use crate::parser::Dialect;
 
 /// The Amazon Redshift dialect ([`FeatureSet::REDSHIFT`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, Redshift)`. Redshift is a
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Redshift))`. Redshift is a
 /// PostgreSQL-8 fork, but it is exposed here as a deliberately conservative *ANSI*-derived preset
 /// (no Redshift oracle exists to fit a wider surface, and deriving from our PG-17-fitted
 /// `Postgres` preset would silently over-accept features Redshift never had). Over ANSI it adds a
@@ -66,15 +66,15 @@ mod tests {
             "SELECT DISTINCT ON (a) a, b FROM t",
         ] {
             assert!(
-                parse_with(sql, Redshift).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Redshift)).is_err(),
                 "Redshift defers the PG-heritage form {sql:?} (conservative reject)",
             );
             assert!(
-                parse_with(sql, Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
                 "ANSI also rejects {sql:?} (the base Redshift derives from)",
             );
             assert!(
-                parse_with(sql, Postgres).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
                 "PostgreSQL — the fork parent — accepts {sql:?}, proving it is a real deferral",
             );
         }
@@ -83,7 +83,7 @@ mod tests {
         // a DuckDB/Snowflake surface), so only the Redshift reject is pinned.
         let qualify = "SELECT * FROM t QUALIFY row_number() OVER (ORDER BY a) = 1";
         assert!(
-            parse_with(qualify, Redshift).is_err(),
+            parse_with(qualify, crate::ParseConfig::new(Redshift)).is_err(),
             "Redshift defers QUALIFY (conservative reject)",
         );
     }
@@ -96,11 +96,11 @@ mod tests {
         // Redshift and its ANSI base. This pins that the preset added no lexical divergence.
         let quoted = "SELECT \"Col\" FROM t";
         assert!(
-            parse_with(quoted, Redshift).is_ok(),
+            parse_with(quoted, crate::ParseConfig::new(Redshift)).is_ok(),
             "Redshift reads `\"Col\"` as a quoted identifier (standard lexis)",
         );
         assert!(
-            parse_with(quoted, Ansi).is_ok(),
+            parse_with(quoted, crate::ParseConfig::new(Ansi)).is_ok(),
             "ANSI reads `\"Col\"` as a quoted identifier too — Redshift's lexis is ANSI verbatim",
         );
     }

@@ -22,7 +22,7 @@ use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser as UpstreamParser;
 use squonk::dialect::Postgres;
 use squonk::error::ParseErrorKind;
-use squonk::{DEFAULT_RECURSION_LIMIT, ParseOptions, parse_with, parse_with_options};
+use squonk::{DEFAULT_RECURSION_LIMIT, ParseConfig, parse_with};
 use squonk_bench::adversarial::{DEPTH_FAMILIES, WIDTH_FAMILIES, WIDTH_LADDER, nested_parens};
 use squonk_bench::{parse_postgres_sql, time_loop};
 
@@ -52,7 +52,7 @@ fn bench_table() {
             let sql = (family.generate)(width);
             // Keep the harness honest if the generated surface ever drifts past
             // either parser.
-            if parse_with(&sql, Postgres).is_err()
+            if parse_with(&sql, squonk::ParseConfig::new(Postgres)).is_err()
                 || UpstreamParser::parse_sql(&PostgreSqlDialect {}, &sql).is_err()
             {
                 println!(
@@ -76,7 +76,7 @@ fn bench_table() {
 /// Our outcome on `sql`, as a label: accepted, the clean recursion rejection, or any
 /// other (syntax) rejection.
 fn ours_outcome(sql: &str) -> &'static str {
-    match parse_with(sql, Postgres) {
+    match parse_with(sql, squonk::ParseConfig::new(Postgres)) {
         Ok(_) => "accept",
         Err(e) if e.kind == ParseErrorKind::RecursionLimitExceeded => "reject(recursion)",
         Err(_) => "reject(syntax)",
@@ -118,11 +118,7 @@ fn recursion_report() {
     println!("# configurable limit (input = SELECT with 40 nested parens):");
     let sql = nested_parens(40);
     for limit in [20usize, 200] {
-        let outcome = match parse_with_options(
-            &sql,
-            Postgres,
-            ParseOptions::default().with_recursion_limit(limit),
-        ) {
+        let outcome = match parse_with(&sql, ParseConfig::new(Postgres).recursion_limit(limit)) {
             Ok(_) => "accept",
             Err(e) if e.kind == ParseErrorKind::RecursionLimitExceeded => "reject(recursion)",
             Err(_) => "reject(syntax)",

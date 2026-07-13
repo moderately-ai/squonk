@@ -13,8 +13,8 @@ use squonk::bindings::{
 };
 use squonk::render::{RenderConfig, RenderMode, Renderer};
 use squonk::{
-    BuiltinDialect, ParseOptions, Parsed, parse_recovering_with_builtin_options,
-    parse_with_builtin_options, tokenize_with_builtin, tokenize_with_builtin_trivia,
+    BuiltinDialect, ParseConfig, Parsed, Recovered, parse_builtin_with,
+    parse_recovering_builtin_with, tokenize_with_builtin, tokenize_with_builtin_trivia,
 };
 
 /// Binding-layer result type. Errors use the same serializable diagnostic shape as
@@ -27,7 +27,7 @@ pub fn parse<T>(
     dialect: &str,
     emit: impl FnOnce(&ParseDocument<'_, Arc<str>>) -> BindingResult<T>,
 ) -> BindingResult<T> {
-    parse_with_options(sql, dialect, None, false, false, emit)
+    parse_with(sql, dialect, None, false, false, emit)
 }
 
 /// Parse `sql` under `dialect` with an explicit recursion-depth limit.
@@ -37,15 +37,15 @@ pub fn parse_with_limit<T>(
     limit: usize,
     emit: impl FnOnce(&ParseDocument<'_, Arc<str>>) -> BindingResult<T>,
 ) -> BindingResult<T> {
-    parse_with_options(sql, dialect, Some(limit), false, false, emit)
+    parse_with(sql, dialect, Some(limit), false, false, emit)
 }
 
 /// Parse `sql` under `dialect`, honoring all binding parse options.
-// One flat parameter per exposed `ParseOptions` field plus the `emit` sink: the binding
+// One flat parameter per exposed `ParseConfig` field plus the `emit` sink: the binding
 // facade mirrors the JS/wasm-bindgen call shape, so the option list grows past the
 // clippy default as the parser gains knobs rather than hiding behind an options struct.
 #[allow(clippy::too_many_arguments)]
-pub fn parse_with_options<T>(
+pub fn parse_with<T>(
     sql: &str,
     dialect: &str,
     recursion_limit: Option<usize>,
@@ -53,14 +53,35 @@ pub fn parse_with_options<T>(
     parse_float_as_decimal: bool,
     emit: impl FnOnce(&ParseDocument<'_, Arc<str>>) -> BindingResult<T>,
 ) -> BindingResult<T> {
-    let dialect = resolve(dialect)?;
-    let parsed = parse_with_builtin_options(
+    let (parsed, dialect) = parse_owned_with(
         sql,
         dialect,
-        parse_options(recursion_limit, capture_trivia, parse_float_as_decimal),
+        recursion_limit,
+        capture_trivia,
+        parse_float_as_decimal,
+    )?;
+    emit(&ParseDocument::new(&parsed, dialect))
+}
+
+pub(crate) fn parse_owned_with(
+    sql: &str,
+    dialect: &str,
+    recursion_limit: Option<usize>,
+    capture_trivia: bool,
+    parse_float_as_decimal: bool,
+) -> BindingResult<(Parsed, BuiltinDialect)> {
+    let dialect = resolve(dialect)?;
+    let parsed = parse_builtin_with(
+        sql,
+        parse_config(
+            dialect,
+            recursion_limit,
+            capture_trivia,
+            parse_float_as_decimal,
+        ),
     )
     .map_err(|error| ParseDiagnostic::from(&error))?;
-    emit(&ParseDocument::new(&parsed, dialect))
+    Ok((parsed, dialect))
 }
 
 /// Parse `sql` recovering past statement errors.
@@ -69,14 +90,14 @@ pub fn parse_recovering<T>(
     dialect: &str,
     emit: impl FnOnce(&RecoveredDocument<'_, Arc<str>>) -> BindingResult<T>,
 ) -> BindingResult<T> {
-    parse_recovering_with_options(sql, dialect, None, false, false, emit)
+    parse_recovering_with(sql, dialect, None, false, false, emit)
 }
 
 /// Recovering parse honoring all binding parse options.
-// See `parse_with_options`: one flat parameter per exposed `ParseOptions` field plus the
+// See `parse_with`: one flat parameter per exposed `ParseConfig` field plus the
 // `emit` sink mirrors the wasm-bindgen call shape.
 #[allow(clippy::too_many_arguments)]
-pub fn parse_recovering_with_options<T>(
+pub fn parse_recovering_with<T>(
     sql: &str,
     dialect: &str,
     recursion_limit: Option<usize>,
@@ -84,14 +105,35 @@ pub fn parse_recovering_with_options<T>(
     parse_float_as_decimal: bool,
     emit: impl FnOnce(&RecoveredDocument<'_, Arc<str>>) -> BindingResult<T>,
 ) -> BindingResult<T> {
-    let dialect = resolve(dialect)?;
-    let recovered = parse_recovering_with_builtin_options(
+    let (recovered, dialect) = parse_recovering_owned_with(
         sql,
         dialect,
-        parse_options(recursion_limit, capture_trivia, parse_float_as_decimal),
+        recursion_limit,
+        capture_trivia,
+        parse_float_as_decimal,
+    )?;
+    emit(&RecoveredDocument::new(&recovered, dialect))
+}
+
+pub(crate) fn parse_recovering_owned_with(
+    sql: &str,
+    dialect: &str,
+    recursion_limit: Option<usize>,
+    capture_trivia: bool,
+    parse_float_as_decimal: bool,
+) -> BindingResult<(Recovered, BuiltinDialect)> {
+    let dialect = resolve(dialect)?;
+    let recovered = parse_recovering_builtin_with(
+        sql,
+        parse_config(
+            dialect,
+            recursion_limit,
+            capture_trivia,
+            parse_float_as_decimal,
+        ),
     )
     .map_err(|error| ParseDiagnostic::from(&error))?;
-    emit(&RecoveredDocument::new(&recovered, dialect))
+    Ok((recovered, dialect))
 }
 
 /// Built-in dialect metadata compiled into this wasm artifact.
@@ -125,7 +167,7 @@ pub fn tokenize<T>(
 /// Render SQL under `dialect` using Rust's renderer.
 pub fn render_sql(sql: &str, dialect: &str, mode: &str) -> BindingResult<String> {
     let dialect = resolve(dialect)?;
-    let parsed = parse_with_builtin_options(sql, dialect, ParseOptions::default())
+    let parsed = parse_builtin_with(sql, ParseConfig::new(dialect))
         .map_err(|error| ParseDiagnostic::from(&error))?;
     render_parsed(&parsed, dialect, mode)
 }
@@ -210,7 +252,7 @@ pub fn transpile_sql(
 ) -> BindingResult<String> {
     let source = resolve(source_dialect)?;
     let target = resolve(target_dialect)?;
-    let parsed = parse_with_builtin_options(sql, source, ParseOptions::default())
+    let parsed = parse_builtin_with(sql, ParseConfig::new(source))
         .map_err(|error| ParseDiagnostic::from(&error))?;
     render_parsed(&parsed, target, "canonical")
 }
@@ -241,18 +283,19 @@ pub fn binding_error(message: impl Into<String>, kind: &'static str) -> ParseDia
     }
 }
 
-fn parse_options(
+fn parse_config(
+    dialect: BuiltinDialect,
     recursion_limit: Option<usize>,
     capture_trivia: bool,
     parse_float_as_decimal: bool,
-) -> ParseOptions {
-    let mut options = ParseOptions::default()
-        .with_trivia_capture(capture_trivia)
-        .with_parse_float_as_decimal(parse_float_as_decimal);
+) -> ParseConfig<BuiltinDialect> {
+    let mut config = ParseConfig::new(dialect)
+        .capture_trivia(capture_trivia)
+        .parse_float_as_decimal(parse_float_as_decimal);
     if let Some(limit) = recursion_limit {
-        options = options.with_recursion_limit(limit);
+        config = config.recursion_limit(limit);
     }
-    options
+    config
 }
 
 fn resolve(dialect: &str) -> BindingResult<BuiltinDialect> {
@@ -314,14 +357,14 @@ pub fn parse_json(sql: &str, dialect: &str) -> Result<String, String> {
 }
 
 #[cfg(test)]
-pub fn parse_with_options_json(
+pub fn parse_with_json(
     sql: &str,
     dialect: &str,
     recursion_limit: Option<usize>,
     capture_trivia: bool,
     parse_float_as_decimal: bool,
 ) -> Result<String, String> {
-    parse_with_options(
+    parse_with(
         sql,
         dialect,
         recursion_limit,
@@ -338,14 +381,14 @@ pub fn parse_recovering_json(sql: &str, dialect: &str) -> Result<String, String>
 }
 
 #[cfg(test)]
-pub fn parse_recovering_with_options_json(
+pub fn parse_recovering_with_json(
     sql: &str,
     dialect: &str,
     recursion_limit: Option<usize>,
     capture_trivia: bool,
     parse_float_as_decimal: bool,
 ) -> Result<String, String> {
-    parse_recovering_with_options(
+    parse_recovering_with(
         sql,
         dialect,
         recursion_limit,
@@ -435,7 +478,7 @@ mod tests {
 
     #[test]
     fn parse_options_can_expose_trivia() {
-        let json = parse_with_options_json("/* lead */ SELECT 1", "ansi", None, true, false)
+        let json = parse_with_json("/* lead */ SELECT 1", "ansi", None, true, false)
             .expect("parses with trivia");
         let value = value(&json);
         assert_eq!(value["trivia"][0]["kind"], "BlockComment");

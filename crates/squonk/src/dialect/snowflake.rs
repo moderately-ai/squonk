@@ -13,7 +13,7 @@ use crate::parser::Dialect;
 
 /// The Snowflake dialect ([`FeatureSet::SNOWFLAKE`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, Snowflake)`.
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Snowflake))`.
 /// Snowflake is exposed as a deliberately conservative ANSI-derived preset (no Snowflake
 /// oracle exists to fit a wider surface): it adds semi-structured path access
 /// (`base:key[0].field` over `VARIANT`/`OBJECT`/`ARRAY` columns), the `QUALIFY <predicate>`
@@ -57,23 +57,23 @@ mod tests {
     /// against each so a future preset edit cannot silently move one).
     fn rejects_under_every_oracle_preset(sql: &str) {
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI must reject the Snowflake-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL must reject the Snowflake-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL must reject the Snowflake-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite must reject the Snowflake-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB must reject the Snowflake-only form {sql:?}",
         );
     }
@@ -90,12 +90,12 @@ mod tests {
         // meaning (verified on DuckDB 1.5.4: `SELECT src:customer` → COLUMN_REF aliased `src`).
         for sql in ["SELECT src:customer", "SELECT src:customer[0].name"] {
             assert!(
-                parse_with(sql, Snowflake).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Snowflake)).is_ok(),
                 "Snowflake parses {sql:?} as a semi-structured path"
             );
             rejects_under_the_non_duckdb_oracle_presets(sql);
             assert!(
-                parse_with(sql, DuckDb).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
                 "DuckDB reinterprets {sql:?} as a prefix colon alias, not a path",
             );
         }
@@ -104,7 +104,7 @@ mod tests {
         // DuckDB included, syntax-rejects it (verified on DuckDB 1.5.4).
         let mid = "SELECT a + src:customer FROM t";
         assert!(
-            parse_with(mid, Snowflake).is_ok(),
+            parse_with(mid, crate::ParseConfig::new(Snowflake)).is_ok(),
             "Snowflake parses {mid:?}"
         );
         rejects_under_every_oracle_preset(mid);
@@ -115,14 +115,20 @@ mod tests {
     /// both flags), so the boundary here excludes DuckDB — the reject is asserted only
     /// against the presets that genuinely lack the clause.
     fn rejects_under_the_non_duckdb_oracle_presets(sql: &str) {
-        assert!(parse_with(sql, Ansi).is_err(), "ANSI must reject {sql:?}");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+            "ANSI must reject {sql:?}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL must reject {sql:?}",
         );
-        assert!(parse_with(sql, MySql).is_err(), "MySQL must reject {sql:?}");
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+            "MySQL must reject {sql:?}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite must reject {sql:?}"
         );
     }
@@ -137,13 +143,13 @@ mod tests {
             "SELECT a, count(*) FROM t GROUP BY ALL",
         ] {
             assert!(
-                parse_with(sql, Snowflake).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Snowflake)).is_ok(),
                 "Snowflake parses {sql:?}"
             );
             rejects_under_the_non_duckdb_oracle_presets(sql);
             // The shared-surface half: DuckDB accepts these too (both flags on there).
             assert!(
-                parse_with(sql, DuckDb).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
                 "DuckDB shares {sql:?} (its own QUALIFY / GROUP BY ALL)",
             );
         }
@@ -161,7 +167,7 @@ mod tests {
             "COPY INTO 's3://bucket/unload/' FROM t OVERWRITE = TRUE",
             "COPY INTO t FROM (SELECT a FROM src) PATTERN = '.*[.]csv'",
         ] {
-            let parsed = parse_with(sql, Snowflake)
+            let parsed = parse_with(sql, crate::ParseConfig::new(Snowflake))
                 .unwrap_or_else(|err| panic!("Snowflake parses {sql:?}: {err:?}"));
             // The `KEY = VALUE` spellings render back from their spans verbatim. The
             // `Snowflake` unit dialect carries no `RenderDialect` impl (no Snowflake
@@ -184,7 +190,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT a FROM t QUALIFY row_number() OVER () = 1",
-                Snowflake
+                crate::ParseConfig::new(Snowflake)
             )
             .is_ok(),
             "the bare `FROM t QUALIFY …` form parses the clause, not an alias",
@@ -192,11 +198,11 @@ mod tests {
         // The reservation side: `qualify` is not usable as a bare column name under
         // Snowflake, while ANSI (which does not reserve it) reads it as an ordinary column.
         assert!(
-            parse_with("SELECT qualify FROM t", Snowflake).is_err(),
+            parse_with("SELECT qualify FROM t", crate::ParseConfig::new(Snowflake)).is_err(),
             "Snowflake rejects `qualify` as a column name (reserved)",
         );
         assert!(
-            parse_with("SELECT qualify FROM t", Ansi).is_ok(),
+            parse_with("SELECT qualify FROM t", crate::ParseConfig::new(Ansi)).is_ok(),
             "ANSI reads `qualify` as an ordinary column name (unreserved)",
         );
     }
@@ -219,8 +225,8 @@ mod tests {
             "COPY INTO @my_stage FROM t",
             "COPY INTO @db.schema.stage/path FROM (SELECT 1)",
         ] {
-            let parsed =
-                parse_with(sql, Snowflake).unwrap_or_else(|e| panic!("must parse {sql:?}: {e:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Snowflake))
+                .unwrap_or_else(|e| panic!("must parse {sql:?}: {e:?}"));
             let Statement::CopyInto { copy, .. } = &parsed.statements()[0] else {
                 panic!("expected CopyInto for {sql:?}");
             };

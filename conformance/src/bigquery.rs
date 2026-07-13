@@ -235,13 +235,13 @@ mod tests {
         // This does not claim GoogleSQL completeness.
         for sql in BIGQUERY_FEATURE_SEEDS {
             assert!(
-                parse_with(sql, BigQuery).is_ok(),
+                parse_with(sql, squonk::ParseConfig::new(BigQuery)).is_ok(),
                 "modelled-surface seed must parse under BigQuery: {sql:?}"
             );
         }
         for sql in MODELLED_SURFACE_AGREE_ACCEPT {
             assert!(
-                parse_with(sql, BigQuery).is_ok(),
+                parse_with(sql, squonk::ParseConfig::new(BigQuery)).is_ok(),
                 "agree-accept corpus must parse under BigQuery: {sql:?}"
             );
         }
@@ -253,13 +253,16 @@ mod tests {
         // literals to chase sqlglot) fails loudly and forces an explicit ticket.
         for sql in INTENTIONAL_OUR_REJECTS {
             assert!(
-                parse_with(sql, BigQuery).is_err(),
+                parse_with(sql, squonk::ParseConfig::new(BigQuery)).is_err(),
                 "expected intentional reject under conservative BigQuery preset: {sql:?}"
             );
         }
         // ANSI also rejects (no unnest / no list primary).
         for sql in INTENTIONAL_OUR_REJECTS {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI must reject {sql:?}");
+            assert!(
+                parse_with(sql, squonk::ParseConfig::new(Ansi)).is_err(),
+                "ANSI must reject {sql:?}"
+            );
         }
     }
 
@@ -280,7 +283,7 @@ mod tests {
         oracle_or_skip!(oracle = BigQuerySqlglotOracle::new());
         for sql in AGREE_REJECT {
             assert!(
-                parse_with(sql, BigQuery).is_err(),
+                parse_with(sql, squonk::ParseConfig::new(BigQuery)).is_err(),
                 "our preset must reject garbage {sql:?}"
             );
             let v = oracle.verdict(sql).expect("oracle available");
@@ -304,7 +307,7 @@ mod tests {
                 "expected sqlglot to accept GoogleSQL form we intentionally reject: {sql:?} (got {v:?})"
             );
             assert!(
-                parse_with(sql, BigQuery).is_err(),
+                parse_with(sql, squonk::ParseConfig::new(BigQuery)).is_err(),
                 "our preset must still reject {sql:?}"
             );
         }
@@ -314,7 +317,7 @@ mod tests {
         oracle: &BigQuerySqlglotOracle,
         sql: &str,
     ) -> Option<String> {
-        let ours = parse_with(sql, BigQuery).is_ok();
+        let ours = parse_with(sql, squonk::ParseConfig::new(BigQuery)).is_ok();
         let theirs = match oracle.verdict(sql) {
             Ok(OracleVerdict::Accept) => true,
             Ok(OracleVerdict::Reject) => false,
@@ -364,7 +367,7 @@ mod tests {
             let tree = strategy.new_tree(&mut runner).expect("strategy ok");
             let (family, sql) = tree.current();
             assert!(
-                parse_with(&sql, BigQuery).is_ok(),
+                parse_with(&sql, squonk::ParseConfig::new(BigQuery)).is_ok(),
                 "probe family {family:?} emitted SQL our BigQuery preset rejects: {sql:?}"
             );
             if let Some(detail) = modelled_surface_comparison_divergence(&oracle, &sql) {
@@ -376,7 +379,7 @@ mod tests {
     #[test]
     fn angle_bracket_types_gate_ansi_reject() {
         let sql = "SELECT CAST(x AS ARRAY<INT64>)";
-        assert!(parse_with(sql, BigQuery).is_ok());
-        assert!(parse_with(sql, Ansi).is_err());
+        assert!(parse_with(sql, squonk::ParseConfig::new(BigQuery)).is_ok());
+        assert!(parse_with(sql, squonk::ParseConfig::new(Ansi)).is_err());
     }
 }

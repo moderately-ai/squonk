@@ -91,14 +91,14 @@ pub struct Parsed<S: SourceStore = Arc<str>, X: Extension = NoExt> {
     line_index: OnceLock<LineIndex>,
     /// Out-of-band comment/whitespace spans, recoverable by offset for tooling.
     /// Empty unless the tree was produced by
-    /// [`parse_with_trivia`](crate::parse_with_trivia): capture is opt-in so the
+    /// [`ParseConfig::capture_trivia`](crate::ParseConfig::capture_trivia): capture is opt-in so the
     /// default parse pays nothing, and an empty index owns an empty `Vec` (no
     /// allocation). The AST nodes never carry trivia, so structural equality and
     /// node sizes are unaffected — it lives only here, on the root.
     trivia: TriviaIndex,
     /// Per-clause-keyword offsets, recoverable by owning node and offset for the
     /// formatter's comment anchoring. Empty unless the tree was produced by
-    /// [`parse_with_trivia`](crate::parse_with_trivia)/`capture_trivia`: clause-mark
+    /// [`ParseConfig::capture_trivia`](crate::ParseConfig::capture_trivia): clause-mark
     /// capture rides the *same* opt-in as trivia, so the default parse pays nothing
     /// and an empty index owns an empty `Vec` (no allocation). Like trivia it lives
     /// only here — the hot AST nodes never carry it, so node sizes and structural
@@ -135,7 +135,7 @@ impl<S: SourceStore, X: Extension> Parsed<S, X> {
         }
     }
 
-    /// Attach the out-of-band trivia captured by a `parse_with_trivia` parse.
+    /// Attach the out-of-band trivia captured by a trivia-enabled parse.
     ///
     /// Crate-internal builder step: the default [`new`](Self::new) leaves trivia
     /// empty (the common path), and only the trivia-capturing collector swaps in a
@@ -257,7 +257,7 @@ impl<S: SourceStore, X: Extension> Parsed<S, X> {
     /// Every captured comment and whitespace run, in source order.
     ///
     /// Empty unless this tree was produced by
-    /// [`parse_with_trivia`](crate::parse_with_trivia); trivia capture is opt-in so
+    /// [`ParseConfig::capture_trivia`](crate::ParseConfig::capture_trivia); trivia capture is opt-in so
     /// the default parse path stays trivia-free at zero cost. The text of
     /// any run slices back out of [`source`](Self::source) by its span, the same
     /// zero-copy contract the tokens use.
@@ -284,7 +284,7 @@ impl<S: SourceStore, X: Extension> Parsed<S, X> {
     /// Every recorded clause-introducing keyword, in source (offset) order.
     ///
     /// Empty unless this tree was produced by
-    /// [`parse_with_trivia`](crate::parse_with_trivia)/`capture_trivia`; clause-mark
+    /// [`ParseConfig::capture_trivia`](crate::ParseConfig::capture_trivia); clause-mark
     /// capture is the same opt-in as trivia, so the default parse stays clause-mark
     /// free at zero cost. Each [`ClauseMark`] pairs the clause
     /// [`kind`](ClauseMark::kind) and keyword [`offset`](ClauseMark::offset) with the
@@ -938,7 +938,8 @@ mod serde_impls {
                        avg(a) OVER (ORDER BY b ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) \
                        FROM s.t AS t JOIN u ON t.a = u.b \
                        WHERE a IN (SELECT x FROM w) ORDER BY n";
-            let parsed = parse_with(sql, TestDialect).expect("rich corpus parses");
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).expect("rich corpus parses");
 
             let mut walk = NodeIdWalk::default();
             let mut validator = DocumentValidator {
@@ -969,7 +970,7 @@ mod serde_impls {
 mod tests {
     use super::*;
     use crate::interner::Interner;
-    use crate::parser::{TestDialect, parse_with, parse_with_rc};
+    use crate::parser::{ParseConfig, TestDialect, parse_rc_with, parse_with};
     use std::rc::Rc;
 
     /// A root over arbitrary source with an empty resolver and no statements —
@@ -1032,7 +1033,7 @@ mod tests {
     fn public_roots_are_static_and_never_borrow_the_input() {
         fn assert_static<T: 'static>() {}
         // Both public ownership tiers (ADR-0001) are `'static`: `parse_with` and
-        // `parse_with_rc` materialize an owned store from the `&str` input rather
+        // `parse_rc_with` materialize an owned store from the `&str` input rather
         // than borrowing it, so no public root threads the caller's source lifetime
         // into the AST. `Send + Sync` above does not by itself imply `'static`.
         assert_static::<Parsed>(); // the Arc<str> default tier
@@ -1042,15 +1043,17 @@ mod tests {
     #[test]
     fn arc_root_parses_and_renders_canonical_sql() {
         // parse_with is the Arc tier (the default store), rendered canonically.
-        let parsed = parse_with("select 1, a", TestDialect).expect("Arc root parses");
+        let parsed = parse_with("select 1, a", crate::ParseConfig::new(TestDialect))
+            .expect("Arc root parses");
         assert_eq!(parsed.source(), "select 1, a");
         assert_eq!(format!("{parsed}"), "SELECT 1, a");
     }
 
     #[test]
     fn rc_root_parses_and_renders_canonical_sql() {
-        // parse_with_rc names the single-thread Rc tier (ADR-0001); same render.
-        let parsed = parse_with_rc("select 1, a", TestDialect).expect("Rc root parses");
+        // parse_rc_with names the single-thread Rc tier (ADR-0001); same render.
+        let parsed =
+            parse_rc_with("select 1, a", ParseConfig::new(TestDialect)).expect("Rc root parses");
         assert_eq!(parsed.source(), "select 1, a");
         assert_eq!(format!("{parsed}"), "SELECT 1, a");
     }
@@ -1061,7 +1064,8 @@ mod tests {
         // ADR-0001's third tier: a bare Vec<Statement> is Send and structure-only.
         assert_send::<Vec<Statement>>();
 
-        let parsed = parse_with("SELECT 1; SELECT 2", TestDialect).expect("parses");
+        let parsed =
+            parse_with("SELECT 1; SELECT 2", crate::ParseConfig::new(TestDialect)).expect("parses");
         let statements = parsed.into_statements();
         // Source and resolver are dropped; only statement structure survives.
         assert_eq!(statements.len(), 2);
@@ -1071,12 +1075,14 @@ mod tests {
     #[test]
     fn display_joins_statements_and_renders_empty_input() {
         // Mirrors render_statements: canonical per statement, joined by "; ".
-        let parsed = parse_with("select a; select b", TestDialect).expect("parses");
+        let parsed =
+            parse_with("select a; select b", crate::ParseConfig::new(TestDialect)).expect("parses");
         assert_eq!(format!("{parsed}"), "SELECT a; SELECT b");
         assert_eq!(parsed.to_string(), "SELECT a; SELECT b");
 
         // No statements renders to the empty string (no stray separators).
-        let empty = parse_with("  ; ;  ", TestDialect).expect("only separators");
+        let empty =
+            parse_with("  ; ;  ", crate::ParseConfig::new(TestDialect)).expect("only separators");
         assert!(empty.statements().is_empty());
         assert_eq!(format!("{empty}"), "");
     }
@@ -1086,7 +1092,11 @@ mod tests {
         // The off path (the common `parse_with`): trivia is never captured, so the
         // root's index is empty even when the source is full of comments/whitespace.
         // This is the zero-overhead-when-off proof at the root API: nothing to query.
-        let parsed = parse_with("SELECT /* c */ 1 -- note\n", TestDialect).expect("parses");
+        let parsed = parse_with(
+            "SELECT /* c */ 1 -- note\n",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("parses");
         assert!(
             parsed.trivia().is_empty(),
             "default parse captures no trivia"
@@ -1096,12 +1106,15 @@ mod tests {
     }
 
     #[test]
-    fn parse_with_trivia_homes_recoverable_trivia_on_the_root() {
-        use crate::parser::parse_with_trivia;
+    fn trivia_config_homes_recoverable_trivia_on_the_root() {
         use crate::tokenizer::TriviaKind::{BlockComment, LineComment, Whitespace};
 
         let src = "SELECT /* c */ 1 -- note\n";
-        let parsed = parse_with_trivia(src, TestDialect).expect("parses with trivia");
+        let parsed = parse_with(
+            src,
+            crate::ParseConfig::new(TestDialect).capture_trivia(true),
+        )
+        .expect("parses with trivia");
 
         // Every comment/whitespace run is recoverable from the root, in source order.
         let kinds: Vec<_> = parsed.trivia().iter().map(|r| r.kind()).collect();
@@ -1126,13 +1139,16 @@ mod tests {
 
     #[test]
     fn root_trivia_queries_recover_runs_by_offset() {
-        use crate::parser::parse_with_trivia;
         use crate::tokenizer::TriviaKind::{BlockComment, LineComment};
 
         //            0         1         2
         //            0123456789012345678901234567
         let src = "SELECT /* c */ 1 -- note\n";
-        let parsed = parse_with_trivia(src, TestDialect).expect("parses with trivia");
+        let parsed = parse_with(
+            src,
+            crate::ParseConfig::new(TestDialect).capture_trivia(true),
+        )
+        .expect("parses with trivia");
 
         // `trivia_in`: only the block comment lies fully inside the SELECT..1 gap.
         let inner = parsed.trivia_in(Span::new(7, 14));
@@ -1160,13 +1176,15 @@ mod tests {
 
     #[test]
     fn trivia_capture_does_not_change_statement_structure() {
-        use crate::parser::parse_with_trivia;
-
         // Out-of-band: the parsed statements are identical with capture on or off, so
         // structural equality is unaffected — trivia lives only on the root.
         let src = "SELECT a, /* x */ b FROM t -- trailing";
-        let plain = parse_with(src, TestDialect).expect("plain");
-        let with_trivia = parse_with_trivia(src, TestDialect).expect("with trivia");
+        let plain = parse_with(src, crate::ParseConfig::new(TestDialect)).expect("plain");
+        let with_trivia = parse_with(
+            src,
+            crate::ParseConfig::new(TestDialect).capture_trivia(true),
+        )
+        .expect("with trivia");
 
         assert_eq!(plain.statements(), with_trivia.statements());
         assert!(plain.trivia().is_empty());
@@ -1174,38 +1192,39 @@ mod tests {
     }
 
     #[test]
-    fn parse_with_options_trivia_capture_matches_the_parse_with_trivia_sugar() {
-        use crate::parser::{ParseOptions, parse_with_options, parse_with_trivia};
+    fn capture_trivia_config_is_deterministic() {
+        use crate::parser::{ParseConfig, parse_with};
 
-        // `parse_with_trivia` is one-line sugar over `parse_with_options` with
-        // `capture_trivia` set (the entry-point rule, crate docs `# Entry points`):
-        // the two must capture byte-for-byte identical trivia for the same source.
+        // Equivalent `ParseConfig` values must capture byte-for-byte identical trivia.
         let src = "SELECT /* c */ a -- note\nFROM t";
-        let sugar = parse_with_trivia(src, TestDialect).expect("parses with trivia");
-        let via_options = parse_with_options(
+        let first = parse_with(
             src,
-            TestDialect,
-            ParseOptions::default().with_trivia_capture(true),
+            crate::ParseConfig::new(TestDialect).capture_trivia(true),
         )
         .expect("parses with trivia");
-        assert!(!via_options.trivia().is_empty());
-        assert_eq!(sugar.trivia(), via_options.trivia());
+        let second = parse_with(src, ParseConfig::new(TestDialect).capture_trivia(true))
+            .expect("parses with trivia");
+        assert!(!second.trivia().is_empty());
+        assert_eq!(first.trivia(), second.trivia());
 
         // Default options (`capture_trivia: false`) stay trivia-free, matching
         // `parse_with`'s zero-cost-when-off contract.
-        let off = parse_with_options(src, TestDialect, ParseOptions::default())
-            .expect("parses without trivia");
+        let off = parse_with(src, ParseConfig::new(TestDialect)).expect("parses without trivia");
         assert!(off.trivia().is_empty());
     }
 
     #[test]
     fn clause_marks_capture_kinds_owners_and_offsets() {
         use crate::ast::SetExpr;
-        use crate::parser::{ClauseKw, parse_with_trivia};
+        use crate::parser::ClauseKw;
 
         // A statement with every SELECT-body clause and a query-tail ORDER BY/LIMIT.
         let src = "SELECT a FROM t WHERE b GROUP BY c HAVING d ORDER BY e LIMIT 1";
-        let parsed = parse_with_trivia(src, TestDialect).expect("parses with clause marks");
+        let parsed = parse_with(
+            src,
+            crate::ParseConfig::new(TestDialect).capture_trivia(true),
+        )
+        .expect("parses with clause marks");
 
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
@@ -1274,7 +1293,7 @@ mod tests {
         // zero-overhead-when-off proof at the root API.
         let parsed = parse_with(
             "SELECT a FROM t WHERE b GROUP BY c ORDER BY d LIMIT 1",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("parses");
         assert!(
@@ -1287,12 +1306,14 @@ mod tests {
     #[test]
     fn nested_query_clause_marks_are_owned_by_the_inner_nodes() {
         use crate::ast::SetExpr;
-        use crate::parser::parse_with_trivia;
-
         // The subquery's WHERE/FROM must belong to the *inner* Select, not the outer,
         // so a formatter anchors an inner-clause comment to the inner node.
         let src = "SELECT a FROM t WHERE a IN (SELECT x FROM u WHERE y) ORDER BY a";
-        let parsed = parse_with_trivia(src, TestDialect).expect("parses");
+        let parsed = parse_with(
+            src,
+            crate::ParseConfig::new(TestDialect).capture_trivia(true),
+        )
+        .expect("parses");
 
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");

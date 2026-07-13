@@ -18,7 +18,7 @@
 //! [`NoTrivia`] sink's `const RECORDING = false` folds the capture — and the
 //! offset reads feeding it — away at compile time, so a parse that does not ask for
 //! trivia lexes byte-for-byte as it did before this seam existed. A tool that wants
-//! trivia opts in (`parse_with_trivia` / `tokenize_with_trivia`), which swaps in a
+//! trivia opts in (`ParseConfig::capture_trivia` / `tokenize_with_trivia`), which swaps in a
 //! recording sink and pays for what it captures.
 //!
 //! ## Sorted by construction

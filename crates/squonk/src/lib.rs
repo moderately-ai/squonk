@@ -35,7 +35,13 @@
 //!
 //! # Entry points
 //!
-//! The rule behind the parse entry points: a caller-tunable knob that leaves the return type alone is a field on [`ParseOptions`], reached through the combining `_with_options` form — [`parse`]/[`parse_with`]/[`parse_with_rc`]/[`parse_with_options`] all return a [`Parsed`] tree, and [`parse_with_trivia`] is simply documented sugar over [`parse_with_options`] for one common combination. A genuinely different result shape earns its own verb instead: [`Recovered`] (partial AST plus diagnostics, from [`parse_recovering`]/[`parse_recovering_with_options`]) and the streaming [`Statements`] iterator (from [`statements`]/[`statements_with_options`]) are not options on [`ParseOptions`], because forcing either behind a flag would need an enum return — worse than a second name. A new knob follows the first path unless it genuinely changes what the function returns.
+//! Caller-tunable knobs that leave the return type unchanged are fields on
+//! [`ParseConfig`] and are passed to the corresponding `_with` entry point:
+//! [`parse_with`], [`parse_rc_with`], [`parse_recovering_with`], or
+//! [`statements_with`]. A genuinely different result shape earns its own verb:
+//! [`Recovered`] carries a partial AST plus diagnostics, while [`Statements`] is a
+//! lazy iterator. A new knob belongs on [`ParseConfig`] unless it changes what the
+//! function returns.
 //!
 //! # Examples
 //!
@@ -48,7 +54,7 @@
 //!
 //! ```
 //! use squonk::dialect::Ansi;
-//! use squonk::{parse, parse_with};
+//! use squonk::{ParseConfig, parse, parse_with};
 //!
 //! // ANSI by default.
 //! let parsed = parse("SELECT 1").expect("a well-formed query parses");
@@ -56,26 +62,26 @@
 //!
 //! // ...or name a dialect explicitly. Non-default dialects (e.g. `Postgres`)
 //! // are available under their cargo feature.
-//! let parsed = parse_with("SELECT 1", Ansi).expect("parses under ANSI");
+//! let parsed = parse_with("SELECT 1", ParseConfig::new(Ansi)).expect("parses under ANSI");
 //! assert_eq!(parsed.statements().len(), 1);
 //! ```
 //!
 //! The default [`parse_with`] root is `Parsed<Arc<str>>` — `Send + Sync`, so it can
 //! cross threads. The tree's ownership tiers let a caller trade that reach for a
-//! cheaper one: [`parse_with_rc`] roots the tree in a non-atomic `Rc<str>` for
+//! cheaper one: [`parse_rc_with`] roots the tree in a non-atomic `Rc<str>` for
 //! single-thread use, and [`Parsed::into_statements`] drops the source and resolver
 //! entirely for callers that only inspect statement *shape*.
 //!
 //! ```
 //! use squonk::dialect::Ansi;
-//! use squonk::{parse_with, parse_with_rc};
+//! use squonk::{ParseConfig, parse_rc_with, parse_with};
 //!
 //! // Default tier: an `Arc<str>` root, `Send + Sync` (can cross threads).
-//! let arc = parse_with("SELECT 1", Ansi).expect("Arc<str> root");
+//! let arc = parse_with("SELECT 1", ParseConfig::new(Ansi)).expect("Arc<str> root");
 //! assert_eq!(arc.statements().len(), 1);
 //!
 //! // Single-thread tier: a non-atomic `Rc<str>` root, the cheapest refcount.
-//! let rc = parse_with_rc("SELECT 1", Ansi).expect("Rc<str> root");
+//! let rc = parse_rc_with("SELECT 1", ParseConfig::new(Ansi)).expect("Rc<str> root");
 //! assert_eq!(rc.statements().len(), 1);
 //!
 //! // Structure-only tier: drop the source and resolver, keep the statements.
@@ -281,9 +287,9 @@
 //! // PostgreSQL requires the `postgres` feature.)
 //! # #[cfg(feature = "postgres")] {
 //! # use squonk::dialect::Postgres;
-//! # use squonk::parse_with;
+//! # use squonk::{ParseConfig, parse_with};
 //! # use squonk::render::RenderErrorKind;
-//! let pg = parse_with("SELECT $1", Postgres).expect("parses under PostgreSQL");
+//! let pg = parse_with("SELECT $1", ParseConfig::new(Postgres)).expect("parses under PostgreSQL");
 //! let error = Renderer::new(Ansi).render_parsed(&pg).expect_err("ANSI has no $n");
 //! assert_eq!(error.kind(), RenderErrorKind::Unsupported);
 //! assert!(error.span().is_some());
@@ -340,7 +346,7 @@
 //! ```
 //! use squonk::ast::NoExt;
 //! use squonk::ast::dialect::{FeatureDelta, FeatureSet, ParameterSyntax};
-//! use squonk::{Dialect, parse_with};
+//! use squonk::{Dialect, ParseConfig, parse_with};
 //!
 //! // ANSI, plus anonymous `?` parameter placeholders.
 //! const ANSI_WITH_PARAMS: FeatureSet = FeatureSet::ANSI.with(
@@ -363,7 +369,7 @@
 //! }
 //!
 //! // `?` now parses where stock ANSI would reject it.
-//! let parsed = parse_with("SELECT ?", AnsiWithParams).expect("the custom dialect parses `?`");
+//! let parsed = parse_with("SELECT ?", ParseConfig::new(AnsiWithParams)).expect("the custom dialect parses `?`");
 //! assert_eq!(parsed.statements().len(), 1);
 //! ```
 //!
@@ -404,11 +410,11 @@
 //!
 //! ```
 //! use squonk::dialect::Ansi;
-//! use squonk::parse_recovering;
+//! use squonk::{ParseConfig, parse_recovering_with};
 //!
 //! // The middle statement is malformed; the outer two are well-formed.
 //! let recovered =
-//!     parse_recovering("SELECT 1; SELECT FROM t; SELECT 2", Ansi).expect("recovers");
+//!     parse_recovering_with("SELECT 1; SELECT FROM t; SELECT 2", ParseConfig::new(Ansi)).expect("recovers");
 //! assert!(recovered.has_errors());
 //! assert_eq!(recovered.errors().len(), 1);
 //! // The two good statements are still parsed and usable.
@@ -419,16 +425,16 @@
 //!
 //! Comments and whitespace are skipped at zero cost by default. To recover them — for
 //! a formatter, linter, or doc-comment extractor — set
-//! [`ParseOptions::with_trivia_capture`] (or the [`parse_with_trivia`] sugar). The
+//! [`ParseConfig::capture_trivia`] and pass it to [`parse_with`]. The
 //! captured runs hang off the [`Parsed`] root, queryable by offset via
 //! [`Parsed::trivia`], [`Parsed::trivia_in`], and [`Parsed::trivia_before`]; the
 //! statements themselves stay trivia-free.
 //!
 //! ```
 //! use squonk::dialect::Ansi;
-//! use squonk::parse_with_trivia;
+//! use squonk::{ParseConfig, parse_with};
 //!
-//! let parsed = parse_with_trivia("SELECT /* note */ 1", Ansi).expect("parses with trivia");
+//! let parsed = parse_with("SELECT /* note */ 1", ParseConfig::new(Ansi).capture_trivia(true)).expect("parses with trivia");
 //! // Every skipped run is recoverable from the root and slices back out of source.
 //! let comment = parsed.trivia().iter().find_map(|run| {
 //!     let span = run.span();
@@ -486,7 +492,7 @@
 //! Each [`parse_with`] result is an owned, `Send + Sync` `Parsed<Arc<str>>`,
 //! so parsing many *independent* SQL strings parallelizes with no feature, dependency,
 //! or code from this crate — just the caller's thread pool (e.g.
-//! `inputs.par_iter().map(|s| parse_with(s, Ansi))` under rayon). Aggregate throughput
+//! `inputs.par_iter().map(|s| parse_with(s, ParseConfig::new(Ansi)))` under rayon). Aggregate throughput
 //! scales near-linearly to the performance-core count: a measured 1.16M parses/sec on
 //! one thread rises to ~7.3M/sec on 14 threads (Apple M4 Max, 10 performance + 4
 //! efficiency cores), ~85-97% efficiency through 4 threads and hardware-bound
@@ -506,7 +512,7 @@
 //! use std::thread;
 //!
 //! use squonk::dialect::Ansi;
-//! use squonk::{Parsed, parse_with};
+//! use squonk::{ParseConfig, Parsed, parse_with};
 //!
 //! let inputs = ["SELECT 1", "INSERT INTO t VALUES (1)", "UPDATE t SET a = 1"];
 //!
@@ -515,7 +521,7 @@
 //! let parsed: Vec<Parsed> = thread::scope(|scope| {
 //!     let handles: Vec<_> = inputs
 //!         .iter()
-//!         .map(|&sql| scope.spawn(move || parse_with(sql, Ansi).expect("each input parses")))
+//!         .map(|&sql| scope.spawn(move || parse_with(sql, ParseConfig::new(Ansi)).expect("each input parses")))
 //!         .collect();
 //!     handles
 //!         .into_iter()
@@ -553,21 +559,21 @@ pub mod parser;
 pub mod render;
 pub mod tokenizer;
 
-/// [`parse`] is the crate's default-dialect (`Ansi`) convenience, re-exported here so the crate's own leading example (`use squonk::parse;`) works from the root; [`BuiltinDialect`]/[`parse_with_builtin`] add runtime built-in dialect selection, the compile-time-free sibling of [`parse_with`].
+/// [`parse`] is the crate's default-dialect (`Ansi`) convenience, re-exported here so the crate's own leading example (`use squonk::parse;`) works from the root; [`BuiltinDialect`]/[`parse_builtin`] add runtime built-in dialect selection, the compile-time-free sibling of [`parse_with`].
 pub use dialect::{
-    BuiltinDialect, ParseBuiltinDialectError, parse, parse_recovering_with_builtin,
-    parse_recovering_with_builtin_options, parse_with_builtin, parse_with_builtin_options,
-    tokenize_with_builtin, tokenize_with_builtin_trivia,
+    BuiltinDialect, ParseBuiltinDialectError, parse, parse_builtin, parse_builtin_with,
+    parse_recovering_builtin, parse_recovering_builtin_with, tokenize_with_builtin,
+    tokenize_with_builtin_trivia,
 };
 /// The parser engine, dialect trait, owned root, and entry points.
 pub use parser::{
-    ClauseKw, ClauseMark, ClauseMarkIndex, DEFAULT_RECURSION_LIMIT, Dialect, ParseOptions, Parsed,
-    Parser, Statements, StockParsed, parse_with, parse_with_options, parse_with_rc,
-    parse_with_trivia, statements, statements_with_options,
+    ClauseKw, ClauseMark, ClauseMarkIndex, DEFAULT_RECURSION_LIMIT, Dialect, ParseConfig, Parsed,
+    Parser, Statements, StockParsed, parse_rc, parse_rc_with, parse_with, statements,
+    statements_with,
 };
 /// Resilient multi-error parsing: collect every diagnostic and the partial AST in
 /// one run, instead of stopping at the first error like the default [`parse_with`].
-pub use parser::{Recovered, parse_recovering, parse_recovering_with_options};
+pub use parser::{Recovered, parse_recovering, parse_recovering_with};
 /// The one-call [`transpile`] convenience — parse under a source dialect, render for a
 /// target — and its [`TranspileError`], re-exported from [`render`] beside the
 /// lower-level [`Renderer`](render::Renderer) building block it composes.

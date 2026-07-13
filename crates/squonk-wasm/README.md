@@ -1,6 +1,6 @@
 # Squonk for TypeScript and JavaScript
 
-Typed WebAssembly bindings for Squonk's SQL parser, renderer, formatter, tokenizer, and transpiler. Packages are ESM-only, require Node 22 or newer for their synchronous Node entrypoint, and include TypeScript declarations.
+Typed native and WebAssembly bindings for Squonk's SQL parser, renderer, formatter, tokenizer, and transpiler. Packages require Node 22 or newer for their synchronous Node entrypoint and include TypeScript declarations.
 
 ## Choose a package
 
@@ -22,9 +22,9 @@ npm install @squonk-sql/postgres
 
 The `squonk` umbrella additionally includes BigQuery, Hive, ClickHouse, Databricks, MSSQL, Snowflake, and Redshift. Every package has the complete document API; there are no `full` variants.
 
-## Node
+## Node and Bun
 
-Node initializes its colocated WASM synchronously when the module loads. Consumers do not call `init()`:
+Node and Bun select a prebuilt Node-API engine for the current platform. Unsupported platforms and Node's `--no-addons` mode fall back to colocated WASM. Both paths are synchronous and consumers never call `init()`:
 
 ```ts
 import { format, parse, parseRecovering, tokenize } from "@squonk-sql/postgres";
@@ -43,6 +43,20 @@ console.log(tokenize("select $1").tokens);
 ```
 
 A focused package defaults to its named dialect. Pass `{ dialect: "ansi" }` when the ANSI baseline is desired.
+
+Use `runtimeInfo()` when diagnostics or telemetry need to distinguish `{ backend: "native" }` from `{ backend: "wasm" }`. Application behavior must not depend on which compatible backend was selected.
+
+## Deno and edge runtimes
+
+Bare imports in Deno use a permissionless WebAssembly-module entrypoint; `--allow-read` and `--allow-ffi` are not required. Cloudflare Wrangler selects the `workerd` entrypoint, and edge-light bundlers receive the corresponding static WASM-module entrypoint. All retain the synchronous parse API:
+
+```ts
+import { parse } from "npm:@squonk-sql/postgres";
+
+console.log(parse("select $1").toSQL());
+```
+
+Explicit runtime entrypoints are available as `/node`, `/deno`, `/workerd`, `/edge-light`, `/browser`, and `/wasm`. Normal consumers should use the bare package import and let conditional exports select the backend.
 
 ## Browser
 
@@ -71,15 +85,17 @@ The API includes:
 - `parse`, `parseJson`, `parseWithLimit`
 - `parseRecovering`, `parseRecoveringJson`
 - `render`, `redact`, `format`, `transpile`
-- `tokenize`, `supportedDialects`, `version`
+- `tokenize`, `supportedDialects`, `version`, `schemaVersion`, `runtimeInfo`
 - `isDialectName`, `assertDialectName`, `canonicalDialectName`
 - `Document`, `RecoveredDocument`, `Node`, `Ident`, `ObjectName`, `Diagnostic`, and `SqlParseError`
 
 Wrapper instances are created by parse operations and remain bound to their WASM
-runtime; their constructors are not a supported public factory. `raw` and `toJSON()`
-are live mutable views, so edits are observed by subsequent rendering. Node fragment
-rendering supports complete statements, queries, expressions, and data types;
-context-dependent nodes report `unsupported_node_render`.
+runtime; their constructors are not a supported public factory. Parse results stay in
+WASM through source metadata access and parse → render. Reading `raw`, calling
+`toJSON()`, or using `parseJson` explicitly materializes the tree into JavaScript;
+that materialized view is live, so edits are observed by subsequent rendering. Node
+fragment rendering supports complete statements, queries, expressions, and data
+types; context-dependent nodes report `unsupported_node_render`.
 
 Dialect aliases infer canonical result types:
 
@@ -113,6 +129,8 @@ npm run typecheck
 npm run smoke:variants
 npm run size:check:tarball
 npm run smoke:install
+npm run smoke:runtimes
+npm run smoke:workerd
 ```
 
-`npm run build` creates seven optimized WASM artifacts, compiles the shared TypeScript facade, and stages exact publish trees under `dist/npm/`. The checked-in build manifest remains private; publishing is performed only from verified staged artifacts by the protected release workflow.
+`npm run build` creates browser/edge and Deno WASM artifacts, builds the local Node-API addon, compiles the shared TypeScript facade, and stages exact publish trees under `dist/npm/`. The release workflow builds eight platform addons independently before staging. The checked-in build manifest remains private; publishing is performed only from verified staged artifacts by the protected release workflow.

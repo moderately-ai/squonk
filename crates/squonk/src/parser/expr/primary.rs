@@ -268,8 +268,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
         match token.kind {
             TokenKind::Number => {
                 self.advance()?;
-                let kind =
-                    number_literal_kind(self.span_text(token.span), self.parse_float_as_decimal());
+                let kind = number_literal_kind(
+                    self.span_text(token.span),
+                    self.float_as_decimal_enabled(),
+                );
                 let literal = Literal {
                     kind,
                     meta: self.make_meta(token.span),

@@ -1298,17 +1298,27 @@ mod tests {
     /// statement is the expected variant, pinning the dispatch boundary.
     #[test]
     fn dispatch_routes_dml_keywords_to_this_family() {
-        let _ =
-            insert_of(&parse_with("INSERT INTO t DEFAULT VALUES", TestDialect).expect("INSERT"));
-        let _ = update_of(&parse_with("UPDATE t SET a = 1", TestDialect).expect("UPDATE"));
-        let _ = delete_of(&parse_with("DELETE FROM t", TestDialect).expect("DELETE"));
+        let _ = insert_of(
+            &parse_with(
+                "INSERT INTO t DEFAULT VALUES",
+                crate::ParseConfig::new(TestDialect),
+            )
+            .expect("INSERT"),
+        );
+        let _ = update_of(
+            &parse_with("UPDATE t SET a = 1", crate::ParseConfig::new(TestDialect))
+                .expect("UPDATE"),
+        );
+        let _ = delete_of(
+            &parse_with("DELETE FROM t", crate::ParseConfig::new(TestDialect)).expect("DELETE"),
+        );
     }
 
     #[test]
     fn insert_values_parses_target_columns_and_default_items() {
         let parsed = parse_with(
             "INSERT INTO t (id, name) VALUES (1, DEFAULT), (2, 'b')",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("INSERT VALUES parses");
         let insert = insert_of(&parsed);
@@ -1348,8 +1358,11 @@ mod tests {
 
     #[test]
     fn insert_default_values_parses() {
-        let parsed =
-            parse_with("INSERT INTO t DEFAULT VALUES", TestDialect).expect("INSERT parses");
+        let parsed = parse_with(
+            "INSERT INTO t DEFAULT VALUES",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("INSERT parses");
         let insert = insert_of(&parsed);
         assert!(matches!(insert.source, InsertSource::DefaultValues { .. }));
     }
@@ -1365,17 +1378,21 @@ mod tests {
             "INSERT INTO t (id, name) DEFAULT VALUES",
             "INSERT INTO t AS x (id) DEFAULT VALUES",
         ] {
-            parse_with(sql, TestDialect).expect_err(&format!("should reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
+                .expect_err(&format!("should reject {sql:?}"));
         }
-        parse_with("INSERT INTO t (id) VALUES (1)", TestDialect)
-            .expect("a column list on a VALUES source stays accepted");
+        parse_with(
+            "INSERT INTO t (id) VALUES (1)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("a column list on a VALUES source stays accepted");
     }
 
     #[test]
     fn insert_select_and_source_with_clause_parse() {
         let parsed = parse_with(
             "INSERT INTO t WITH src AS (SELECT 1) SELECT * FROM src",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("INSERT ... SELECT parses");
         let insert = insert_of(&parsed);
@@ -1390,7 +1407,7 @@ mod tests {
     fn statement_level_with_insert_parses() {
         let parsed = parse_with(
             "WITH src AS (SELECT 1) INSERT INTO t SELECT * FROM src",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("WITH ... INSERT parses");
         let insert = insert_of(&parsed);
@@ -1403,7 +1420,7 @@ mod tests {
     fn insert_alias_requires_as_and_overriding_is_preserved() {
         let parsed = parse_with(
             "INSERT INTO t AS target (id) OVERRIDING SYSTEM VALUE VALUES (1)",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("aliased INSERT parses");
         let insert = insert_of(&parsed);
@@ -1411,15 +1428,18 @@ mod tests {
         assert_eq!(parsed.resolver().resolve(alias.sym), "target");
         assert_eq!(insert.overriding, Some(InsertOverriding::SystemValue));
 
-        parse_with("INSERT INTO t target VALUES (1)", TestDialect)
-            .expect_err("PostgreSQL rejects INSERT target aliases without AS");
+        parse_with(
+            "INSERT INTO t target VALUES (1)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("PostgreSQL rejects INSERT target aliases without AS");
     }
 
     #[test]
     fn update_parses_assignments_from_where_and_aliases() {
         let parsed = parse_with(
             "UPDATE t AS target SET a = 1, b = DEFAULT FROM u WHERE target.id = u.id",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("UPDATE parses");
         let update = update_of(&parsed);
@@ -1446,7 +1466,7 @@ mod tests {
     fn update_accepts_bare_alias_and_statement_with_clause() {
         let parsed = parse_with(
             "WITH src AS (SELECT 1) UPDATE t target SET a = 1 WHERE EXISTS (SELECT 1)",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("WITH ... UPDATE parses");
         let update = update_of(&parsed);
@@ -1459,7 +1479,7 @@ mod tests {
     fn delete_parses_using_where_and_aliases() {
         let parsed = parse_with(
             "DELETE FROM t AS target USING u WHERE target.id = u.id",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("DELETE parses");
         let delete = delete_of(&parsed);
@@ -1480,7 +1500,7 @@ mod tests {
     fn delete_accepts_bare_alias_and_statement_with_clause() {
         let parsed = parse_with(
             "WITH src AS (SELECT 1) DELETE FROM t target WHERE EXISTS (SELECT 1)",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("WITH ... DELETE parses");
         let delete = delete_of(&parsed);
@@ -1491,12 +1511,16 @@ mod tests {
 
     #[test]
     fn delete_requires_from_and_ansi_rejects_only() {
-        parse_with("DELETE t", TestDialect).expect_err("DELETE requires FROM");
+        parse_with("DELETE t", crate::ParseConfig::new(TestDialect))
+            .expect_err("DELETE requires FROM");
         // `ONLY` is gated by dialect data, so the ANSI baseline rejects it rather
         // than misreading the reserved keyword as a table named `ONLY`.
-        parse_with("UPDATE ONLY t SET a = 1", TestDialect)
-            .expect_err("ANSI has no ONLY-target inheritance suppression");
-        parse_with("DELETE FROM ONLY t", TestDialect)
+        parse_with(
+            "UPDATE ONLY t SET a = 1",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI has no ONLY-target inheritance suppression");
+        parse_with("DELETE FROM ONLY t", crate::ParseConfig::new(TestDialect))
             .expect_err("ANSI has no ONLY-target inheritance suppression");
     }
 
@@ -1531,16 +1555,19 @@ mod tests {
             "UPDATE 'table1' SET a = 1",
             "INSERT INTO 'table1' VALUES (1)",
         ] {
-            let parsed =
-                parse_with(sql, SQLITE_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(SQLITE_DIALECT))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(SQLITE_DIALECT)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
             assert_eq!(rendered, sql, "round-trip");
         }
         // The folded name carries the single-quote spelling.
-        let parsed = parse_with("DELETE FROM 'table1'", SQLITE_DIALECT)
-            .expect("DELETE FROM 'table1' parses");
+        let parsed = parse_with(
+            "DELETE FROM 'table1'",
+            crate::ParseConfig::new(SQLITE_DIALECT),
+        )
+        .expect("DELETE FROM 'table1' parses");
         assert_eq!(
             delete_of(&parsed).target.name.0[0].quote,
             QuoteStyle::Single
@@ -1548,15 +1575,18 @@ mod tests {
 
         // PostgreSQL (flag off) syntax-rejects a string literal in the relation-target
         // position.
-        parse_with("DELETE FROM 'table1' WHERE f1 = 3", PG_DIALECT)
-            .expect_err("PostgreSQL rejects a string literal as a relation-target name");
+        parse_with(
+            "DELETE FROM 'table1' WHERE f1 = 3",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect_err("PostgreSQL rejects a string literal as a relation-target name");
     }
 
     #[test]
     fn insert_on_conflict_do_update_and_returning_parse() {
         let parsed = parse_with(
             "INSERT INTO t (id, n) VALUES (1, 2) ON CONFLICT (id) DO UPDATE SET n = excluded.n RETURNING *",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("INSERT ... ON CONFLICT DO UPDATE ... RETURNING parses");
         let insert = insert_of(&parsed);
@@ -1595,7 +1625,7 @@ mod tests {
         // Bare `DO NOTHING`: no arbiter.
         let parsed = parse_with(
             "INSERT INTO t VALUES (1) ON CONFLICT DO NOTHING",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("bare ON CONFLICT DO NOTHING parses");
         let on_conflict = on_conflict_of(insert_of(&parsed));
@@ -1605,7 +1635,7 @@ mod tests {
         // Named constraint arbiter.
         let parsed = parse_with(
             "INSERT INTO t VALUES (1) ON CONFLICT ON CONSTRAINT t_pkey DO NOTHING",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("ON CONFLICT ON CONSTRAINT parses");
         let target = on_conflict_of(insert_of(&parsed))
@@ -1620,7 +1650,7 @@ mod tests {
         // Index arbiter with a partial-index predicate.
         let parsed = parse_with(
             "INSERT INTO t VALUES (1) ON CONFLICT (a, b) WHERE a > 0 DO NOTHING",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("ON CONFLICT (cols) WHERE predicate parses");
         let target = on_conflict_of(insert_of(&parsed))
@@ -1641,7 +1671,7 @@ mod tests {
     fn update_and_delete_returning_parse() {
         let parsed = parse_with(
             "UPDATE t SET a = 1 WHERE id = 2 RETURNING a, id",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("UPDATE ... RETURNING parses");
         let returning = update_of(&parsed)
@@ -1651,8 +1681,11 @@ mod tests {
         assert_eq!(returning.items.len(), 2);
 
         // A qualified wildcard and an aliased expression round-trip into SelectItem shapes.
-        let parsed = parse_with("DELETE FROM t RETURNING t.*, id AS removed", PG_DIALECT)
-            .expect("DELETE ... RETURNING parses");
+        let parsed = parse_with(
+            "DELETE FROM t RETURNING t.*, id AS removed",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("DELETE ... RETURNING parses");
         let returning = delete_of(&parsed)
             .returning
             .as_ref()
@@ -1678,8 +1711,11 @@ mod tests {
         // `RETURNING * EXCLUDE c1`). PG_DIALECT leaves the gate off, so the modifier
         // keyword stays unconsumed input there — the over-acceptance guard.
         use crate::dialect::DuckDb;
-        let parsed = parse_with("INSERT INTO v0 VALUES (1) RETURNING * EXCLUDE c1", DuckDb)
-            .expect("RETURNING * EXCLUDE parses under DuckDb");
+        let parsed = parse_with(
+            "INSERT INTO v0 VALUES (1) RETURNING * EXCLUDE c1",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("RETURNING * EXCLUDE parses under DuckDb");
         let returning = insert_of(&parsed).returning.as_ref().expect("RETURNING");
         let SelectItem::Wildcard {
             options: Some(options),
@@ -1692,7 +1728,7 @@ mod tests {
         assert!(
             parse_with(
                 "INSERT INTO v0 VALUES (1) RETURNING * EXCLUDE c1",
-                PG_DIALECT
+                crate::ParseConfig::new(PG_DIALECT)
             )
             .is_err(),
             "the modifiers stay rejected where the gate is off",
@@ -1709,14 +1745,19 @@ mod tests {
             "UPDATE t SET a = 1 RETURNING *",
             "DELETE FROM t RETURNING *",
         ] {
-            parse_with(sql, TestDialect).expect_err("ANSI has no RETURNING / ON CONFLICT");
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
+                .expect_err("ANSI has no RETURNING / ON CONFLICT");
         }
     }
 
     #[test]
     fn update_and_delete_only_target_forms_parse() {
         // Bare `ONLY name`.
-        let parsed = parse_with("UPDATE ONLY t SET a = 1", PG_DIALECT).expect("UPDATE ONLY parses");
+        let parsed = parse_with(
+            "UPDATE ONLY t SET a = 1",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("UPDATE ONLY parses");
         let target = &update_of(&parsed).target;
         assert_eq!(
             target.inheritance,
@@ -1725,8 +1766,11 @@ mod tests {
         assert_eq!(parsed.resolver().resolve(target.name.0[0].sym), "t");
 
         // Parenthesized `ONLY ( name )`, with an alias after the close paren.
-        let parsed = parse_with("DELETE FROM ONLY (t) AS d WHERE d.id = 1", PG_DIALECT)
-            .expect("DELETE FROM ONLY (t) parses");
+        let parsed = parse_with(
+            "DELETE FROM ONLY (t) AS d WHERE d.id = 1",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("DELETE FROM ONLY (t) parses");
         let delete = delete_of(&parsed);
         assert_eq!(
             delete.target.inheritance,
@@ -1740,8 +1784,8 @@ mod tests {
     fn update_and_delete_descendant_star_target_forms_round_trip() {
         // `t *` is the explicit-descendants counterpart to `ONLY t`: it attaches a
         // trailing star to a plain target and round-trips through rendering.
-        let parsed =
-            parse_with("UPDATE t * SET a = 1", Postgres).expect("UPDATE target `*` parses");
+        let parsed = parse_with("UPDATE t * SET a = 1", crate::ParseConfig::new(Postgres))
+            .expect("UPDATE target `*` parses");
         assert_eq!(
             update_of(&parsed).target.inheritance,
             RelationInheritance::Descendants
@@ -1753,8 +1797,11 @@ mod tests {
             "UPDATE t * SET a = 1"
         );
 
-        let parsed =
-            parse_with("DELETE FROM t * WHERE id = 1", Postgres).expect("DELETE target `*` parses");
+        let parsed = parse_with(
+            "DELETE FROM t * WHERE id = 1",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("DELETE target `*` parses");
         assert_eq!(
             delete_of(&parsed).target.inheritance,
             RelationInheritance::Descendants
@@ -1767,15 +1814,18 @@ mod tests {
         );
 
         // The descendant `*` is gated like `ONLY`, so ANSI rejects it on a target too.
-        parse_with("UPDATE t * SET a = 1", TestDialect)
+        parse_with("UPDATE t * SET a = 1", crate::ParseConfig::new(TestDialect))
             .expect_err("ANSI has no descendant-table `*` marker");
     }
 
     #[test]
     fn update_multi_column_assignment_forms_parse() {
         // A value row mixing an expression and a per-element DEFAULT.
-        let parsed = parse_with("UPDATE t SET (a, b) = (1, DEFAULT)", PG_DIALECT)
-            .expect("tuple value row parses");
+        let parsed = parse_with(
+            "UPDATE t SET (a, b) = (1, DEFAULT)",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("tuple value row parses");
         let assignments = &update_of(&parsed).assignments;
         assert_eq!(assignments.len(), 1);
         let UpdateAssignment::Tuple {
@@ -1798,8 +1848,11 @@ mod tests {
         assert!(matches!(values[1], UpdateValue::Default { .. }));
 
         // Explicit `ROW( ... )`.
-        let parsed = parse_with("UPDATE t SET (a, b) = ROW(1, 2)", PG_DIALECT)
-            .expect("explicit ROW source parses");
+        let parsed = parse_with(
+            "UPDATE t SET (a, b) = ROW(1, 2)",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("explicit ROW source parses");
         let UpdateAssignment::Tuple { source, .. } = &update_of(&parsed).assignments[0] else {
             panic!("expected a tuple assignment");
         };
@@ -1809,24 +1862,33 @@ mod tests {
         ));
 
         // Row subquery.
-        let parsed = parse_with("UPDATE t SET (a, b) = (SELECT x, y FROM u)", PG_DIALECT)
-            .expect("row subquery source parses");
+        let parsed = parse_with(
+            "UPDATE t SET (a, b) = (SELECT x, y FROM u)",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("row subquery source parses");
         let UpdateAssignment::Tuple { source, .. } = &update_of(&parsed).assignments[0] else {
             panic!("expected a tuple assignment");
         };
         assert!(matches!(source, UpdateTupleSource::Subquery { .. }));
 
         // Bare `DEFAULT` for every target.
-        let parsed = parse_with("UPDATE t SET (a, b) = DEFAULT", PG_DIALECT)
-            .expect("bare DEFAULT source parses");
+        let parsed = parse_with(
+            "UPDATE t SET (a, b) = DEFAULT",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("bare DEFAULT source parses");
         let UpdateAssignment::Tuple { source, .. } = &update_of(&parsed).assignments[0] else {
             panic!("expected a tuple assignment");
         };
         assert!(matches!(source, UpdateTupleSource::Default { .. }));
 
         // A single and a tuple assignment in one statement.
-        let parsed = parse_with("UPDATE t SET a = 1, (b, c) = (2, 3)", PG_DIALECT)
-            .expect("mixed single and tuple assignments parse");
+        let parsed = parse_with(
+            "UPDATE t SET a = 1, (b, c) = (2, 3)",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("mixed single and tuple assignments parse");
         let assignments = &update_of(&parsed).assignments;
         assert_eq!(assignments.len(), 2);
         assert!(matches!(assignments[0], UpdateAssignment::Single { .. }));
@@ -1837,7 +1899,7 @@ mod tests {
     fn multi_column_assignment_reaches_on_conflict_do_update() {
         let parsed = parse_with(
             "INSERT INTO t VALUES (1) ON CONFLICT (id) DO UPDATE SET (a, b) = (1, 2)",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("ON CONFLICT DO UPDATE with a tuple assignment parses");
         let ConflictAction::Update { assignments, .. } = &on_conflict_of(insert_of(&parsed)).action
@@ -1862,7 +1924,8 @@ mod tests {
     fn insert_on_duplicate_key_update_parses_and_round_trips() {
         let sql =
             "INSERT INTO t (id, n) VALUES (1, 2) ON DUPLICATE KEY UPDATE a = 1, b = VALUES(c)";
-        let parsed = parse_with(sql, MYSQL_DIALECT).expect("ON DUPLICATE KEY UPDATE parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_DIALECT))
+            .expect("ON DUPLICATE KEY UPDATE parses");
         let insert = insert_of(&parsed);
 
         let assignments = on_duplicate_assignments(insert);
@@ -1900,8 +1963,10 @@ mod tests {
         // ANSI and PostgreSQL leave `ON` unconsumed, so the trailing clause is leftover
         // input and the parse fails.
         let sql = "INSERT INTO t VALUES (1) ON DUPLICATE KEY UPDATE a = 1";
-        parse_with(sql, TestDialect).expect_err("ANSI has no ON DUPLICATE KEY UPDATE");
-        parse_with(sql, Postgres).expect_err("PostgreSQL spells its upsert ON CONFLICT");
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
+            .expect_err("ANSI has no ON DUPLICATE KEY UPDATE");
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect_err("PostgreSQL spells its upsert ON CONFLICT");
     }
 
     #[test]
@@ -1909,7 +1974,8 @@ mod tests {
         // MySQL 8.0.19+ row alias between the VALUES source and `ON DUPLICATE KEY UPDATE`,
         // with an optional column-alias list; it reuses the shared `TableAlias` shape.
         let sql = "INSERT INTO t VALUES (1) AS new_row(c) ON DUPLICATE KEY UPDATE a = new_row.c";
-        let parsed = parse_with(sql, MYSQL_DIALECT).expect("row alias parses");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(MYSQL_DIALECT)).expect("row alias parses");
         let insert = insert_of(&parsed);
         let alias = insert.row_alias.as_ref().expect("a row alias");
         assert_eq!(parsed.resolver().resolve(alias.name.sym), "new_row");
@@ -1928,14 +1994,17 @@ mod tests {
         // The row alias rides the `on_duplicate_key_update` gate (only MySQL enables it),
         // so elsewhere the `AS new_row` after the source is leftover input -> reject.
         let sql = "INSERT INTO t VALUES (1) AS new_row";
-        parse_with(sql, TestDialect).expect_err("ANSI has no INSERT row alias");
-        parse_with(sql, Postgres).expect_err("PostgreSQL has no INSERT row alias");
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
+            .expect_err("ANSI has no INSERT row alias");
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect_err("PostgreSQL has no INSERT row alias");
     }
 
     #[test]
     fn update_order_by_and_limit_tails_parse_and_round_trip() {
         let sql = "UPDATE t SET a = 1 WHERE b = 2 ORDER BY c DESC LIMIT 5";
-        let parsed = parse_with(sql, MYSQL_DIALECT).expect("UPDATE tails parse");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(MYSQL_DIALECT)).expect("UPDATE tails parse");
         let update = update_of(&parsed);
         assert_eq!(update.order_by.len(), 1);
         assert_eq!(update.order_by[0].asc, Some(false));
@@ -1952,7 +2021,8 @@ mod tests {
     #[test]
     fn delete_order_by_and_limit_tails_parse_and_round_trip() {
         let sql = "DELETE FROM t WHERE b = 2 ORDER BY c LIMIT 5";
-        let parsed = parse_with(sql, MYSQL_DIALECT).expect("DELETE tails parse");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(MYSQL_DIALECT)).expect("DELETE tails parse");
         let delete = delete_of(&parsed);
         assert_eq!(delete.order_by.len(), 1);
         let limit = delete.limit.as_ref().expect("a LIMIT tail");
@@ -1973,8 +2043,10 @@ mod tests {
             "UPDATE t SET a = 1 ORDER BY a LIMIT 1",
             "DELETE FROM t ORDER BY a LIMIT 1",
         ] {
-            parse_with(sql, TestDialect).expect_err("ANSI has no UPDATE/DELETE tails");
-            parse_with(sql, Postgres).expect_err("PostgreSQL has no UPDATE/DELETE tails");
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
+                .expect_err("ANSI has no UPDATE/DELETE tails");
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err("PostgreSQL has no UPDATE/DELETE tails");
         }
     }
 
@@ -1998,7 +2070,8 @@ mod tests {
             "REPLACE INTO t SET a = 1, b = 2",
             "REPLACE INTO t SELECT 1",
         ] {
-            let parsed = parse_with(sql, MYSQL_DIALECT).expect("REPLACE parses under MySQL");
+            let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_DIALECT))
+                .expect("REPLACE parses under MySQL");
             let insert = insert_of(&parsed);
             assert_eq!(insert.verb, InsertVerb::Replace);
             assert!(insert.upsert.is_none(), "REPLACE has no upsert tail");
@@ -2013,8 +2086,11 @@ mod tests {
 
         // The SET source reuses the shared `UpdateAssignment` shape, so a `DEFAULT` in
         // value position parses exactly as it does in `UPDATE ... SET`.
-        let parsed = parse_with("REPLACE INTO t SET a = 1, b = DEFAULT", MYSQL_DIALECT)
-            .expect("REPLACE ... SET parses");
+        let parsed = parse_with(
+            "REPLACE INTO t SET a = 1, b = DEFAULT",
+            crate::ParseConfig::new(MYSQL_DIALECT),
+        )
+        .expect("REPLACE ... SET parses");
         let assignments = set_source_assignments(insert_of(&parsed));
         assert_eq!(assignments.len(), 2);
         let (_, value) = single_assignment(&assignments[1]);
@@ -2025,8 +2101,11 @@ mod tests {
     fn mysql_replace_optional_into_normalizes_to_into() {
         // `INTO` is optional after `REPLACE` (MySQL); the bare form parses and renders
         // canonically with `INTO`, mirroring how a bare DML alias normalizes to `AS`.
-        let parsed =
-            parse_with("REPLACE t VALUES (1)", MYSQL_DIALECT).expect("REPLACE without INTO parses");
+        let parsed = parse_with(
+            "REPLACE t VALUES (1)",
+            crate::ParseConfig::new(MYSQL_DIALECT),
+        )
+        .expect("REPLACE without INTO parses");
         assert_eq!(insert_of(&parsed).verb, InsertVerb::Replace);
         assert_eq!(
             Renderer::new(MYSQL_DIALECT)
@@ -2042,7 +2121,7 @@ mod tests {
         // `ON DUPLICATE KEY UPDATE` is leftover input even under MySQL.
         parse_with(
             "REPLACE INTO t VALUES (1) ON DUPLICATE KEY UPDATE a = 1",
-            MYSQL_DIALECT,
+            crate::ParseConfig::new(MYSQL_DIALECT),
         )
         .expect_err("REPLACE has no ON DUPLICATE KEY UPDATE tail");
     }
@@ -2052,8 +2131,10 @@ mod tests {
         // `replace_into` is off in ANSI/PostgreSQL, so `REPLACE` is never dispatched and
         // surfaces as an unknown statement.
         for sql in ["REPLACE INTO t VALUES (1)", "REPLACE INTO t SET a = 1"] {
-            parse_with(sql, TestDialect).expect_err("ANSI has no REPLACE statement");
-            parse_with(sql, Postgres).expect_err("PostgreSQL has no REPLACE statement");
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
+                .expect_err("ANSI has no REPLACE statement");
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err("PostgreSQL has no REPLACE statement");
         }
     }
 
@@ -2082,7 +2163,8 @@ mod tests {
                 ConflictResolution::Replace,
             ),
         ] {
-            let parsed = parse_with(sql, SQLITE_DIALECT).expect("INSERT OR <action> parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(SQLITE_DIALECT))
+                .expect("INSERT OR <action> parses");
             let insert = insert_of(&parsed);
             assert_eq!(insert.verb, InsertVerb::Insert);
             assert_eq!(insert.or_action, Some(action));
@@ -2097,7 +2179,11 @@ mod tests {
         // A plain `INSERT` under the same preset leaves the slot empty.
         assert!(
             insert_of(
-                &parse_with("INSERT INTO t VALUES (1)", SQLITE_DIALECT).expect("plain INSERT")
+                &parse_with(
+                    "INSERT INTO t VALUES (1)",
+                    crate::ParseConfig::new(SQLITE_DIALECT)
+                )
+                .expect("plain INSERT")
             )
             .or_action
             .is_none()
@@ -2108,7 +2194,8 @@ mod tests {
     fn update_or_action_parses_and_round_trips() {
         // `UPDATE OR <action>` reuses the same slot on the `Update` node and round-trips.
         let sql = "UPDATE OR REPLACE t SET a = 2 WHERE a = 1";
-        let parsed = parse_with(sql, SQLITE_DIALECT).expect("UPDATE OR REPLACE parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(SQLITE_DIALECT))
+            .expect("UPDATE OR REPLACE parses");
         assert_eq!(
             update_of(&parsed).or_action,
             Some(ConflictResolution::Replace)
@@ -2129,7 +2216,8 @@ mod tests {
             ("UPDATE OR FAIL t SET a = 1", ConflictResolution::Fail),
             ("UPDATE OR IGNORE t SET a = 1", ConflictResolution::Ignore),
         ] {
-            let parsed = parse_with(sql, SQLITE_DIALECT).expect("UPDATE OR <action> parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(SQLITE_DIALECT))
+                .expect("UPDATE OR <action> parses");
             assert_eq!(update_of(&parsed).or_action, Some(action));
             assert_eq!(
                 Renderer::new(SQLITE_DIALECT)
@@ -2146,14 +2234,20 @@ mod tests {
         // as different source texts, so each keeps its own representation (the `ConflictResolution`
         // slot vs the `InsertVerb::Replace` tag) and round-trips through it — one is never
         // folded onto the other.
-        let or_replace = parse_with("INSERT OR REPLACE INTO t VALUES (1)", SQLITE_DIALECT)
-            .expect("INSERT OR REPLACE parses");
+        let or_replace = parse_with(
+            "INSERT OR REPLACE INTO t VALUES (1)",
+            crate::ParseConfig::new(SQLITE_DIALECT),
+        )
+        .expect("INSERT OR REPLACE parses");
         let insert = insert_of(&or_replace);
         assert_eq!(insert.verb, InsertVerb::Insert);
         assert_eq!(insert.or_action, Some(ConflictResolution::Replace));
 
-        let replace_into =
-            parse_with("REPLACE INTO t VALUES (1)", SQLITE_DIALECT).expect("REPLACE INTO parses");
+        let replace_into = parse_with(
+            "REPLACE INTO t VALUES (1)",
+            crate::ParseConfig::new(SQLITE_DIALECT),
+        )
+        .expect("REPLACE INTO parses");
         let replace = insert_of(&replace_into);
         assert_eq!(replace.verb, InsertVerb::Replace);
         assert!(
@@ -2188,9 +2282,11 @@ mod tests {
             "INSERT OR IGNORE INTO t VALUES (1)",
             "UPDATE OR REPLACE t SET a = 1",
         ] {
-            parse_with(sql, TestDialect).expect_err("ANSI has no INSERT OR / UPDATE OR");
-            parse_with(sql, Postgres).expect_err("PostgreSQL has no INSERT OR / UPDATE OR");
-            parse_with(sql, MYSQL_DIALECT)
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
+                .expect_err("ANSI has no INSERT OR / UPDATE OR");
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err("PostgreSQL has no INSERT OR / UPDATE OR");
+            parse_with(sql, crate::ParseConfig::new(MYSQL_DIALECT))
                 .expect_err("MySQL has no OR-prefixed conflict action (INSERT IGNORE differs)");
         }
     }
@@ -2200,7 +2296,8 @@ mod tests {
         // The `SET` source is shared by INSERT and REPLACE under `insert_set`; INSERT
         // accepts it under MySQL and round-trips verbatim, with the standard verb tag.
         let sql = "INSERT INTO t SET a = 1, b = 2";
-        let parsed = parse_with(sql, MYSQL_DIALECT).expect("INSERT ... SET parses");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(MYSQL_DIALECT)).expect("INSERT ... SET parses");
         let insert = insert_of(&parsed);
         assert_eq!(insert.verb, InsertVerb::Insert);
         assert_eq!(set_source_assignments(insert).len(), 2);
@@ -2216,9 +2313,12 @@ mod tests {
     fn ansi_and_postgres_reject_insert_set_source() {
         // `insert_set` is off in ANSI/PostgreSQL, so `SET` after the target is leftover
         // input and the parse fails.
-        parse_with("INSERT INTO t SET a = 1", TestDialect)
-            .expect_err("ANSI INSERT has no SET source");
-        parse_with("INSERT INTO t SET a = 1", Postgres)
+        parse_with(
+            "INSERT INTO t SET a = 1",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI INSERT has no SET source");
+        parse_with("INSERT INTO t SET a = 1", crate::ParseConfig::new(Postgres))
             .expect_err("PostgreSQL INSERT has no SET source");
     }
 
@@ -2230,14 +2330,14 @@ mod tests {
         // in their clause lead-in.
         let parsed = parse_with(
             "INSERT INTO t VALUES (1) ON DUPLICATE KEY UPDATE n = 2",
-            MYSQL_DIALECT,
+            crate::ParseConfig::new(MYSQL_DIALECT),
         )
         .expect("ON DUPLICATE KEY UPDATE parses");
         let on_duplicate = on_duplicate_assignments(insert_of(&parsed));
 
         let pg = parse_with(
             "INSERT INTO t VALUES (1) ON CONFLICT (id) DO UPDATE SET n = 2",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("ON CONFLICT DO UPDATE parses");
         let Upsert::OnConflict { conflict, .. } =
@@ -2266,8 +2366,11 @@ mod tests {
 
     #[test]
     fn update_and_delete_where_current_of_parse() {
-        let parsed = parse_with("UPDATE t SET a = 1 WHERE CURRENT OF c", PG_DIALECT)
-            .expect("UPDATE ... WHERE CURRENT OF parses");
+        let parsed = parse_with(
+            "UPDATE t SET a = 1 WHERE CURRENT OF c",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("UPDATE ... WHERE CURRENT OF parses");
         let DmlSelection::CurrentOf { cursor, .. } = update_of(&parsed)
             .selection
             .as_ref()
@@ -2278,8 +2381,11 @@ mod tests {
         assert_eq!(parsed.resolver().resolve(cursor.sym), "c");
 
         // A quoted cursor name round-trips through the identifier path.
-        let parsed = parse_with("DELETE FROM t WHERE CURRENT OF \"My Cursor\"", PG_DIALECT)
-            .expect("DELETE ... WHERE CURRENT OF parses");
+        let parsed = parse_with(
+            "DELETE FROM t WHERE CURRENT OF \"My Cursor\"",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("DELETE ... WHERE CURRENT OF parses");
         let DmlSelection::CurrentOf { cursor, .. } = delete_of(&parsed)
             .selection
             .as_ref()
@@ -2290,8 +2396,11 @@ mod tests {
         assert_eq!(parsed.resolver().resolve(cursor.sym), "My Cursor");
 
         // A plain condition stays a `Where`, not a positioned form.
-        let parsed = parse_with("UPDATE t SET a = 1 WHERE id = 2", PG_DIALECT)
-            .expect("UPDATE ... WHERE condition parses");
+        let parsed = parse_with(
+            "UPDATE t SET a = 1 WHERE id = 2",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("UPDATE ... WHERE condition parses");
         assert!(matches!(
             update_of(&parsed).selection,
             Some(DmlSelection::Where { .. })
@@ -2308,7 +2417,7 @@ mod tests {
             "UPDATE t SET a = 1 WHERE CURRENT OF c",
             "DELETE FROM t WHERE CURRENT OF c",
         ] {
-            parse_with(sql, TestDialect)
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
                 .expect_err("ANSI has no ONLY / multi-column SET / WHERE CURRENT OF");
         }
     }
@@ -2324,7 +2433,8 @@ mod tests {
                    WHEN MATCHED THEN UPDATE SET balance = t.balance + s.amount \
                    WHEN NOT MATCHED THEN INSERT (id, balance) VALUES (s.account_id, s.amount) \
                    WHEN NOT MATCHED AND s.flag THEN DO NOTHING";
-        let parsed = parse_with(sql, Postgres).expect("the full MERGE parses");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(Postgres)).expect("the full MERGE parses");
         let merge = merge_of(&parsed);
 
         assert_eq!(
@@ -2401,7 +2511,8 @@ mod tests {
     fn merge_using_subquery_source_parses_and_round_trips() {
         let sql = "MERGE INTO t USING (SELECT id FROM staging) AS s ON t.id = s.id \
                    WHEN MATCHED THEN DELETE";
-        let parsed = parse_with(sql, Postgres).expect("a subquery USING source parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("a subquery USING source parses");
         assert!(matches!(
             merge_of(&parsed).using.relation,
             TableFactor::Derived { .. }
@@ -2420,7 +2531,7 @@ mod tests {
     fn ansi_accepts_merge() {
         parse_with(
             "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN DELETE",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("ANSI accepts the standard MERGE statement");
     }
@@ -2431,7 +2542,7 @@ mod tests {
     fn mysql_rejects_merge() {
         parse_with(
             "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN DELETE",
-            MYSQL_DIALECT,
+            crate::ParseConfig::new(MYSQL_DIALECT),
         )
         .expect_err("MySQL has no MERGE statement");
     }
@@ -2447,18 +2558,19 @@ mod tests {
             "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED THEN UPDATE SET a = 1",
             "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED THEN DELETE",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("mismatched MERGE action: {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("mismatched MERGE action: {sql:?}"));
         }
 
         // `DO NOTHING` is valid in both branches.
         parse_with(
             "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN DO NOTHING",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("DO NOTHING is a valid MATCHED action");
         parse_with(
             "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED THEN DO NOTHING",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("DO NOTHING is a valid NOT MATCHED action");
     }
@@ -2476,7 +2588,8 @@ mod tests {
                    WHEN NOT MATCHED BY SOURCE AND t.stale THEN DELETE \
                    WHEN NOT MATCHED BY SOURCE THEN UPDATE SET archived = TRUE \
                    WHEN NOT MATCHED THEN INSERT VALUES (s.id)";
-        let parsed = parse_with(sql, Postgres).expect("BY SOURCE arms parse under PostgreSQL");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("BY SOURCE arms parse under PostgreSQL");
         let merge = merge_of(&parsed);
         assert_eq!(
             merge.clauses[0].match_kind,
@@ -2496,7 +2609,8 @@ mod tests {
         // `BY TARGET` folds onto the bare `NOT MATCHED` production and renders bare.
         let by_target = "MERGE INTO t USING s ON t.id = s.id \
                          WHEN NOT MATCHED BY TARGET THEN INSERT VALUES (s.id)";
-        let parsed = parse_with(by_target, Postgres).expect("BY TARGET parses");
+        let parsed =
+            parse_with(by_target, crate::ParseConfig::new(Postgres)).expect("BY TARGET parses");
         assert_eq!(
             merge_of(&parsed).clauses[0].match_kind,
             MergeMatchKind::NotMatchedByTarget
@@ -2510,7 +2624,7 @@ mod tests {
 
         parse_with(
             "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED BY SOURCE THEN DELETE",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect_err("the standard merge has no BY SOURCE arm");
     }
@@ -2529,12 +2643,13 @@ mod tests {
             "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED BY TARGET THEN UPDATE SET a = 1",
             "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED BY TARGET THEN DELETE",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("invalid BY arm must reject: {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("invalid BY arm must reject: {sql:?}"));
         }
         // `DO NOTHING` stays valid on the BY SOURCE arm (probed).
         parse_with(
             "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED BY SOURCE THEN DO NOTHING",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("DO NOTHING is a valid BY SOURCE action");
     }
@@ -2547,7 +2662,8 @@ mod tests {
     #[test]
     fn merge_insert_default_values_parses_and_round_trips() {
         let sql = "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED THEN INSERT DEFAULT VALUES";
-        let parsed = parse_with(sql, Postgres).expect("INSERT DEFAULT VALUES parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("INSERT DEFAULT VALUES parses");
         assert!(matches!(
             merge_of(&parsed).clauses[0].action,
             MergeAction::InsertDefault { .. }
@@ -2568,9 +2684,10 @@ mod tests {
             // And the MATCHED arm never takes an INSERT.
             "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN INSERT DEFAULT VALUES",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("must reject: {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("must reject: {sql:?}"));
         }
-        parse_with(sql, TestDialect)
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
             .expect_err("the standard merge insert has no DEFAULT VALUES form");
     }
 
@@ -2588,7 +2705,8 @@ mod tests {
             "MERGE INTO t USING s ON t.id = s.id \
              WHEN NOT MATCHED THEN INSERT OVERRIDING SYSTEM VALUE VALUES (s.a)",
         ] {
-            let parsed = parse_with(dialect_sql, Postgres).expect("OVERRIDING parses");
+            let parsed = parse_with(dialect_sql, crate::ParseConfig::new(Postgres))
+                .expect("OVERRIDING parses");
             let MergeAction::Insert { overriding, .. } = &merge_of(&parsed).clauses[0].action
             else {
                 panic!("expected an INSERT action");
@@ -2601,12 +2719,13 @@ mod tests {
                 dialect_sql,
             );
         }
-        parse_with(sql, TestDialect).expect("the override clause is SQL:2016 standard surface");
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
+            .expect("the override clause is SQL:2016 standard surface");
         // Only SYSTEM/USER name an override source (probed).
         parse_with(
             "MERGE INTO t USING s ON t.id = s.id \
              WHEN NOT MATCHED THEN INSERT (a) OVERRIDING grp VALUE VALUES (1)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect_err("only SYSTEM or USER can be overridden");
     }
@@ -2619,7 +2738,8 @@ mod tests {
     #[test]
     fn merge_into_only_target_parses_and_round_trips() {
         let sql = "MERGE INTO ONLY t AS m USING s ON m.id = s.id WHEN MATCHED THEN DELETE";
-        let parsed = parse_with(sql, Postgres).expect("MERGE INTO ONLY parses");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(Postgres)).expect("MERGE INTO ONLY parses");
         assert!(matches!(
             merge_of(&parsed).target.inheritance,
             RelationInheritance::Only(OnlySyntax::Bare)
@@ -2632,14 +2752,15 @@ mod tests {
         );
 
         let starred = "MERGE INTO t * USING s ON t.id = s.id WHEN MATCHED THEN DELETE";
-        let parsed = parse_with(starred, Postgres).expect("the descendant `*` parses");
+        let parsed = parse_with(starred, crate::ParseConfig::new(Postgres))
+            .expect("the descendant `*` parses");
         assert!(matches!(
             merge_of(&parsed).target.inheritance,
             RelationInheritance::Descendants
         ));
 
         for sql in [sql, starred] {
-            parse_with(sql, TestDialect)
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
                 .expect_err("ANSI has no inheritance markers on a MERGE target");
         }
     }
@@ -2653,7 +2774,8 @@ mod tests {
     fn merge_using_joined_source_parses_and_round_trips() {
         let sql = "MERGE INTO t USING a JOIN b ON a.k = b.k ON t.id = a.id \
                    WHEN MATCHED THEN DELETE";
-        let parsed = parse_with(sql, Postgres).expect("a joined USING source parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("a joined USING source parses");
         let merge = merge_of(&parsed);
         assert_eq!(merge.using.joins.len(), 1);
         assert!(matches!(merge.on, Expr::BinaryOp { .. }));
@@ -2666,7 +2788,7 @@ mod tests {
 
         parse_with(
             "MERGE INTO t USING a, b ON t.id = a.id WHEN MATCHED THEN DELETE",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect_err("the merge source is one table reference, never a list");
     }
@@ -2679,7 +2801,8 @@ mod tests {
     fn merge_with_leading_cte_parses_and_round_trips() {
         let sql = "WITH src AS (SELECT 1 AS id) MERGE INTO t USING src ON t.id = src.id \
                    WHEN MATCHED THEN DELETE";
-        let parsed = parse_with(sql, Postgres).expect("WITH … MERGE parses under PostgreSQL");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("WITH … MERGE parses under PostgreSQL");
         assert!(merge_of(&parsed).with.is_some());
         assert_eq!(
             Renderer::new(Postgres)
@@ -2687,7 +2810,7 @@ mod tests {
                 .expect("the MERGE renders"),
             sql,
         );
-        parse_with(sql, TestDialect)
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
             .expect_err("the standard merge statement takes no leading WITH");
     }
 
@@ -2700,7 +2823,8 @@ mod tests {
     fn merge_returning_parses_and_round_trips() {
         let sql = "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN DELETE \
                    RETURNING t.id, t.balance";
-        let parsed = parse_with(sql, Postgres).expect("MERGE … RETURNING parses under PostgreSQL");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("MERGE … RETURNING parses under PostgreSQL");
         assert!(merge_of(&parsed).returning.is_some());
         assert_eq!(
             Renderer::new(Postgres)
@@ -2708,16 +2832,18 @@ mod tests {
                 .expect("the MERGE renders"),
             sql,
         );
-        parse_with(sql, TestDialect).expect_err("RETURNING is gated off in the ANSI baseline");
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
+            .expect_err("RETURNING is gated off in the ANSI baseline");
     }
 
     #[test]
     fn duckdb_rejects_qualified_update_set_targets() {
         use crate::dialect::{DuckDb, Postgres};
-        parse_with("UPDATE t SET t.i = 1", DuckDb)
+        parse_with("UPDATE t SET t.i = 1", crate::ParseConfig::new(DuckDb))
             .expect_err("DuckDB rejects qualified SET targets");
-        parse_with("UPDATE t SET i = 1", DuckDb).expect("DuckDB admits bare SET targets");
-        parse_with("UPDATE t SET t.i = 1", Postgres)
+        parse_with("UPDATE t SET i = 1", crate::ParseConfig::new(DuckDb))
+            .expect("DuckDB admits bare SET targets");
+        parse_with("UPDATE t SET t.i = 1", crate::ParseConfig::new(Postgres))
             .expect("PostgreSQL admits qualified SET targets");
     }
 
@@ -2749,8 +2875,8 @@ mod tests {
             ),
         ];
         for (sql, label) in cases {
-            let parsed =
-                parse_with(sql, DuckDb).unwrap_or_else(|e| panic!("DuckDB parses {label}: {e:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|e| panic!("DuckDB parses {label}: {e:?}"));
             let Statement::Merge { merge, .. } = &parsed.statements()[0] else {
                 panic!("expected Merge for {label}");
             };
@@ -2774,8 +2900,10 @@ mod tests {
                 _ => unreachable!(),
             }
             // Postgres/ANSI reject the DuckDB-only spellings
-            parse_with(sql, Postgres).expect_err(&format!("Postgres rejects {label}"));
-            parse_with(sql, Ansi).expect_err(&format!("ANSI rejects {label}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("Postgres rejects {label}"));
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err(&format!("ANSI rejects {label}"));
         }
     }
 
@@ -2786,35 +2914,55 @@ mod tests {
 
         // INSERT OR REPLACE (engine-accept)
         let sql = "INSERT OR REPLACE INTO t VALUES (1)";
-        let parsed = parse_with(sql, DuckDb).expect("INSERT OR REPLACE");
+        let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("INSERT OR REPLACE");
         let Statement::Insert { insert, .. } = &parsed.statements()[0] else {
             panic!("insert");
         };
         assert_eq!(insert.or_action, Some(ConflictResolution::Replace));
-        parse_with(sql, Postgres).expect_err("PG has no INSERT OR");
+        parse_with(sql, crate::ParseConfig::new(Postgres)).expect_err("PG has no INSERT OR");
 
         // INSERT BY NAME (engine-accept; no column list)
         let sql = "INSERT INTO t BY NAME SELECT 1 AS a";
-        let parsed = parse_with(sql, DuckDb).expect("BY NAME");
+        let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("BY NAME");
         let Statement::Insert { insert, .. } = &parsed.statements()[0] else {
             panic!("insert");
         };
         assert_eq!(insert.column_matching, Some(InsertColumnMatching::ByName));
-        parse_with("INSERT INTO t (a) BY NAME SELECT 1 AS a", DuckDb)
-            .expect_err("BY NAME + column list rejected like DuckDB");
+        parse_with(
+            "INSERT INTO t (a) BY NAME SELECT 1 AS a",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("BY NAME + column list rejected like DuckDB");
 
         // INSERT BY POSITION
-        parse_with("INSERT INTO t BY POSITION VALUES (1)", DuckDb).expect("BY POSITION");
+        parse_with(
+            "INSERT INTO t BY POSITION VALUES (1)",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("BY POSITION");
 
         // Multi-col SET matching arity (engine Parser Error on mismatch)
-        parse_with("UPDATE t SET (a, b, c) = (1, 2, 3)", DuckDb).expect("matching arity");
-        parse_with("UPDATE t SET (a, b, c) = (1, 2)", DuckDb)
-            .expect_err("arity mismatch must reject like DuckDB");
-        parse_with("UPDATE t SET (a, b, c) = (1, 2, 3, 4)", DuckDb)
-            .expect_err("arity mismatch high");
+        parse_with(
+            "UPDATE t SET (a, b, c) = (1, 2, 3)",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("matching arity");
+        parse_with(
+            "UPDATE t SET (a, b, c) = (1, 2)",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("arity mismatch must reject like DuckDB");
+        parse_with(
+            "UPDATE t SET (a, b, c) = (1, 2, 3, 4)",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("arity mismatch high");
         // PostgreSQL raw parsing accepts this surface; arity is semantic analysis there.
-        parse_with("UPDATE t SET (a, b, c) = (1, 2)", Postgres)
-            .expect("PostgreSQL parses value-row arity mismatches");
+        parse_with(
+            "UPDATE t SET (a, b, c) = (1, 2)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("PostgreSQL parses value-row arity mismatches");
     }
 
     #[test]
@@ -2823,7 +2971,7 @@ mod tests {
         use crate::dialect::{Ansi, DuckDb};
 
         let sql = "SELECT 'hello' GLOB 'h*'";
-        let parsed = parse_with(sql, DuckDb).expect("GLOB");
+        let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("GLOB");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!();
         };
@@ -2837,10 +2985,10 @@ mod tests {
             panic!("{expr:?}");
         };
         assert_eq!(*op, BinaryOperator::Glob);
-        parse_with(sql, Ansi).expect_err("ANSI has no GLOB keyword op");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no GLOB keyword op");
 
         let sql = "SELECT 'hello' ^@ 'he'";
-        let parsed = parse_with(sql, DuckDb).expect("^@");
+        let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("^@");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!();
         };
@@ -2854,6 +3002,6 @@ mod tests {
             panic!("{expr:?}");
         };
         assert_eq!(*op, BinaryOperator::StartsWith);
-        parse_with(sql, Ansi).expect_err("ANSI has no ^@");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no ^@");
     }
 }

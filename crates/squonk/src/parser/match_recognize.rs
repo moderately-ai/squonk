@@ -437,9 +437,9 @@ mod tests {
     };
     use crate::dialect::{Lenient, Postgres, Snowflake};
     use crate::error::ParseErrorKind;
-    use crate::parser::{Parsed, parse_with, parse_with_options};
+    use crate::parser::{Parsed, parse_with};
 
-    use super::super::ParseOptions;
+    use super::super::ParseConfig;
 
     /// The first FROM relation of a single-query statement.
     fn relation_of(parsed: &Parsed) -> &TableFactor<crate::ast::NoExt> {
@@ -466,7 +466,8 @@ mod tests {
     /// Round-trip `sql` under Lenient (the render target that shares the gate): parse and
     /// render must reproduce it byte-for-byte.
     fn round_trips_under_lenient(sql: &str) {
-        let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let rendered = crate::render::Renderer::new(Lenient)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -483,7 +484,7 @@ mod tests {
              PATTERN (^ A B+ C* D{2,3}) \
              SUBSET U = (A, B) \
              DEFINE A AS a > 0, B AS b < 0)",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("the full MATCH_RECOGNIZE parses under Snowflake");
         let mr = factor_match_recognize(&parsed);
@@ -538,18 +539,25 @@ mod tests {
         // alias between the table and the operator) reaches it directly.
         let parsed = parse_with(
             "SELECT * FROM t MATCH_RECOGNIZE (PATTERN (A) DEFINE A AS a > 0)",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("Snowflake reaches the bare-factor MATCH_RECOGNIZE via the ColId reservation");
         assert_eq!(factor_match_recognize(&parsed).define.len(), 1);
         // The cost mirrors PIVOT's: under Snowflake an unquoted `match_recognize` is not a
         // table alias (bare or explicit-`AS`), while Lenient keeps it a plain identifier.
         assert!(
-            parse_with("SELECT * FROM t AS match_recognize", Snowflake).is_err(),
+            parse_with(
+                "SELECT * FROM t AS match_recognize",
+                crate::ParseConfig::new(Snowflake)
+            )
+            .is_err(),
             "Snowflake rejects a table alias named match_recognize",
         );
-        parse_with("SELECT * FROM t AS match_recognize", Lenient)
-            .expect("Lenient keeps match_recognize a plain identifier alias");
+        parse_with(
+            "SELECT * FROM t AS match_recognize",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient keeps match_recognize a plain identifier alias");
     }
 
     #[test]
@@ -557,7 +565,7 @@ mod tests {
         // Every clause but PATTERN is optional; a bare `PATTERN (A)` is a single symbol.
         let parsed = parse_with(
             "SELECT * FROM t AS m MATCH_RECOGNIZE (PATTERN (A))",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("the minimal form parses");
         let mr = factor_match_recognize(&parsed);
@@ -575,7 +583,7 @@ mod tests {
     fn match_recognize_takes_a_trailing_alias() {
         let parsed = parse_with(
             "SELECT * FROM t AS m MATCH_RECOGNIZE (PATTERN (A)) AS mr",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("the trailing alias parses");
         let TableFactor::MatchRecognize { alias, .. } = relation_of(&parsed) else {
@@ -608,8 +616,8 @@ mod tests {
             ),
         ] {
             let sql = format!("SELECT * FROM t AS m MATCH_RECOGNIZE ({sql} PATTERN (A))");
-            let parsed =
-                parse_with(&sql, Snowflake).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(&sql, crate::ParseConfig::new(Snowflake))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert_eq!(
                 factor_match_recognize(&parsed).rows_per_match,
                 Some(expected)
@@ -627,8 +635,8 @@ mod tests {
         ];
         for skip in cases {
             let sql = format!("SELECT * FROM t AS m MATCH_RECOGNIZE ({skip} PATTERN (A))");
-            let parsed =
-                parse_with(&sql, Snowflake).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(&sql, crate::ParseConfig::new(Snowflake))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert!(
                 factor_match_recognize(&parsed).after_match_skip.is_some(),
                 "{sql:?}",
@@ -641,7 +649,7 @@ mod tests {
         // Alternation is looser than concatenation: `A B | C` is `(A B) | C`.
         let parsed = parse_with(
             "SELECT * FROM t AS m MATCH_RECOGNIZE (PATTERN (A B | C))",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("alternation parses");
         let MatchRecognizePattern::Alternation { patterns, .. } =
@@ -656,7 +664,7 @@ mod tests {
         // Grouping, exclusion, and permutation.
         let parsed = parse_with(
             "SELECT * FROM t AS m MATCH_RECOGNIZE (PATTERN ((A | B) {- C -} PERMUTE(D, E)))",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("group / exclusion / permute parse");
         let MatchRecognizePattern::Concat { patterns, .. } =
@@ -679,7 +687,7 @@ mod tests {
     fn quantifier_bounds_parse_every_form() {
         let parsed = parse_with(
             "SELECT * FROM t AS m MATCH_RECOGNIZE (PATTERN (A* B+ C{2} D{3,} E{,4} F{2,5}))",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("every quantifier form parses");
         let MatchRecognizePattern::Concat { patterns, .. } =
@@ -733,7 +741,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT * FROM t AS m MATCH_RECOGNIZE (PATTERN (A))",
-                Postgres,
+                crate::ParseConfig::new(Postgres),
             )
             .is_err(),
             "PostgreSQL rejects the MATCH_RECOGNIZE table factor",
@@ -750,8 +758,8 @@ mod tests {
             "(".repeat(64),
             ")".repeat(64),
         );
-        let options = ParseOptions::default().with_recursion_limit(16);
-        let err = parse_with_options(&deep, Snowflake, options)
+        let options = ParseConfig::default().recursion_limit(16);
+        let err = parse_with(&deep, options.dialect(Snowflake))
             .expect_err("a 64-deep pattern nest must reject past a limit of 16");
         assert_eq!(err.kind, ParseErrorKind::RecursionLimitExceeded);
 
@@ -760,6 +768,7 @@ mod tests {
             "(".repeat(4),
             ")".repeat(4),
         );
-        parse_with(&shallow, Snowflake).expect("a shallow pattern nest parses under the default");
+        parse_with(&shallow, crate::ParseConfig::new(Snowflake))
+            .expect("a shallow pattern nest parses under the default");
     }
 }

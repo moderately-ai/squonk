@@ -1,9 +1,10 @@
 # Stable Rust API policy
 
 This policy covers the two published Rust crates, `squonk-ast` and
-`squonk`. It starts at the `v1.0.0` tag. The checked configuration in
-`release/semver-baseline.toml` is the machine-readable baseline; package paths
-are used there so the final project-name sweep does not invalidate the gate.
+`squonk`. It starts at the `v1.0.0` tag. Each major line uses its `.0.0` release
+tag as the immutable compatibility baseline; the checked configuration in
+`release/semver-baseline.toml` names the current baseline. Package paths are used
+there so crate-name changes do not invalidate the gate.
 
 ## Reviewed surface
 
@@ -87,11 +88,13 @@ cargo xtask semver
 ```
 
 While the workspace is 0.x, the command validates the checked baseline manifest
-and reports that comparison is pending. Once the workspace reaches 1.x, it
-requires the configured `v1.0.0` Git tag and an installed
-`cargo-semver-checks`, then compares both published crates against that tag with
-all features enabled. Install the external tool with `cargo install
-cargo-semver-checks --locked`; it is release tooling, not a workspace dependency.
+and reports that comparison is pending. At major `N >= 1`, it requires the
+configured `vN.0.0` Git tag and an installed `cargo-semver-checks`, then compares
+both published crates against that tag with all features enabled. The xtask also
+requires the configured tag to match the workspace major, so retaining an older
+major's baseline cannot turn the checks into a vacuous major-version comparison.
+Install the external tool with `cargo install cargo-semver-checks --locked`; it is
+release tooling, not a workspace dependency.
 
 `cargo-semver-checks` is a guard, not the policy. Review its report together
 with this document because automated analysis does not cover every generic,

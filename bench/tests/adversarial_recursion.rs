@@ -26,7 +26,7 @@ use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser as UpstreamParser;
 use squonk::dialect::Postgres;
 use squonk::error::ParseErrorKind;
-use squonk::{DEFAULT_RECURSION_LIMIT, ParseOptions, parse_with, parse_with_options};
+use squonk::{DEFAULT_RECURSION_LIMIT, ParseConfig, parse_with};
 use squonk_bench::adversarial::{nested_parens, nested_subqueries};
 
 /// A safe depth far past anything legitimate (real SQL rarely nests beyond ~20) yet
@@ -43,13 +43,9 @@ const OVER_REACH: usize = 8;
 const PAST_THEIRS_BUDGET: usize = 200;
 
 fn ours_under_limit(sql: &str, limit: usize) -> Result<(), ParseErrorKind> {
-    parse_with_options(
-        sql,
-        Postgres,
-        ParseOptions::default().with_recursion_limit(limit),
-    )
-    .map(|_| ())
-    .map_err(|e| e.kind)
+    parse_with(sql, ParseConfig::new(Postgres).recursion_limit(limit))
+        .map(|_| ())
+        .map_err(|e| e.kind)
 }
 
 fn theirs_accepts(sql: &str) -> bool {
@@ -110,7 +106,7 @@ fn ours_rejects_cleanly_past_the_shipped_default_limit() {
             ("nested_parens", nested_parens(depth)),
             ("nested_subqueries", nested_subqueries(depth)),
         ] {
-            let err = parse_with(&sql, Postgres).expect_err(&format!(
+            let err = parse_with(&sql, squonk::ParseConfig::new(Postgres)).expect_err(&format!(
                 "{label}: depth {depth} must reject under the default limit"
             ));
             assert_eq!(
@@ -131,7 +127,7 @@ fn ours_accepts_a_safe_depth_under_the_default() {
         ("nested_subqueries", nested_subqueries(SAFE_DEPTH)),
     ] {
         assert!(
-            parse_with(&sql, Postgres).is_ok(),
+            parse_with(&sql, squonk::ParseConfig::new(Postgres)).is_ok(),
             "{label}: depth {SAFE_DEPTH} is safe and must parse under the default limit"
         );
     }
@@ -166,7 +162,7 @@ fn ours_has_more_headroom_than_upstream() {
         ("nested_subqueries", nested_subqueries(SAFE_DEPTH)),
     ] {
         assert!(
-            parse_with(&sql, Postgres).is_ok(),
+            parse_with(&sql, squonk::ParseConfig::new(Postgres)).is_ok(),
             "{label}: ours accepts the safe depth {SAFE_DEPTH}"
         );
         assert!(

@@ -103,7 +103,7 @@ pub enum ParseErrorKind {
     /// parsing was stopped with this clean error instead of recursing further and
     /// overflowing the stack. A deliberate DoS guard for untrusted SQL;
     /// the limit is configurable via
-    /// [`Parser::with_recursion_limit`](crate::parser::Parser::with_recursion_limit).
+    /// [`Parser::recursion_limit`](crate::parser::Parser::recursion_limit).
     RecursionLimitExceeded,
     /// A lexical fault that widened into a `ParseError` at a `?` boundary,
     /// carrying the tokenizer's machine-matchable [`LexErrorKind`]. The span and a

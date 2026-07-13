@@ -474,7 +474,7 @@ enum Serialized {
 /// For a both-accept SELECT `s`, it round-trips `s` through our parser and canonical
 /// renderer and asks DuckDB whether the *shape* survived, by comparing
 /// `json_serialize_sql(s)` against
-/// `json_serialize_sql(render_statements(&parse_with(s, DuckDb)?, Canonical))`, each
+/// `json_serialize_sql(render_statements(&parse_with(s, DuckDb)?, squonk::ParseConfig::new(Canonical)))`, each
 /// normalized by stripping DuckDB's byte-offset `query_location` fields (the sole
 /// position-bearing field; the same-named `offset` field is the semantic LIMIT OFFSET and
 /// is kept). Each side self-compares engine-tree vs engine-tree in DuckDB's OWN
@@ -530,7 +530,7 @@ impl DuckDbMediatedStructuralOracle {
     /// arrive in-band via `json_serialize_sql`'s `error` flag. This is why the lane
     /// returns a `Result` where the always-in-process PG lane does not.
     pub fn verdict(&self, sql: &str) -> Result<DuckDbMediatedVerdict, OracleUnavailable> {
-        let parsed = match parse_with(sql, DuckDb) {
+        let parsed = match parse_with(sql, squonk::ParseConfig::new(DuckDb)) {
             Ok(parsed) => parsed,
             Err(err) => {
                 return Ok(DuckDbMediatedVerdict::Skip(format!(

@@ -15,6 +15,7 @@ from ._ast_metadata import AST_FIELD_TYPES
 
 
 JsonDict = dict[str, Any]
+NativeDocument = Union[_native.NativeDocument, _native.NativeRecoveredDocument]
 _TDialect = TypeVar("_TDialect", bound=str, covariant=True)
 
 
@@ -39,41 +40,56 @@ class Span:
 class Document(Mapping[str, Any], Generic[_TDialect]):
     """A live typed view over a parsed SQL document."""
 
-    def __init__(self, raw: JsonDict):
+    def __init__(
+        self,
+        raw: Optional[JsonDict] = None,
+        *,
+        native: Optional[NativeDocument] = None,
+    ):
+        if (raw is None) == (native is None):
+            raise TypeError("Document requires exactly one raw mapping or native document")
         self._raw = raw
+        self._native = native
         self._keyword_symbols: Optional[dict[int, str]] = None
         self._line_starts: Optional[list[int]] = None
 
     @property
     def raw(self) -> JsonDict:
         """The serde-compatible parse document backing this view."""
-        return self._raw
+        return self._materialize()
 
     @property
     def source(self) -> str:
+        if self._raw is None:
+            assert self._native is not None
+            return self._native.source
         return cast(str, self._raw["source"])
 
     @property
     def dialect(self) -> _TDialect:
+        if self._raw is None:
+            assert self._native is not None
+            return cast(_TDialect, self._native.dialect)
         return cast(_TDialect, self._raw.get("dialect", "ansi"))
 
     @property
     def statements(self) -> list[Node]:
         return [
             _wrap_node(value, self, "Statement")
-            for value in self._raw.get("statements", [])
+            for value in self.raw.get("statements", [])
         ]
 
     @property
     def trivia(self) -> list[Trivia]:
-        return [Trivia(value, self) for value in self._raw.get("trivia", [])]
+        return [Trivia(value, self) for value in self.raw.get("trivia", [])]
 
     @property
     def errors(self) -> list[Diagnostic]:
-        return [Diagnostic(error, self) for error in self._raw.get("errors", [])]
+        return [Diagnostic(error, self) for error in self.raw.get("errors", [])]
 
     def resolve_symbol(self, symbol: int) -> str:
-        resolver = self._raw.get("resolver", {})
+        raw = self.raw
+        resolver = raw.get("resolver", {})
         dynamic_base = int(resolver.get("dynamic_base", 1))
         if symbol < dynamic_base:
             if self._keyword_symbols is None:
@@ -88,7 +104,7 @@ class Document(Mapping[str, Any], Generic[_TDialect]):
 
         index = symbol - dynamic_base
         try:
-            return str(self._raw["symbols"][index])
+            return str(raw["symbols"][index])
         except IndexError as error:
             raise KeyError(f"unknown dynamic symbol {symbol}") from error
 
@@ -132,15 +148,21 @@ class Document(Mapping[str, Any], Generic[_TDialect]):
                 yield node
 
     def to_dict(self) -> JsonDict:
-        return self._raw
+        return self.raw
 
     def to_json(self) -> str:
+        if self._raw is None:
+            assert self._native is not None
+            return self._native.to_json()
         return json.dumps(self._raw, separators=(",", ":"))
 
     def to_sql(self, *, dialect: Optional[str] = None, mode: str = "canonical") -> str:
         from ._exceptions import SquonkError
 
         try:
+            if self._raw is None:
+                assert self._native is not None
+                return self._native.render(dialect or self.dialect, mode)
             return _native.render_document(
                 self.to_json(),
                 dialect or self.dialect,
@@ -150,18 +172,25 @@ class Document(Mapping[str, Any], Generic[_TDialect]):
             raise error._with_source(self.source) from None
 
     def __getitem__(self, key: str) -> Any:
-        return self._raw[key]
+        return self.raw[key]
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._raw)
+        return iter(self.raw)
 
     def __len__(self) -> int:
-        return len(self._raw)
+        return len(self.raw)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Document):
-            return self._raw == other._raw
-        return self._raw == other
+            return self.raw == other.raw
+        return self.raw == other
+
+    def _materialize(self) -> JsonDict:
+        if self._raw is None:
+            assert self._native is not None
+            self._raw = cast(JsonDict, json.loads(self._native.to_json()))
+            self._native = None
+        return self._raw
 
     def _line_start_bytes(self) -> list[int]:
         if self._line_starts is None:
@@ -430,6 +459,13 @@ def document_from_json(text: str, *, recovered: bool = False) -> Document[str]:
     raw = json.loads(text)
     cls = RecoveredDocument if recovered else Document
     return cls(raw)
+
+
+def document_from_native(
+    native: NativeDocument, *, recovered: bool = False
+) -> Document[str]:
+    cls = RecoveredDocument if recovered else Document
+    return cls(native=native)
 
 
 def _wrap(value: Any, document: Document[str], type_spec: Optional[str] = None) -> Any:

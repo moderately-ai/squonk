@@ -139,7 +139,8 @@ pub fn accept_reject_divergence<D: Dialect, O: AcceptRejectOracle>(
         Ok(verdict) => verdict,
         Err(OracleUnavailable(_)) => return None,
     };
-    let ours = OracleVerdict::from_accepts(parse_with(sql, dialect).is_ok());
+    let ours =
+        OracleVerdict::from_accepts(parse_with(sql, squonk::ParseConfig::new(dialect)).is_ok());
     (engine != ours).then(|| {
         format!(
             "{}={}, squonk={}",
@@ -211,7 +212,7 @@ pub fn structural_comparison<D: Dialect<Ext = NoExt>, O: StructuralOracle>(
     dialect: D,
     oracle: &O,
 ) -> Comparison {
-    let ours = match parse_with(sql, dialect) {
+    let ours = match parse_with(sql, squonk::ParseConfig::new(dialect)) {
         Ok(parsed) => parsed,
         Err(_) => return Comparison::OursReject,
     };

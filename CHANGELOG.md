@@ -9,6 +9,44 @@ All notable changes to this project are documented here. The format is based on 
 
 _No unreleased changes yet._
 
+## [2.0.0] — 2026-07-13
+
+This release makes the deliberately breaking interface cleanup identified after the
+first stable publish and coordinates the Rust crates, Python wheel, npm facades, and
+npm native platform packages on one major version.
+
+### Changed
+
+- **Rust parse configuration is one typed combining form.** `ParseConfig<D>` now
+  carries the dialect, recursion limit, trivia capture, and float classification.
+  Simple ANSI calls remain `parse(sql)`, `parse_recovering(sql)`, and
+  `statements(sql)`; configured calls consistently use `parse_with(sql, config)`,
+  `parse_recovering_with(sql, config)`, and `statements_with(sql, config)`.
+- **Rust ownership tiers are explicit.** The default parsed document uses `Arc`;
+  single-threaded callers can choose `parse_rc` or `parse_rc_with` for an `Rc` root.
+- **Python returns ergonomic lazy document views.** Parse results retain their
+  Rust-owned representation for metadata and rendering, materializing the typed AST
+  only when mapping, traversal, or JSON access requests it. The package ships
+  `py.typed`, exhaustive generated AST types, structured diagnostics, and typed
+  helpers for tokenization, rendering, redaction, formatting, and transpilation.
+- **Node and Bun use prebuilt native bindings automatically.** Consumers call the
+  synchronous API without `init()`. Unsupported platforms and `--no-addons` fall
+  back to colocated WebAssembly; `runtimeInfo()` exposes the selected backend for
+  diagnostics.
+- **JavaScript distribution is runtime-aware.** Focused `@squonk-sql/*` packages and
+  the `squonk` umbrella now provide conditional Node, Bun, Deno, workerd,
+  edge-light, and browser entrypoints. Deno and edge entrypoints use static Wasm
+  modules, while browsers use the explicit asynchronous `createSquonk()` factory.
+
+### Removed
+
+- Removed the Rust 1.x option-specific aliases (`ParseOptions`,
+  `parse_with_options`, `parse_with_trivia`, `parse_*_with_builtin_options`, and
+  related variants) and the option setters on `Parser`. Migrate by constructing
+  `ParseConfig::new(dialect)` and using its builder methods, then pass it to the
+  appropriate `*_with` function. Runtime-selected built-ins use
+  `parse_builtin_with` or `parse_recovering_builtin_with`.
+
 ## [1.0.0] — 2026-07-12 (first stable release)
 
 First stable release of `squonk`, a lightweight, high-performance, multi-dialect SQL parser with a Rust core and Python and TypeScript/WASM bindings. `1.0.0` freezes the public API: from this tag forward, no breaking change to the surface described in [docs/stable-api.md](docs/stable-api.md) lands without a major-version bump, and the machine-checked SemVer gate (`cargo xtask semver`) enforces it against the `v1.0.0` baseline.
@@ -41,7 +79,8 @@ First stable release of `squonk`, a lightweight, high-performance, multi-dialect
 
 - **Windows `x86_64` promoted to Tier 1 (tested).** The `cross-os` lane in `platform.yml` now runs the full core-crate `cargo nextest` suite on `windows-latest` on every landing, alongside macOS `arm64` and Linux `x86_64`; a Windows test regression blocks the release. This is a release-notes-worthy tier promotion per the [platform-support](docs/platform-support.md) Evolution rule. See that document for the full Tier 1/2/3 matrix across all three published surfaces.
 
-[Unreleased]: https://github.com/moderately-ai/squonk/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/moderately-ai/squonk/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/moderately-ai/squonk/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/moderately-ai/squonk/releases/tag/v1.0.0
 
 ---

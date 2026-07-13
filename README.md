@@ -88,7 +88,7 @@ const doc = parse("select id, name from users where id = $1");
 console.log(doc.toSQL());
 ```
 
-Node exposes a synchronous API with automatic initialization. Browsers use the explicit async factory from `@squonk-sql/postgres/browser`. Focused `@squonk-sql/*` packages ship one dialect-sized artifact; the unscoped `squonk` package includes every built-in dialect.
+Node and Bun expose a synchronous API backed by a prebuilt Node-API engine, with automatic WASM fallback when addons are unavailable. Deno and Workers receive permissionless runtime-specific WASM entrypoints. Browsers use the explicit async factory from `@squonk-sql/postgres/browser`. Focused `@squonk-sql/*` packages retain dialect-gated APIs and dialect-sized WASM artifacts; the unscoped `squonk` package includes every built-in dialect.
 
 The parser is pure Rust, so building it does not require a C toolchain.
 

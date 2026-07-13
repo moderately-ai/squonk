@@ -596,7 +596,7 @@ fn pg_regress_corpus_is_pinned_and_parses_without_panicking() {
     for &sql in &flat {
         let start = std::time::Instant::now();
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            parse_with(sql, Postgres).is_ok()
+            parse_with(sql, squonk::ParseConfig::new(Postgres)).is_ok()
         })) {
             Ok(true) => accept += 1,
             Ok(false) => reject += 1,
@@ -1195,7 +1195,7 @@ fn subclassify_family(groups: &[RegressGroup], family: &str) -> (usize, Vec<Reje
                 continue;
             }
             // A coverage gap is: our parser rejects AND pg_query accepts. Parse once.
-            let Err(err) = parse_with(sql, Postgres) else {
+            let Err(err) = parse_with(sql, squonk::ParseConfig::new(Postgres)) else {
                 continue; // we accept — agree-accept or over-accept, not a gap
             };
             if !postgres_accepts(sql) {

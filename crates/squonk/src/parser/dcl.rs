@@ -939,7 +939,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             self.advance()?;
             let span = sign_span.union(number.span);
             let literal = Literal {
-                kind: number_literal_kind(self.span_text(span), self.parse_float_as_decimal()),
+                kind: number_literal_kind(self.span_text(span), self.float_as_decimal_enabled()),
                 meta: self.make_meta(span),
             };
             let meta = self.make_meta(start.union(self.preceding_span()));
@@ -948,8 +948,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
         match self.peek()? {
             Some(token) if token.kind == TokenKind::Number => {
                 self.advance()?;
-                let kind =
-                    number_literal_kind(self.span_text(token.span), self.parse_float_as_decimal());
+                let kind = number_literal_kind(
+                    self.span_text(token.span),
+                    self.float_as_decimal_enabled(),
+                );
                 let literal = Literal {
                     kind,
                     meta: self.make_meta(token.span),
@@ -2496,7 +2498,8 @@ mod tests {
     use crate::render::Renderer;
 
     fn parse_one(sql: &str) -> Parsed {
-        parse_with(sql, TestDialect).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
     }
 
     fn parse_session(sql: &str) -> SessionStatement {
@@ -3047,7 +3050,7 @@ mod tests {
             "REVOKE SELECT ON t", // missing FROM grantees
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "{sql:?} should be rejected",
             );
         }
@@ -3074,7 +3077,8 @@ mod tests {
         sql: &str,
         dialect: D,
     ) -> SessionStatement {
-        let parsed = parse_with(sql, dialect).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(dialect))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let [Statement::Session { session, .. }] = parsed.statements() else {
             panic!(
                 "{sql:?} did not parse to one session statement: {:?}",
@@ -3124,8 +3128,8 @@ mod tests {
         // value position is a clean parse error ("expected a SET value, found ["), the
         // reading of every dialect that does not open a list with `[`; the same text
         // parses once the gate is on.
-        assert!(parse_with("SET x = ['a']", TestDialect).is_err());
-        assert!(parse_with("SET x = ['a']", SET_LIST_DIALECT).is_ok());
+        assert!(parse_with("SET x = ['a']", crate::ParseConfig::new(TestDialect)).is_err());
+        assert!(parse_with("SET x = ['a']", crate::ParseConfig::new(SET_LIST_DIALECT)).is_ok());
     }
 
     #[test]
@@ -3136,8 +3140,8 @@ mod tests {
             "SET allowed_paths TO ['a', 'b']",
             "SET allowed_directories TO []",
         ] {
-            let parsed =
-                parse_with(sql, SET_LIST_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(SET_LIST_DIALECT))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(SET_LIST_DIALECT)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?}: {err}"));
@@ -3194,8 +3198,14 @@ mod tests {
         // consumed, so it surfaces as the same trailing-token error as before this flag,
         // while the bare `SHOW ALL`/`SHOW <var>` forms parse exactly as today —
         // `verbose = false` on the node.
-        assert!(parse_with("SHOW ALL VERBOSE", TestDialect).is_err());
-        assert!(parse_with("SHOW work_mem VERBOSE", TestDialect).is_err());
+        assert!(parse_with("SHOW ALL VERBOSE", crate::ParseConfig::new(TestDialect)).is_err());
+        assert!(
+            parse_with(
+                "SHOW work_mem VERBOSE",
+                crate::ParseConfig::new(TestDialect)
+            )
+            .is_err()
+        );
         assert!(matches!(
             parse_session("SHOW ALL"),
             SessionStatement::Show {
@@ -3217,7 +3227,7 @@ mod tests {
     #[test]
     fn show_verbose_round_trips_exactly() {
         for sql in ["SHOW ALL VERBOSE", "SHOW work_mem VERBOSE", "SHOW ALL"] {
-            let parsed = parse_with(sql, SHOW_VERBOSE_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(SHOW_VERBOSE_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(SHOW_VERBOSE_DIALECT)
                 .render_parsed(&parsed)
@@ -3249,7 +3259,7 @@ mod tests {
             }
         ));
         // `SHOW ALL TABLES` routes to the typed `Statement::Show`, not the session family.
-        let parsed = parse_with("SHOW ALL TABLES", Lenient)
+        let parsed = parse_with("SHOW ALL TABLES", crate::ParseConfig::new(Lenient))
             .unwrap_or_else(|err| panic!("SHOW ALL TABLES: {err:?}"));
         assert!(
             matches!(parsed.statements(), [Statement::Show { .. }]),
@@ -3268,7 +3278,8 @@ mod tests {
     /// source-fidelity round-trip contract (quoting spellings, keyword casing preserved).
     fn mysql_round_trips(sql: &str) -> Parsed {
         use crate::dialect::MySql;
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
         let rendered = Renderer::new(MYSQL_RENDER)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("RENDER {sql:?}: {err:?}"));
@@ -3302,7 +3313,7 @@ mod tests {
     fn mysql_rejects(sql: &str) {
         use crate::dialect::MySql;
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "{sql:?} should be a MySQL parse error",
         );
     }
@@ -3312,7 +3323,8 @@ mod tests {
     /// spelling (`:=` → `=`), where the fidelity lives in the AST tag, not a byte replay.
     fn mysql_session_no_roundtrip(sql: &str) -> SessionStatement {
         use crate::dialect::MySql;
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
         let [Statement::Session { session, .. }] = parsed.statements() else {
             panic!("{sql:?} is not a session statement");
         };
@@ -3372,7 +3384,7 @@ mod tests {
             features: &VARIABLE_ASSIGNMENT_ONLY,
         };
         assert!(
-            parse_with("SET x = 1", dialect).is_err(),
+            parse_with("SET x = 1", crate::ParseConfig::new(dialect)).is_err(),
             "no SET form parses when session_statements is off",
         );
         // And the combination is neither a feature-dependency violation (the flag is not
@@ -3651,7 +3663,11 @@ mod tests {
 
         // The `opt_comma` separator: whitespace-separated ids parse and render canonically.
         use crate::dialect::MySql;
-        let parsed = parse_with("SET RESOURCE GROUP g FOR 1 2 3", MySql).unwrap();
+        let parsed = parse_with(
+            "SET RESOURCE GROUP g FOR 1 2 3",
+            crate::ParseConfig::new(MySql),
+        )
+        .unwrap();
         let rendered = Renderer::new(MYSQL_RENDER).render_parsed(&parsed).unwrap();
         assert_eq!(rendered, "SET RESOURCE GROUP g FOR 1, 2, 3");
     }
@@ -3672,11 +3688,14 @@ mod tests {
 
         use crate::dialect::{Lenient, MySql};
         let sql = "SET RESOURCE GROUP g";
-        parse_with(sql, MySql).unwrap_or_else(|err| panic!("MySQL accepts {sql:?}: {err:?}"));
-        parse_with(sql, Lenient).unwrap_or_else(|err| panic!("Lenient accepts {sql:?}: {err:?}"));
-        parse_with(sql, crate::dialect::Postgres)
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("MySQL accepts {sql:?}: {err:?}"));
+        parse_with(sql, crate::ParseConfig::new(Lenient))
+            .unwrap_or_else(|err| panic!("Lenient accepts {sql:?}: {err:?}"));
+        parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
             .expect_err(&format!("PostgreSQL rejects {sql:?}"));
-        parse_with(sql, crate::dialect::Ansi).expect_err(&format!("ANSI rejects {sql:?}"));
+        parse_with(sql, crate::ParseConfig::new(crate::dialect::Ansi))
+            .expect_err(&format!("ANSI rejects {sql:?}"));
     }
 
     #[test]
@@ -3806,15 +3825,16 @@ mod tests {
         use crate::dialect::Postgres;
         // With `user_role_management` off, `CREATE USER` is not dispatched and the parse fails
         // (the leading `USER` surfaces as the ordinary CREATE-object parse error).
-        assert!(parse_with("CREATE USER u@localhost", Postgres).is_err());
-        assert!(parse_with("DROP ROLE r", Postgres).is_err());
+        assert!(parse_with("CREATE USER u@localhost", crate::ParseConfig::new(Postgres)).is_err());
+        assert!(parse_with("DROP ROLE r", crate::ParseConfig::new(Postgres)).is_err());
     }
 
     // --- MySQL account-based GRANT / REVOKE ---------------------------------
 
     /// Parse `sql` under MySQL and return its single access-control statement.
     fn mysql_access(sql: &str) -> AccessControlStatement {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let [Statement::AccessControl { access, .. }] = parsed.statements() else {
             panic!(
                 "{sql:?} did not parse to one access-control statement: {:?}",
@@ -4044,19 +4064,40 @@ mod tests {
             "GRANT r1 TO u WITH GRANT OPTION",
             "GRANT IF EXISTS SELECT ON db.* TO u",
         ] {
-            assert!(parse_with(sql, MySql).is_err(), "MySQL must reject {sql:?}",);
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+                "MySQL must reject {sql:?}",
+            );
         }
     }
 
     #[test]
     fn mysql_and_postgres_grant_grammars_are_disjoint_routes() {
         // MySQL routes to the account grammar (accepts `*.*`); PostgreSQL does not.
-        assert!(parse_with("GRANT SELECT ON *.* TO u", MySql).is_ok());
+        assert!(parse_with("GRANT SELECT ON *.* TO u", crate::ParseConfig::new(MySql)).is_ok());
         use crate::dialect::Postgres;
-        assert!(parse_with("GRANT SELECT ON *.* TO u", Postgres).is_err());
+        assert!(
+            parse_with(
+                "GRANT SELECT ON *.* TO u",
+                crate::ParseConfig::new(Postgres)
+            )
+            .is_err()
+        );
         // PostgreSQL routes to the typed-object grammar (accepts `ON SCHEMA`); MySQL does not.
-        assert!(parse_with("GRANT USAGE ON SCHEMA s TO u", Postgres).is_ok());
-        assert!(parse_with("GRANT USAGE ON SCHEMA s TO u", MySql).is_err());
+        assert!(
+            parse_with(
+                "GRANT USAGE ON SCHEMA s TO u",
+                crate::ParseConfig::new(Postgres)
+            )
+            .is_ok()
+        );
+        assert!(
+            parse_with(
+                "GRANT USAGE ON SCHEMA s TO u",
+                crate::ParseConfig::new(MySql)
+            )
+            .is_err()
+        );
     }
 
     // --- INSTALL / UNINSTALL PLUGIN / COMPONENT (MySQL) ----------------------
@@ -4091,8 +4132,11 @@ mod tests {
 
         // The `:=` assignment synonym parses; the canonical render normalizes it to `=`
         // (the general-`SET` precedent), so it is asserted structurally, not by byte replay.
-        let parsed = parse_with("INSTALL COMPONENT 'x' SET v := 1", MySql)
-            .unwrap_or_else(|err| panic!("`:=` form: {err:?}"));
+        let parsed = parse_with(
+            "INSTALL COMPONENT 'x' SET v := 1",
+            crate::ParseConfig::new(MySql),
+        )
+        .unwrap_or_else(|err| panic!("`:=` form: {err:?}"));
         let [Statement::Install { install, .. }] = parsed.statements() else {
             panic!("expected an INSTALL statement");
         };

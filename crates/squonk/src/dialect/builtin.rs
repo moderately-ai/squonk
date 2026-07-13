@@ -5,9 +5,9 @@
 //!
 //! [`Dialect::Ext`](crate::parser::Dialect::Ext) makes `&dyn Dialect` non-object-safe,
 //! so a config/CLI string cannot pick a compile-time dialect the way
-//! `parse_with(src, Postgres)` does. This module is the designed escape: a
+//! `parse_with(src, crate::ParseConfig::new(Postgres))` does. This module is the designed escape: a
 //! [`BuiltinDialect`] value-enum over the stock dialects — all of which share
-//! `Ext = NoExt` — plus a [`parse_with_builtin`] dispatcher that matches the value to
+//! `Ext = NoExt` — plus a [`parse_builtin`] dispatcher that matches the value to
 //! the monomorphized parser and returns a plain [`Parsed`]. Each non-ANSI arm is
 //! gated by its cargo feature, so a name for a disabled (or unknown) dialect resolves
 //! to `None` rather than panicking.
@@ -42,9 +42,7 @@ use crate::dialect::Snowflake;
 #[cfg(feature = "sqlite")]
 use crate::dialect::Sqlite;
 use crate::error::ParseResult;
-use crate::parser::{
-    ParseOptions, Parsed, Recovered, parse_recovering_with_options, parse_with_options,
-};
+use crate::parser::{ParseConfig, Parsed, Recovered, parse_recovering_with, parse_with};
 use crate::render::RenderDialect;
 use crate::tokenizer::{LexError, Token, TriviaIndex, tokenize_with, tokenize_with_trivia};
 
@@ -398,7 +396,7 @@ impl std::error::Error for ParseBuiltinDialectError {}
 
 /// Parse `src` under a runtime-selected built-in `dialect` into an owned [`Parsed`].
 ///
-/// Dispatches by value to the monomorphized [`parse_with`](crate::parse_with): every
+/// Dispatches by value to the monomorphized [`parse_with`]: every
 /// builtin's `Ext` is [`NoExt`](crate::ast::NoExt), so all arms share the single
 /// [`Parsed`] return type — the designed object-safe runtime path, without a
 /// `dyn Dialect`. To select the dialect from a string, resolve it with
@@ -408,99 +406,96 @@ impl std::error::Error for ParseBuiltinDialectError {}
 /// # Errors
 ///
 /// Returns the first [`ParseError`](crate::error::ParseError), exactly as
-/// [`parse_with`](crate::parse_with) does.
+/// [`parse_with`] does.
 ///
 /// ```
-/// use squonk::dialect::{BuiltinDialect, parse_with_builtin};
+/// use squonk::dialect::{BuiltinDialect, parse_builtin};
 ///
 /// let dialect = BuiltinDialect::from_name("ansi").expect("ansi is always built in");
-/// let parsed = parse_with_builtin("SELECT 1", dialect).expect("`SELECT 1` parses");
+/// let parsed = parse_builtin("SELECT 1", dialect).expect("`SELECT 1` parses");
 /// assert_eq!(parsed.statements().len(), 1);
 ///
 /// assert!(BuiltinDialect::from_name("nope").is_none());
 /// ```
-pub fn parse_with_builtin(src: &str, dialect: BuiltinDialect) -> ParseResult<Parsed> {
-    parse_with_builtin_options(src, dialect, ParseOptions::default())
+pub fn parse_builtin(src: &str, dialect: BuiltinDialect) -> ParseResult<Parsed> {
+    parse_builtin_with(src, ParseConfig::new(dialect))
 }
 
 /// Parse `src` under a runtime-selected built-in `dialect`, honouring
-/// [`ParseOptions`].
+/// [`ParseConfig`].
 ///
-/// This is the optioned counterpart to [`parse_with_builtin`]. It keeps runtime
+/// This is the configured counterpart to [`parse_builtin`]. It keeps runtime
 /// dialect dispatch centralized so language bindings do not have to hand-copy the
 /// same feature-gated match.
-pub fn parse_with_builtin_options(
-    src: &str,
-    dialect: BuiltinDialect,
-    options: ParseOptions,
-) -> ParseResult<Parsed> {
+pub fn parse_builtin_with(src: &str, config: ParseConfig<BuiltinDialect>) -> ParseResult<Parsed> {
+    let dialect = config.dialect;
     match dialect {
-        BuiltinDialect::Ansi => parse_with_options(src, Ansi, options),
+        BuiltinDialect::Ansi => parse_with(src, config.dialect(Ansi)),
         #[cfg(feature = "postgres")]
-        BuiltinDialect::Postgres => parse_with_options(src, Postgres, options),
+        BuiltinDialect::Postgres => parse_with(src, config.dialect(Postgres)),
         #[cfg(feature = "mysql")]
-        BuiltinDialect::MySql => parse_with_options(src, MySql, options),
+        BuiltinDialect::MySql => parse_with(src, config.dialect(MySql)),
         #[cfg(feature = "sqlite")]
-        BuiltinDialect::Sqlite => parse_with_options(src, Sqlite, options),
+        BuiltinDialect::Sqlite => parse_with(src, config.dialect(Sqlite)),
         #[cfg(feature = "duckdb")]
-        BuiltinDialect::DuckDb => parse_with_options(src, DuckDb, options),
+        BuiltinDialect::DuckDb => parse_with(src, config.dialect(DuckDb)),
         #[cfg(feature = "bigquery")]
-        BuiltinDialect::BigQuery => parse_with_options(src, BigQuery, options),
+        BuiltinDialect::BigQuery => parse_with(src, config.dialect(BigQuery)),
         #[cfg(feature = "hive")]
-        BuiltinDialect::Hive => parse_with_options(src, Hive, options),
+        BuiltinDialect::Hive => parse_with(src, config.dialect(Hive)),
         #[cfg(feature = "clickhouse")]
-        BuiltinDialect::ClickHouse => parse_with_options(src, ClickHouse, options),
+        BuiltinDialect::ClickHouse => parse_with(src, config.dialect(ClickHouse)),
         #[cfg(feature = "databricks")]
-        BuiltinDialect::Databricks => parse_with_options(src, Databricks, options),
+        BuiltinDialect::Databricks => parse_with(src, config.dialect(Databricks)),
         #[cfg(feature = "mssql")]
-        BuiltinDialect::Mssql => parse_with_options(src, Mssql, options),
+        BuiltinDialect::Mssql => parse_with(src, config.dialect(Mssql)),
         #[cfg(feature = "snowflake")]
-        BuiltinDialect::Snowflake => parse_with_options(src, Snowflake, options),
+        BuiltinDialect::Snowflake => parse_with(src, config.dialect(Snowflake)),
         #[cfg(feature = "redshift")]
-        BuiltinDialect::Redshift => parse_with_options(src, Redshift, options),
+        BuiltinDialect::Redshift => parse_with(src, config.dialect(Redshift)),
         #[cfg(feature = "lenient")]
-        BuiltinDialect::Lenient => parse_with_options(src, Lenient, options),
+        BuiltinDialect::Lenient => parse_with(src, config.dialect(Lenient)),
     }
 }
 
 /// Parse `src` under a runtime-selected built-in `dialect`, recovering past
 /// statement errors to return the partial tree plus diagnostics.
-pub fn parse_recovering_with_builtin(src: &str, dialect: BuiltinDialect) -> ParseResult<Recovered> {
-    parse_recovering_with_builtin_options(src, dialect, ParseOptions::default())
+pub fn parse_recovering_builtin(src: &str, dialect: BuiltinDialect) -> ParseResult<Recovered> {
+    parse_recovering_builtin_with(src, ParseConfig::new(dialect))
 }
 
-/// [`parse_recovering_with_builtin`] honouring [`ParseOptions`].
-pub fn parse_recovering_with_builtin_options(
+/// [`parse_recovering_builtin`] honouring [`ParseConfig`].
+pub fn parse_recovering_builtin_with(
     src: &str,
-    dialect: BuiltinDialect,
-    options: ParseOptions,
+    config: ParseConfig<BuiltinDialect>,
 ) -> ParseResult<Recovered> {
+    let dialect = config.dialect;
     match dialect {
-        BuiltinDialect::Ansi => parse_recovering_with_options(src, Ansi, options),
+        BuiltinDialect::Ansi => parse_recovering_with(src, config.dialect(Ansi)),
         #[cfg(feature = "postgres")]
-        BuiltinDialect::Postgres => parse_recovering_with_options(src, Postgres, options),
+        BuiltinDialect::Postgres => parse_recovering_with(src, config.dialect(Postgres)),
         #[cfg(feature = "mysql")]
-        BuiltinDialect::MySql => parse_recovering_with_options(src, MySql, options),
+        BuiltinDialect::MySql => parse_recovering_with(src, config.dialect(MySql)),
         #[cfg(feature = "sqlite")]
-        BuiltinDialect::Sqlite => parse_recovering_with_options(src, Sqlite, options),
+        BuiltinDialect::Sqlite => parse_recovering_with(src, config.dialect(Sqlite)),
         #[cfg(feature = "duckdb")]
-        BuiltinDialect::DuckDb => parse_recovering_with_options(src, DuckDb, options),
+        BuiltinDialect::DuckDb => parse_recovering_with(src, config.dialect(DuckDb)),
         #[cfg(feature = "bigquery")]
-        BuiltinDialect::BigQuery => parse_recovering_with_options(src, BigQuery, options),
+        BuiltinDialect::BigQuery => parse_recovering_with(src, config.dialect(BigQuery)),
         #[cfg(feature = "hive")]
-        BuiltinDialect::Hive => parse_recovering_with_options(src, Hive, options),
+        BuiltinDialect::Hive => parse_recovering_with(src, config.dialect(Hive)),
         #[cfg(feature = "clickhouse")]
-        BuiltinDialect::ClickHouse => parse_recovering_with_options(src, ClickHouse, options),
+        BuiltinDialect::ClickHouse => parse_recovering_with(src, config.dialect(ClickHouse)),
         #[cfg(feature = "databricks")]
-        BuiltinDialect::Databricks => parse_recovering_with_options(src, Databricks, options),
+        BuiltinDialect::Databricks => parse_recovering_with(src, config.dialect(Databricks)),
         #[cfg(feature = "mssql")]
-        BuiltinDialect::Mssql => parse_recovering_with_options(src, Mssql, options),
+        BuiltinDialect::Mssql => parse_recovering_with(src, config.dialect(Mssql)),
         #[cfg(feature = "snowflake")]
-        BuiltinDialect::Snowflake => parse_recovering_with_options(src, Snowflake, options),
+        BuiltinDialect::Snowflake => parse_recovering_with(src, config.dialect(Snowflake)),
         #[cfg(feature = "redshift")]
-        BuiltinDialect::Redshift => parse_recovering_with_options(src, Redshift, options),
+        BuiltinDialect::Redshift => parse_recovering_with(src, config.dialect(Redshift)),
         #[cfg(feature = "lenient")]
-        BuiltinDialect::Lenient => parse_recovering_with_options(src, Lenient, options),
+        BuiltinDialect::Lenient => parse_recovering_with(src, config.dialect(Lenient)),
     }
 }
 
@@ -592,8 +587,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_with_builtin_parses_under_ansi() {
-        let parsed = parse_with_builtin("SELECT 1", BuiltinDialect::Ansi).expect("parses");
+    fn parse_builtin_parses_under_ansi() {
+        let parsed = parse_builtin("SELECT 1", BuiltinDialect::Ansi).expect("parses");
         assert_eq!(parsed.statements().len(), 1);
     }
 
@@ -611,8 +606,8 @@ mod tests {
         assert_eq!(BuiltinDialect::Postgres.features(), &FeatureSet::POSTGRES);
         // `$1` positional parameters are a PostgreSQL-only lexical form: it parses
         // under the runtime-selected Postgres builtin and is rejected under ANSI.
-        assert!(parse_with_builtin("SELECT $1", BuiltinDialect::Postgres).is_ok());
-        assert!(parse_with_builtin("SELECT $1", BuiltinDialect::Ansi).is_err());
+        assert!(parse_builtin("SELECT $1", BuiltinDialect::Postgres).is_ok());
+        assert!(parse_builtin("SELECT $1", BuiltinDialect::Ansi).is_err());
     }
 
     #[cfg(feature = "mysql")]
@@ -625,8 +620,8 @@ mod tests {
         assert_eq!(BuiltinDialect::MySql.features(), &FeatureSet::MYSQL);
         // The `LIMIT <offset>, <count>` comma form is MySQL-only: parses under the
         // runtime-selected MySQL builtin, rejected under ANSI.
-        assert!(parse_with_builtin("SELECT a FROM t LIMIT 5, 10", BuiltinDialect::MySql).is_ok());
-        assert!(parse_with_builtin("SELECT a FROM t LIMIT 5, 10", BuiltinDialect::Ansi).is_err());
+        assert!(parse_builtin("SELECT a FROM t LIMIT 5, 10", BuiltinDialect::MySql).is_ok());
+        assert!(parse_builtin("SELECT a FROM t LIMIT 5, 10", BuiltinDialect::Ansi).is_err());
     }
 
     #[cfg(feature = "sqlite")]
@@ -643,9 +638,9 @@ mod tests {
         assert_eq!(BuiltinDialect::Sqlite.features(), &FeatureSet::SQLITE);
         // The `==` equality spelling and `$name` placeholder are SQLite-only lexical
         // forms: they parse under the runtime-selected SQLite builtin, rejected under ANSI.
-        assert!(parse_with_builtin("SELECT 1 == 1", BuiltinDialect::Sqlite).is_ok());
-        assert!(parse_with_builtin("SELECT 1 == 1", BuiltinDialect::Ansi).is_err());
-        assert!(parse_with_builtin("SELECT $value", BuiltinDialect::Sqlite).is_ok());
+        assert!(parse_builtin("SELECT 1 == 1", BuiltinDialect::Sqlite).is_ok());
+        assert!(parse_builtin("SELECT 1 == 1", BuiltinDialect::Ansi).is_err());
+        assert!(parse_builtin("SELECT $value", BuiltinDialect::Sqlite).is_ok());
     }
 
     #[cfg(feature = "duckdb")]
@@ -663,11 +658,11 @@ mod tests {
         // The `0x` radix integer form is a DuckDB-only lexical widening over ANSI: with
         // the trailing `+ 1` forcing the hex reading it parses under the runtime-selected
         // DuckDB builtin and rejects under ANSI (which lexes `0 AS xFF` then trailing `+`).
-        assert!(parse_with_builtin("SELECT 0xFF + 1", BuiltinDialect::DuckDb).is_ok());
-        assert!(parse_with_builtin("SELECT 0xFF + 1", BuiltinDialect::Ansi).is_err());
+        assert!(parse_builtin("SELECT 0xFF + 1", BuiltinDialect::DuckDb).is_ok());
+        assert!(parse_builtin("SELECT 0xFF + 1", BuiltinDialect::Ansi).is_err());
         // The bare `SELECT` empty-target list is the DuckDB tightening: rejected under
         // DuckDB, accepted under the runtime-selected Postgres builtin.
-        assert!(parse_with_builtin("SELECT", BuiltinDialect::DuckDb).is_err());
+        assert!(parse_builtin("SELECT", BuiltinDialect::DuckDb).is_err());
     }
 
     #[cfg(feature = "bigquery")]
@@ -691,14 +686,14 @@ mod tests {
         // parses under the runtime-selected BigQuery builtin and is rejected under ANSI (which
         // has no first-class UNNEST factor at all).
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT * FROM UNNEST(arr) WITH OFFSET AS pos",
                 BuiltinDialect::BigQuery
             )
             .is_ok()
         );
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT * FROM UNNEST(arr) WITH OFFSET AS pos",
                 BuiltinDialect::Ansi
             )
@@ -723,14 +718,14 @@ mod tests {
         // parses under the runtime-selected Hive builtin and is rejected under ANSI (which has
         // no sided semi-/anti-join spelling).
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT * FROM a LEFT SEMI JOIN b ON a.x = b.x",
                 BuiltinDialect::Hive
             )
             .is_ok()
         );
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT * FROM a LEFT SEMI JOIN b ON a.x = b.x",
                 BuiltinDialect::Ansi
             )
@@ -757,14 +752,14 @@ mod tests {
         // under the runtime-selected ClickHouse builtin and is rejected under ANSI (which
         // leaves the trailing `SETTINGS …` unconsumed).
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT a FROM t SETTINGS max_threads = 8",
                 BuiltinDialect::ClickHouse
             )
             .is_ok()
         );
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT a FROM t SETTINGS max_threads = 8",
                 BuiltinDialect::Ansi
             )
@@ -787,10 +782,8 @@ mod tests {
         // The `base:key` semi-structured path is the Snowflake-only accessor this preset
         // exposes: it parses under the runtime-selected Snowflake builtin and is rejected
         // under ANSI (where `:` after an identifier is unexpected).
-        assert!(
-            parse_with_builtin("SELECT src:customer[0].name", BuiltinDialect::Snowflake).is_ok()
-        );
-        assert!(parse_with_builtin("SELECT src:customer[0].name", BuiltinDialect::Ansi).is_err());
+        assert!(parse_builtin("SELECT src:customer[0].name", BuiltinDialect::Snowflake).is_ok());
+        assert!(parse_builtin("SELECT src:customer[0].name", BuiltinDialect::Ansi).is_err());
     }
 
     #[cfg(feature = "redshift")]
@@ -810,12 +803,12 @@ mod tests {
         assert_eq!(BuiltinDialect::Redshift.features(), &FeatureSet::REDSHIFT);
         // Redshift's ANSI-verbatim grammar parses the shared surface, and its lexis is standard —
         // `"…"` is a quoted identifier just like ANSI (unlike Hive/BigQuery).
-        assert!(parse_with_builtin("SELECT \"Col\" FROM t", BuiltinDialect::Redshift).is_ok());
+        assert!(parse_builtin("SELECT \"Col\" FROM t", BuiltinDialect::Redshift).is_ok());
         // The conservative-off deferral, pinned at the runtime layer: the PostgreSQL-heritage
         // `ILIKE` Redshift genuinely accepts is deferred here, so it rejects under the
         // runtime-selected Redshift builtin exactly as under ANSI — while Postgres accepts it.
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT * FROM t WHERE name ILIKE 'a%'",
                 BuiltinDialect::Redshift
             )
@@ -842,14 +835,14 @@ mod tests {
         // real: it parses under the runtime-selected Databricks builtin and is rejected
         // under ANSI (where `SEMI` after `LEFT` is unexpected).
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT * FROM a LEFT SEMI JOIN b ON a.x = b.x",
                 BuiltinDialect::Databricks
             )
             .is_ok()
         );
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT * FROM a LEFT SEMI JOIN b ON a.x = b.x",
                 BuiltinDialect::Ansi
             )
@@ -878,14 +871,14 @@ mod tests {
         // the runtime-selected MSSQL builtin and is rejected under ANSI (where `APPLY` in join
         // position is unexpected).
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT * FROM a CROSS APPLY (SELECT 1) AS t",
                 BuiltinDialect::Mssql
             )
             .is_ok()
         );
         assert!(
-            parse_with_builtin(
+            parse_builtin(
                 "SELECT * FROM a CROSS APPLY (SELECT 1) AS t",
                 BuiltinDialect::Ansi
             )
@@ -908,9 +901,7 @@ mod tests {
         // The multi-quote union is the distinctive capability: all three identifier
         // styles parse under the runtime-selected Lenient builtin, where ANSI rejects the
         // non-standard ones.
-        assert!(
-            parse_with_builtin(r#"SELECT "a", `b`, [c] FROM t"#, BuiltinDialect::Lenient).is_ok()
-        );
-        assert!(parse_with_builtin("SELECT `b` FROM t", BuiltinDialect::Ansi).is_err());
+        assert!(parse_builtin(r#"SELECT "a", `b`, [c] FROM t"#, BuiltinDialect::Lenient).is_ok());
+        assert!(parse_builtin("SELECT `b` FROM t", BuiltinDialect::Ansi).is_err());
     }
 }

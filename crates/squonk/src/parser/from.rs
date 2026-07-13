@@ -3216,8 +3216,8 @@ mod tests {
     /// the gate is honoured as DATA — off for PostgreSQL, on for DuckDB.
     #[test]
     fn prefix_colon_alias_in_from_binds_alias_to_relation() {
-        let parsed =
-            parse_with("SELECT * FROM b : a", DuckDb).expect("FROM prefix colon alias parses");
+        let parsed = parse_with("SELECT * FROM b : a", crate::ParseConfig::new(DuckDb))
+            .expect("FROM prefix colon alias parses");
         let TableFactor::Table { name, alias, .. } = &select_of(&parsed).from[0].relation else {
             panic!("expected a base-table factor");
         };
@@ -3229,7 +3229,7 @@ mod tests {
         assert!(alias.columns.is_empty());
 
         // Off for PostgreSQL: a `:` at a table-factor head is a clean reject.
-        assert!(parse_with("SELECT * FROM b : a", Postgres).is_err());
+        assert!(parse_with("SELECT * FROM b : a", crate::ParseConfig::new(Postgres)).is_err());
     }
 
     /// The prefix alias is mutually exclusive with a trailing alias — DuckDB rejects both
@@ -3237,11 +3237,11 @@ mod tests {
     /// alias parse still runs, so the second alias is caught as an unexpected token.
     #[test]
     fn prefix_colon_alias_in_from_rejects_a_trailing_alias() {
-        assert!(parse_with("SELECT * FROM b : a AS c", DuckDb).is_err());
-        assert!(parse_with("SELECT * FROM b : a c", DuckDb).is_err());
+        assert!(parse_with("SELECT * FROM b : a AS c", crate::ParseConfig::new(DuckDb)).is_err());
+        assert!(parse_with("SELECT * FROM b : a c", crate::ParseConfig::new(DuckDb)).is_err());
         // No chaining: `FROM b : c : a` is a syntax error (the inner factor is parsed
         // without re-entering the prefix-alias head).
-        assert!(parse_with("SELECT * FROM b : c : a", DuckDb).is_err());
+        assert!(parse_with("SELECT * FROM b : c : a", crate::ParseConfig::new(DuckDb)).is_err());
     }
 
     /// `bare_table_alias_is_bare_label` is honoured as DATA, not a hardcoded dialect check:
@@ -3274,23 +3274,23 @@ mod tests {
 
         // Flag OFF (`ColId`): `cross` is an admissible bare `ColId` alias — `FROM t AS cross`.
         assert!(
-            parse_with("SELECT * FROM t cross", off).is_ok(),
+            parse_with("SELECT * FROM t cross", crate::ParseConfig::new(off)).is_ok(),
             "flag off: a bare table alias is a ColId, so `cross` aliases `t`",
         );
         // Flag ON (`BareColLabel`): `cross` is reserved as a bare alias, so it is left for
         // the join grammar — a bare `FROM t cross` is an incomplete CROSS JOIN and rejects.
         assert!(
-            parse_with("SELECT * FROM t cross", on).is_err(),
+            parse_with("SELECT * FROM t cross", crate::ParseConfig::new(on)).is_err(),
             "flag on: `cross` is reserved as a bare alias, so `FROM t cross` is not an alias",
         );
         // ...and a complete CROSS JOIN parses under the flag (the guard).
         assert!(
-            parse_with("SELECT * FROM t cross JOIN u", on).is_ok(),
+            parse_with("SELECT * FROM t cross JOIN u", crate::ParseConfig::new(on),).is_ok(),
             "flag on: `cross` in join position is still the CROSS JOIN",
         );
         // The explicit `AS` alias stays a `ColId` either way — `cross` is admissible there.
         assert!(
-            parse_with("SELECT * FROM t AS cross", on).is_ok(),
+            parse_with("SELECT * FROM t AS cross", crate::ParseConfig::new(on),).is_ok(),
             "the explicit `AS` alias keeps the ColId set, which admits `cross`",
         );
     }
@@ -3313,7 +3313,8 @@ mod tests {
     fn table_version_for_system_time_as_of_is_typed() {
         let sql = "SELECT * FROM t FOR SYSTEM_TIME AS OF '2020-01-01'";
 
-        let bq = parse_with(sql, BigQuery).expect("BigQuery parses FOR SYSTEM_TIME AS OF");
+        let bq = parse_with(sql, crate::ParseConfig::new(BigQuery))
+            .expect("BigQuery parses FOR SYSTEM_TIME AS OF");
         assert!(matches!(
             sole_table_version(&bq),
             TableVersion::ForSystemTimeAsOf { .. }
@@ -3324,7 +3325,8 @@ mod tests {
         );
 
         // MSSQL admits the same `AS OF` spelling (its temporal-table subset).
-        let mssql = parse_with(sql, Mssql).expect("MSSQL parses FOR SYSTEM_TIME AS OF");
+        let mssql = parse_with(sql, crate::ParseConfig::new(Mssql))
+            .expect("MSSQL parses FOR SYSTEM_TIME AS OF");
         assert!(matches!(
             sole_table_version(&mssql),
             TableVersion::ForSystemTimeAsOf { .. }
@@ -3334,7 +3336,7 @@ mod tests {
         // to the table (the common MSSQL `… AS OF <ts> AS e` shape) and round-trips.
         let aliased = parse_with(
             "SELECT * FROM t FOR SYSTEM_TIME AS OF '2020-01-01' AS e",
-            Mssql,
+            crate::ParseConfig::new(Mssql),
         )
         .expect("MSSQL parses a version modifier followed by an alias");
         let TableFactor::Table {
@@ -3356,7 +3358,7 @@ mod tests {
     fn table_version_mssql_temporal_forms_are_typed() {
         let from_to = parse_with(
             "SELECT * FROM t FOR SYSTEM_TIME FROM '2020-01-01' TO '2021-01-01'",
-            Mssql,
+            crate::ParseConfig::new(Mssql),
         )
         .expect("MSSQL parses FOR SYSTEM_TIME FROM..TO");
         assert!(matches!(
@@ -3372,7 +3374,7 @@ mod tests {
 
         let between = parse_with(
             "SELECT * FROM t FOR SYSTEM_TIME BETWEEN '2020-01-01' AND '2021-01-01'",
-            Mssql,
+            crate::ParseConfig::new(Mssql),
         )
         .expect("MSSQL parses FOR SYSTEM_TIME BETWEEN..AND");
         assert!(matches!(
@@ -3388,7 +3390,7 @@ mod tests {
 
         let contained = parse_with(
             "SELECT * FROM t FOR SYSTEM_TIME CONTAINED IN ('2020-01-01', '2021-01-01')",
-            Mssql,
+            crate::ParseConfig::new(Mssql),
         )
         .expect("MSSQL parses FOR SYSTEM_TIME CONTAINED IN");
         assert!(matches!(
@@ -3402,8 +3404,11 @@ mod tests {
             "SELECT * FROM t FOR SYSTEM_TIME CONTAINED IN ('2020-01-01', '2021-01-01')",
         );
 
-        let all = parse_with("SELECT * FROM t FOR SYSTEM_TIME ALL", Mssql)
-            .expect("MSSQL parses FOR SYSTEM_TIME ALL");
+        let all = parse_with(
+            "SELECT * FROM t FOR SYSTEM_TIME ALL",
+            crate::ParseConfig::new(Mssql),
+        )
+        .expect("MSSQL parses FOR SYSTEM_TIME ALL");
         assert!(matches!(
             sole_table_version(&all),
             TableVersion::ForSystemTimeAll { .. }
@@ -3418,8 +3423,11 @@ mod tests {
     /// [`TableVersion`] variants and round-trip.
     #[test]
     fn table_version_databricks_version_and_timestamp_as_of() {
-        let version = parse_with("SELECT * FROM t VERSION AS OF 5", Databricks)
-            .expect("Databricks parses VERSION AS OF");
+        let version = parse_with(
+            "SELECT * FROM t VERSION AS OF 5",
+            crate::ParseConfig::new(Databricks),
+        )
+        .expect("Databricks parses VERSION AS OF");
         assert!(matches!(
             sole_table_version(&version),
             TableVersion::VersionAsOf { .. }
@@ -3431,8 +3439,11 @@ mod tests {
             "SELECT * FROM t VERSION AS OF 5",
         );
 
-        let timestamp = parse_with("SELECT * FROM t TIMESTAMP AS OF '2020-01-01'", Databricks)
-            .expect("Databricks parses TIMESTAMP AS OF");
+        let timestamp = parse_with(
+            "SELECT * FROM t TIMESTAMP AS OF '2020-01-01'",
+            crate::ParseConfig::new(Databricks),
+        )
+        .expect("Databricks parses TIMESTAMP AS OF");
         assert!(matches!(
             sole_table_version(&timestamp),
             TableVersion::TimestampAsOf { .. }
@@ -3450,8 +3461,11 @@ mod tests {
     /// beginning a truncated clause.
     #[test]
     fn bare_version_word_still_aliases_the_table() {
-        let parsed =
-            parse_with("SELECT * FROM t VERSION", Databricks).expect("bare VERSION aliases `t`");
+        let parsed = parse_with(
+            "SELECT * FROM t VERSION",
+            crate::ParseConfig::new(Databricks),
+        )
+        .expect("bare VERSION aliases `t`");
         let TableFactor::Table {
             version: None,
             alias: Some(alias),
@@ -3474,7 +3488,7 @@ mod tests {
     fn table_version_and_query_level_for_xml_coexist_under_mssql() {
         let parsed = parse_with(
             "SELECT * FROM t FOR SYSTEM_TIME AS OF '2020-01-01' FOR XML AUTO",
-            Mssql,
+            crate::ParseConfig::new(Mssql),
         )
         .expect("MSSQL parses a table `FOR SYSTEM_TIME` alongside a query-level `FOR XML`");
         assert!(matches!(
@@ -3483,7 +3497,13 @@ mod tests {
         ));
         // A query-level `FOR XML` with no table version still parses — the version parser
         // declined it (the word after `FOR` is not `SYSTEM_TIME`), leaving it for the tail.
-        assert!(parse_with("SELECT * FROM t FOR XML AUTO", Mssql).is_ok());
+        assert!(
+            parse_with(
+                "SELECT * FROM t FOR XML AUTO",
+                crate::ParseConfig::new(Mssql)
+            )
+            .is_ok()
+        );
     }
 
     /// Off under a gate-off preset (PostgreSQL): the version keyword is left unconsumed, so
@@ -3494,17 +3514,25 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT * FROM t FOR SYSTEM_TIME AS OF '2020-01-01'",
-                Postgres
+                crate::ParseConfig::new(Postgres)
             )
             .is_err(),
             "PostgreSQL has no table version: `FOR SYSTEM_TIME` is not a valid query-level FOR",
         );
         assert!(
-            parse_with("SELECT * FROM t VERSION AS OF 5", Postgres).is_err(),
+            parse_with(
+                "SELECT * FROM t VERSION AS OF 5",
+                crate::ParseConfig::new(Postgres)
+            )
+            .is_err(),
             "PostgreSQL has no table version: the trailing `AS OF 5` is unparsed input",
         );
         assert!(
-            parse_with("SELECT * FROM t TIMESTAMP AS OF '2020-01-01'", Postgres).is_err(),
+            parse_with(
+                "SELECT * FROM t TIMESTAMP AS OF '2020-01-01'",
+                crate::ParseConfig::new(Postgres)
+            )
+            .is_err(),
             "PostgreSQL has no table version: the trailing `AS OF …` is unparsed input",
         );
     }
@@ -3530,7 +3558,8 @@ mod tests {
         // Both `supports_partiql` presets read the path identically.
         fn check<D: Dialect<Ext = NoExt> + Copy>(dialect: D) {
             let sql = "SELECT * FROM src[0].a";
-            let parsed = parse_with(sql, dialect).expect("PartiQL table path parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(dialect))
+                .expect("PartiQL table path parses");
             let path = sole_json_path(&parsed);
             assert!(
                 matches!(path, [Seg::Index { .. }, Seg::Key { .. }]),
@@ -3545,7 +3574,8 @@ mod tests {
 
             // A deeper alternating path round-trips segment-for-segment.
             let deep = "SELECT * FROM src[0].a[1].b";
-            let parsed = parse_with(deep, dialect).expect("deep PartiQL table path parses");
+            let parsed = parse_with(deep, crate::ParseConfig::new(dialect))
+                .expect("deep PartiQL table path parses");
             assert!(matches!(
                 sole_json_path(&parsed),
                 [
@@ -3563,8 +3593,11 @@ mod tests {
             );
 
             // The path binds before the alias, so a trailing correlation alias still attaches.
-            let aliased =
-                parse_with("SELECT * FROM src[0].a AS x", dialect).expect("path then alias parses");
+            let aliased = parse_with(
+                "SELECT * FROM src[0].a AS x",
+                crate::ParseConfig::new(dialect),
+            )
+            .expect("path then alias parses");
             let TableFactor::Table {
                 json_path,
                 alias: Some(_),
@@ -3577,8 +3610,8 @@ mod tests {
 
             // A dotted `FROM src.a.b` has no leading `[`, so it stays a compound relation
             // name with an empty path — not a JSON path.
-            let compound =
-                parse_with("SELECT * FROM src.a.b", dialect).expect("compound name parses");
+            let compound = parse_with("SELECT * FROM src.a.b", crate::ParseConfig::new(dialect))
+                .expect("compound name parses");
             assert!(sole_json_path(&compound).is_empty());
         }
 
@@ -3594,11 +3627,11 @@ mod tests {
         use crate::dialect::Ansi;
 
         assert!(
-            parse_with("SELECT * FROM src[0].a", Ansi).is_err(),
+            parse_with("SELECT * FROM src[0].a", crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI has no PartiQL table path: the trailing `[0].a` is unparsed input",
         );
         assert!(
-            parse_with("SELECT * FROM src[0].a", Postgres).is_err(),
+            parse_with("SELECT * FROM src[0].a", crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL has no PartiQL table path: the trailing `[0].a` is unparsed input",
         );
     }
@@ -3658,8 +3691,11 @@ mod tests {
 
     #[test]
     fn left_join_using_carries_the_using_columns() {
-        let parsed = parse_with("SELECT * FROM t1 LEFT JOIN t2 USING (id)", TestDialect)
-            .expect("LEFT JOIN ... USING parses");
+        let parsed = parse_with(
+            "SELECT * FROM t1 LEFT JOIN t2 USING (id)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("LEFT JOIN ... USING parses");
         let from = &select_of(&parsed).from[0];
         assert_eq!(from.joins.len(), 1);
         let JoinOperator::LeftOuter {
@@ -3680,7 +3716,7 @@ mod tests {
         // replays it (spelling-tags-keyword-operator-batch).
         let outer = parse_with(
             "SELECT * FROM t1 LEFT OUTER JOIN t2 ON t1.a = t2.a",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("LEFT OUTER JOIN parses");
         assert!(matches!(
@@ -3691,8 +3727,11 @@ mod tests {
                 ..
             },
         ));
-        let bare = parse_with("SELECT * FROM t1 LEFT JOIN t2 ON t1.a = t2.a", TestDialect)
-            .expect("LEFT JOIN parses");
+        let bare = parse_with(
+            "SELECT * FROM t1 LEFT JOIN t2 ON t1.a = t2.a",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("LEFT JOIN parses");
         assert!(matches!(
             select_of(&bare).from[0].joins[0].operator,
             JoinOperator::LeftOuter { outer: false, .. },
@@ -3701,8 +3740,11 @@ mod tests {
 
     #[test]
     fn cross_join_has_no_constraint() {
-        let parsed =
-            parse_with("SELECT * FROM t1 CROSS JOIN t2", TestDialect).expect("CROSS JOIN parses");
+        let parsed = parse_with(
+            "SELECT * FROM t1 CROSS JOIN t2",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("CROSS JOIN parses");
         assert!(matches!(
             select_of(&parsed).from[0].joins[0].operator,
             JoinOperator::Cross { .. },
@@ -3711,8 +3753,11 @@ mod tests {
 
     #[test]
     fn natural_right_join_records_side_and_natural_constraint() {
-        let parsed = parse_with("SELECT * FROM t1 NATURAL RIGHT JOIN t2", TestDialect)
-            .expect("NATURAL RIGHT JOIN parses");
+        let parsed = parse_with(
+            "SELECT * FROM t1 NATURAL RIGHT JOIN t2",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("NATURAL RIGHT JOIN parses");
         assert!(matches!(
             select_of(&parsed).from[0].joins[0].operator,
             JoinOperator::RightOuter {
@@ -3727,8 +3772,11 @@ mod tests {
         // PostgreSQL's `join_type` admits an explicit `INNER` after `NATURAL`; it is the
         // default side, so `NATURAL INNER JOIN` and a bare `NATURAL JOIN` yield the same
         // canonical `Inner` operator with a `Natural` constraint.
-        let parsed = parse_with("SELECT * FROM t1 NATURAL INNER JOIN t2", TestDialect)
-            .expect("NATURAL INNER JOIN parses");
+        let parsed = parse_with(
+            "SELECT * FROM t1 NATURAL INNER JOIN t2",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("NATURAL INNER JOIN parses");
         assert!(matches!(
             select_of(&parsed).from[0].joins[0].operator,
             JoinOperator::Inner {
@@ -3753,8 +3801,11 @@ mod tests {
         // Shape + render are asserted under `Lenient` (a render dialect that also enables the
         // flag); `Sqlite` — the corpus dialect, not a Tier-1 render target — is checked for
         // parse acceptance directly.
-        let parsed = parse_with("SELECT * FROM t1 NATURAL CROSS JOIN t2", Lenient)
-            .expect("Lenient parses NATURAL CROSS JOIN");
+        let parsed = parse_with(
+            "SELECT * FROM t1 NATURAL CROSS JOIN t2",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses NATURAL CROSS JOIN");
         assert!(matches!(
             select_of(&parsed).from[0].joins[0].operator,
             JoinOperator::Inner {
@@ -3768,12 +3819,18 @@ mod tests {
             .expect("renders the normalized join");
         assert_eq!(rendered, "SELECT * FROM t1 NATURAL JOIN t2");
 
-        parse_with("SELECT * FROM t1 NATURAL CROSS JOIN t2", Sqlite)
-            .expect("SQLite parses NATURAL CROSS JOIN");
+        parse_with(
+            "SELECT * FROM t1 NATURAL CROSS JOIN t2",
+            crate::ParseConfig::new(Sqlite),
+        )
+        .expect("SQLite parses NATURAL CROSS JOIN");
         // The gate is genuinely required: PostgreSQL parse-rejects it (engine-probed on 16),
         // its `NATURAL` arm falling through to the mandatory `JOIN` on the `CROSS` token.
-        parse_with("SELECT * FROM t1 NATURAL CROSS JOIN t2", Postgres)
-            .expect_err("PostgreSQL rejects NATURAL CROSS JOIN");
+        parse_with(
+            "SELECT * FROM t1 NATURAL CROSS JOIN t2",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL rejects NATURAL CROSS JOIN");
     }
 
     #[test]
@@ -3782,8 +3839,11 @@ mod tests {
 
         // MySQL `STRAIGHT_JOIN` is the canonical inner join with the `straight` surface
         // tag set; it carries the same `ON` constraint grammar as a bare `JOIN`.
-        let parsed = parse_with("SELECT * FROM a STRAIGHT_JOIN b ON a.x = b.x", MySql)
-            .expect("MySQL parses STRAIGHT_JOIN");
+        let parsed = parse_with(
+            "SELECT * FROM a STRAIGHT_JOIN b ON a.x = b.x",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses STRAIGHT_JOIN");
         assert!(matches!(
             select_of(&parsed).from[0].joins[0].operator,
             JoinOperator::Inner {
@@ -3795,8 +3855,11 @@ mod tests {
 
         // Gated: without the dialect flag `STRAIGHT_JOIN` is a non-reserved word the
         // table factor takes as an alias, so `b` is leftover input and the parse fails.
-        parse_with("SELECT * FROM a STRAIGHT_JOIN b ON a.x = b.x", Ansi)
-            .expect_err("ANSI has no STRAIGHT_JOIN join operator");
+        parse_with(
+            "SELECT * FROM a STRAIGHT_JOIN b ON a.x = b.x",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no STRAIGHT_JOIN join operator");
     }
 
     #[test]
@@ -3806,8 +3869,11 @@ mod tests {
 
         // The `ASOF` prefix threads through the side spelling; the bare form is the
         // canonical Inner kind, a spelled side is recorded on the one `AsOf` variant.
-        let parsed = parse_with("SELECT * FROM a ASOF JOIN b ON a.t >= b.t", DuckDb)
-            .expect("DuckDb parses ASOF JOIN");
+        let parsed = parse_with(
+            "SELECT * FROM a ASOF JOIN b ON a.t >= b.t",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDb parses ASOF JOIN");
         assert!(matches!(
             select_of(&parsed).from[0].joins[0].operator,
             JoinOperator::AsOf {
@@ -3816,8 +3882,11 @@ mod tests {
                 ..
             },
         ));
-        let parsed = parse_with("SELECT * FROM a ASOF LEFT JOIN b ON a.t >= b.t", DuckDb)
-            .expect("DuckDb parses ASOF LEFT JOIN");
+        let parsed = parse_with(
+            "SELECT * FROM a ASOF LEFT JOIN b ON a.t >= b.t",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDb parses ASOF LEFT JOIN");
         assert!(matches!(
             select_of(&parsed).from[0].joins[0].operator,
             JoinOperator::AsOf {
@@ -3828,8 +3897,11 @@ mod tests {
 
         // DuckDB *parse*-rejects a constraint-less ASOF join (unlike the sibling
         // side-join arm, whose `None` fallback exists for MySQL's bare inner join).
-        let err = parse_with("SELECT * FROM a ASOF JOIN b", DuckDb)
-            .expect_err("a bare ASOF JOIN needs its constraint");
+        let err = parse_with(
+            "SELECT * FROM a ASOF JOIN b",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("a bare ASOF JOIN needs its constraint");
         assert_eq!(
             err.expected.as_str(),
             "an `ON` or `USING` constraint after `ASOF JOIN`"
@@ -3840,16 +3912,22 @@ mod tests {
     fn duckdb_positional_join_takes_no_constraint() {
         use crate::dialect::DuckDb;
 
-        let parsed = parse_with("SELECT * FROM a POSITIONAL JOIN b", DuckDb)
-            .expect("DuckDb parses POSITIONAL JOIN");
+        let parsed = parse_with(
+            "SELECT * FROM a POSITIONAL JOIN b",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDb parses POSITIONAL JOIN");
         assert!(matches!(
             select_of(&parsed).from[0].joins[0].operator,
             JoinOperator::Positional { .. },
         ));
         // A trailing constraint is left unconsumed and rejects as leftover input,
         // the CROSS JOIN mechanism (DuckDB parse-rejects it too).
-        parse_with("SELECT * FROM a POSITIONAL JOIN b ON a.t = b.t", DuckDb)
-            .expect_err("POSITIONAL JOIN takes no ON constraint");
+        parse_with(
+            "SELECT * FROM a POSITIONAL JOIN b ON a.t = b.t",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("POSITIONAL JOIN takes no ON constraint");
     }
 
     #[test]
@@ -3862,7 +3940,7 @@ mod tests {
         // is a distinct operator from CROSS JOIN — the `Apply` variant, not `Cross`.
         let parsed = parse_with(
             "SELECT * FROM t CROSS APPLY (SELECT x FROM u WHERE u.id = t.id) AS s",
-            Lenient,
+            crate::ParseConfig::new(Lenient),
         )
         .expect("Lenient parses CROSS APPLY over a derived table");
         let join = &select_of(&parsed).from[0].joins[0];
@@ -3882,8 +3960,11 @@ mod tests {
         ));
 
         // A table-valued function is the other MSSQL APPLY right operand.
-        let parsed = parse_with("SELECT * FROM t CROSS APPLY f(t.x) AS g", Lenient)
-            .expect("Lenient parses CROSS APPLY over a table function");
+        let parsed = parse_with(
+            "SELECT * FROM t CROSS APPLY f(t.x) AS g",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses CROSS APPLY over a table function");
         let join = &select_of(&parsed).from[0].joins[0];
         assert!(matches!(
             join.operator,
@@ -3905,14 +3986,21 @@ mod tests {
         // right factor is still the `Cross` operator carrying a `lateral` derived table
         // — the composition CROSS APPLY collapses into one operator, so the two must
         // not alias.
-        let apply = parse_with("SELECT * FROM a CROSS APPLY (SELECT 1) AS s", Lenient)
-            .expect("CROSS APPLY parses");
+        let apply = parse_with(
+            "SELECT * FROM a CROSS APPLY (SELECT 1) AS s",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("CROSS APPLY parses");
         assert!(matches!(
             select_of(&apply).from[0].joins[0].operator,
             JoinOperator::Apply { .. },
         ));
 
-        let cross = parse_with("SELECT * FROM a CROSS JOIN b", Lenient).expect("CROSS JOIN parses");
+        let cross = parse_with(
+            "SELECT * FROM a CROSS JOIN b",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("CROSS JOIN parses");
         assert!(matches!(
             select_of(&cross).from[0].joins[0].operator,
             JoinOperator::Cross { .. },
@@ -3920,7 +4008,7 @@ mod tests {
 
         let cross_lateral = parse_with(
             "SELECT * FROM a CROSS JOIN LATERAL (SELECT 1) AS s",
-            Lenient,
+            crate::ParseConfig::new(Lenient),
         )
         .expect("CROSS JOIN LATERAL parses");
         let join = &select_of(&cross_lateral).from[0].joins[0];
@@ -3938,7 +4026,8 @@ mod tests {
             "SELECT * FROM t CROSS APPLY f(t.x) AS g",
             "SELECT * FROM t CROSS APPLY (SELECT 1) AS s CROSS APPLY g(s.y) AS h",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -3954,22 +4043,28 @@ mod tests {
         // position, so the gate is off everywhere but Lenient. With it off, `APPLY`
         // falls to `expect_keyword(JOIN)` after `CROSS`, which rejects it.
         let sql = "SELECT * FROM t CROSS APPLY (SELECT 1) AS s";
-        assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects CROSS APPLY");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+            "ANSI rejects CROSS APPLY"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects CROSS APPLY"
         );
-        assert!(parse_with(sql, MySql).is_err(), "MySQL rejects CROSS APPLY");
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+            "MySQL rejects CROSS APPLY"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects CROSS APPLY"
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB rejects CROSS APPLY"
         );
         assert!(
-            parse_with(sql, Lenient).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
             "Lenient accepts CROSS APPLY"
         );
     }
@@ -3985,7 +4080,7 @@ mod tests {
         // `Apply` operator — not a separate variant.
         let parsed = parse_with(
             "SELECT * FROM t OUTER APPLY (SELECT x FROM u WHERE u.id = t.id) AS s",
-            Lenient,
+            crate::ParseConfig::new(Lenient),
         )
         .expect("Lenient parses OUTER APPLY over a derived table");
         let join = &select_of(&parsed).from[0].joins[0];
@@ -4004,8 +4099,11 @@ mod tests {
         ));
 
         // A table-valued function is the other MSSQL APPLY right operand.
-        let parsed = parse_with("SELECT * FROM t OUTER APPLY f(t.x) AS g", Lenient)
-            .expect("Lenient parses OUTER APPLY over a table function");
+        let parsed = parse_with(
+            "SELECT * FROM t OUTER APPLY f(t.x) AS g",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses OUTER APPLY over a table function");
         let join = &select_of(&parsed).from[0].joins[0];
         assert!(matches!(
             join.operator,
@@ -4029,8 +4127,11 @@ mod tests {
         // inside `eat_join_side`) — so `OUTER APPLY` must not alias with any outer side
         // join, and a `LEFT JOIN LATERAL (…)` right factor stays the ordinary side
         // operator carrying a `lateral` derived table.
-        let apply = parse_with("SELECT * FROM a OUTER APPLY (SELECT 1) AS s", Lenient)
-            .expect("OUTER APPLY parses");
+        let apply = parse_with(
+            "SELECT * FROM a OUTER APPLY (SELECT 1) AS s",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("OUTER APPLY parses");
         assert!(matches!(
             select_of(&apply).from[0].joins[0].operator,
             JoinOperator::Apply {
@@ -4039,15 +4140,21 @@ mod tests {
             },
         ));
 
-        let left_outer = parse_with("SELECT * FROM a LEFT OUTER JOIN b ON a.id = b.id", Lenient)
-            .expect("LEFT OUTER JOIN parses");
+        let left_outer = parse_with(
+            "SELECT * FROM a LEFT OUTER JOIN b ON a.id = b.id",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("LEFT OUTER JOIN parses");
         assert!(matches!(
             select_of(&left_outer).from[0].joins[0].operator,
             JoinOperator::LeftOuter { .. },
         ));
 
-        let full_outer = parse_with("SELECT * FROM a FULL OUTER JOIN b ON a.id = b.id", Lenient)
-            .expect("FULL OUTER JOIN parses");
+        let full_outer = parse_with(
+            "SELECT * FROM a FULL OUTER JOIN b ON a.id = b.id",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("FULL OUTER JOIN parses");
         assert!(matches!(
             select_of(&full_outer).from[0].joins[0].operator,
             JoinOperator::FullOuter { .. },
@@ -4055,7 +4162,7 @@ mod tests {
 
         let left_lateral = parse_with(
             "SELECT * FROM a LEFT JOIN LATERAL (SELECT 1) AS s ON TRUE",
-            Lenient,
+            crate::ParseConfig::new(Lenient),
         )
         .expect("LEFT JOIN LATERAL parses");
         let join = &select_of(&left_lateral).from[0].joins[0];
@@ -4073,7 +4180,8 @@ mod tests {
             "SELECT * FROM t OUTER APPLY f(t.x) AS g",
             "SELECT * FROM t CROSS APPLY (SELECT 1) AS s OUTER APPLY g(s.y) AS h",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -4090,22 +4198,28 @@ mod tests {
         // two-token lookahead never fires, `OUTER` is left unconsumed at the join head,
         // the chain ends, and the trailing `OUTER APPLY …` rejects as leftover input.
         let sql = "SELECT * FROM t OUTER APPLY (SELECT 1) AS s";
-        assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects OUTER APPLY");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+            "ANSI rejects OUTER APPLY"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects OUTER APPLY"
         );
-        assert!(parse_with(sql, MySql).is_err(), "MySQL rejects OUTER APPLY");
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+            "MySQL rejects OUTER APPLY"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects OUTER APPLY"
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB rejects OUTER APPLY"
         );
         assert!(
-            parse_with(sql, Lenient).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
             "Lenient accepts OUTER APPLY"
         );
     }
@@ -4118,8 +4232,11 @@ mod tests {
         // the shared `Semi` operator as `side: Left` (not a separate variant). Spark
         // requires an `ON`/`USING` constraint and never composes with `ASOF`, so the
         // operator carries `asof: false` and the parsed constraint.
-        let on = parse_with("SELECT * FROM a LEFT SEMI JOIN b ON a.i = b.i", Lenient)
-            .expect("Lenient parses LEFT SEMI JOIN ... ON");
+        let on = parse_with(
+            "SELECT * FROM a LEFT SEMI JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses LEFT SEMI JOIN ... ON");
         assert!(matches!(
             select_of(&on).from[0].joins[0].operator,
             JoinOperator::Semi {
@@ -4131,8 +4248,11 @@ mod tests {
         ));
 
         // The other Spark constraint spelling — `USING (...)`.
-        let using = parse_with("SELECT * FROM a LEFT SEMI JOIN b USING (i)", Lenient)
-            .expect("Lenient parses LEFT SEMI JOIN ... USING");
+        let using = parse_with(
+            "SELECT * FROM a LEFT SEMI JOIN b USING (i)",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses LEFT SEMI JOIN ... USING");
         assert!(matches!(
             select_of(&using).from[0].joins[0].operator,
             JoinOperator::Semi {
@@ -4154,8 +4274,11 @@ mod tests {
         // `Sideless` vs `Left`. The side-less form on a bare factor would alias `a` (the
         // ANSI reserved model Lenient keeps), so the explicit `AS x` lets the semi arm
         // fire; `LEFT` is a reserved side keyword, so it never aliases.
-        let sideless = parse_with("SELECT * FROM a AS x SEMI JOIN b ON x.i = b.i", Lenient)
-            .expect("Lenient parses side-less SEMI JOIN after an explicit alias");
+        let sideless = parse_with(
+            "SELECT * FROM a AS x SEMI JOIN b ON x.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses side-less SEMI JOIN after an explicit alias");
         assert!(matches!(
             select_of(&sideless).from[0].joins[0].operator,
             JoinOperator::Semi {
@@ -4164,8 +4287,11 @@ mod tests {
             },
         ));
 
-        let left = parse_with("SELECT * FROM a LEFT SEMI JOIN b ON a.i = b.i", Lenient)
-            .expect("Lenient parses LEFT SEMI JOIN");
+        let left = parse_with(
+            "SELECT * FROM a LEFT SEMI JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses LEFT SEMI JOIN");
         assert!(matches!(
             select_of(&left).from[0].joins[0].operator,
             JoinOperator::Semi {
@@ -4180,15 +4306,21 @@ mod tests {
         // The leading `LEFT` also heads `LEFT [OUTER] JOIN`; the following `SEMI` keyword
         // forks the two. Without `SEMI` the standard side arm builds `LeftOuter`, so the
         // sided-semi lookahead must not steal a plain outer join.
-        let left_join = parse_with("SELECT * FROM a LEFT JOIN b ON a.i = b.i", Lenient)
-            .expect("LEFT JOIN parses");
+        let left_join = parse_with(
+            "SELECT * FROM a LEFT JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("LEFT JOIN parses");
         assert!(matches!(
             select_of(&left_join).from[0].joins[0].operator,
             JoinOperator::LeftOuter { .. },
         ));
 
-        let left_outer = parse_with("SELECT * FROM a LEFT OUTER JOIN b ON a.i = b.i", Lenient)
-            .expect("LEFT OUTER JOIN parses");
+        let left_outer = parse_with(
+            "SELECT * FROM a LEFT OUTER JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("LEFT OUTER JOIN parses");
         assert!(matches!(
             select_of(&left_outer).from[0].joins[0].operator,
             JoinOperator::LeftOuter { .. },
@@ -4201,7 +4333,8 @@ mod tests {
             "SELECT * FROM a LEFT SEMI JOIN b ON a.i = b.i",
             "SELECT * FROM a LEFT SEMI JOIN b USING (i)",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -4215,7 +4348,11 @@ mod tests {
         // side-less form's mandatory constraint. The unconsumed factor tail surfaces the
         // explicit constraint-required error.
         assert!(
-            parse_with("SELECT * FROM a LEFT SEMI JOIN b", Lenient).is_err(),
+            parse_with(
+                "SELECT * FROM a LEFT SEMI JOIN b",
+                crate::ParseConfig::new(Lenient)
+            )
+            .is_err(),
             "a bare LEFT SEMI JOIN without a constraint rejects"
         );
     }
@@ -4232,27 +4369,27 @@ mod tests {
         // side-less flag does not leak the sided form.
         let sql = "SELECT * FROM a LEFT SEMI JOIN b ON a.i = b.i";
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI rejects LEFT SEMI JOIN"
         );
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects LEFT SEMI JOIN"
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects LEFT SEMI JOIN"
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects LEFT SEMI JOIN"
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB rejects the sided LEFT SEMI JOIN despite accepting side-less SEMI JOIN"
         );
         assert!(
-            parse_with(sql, Lenient).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
             "Lenient accepts LEFT SEMI JOIN"
         );
     }
@@ -4265,8 +4402,11 @@ mod tests {
         // the shared `Anti` operator as `side: Left` (not a separate variant), mirroring
         // `LEFT SEMI JOIN`. Spark requires an `ON`/`USING` constraint and never composes
         // with `ASOF`, so the operator carries `asof: false` and the parsed constraint.
-        let on = parse_with("SELECT * FROM a LEFT ANTI JOIN b ON a.i = b.i", Lenient)
-            .expect("Lenient parses LEFT ANTI JOIN ... ON");
+        let on = parse_with(
+            "SELECT * FROM a LEFT ANTI JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses LEFT ANTI JOIN ... ON");
         assert!(matches!(
             select_of(&on).from[0].joins[0].operator,
             JoinOperator::Anti {
@@ -4278,8 +4418,11 @@ mod tests {
         ));
 
         // The other Spark constraint spelling — `USING (...)`.
-        let using = parse_with("SELECT * FROM a LEFT ANTI JOIN b USING (i)", Lenient)
-            .expect("Lenient parses LEFT ANTI JOIN ... USING");
+        let using = parse_with(
+            "SELECT * FROM a LEFT ANTI JOIN b USING (i)",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses LEFT ANTI JOIN ... USING");
         assert!(matches!(
             select_of(&using).from[0].joins[0].operator,
             JoinOperator::Anti {
@@ -4301,8 +4444,11 @@ mod tests {
         // side-less form on a bare factor would alias `a` (the ANSI reserved model Lenient
         // keeps), so the explicit `AS x` lets the anti arm fire; `LEFT` is a reserved side
         // keyword, so it never aliases.
-        let sideless = parse_with("SELECT * FROM a AS x ANTI JOIN b ON x.i = b.i", Lenient)
-            .expect("Lenient parses side-less ANTI JOIN after an explicit alias");
+        let sideless = parse_with(
+            "SELECT * FROM a AS x ANTI JOIN b ON x.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses side-less ANTI JOIN after an explicit alias");
         assert!(matches!(
             select_of(&sideless).from[0].joins[0].operator,
             JoinOperator::Anti {
@@ -4311,8 +4457,11 @@ mod tests {
             },
         ));
 
-        let left = parse_with("SELECT * FROM a LEFT ANTI JOIN b ON a.i = b.i", Lenient)
-            .expect("Lenient parses LEFT ANTI JOIN");
+        let left = parse_with(
+            "SELECT * FROM a LEFT ANTI JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses LEFT ANTI JOIN");
         assert!(matches!(
             select_of(&left).from[0].joins[0].operator,
             JoinOperator::Anti {
@@ -4327,15 +4476,21 @@ mod tests {
         // The leading `LEFT` also heads `LEFT [OUTER] JOIN`; the following `ANTI` keyword
         // forks the two. Without `ANTI` the standard side arm builds `LeftOuter`, so the
         // sided-anti lookahead must not steal a plain outer join.
-        let left_join = parse_with("SELECT * FROM a LEFT JOIN b ON a.i = b.i", Lenient)
-            .expect("LEFT JOIN parses");
+        let left_join = parse_with(
+            "SELECT * FROM a LEFT JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("LEFT JOIN parses");
         assert!(matches!(
             select_of(&left_join).from[0].joins[0].operator,
             JoinOperator::LeftOuter { .. },
         ));
 
-        let left_outer = parse_with("SELECT * FROM a LEFT OUTER JOIN b ON a.i = b.i", Lenient)
-            .expect("LEFT OUTER JOIN parses");
+        let left_outer = parse_with(
+            "SELECT * FROM a LEFT OUTER JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("LEFT OUTER JOIN parses");
         assert!(matches!(
             select_of(&left_outer).from[0].joins[0].operator,
             JoinOperator::LeftOuter { .. },
@@ -4348,7 +4503,8 @@ mod tests {
             "SELECT * FROM a LEFT ANTI JOIN b ON a.i = b.i",
             "SELECT * FROM a LEFT ANTI JOIN b USING (i)",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -4361,7 +4517,11 @@ mod tests {
         // Spark parse-rejects a bare `LEFT ANTI JOIN` with no `ON`/`USING`, mirroring the
         // side-less form's mandatory constraint.
         assert!(
-            parse_with("SELECT * FROM a LEFT ANTI JOIN b", Lenient).is_err(),
+            parse_with(
+                "SELECT * FROM a LEFT ANTI JOIN b",
+                crate::ParseConfig::new(Lenient)
+            )
+            .is_err(),
             "a bare LEFT ANTI JOIN without a constraint rejects"
         );
     }
@@ -4378,27 +4538,27 @@ mod tests {
         // are genuinely separate and the side-less flag does not leak the sided form.
         let sql = "SELECT * FROM a LEFT ANTI JOIN b ON a.i = b.i";
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI rejects LEFT ANTI JOIN"
         );
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects LEFT ANTI JOIN"
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects LEFT ANTI JOIN"
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects LEFT ANTI JOIN"
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB rejects the sided LEFT ANTI JOIN despite accepting side-less ANTI JOIN"
         );
         assert!(
-            parse_with(sql, Lenient).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
             "Lenient accepts LEFT ANTI JOIN"
         );
     }
@@ -4411,8 +4571,11 @@ mod tests {
         // on the shared `Semi` operator as `side: Right` (not a separate variant), mirroring
         // `LEFT SEMI JOIN`. Spark requires an `ON`/`USING` constraint and never composes
         // with `ASOF`, so the operator carries `asof: false` and the parsed constraint.
-        let on = parse_with("SELECT * FROM a RIGHT SEMI JOIN b ON a.i = b.i", Lenient)
-            .expect("Lenient parses RIGHT SEMI JOIN ... ON");
+        let on = parse_with(
+            "SELECT * FROM a RIGHT SEMI JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses RIGHT SEMI JOIN ... ON");
         assert!(matches!(
             select_of(&on).from[0].joins[0].operator,
             JoinOperator::Semi {
@@ -4424,8 +4587,11 @@ mod tests {
         ));
 
         // The other Spark constraint spelling — `USING (...)`.
-        let using = parse_with("SELECT * FROM a RIGHT SEMI JOIN b USING (i)", Lenient)
-            .expect("Lenient parses RIGHT SEMI JOIN ... USING");
+        let using = parse_with(
+            "SELECT * FROM a RIGHT SEMI JOIN b USING (i)",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses RIGHT SEMI JOIN ... USING");
         assert!(matches!(
             select_of(&using).from[0].joins[0].operator,
             JoinOperator::Semi {
@@ -4447,8 +4613,11 @@ mod tests {
         // side-less form on a bare factor would alias `a` (the ANSI reserved model Lenient
         // keeps), so the explicit `AS x` lets the semi arm fire; `RIGHT` is a reserved side
         // keyword, so it never aliases.
-        let sideless = parse_with("SELECT * FROM a AS x SEMI JOIN b ON x.i = b.i", Lenient)
-            .expect("Lenient parses side-less SEMI JOIN after an explicit alias");
+        let sideless = parse_with(
+            "SELECT * FROM a AS x SEMI JOIN b ON x.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses side-less SEMI JOIN after an explicit alias");
         assert!(matches!(
             select_of(&sideless).from[0].joins[0].operator,
             JoinOperator::Semi {
@@ -4457,8 +4626,11 @@ mod tests {
             },
         ));
 
-        let right = parse_with("SELECT * FROM a RIGHT SEMI JOIN b ON a.i = b.i", Lenient)
-            .expect("Lenient parses RIGHT SEMI JOIN");
+        let right = parse_with(
+            "SELECT * FROM a RIGHT SEMI JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses RIGHT SEMI JOIN");
         assert!(matches!(
             select_of(&right).from[0].joins[0].operator,
             JoinOperator::Semi {
@@ -4473,15 +4645,21 @@ mod tests {
         // The leading `RIGHT` also heads `RIGHT [OUTER] JOIN`; the following `SEMI` keyword
         // forks the two. Without `SEMI` the standard side arm builds `RightOuter`, so the
         // sided-semi lookahead must not steal a plain outer join.
-        let right_join = parse_with("SELECT * FROM a RIGHT JOIN b ON a.i = b.i", Lenient)
-            .expect("RIGHT JOIN parses");
+        let right_join = parse_with(
+            "SELECT * FROM a RIGHT JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("RIGHT JOIN parses");
         assert!(matches!(
             select_of(&right_join).from[0].joins[0].operator,
             JoinOperator::RightOuter { .. },
         ));
 
-        let right_outer = parse_with("SELECT * FROM a RIGHT OUTER JOIN b ON a.i = b.i", Lenient)
-            .expect("RIGHT OUTER JOIN parses");
+        let right_outer = parse_with(
+            "SELECT * FROM a RIGHT OUTER JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("RIGHT OUTER JOIN parses");
         assert!(matches!(
             select_of(&right_outer).from[0].joins[0].operator,
             JoinOperator::RightOuter { .. },
@@ -4494,7 +4672,8 @@ mod tests {
             "SELECT * FROM a RIGHT SEMI JOIN b ON a.i = b.i",
             "SELECT * FROM a RIGHT SEMI JOIN b USING (i)",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -4507,7 +4686,11 @@ mod tests {
         // Spark parse-rejects a bare `RIGHT SEMI JOIN` with no `ON`/`USING`, mirroring the
         // side-less form's mandatory constraint.
         assert!(
-            parse_with("SELECT * FROM a RIGHT SEMI JOIN b", Lenient).is_err(),
+            parse_with(
+                "SELECT * FROM a RIGHT SEMI JOIN b",
+                crate::ParseConfig::new(Lenient)
+            )
+            .is_err(),
             "a bare RIGHT SEMI JOIN without a constraint rejects"
         );
     }
@@ -4524,27 +4707,27 @@ mod tests {
         // are genuinely separate and the side-less flag does not leak the sided form.
         let sql = "SELECT * FROM a RIGHT SEMI JOIN b ON a.i = b.i";
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI rejects RIGHT SEMI JOIN"
         );
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects RIGHT SEMI JOIN"
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects RIGHT SEMI JOIN"
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects RIGHT SEMI JOIN"
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB rejects the sided RIGHT SEMI JOIN despite accepting side-less SEMI JOIN"
         );
         assert!(
-            parse_with(sql, Lenient).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
             "Lenient accepts RIGHT SEMI JOIN"
         );
     }
@@ -4557,8 +4740,11 @@ mod tests {
         // on the shared `Anti` operator as `side: Right` (not a separate variant), mirroring
         // `LEFT ANTI JOIN`. Spark requires an `ON`/`USING` constraint and never composes
         // with `ASOF`, so the operator carries `asof: false` and the parsed constraint.
-        let on = parse_with("SELECT * FROM a RIGHT ANTI JOIN b ON a.i = b.i", Lenient)
-            .expect("Lenient parses RIGHT ANTI JOIN ... ON");
+        let on = parse_with(
+            "SELECT * FROM a RIGHT ANTI JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses RIGHT ANTI JOIN ... ON");
         assert!(matches!(
             select_of(&on).from[0].joins[0].operator,
             JoinOperator::Anti {
@@ -4570,8 +4756,11 @@ mod tests {
         ));
 
         // The other Spark constraint spelling — `USING (...)`.
-        let using = parse_with("SELECT * FROM a RIGHT ANTI JOIN b USING (i)", Lenient)
-            .expect("Lenient parses RIGHT ANTI JOIN ... USING");
+        let using = parse_with(
+            "SELECT * FROM a RIGHT ANTI JOIN b USING (i)",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses RIGHT ANTI JOIN ... USING");
         assert!(matches!(
             select_of(&using).from[0].joins[0].operator,
             JoinOperator::Anti {
@@ -4593,8 +4782,11 @@ mod tests {
         // side-less form on a bare factor would alias `a` (the ANSI reserved model Lenient
         // keeps), so the explicit `AS x` lets the anti arm fire; `RIGHT` is a reserved side
         // keyword, so it never aliases.
-        let sideless = parse_with("SELECT * FROM a AS x ANTI JOIN b ON x.i = b.i", Lenient)
-            .expect("Lenient parses side-less ANTI JOIN after an explicit alias");
+        let sideless = parse_with(
+            "SELECT * FROM a AS x ANTI JOIN b ON x.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses side-less ANTI JOIN after an explicit alias");
         assert!(matches!(
             select_of(&sideless).from[0].joins[0].operator,
             JoinOperator::Anti {
@@ -4603,8 +4795,11 @@ mod tests {
             },
         ));
 
-        let right = parse_with("SELECT * FROM a RIGHT ANTI JOIN b ON a.i = b.i", Lenient)
-            .expect("Lenient parses RIGHT ANTI JOIN");
+        let right = parse_with(
+            "SELECT * FROM a RIGHT ANTI JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses RIGHT ANTI JOIN");
         assert!(matches!(
             select_of(&right).from[0].joins[0].operator,
             JoinOperator::Anti {
@@ -4619,15 +4814,21 @@ mod tests {
         // The leading `RIGHT` also heads `RIGHT [OUTER] JOIN`; the following `ANTI` keyword
         // forks the two. Without `ANTI` the standard side arm builds `RightOuter`, so the
         // sided-anti lookahead must not steal a plain outer join.
-        let right_join = parse_with("SELECT * FROM a RIGHT JOIN b ON a.i = b.i", Lenient)
-            .expect("RIGHT JOIN parses");
+        let right_join = parse_with(
+            "SELECT * FROM a RIGHT JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("RIGHT JOIN parses");
         assert!(matches!(
             select_of(&right_join).from[0].joins[0].operator,
             JoinOperator::RightOuter { .. },
         ));
 
-        let right_outer = parse_with("SELECT * FROM a RIGHT OUTER JOIN b ON a.i = b.i", Lenient)
-            .expect("RIGHT OUTER JOIN parses");
+        let right_outer = parse_with(
+            "SELECT * FROM a RIGHT OUTER JOIN b ON a.i = b.i",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("RIGHT OUTER JOIN parses");
         assert!(matches!(
             select_of(&right_outer).from[0].joins[0].operator,
             JoinOperator::RightOuter { .. },
@@ -4640,7 +4841,8 @@ mod tests {
             "SELECT * FROM a RIGHT ANTI JOIN b ON a.i = b.i",
             "SELECT * FROM a RIGHT ANTI JOIN b USING (i)",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -4653,7 +4855,11 @@ mod tests {
         // Spark parse-rejects a bare `RIGHT ANTI JOIN` with no `ON`/`USING`, mirroring the
         // side-less form's mandatory constraint.
         assert!(
-            parse_with("SELECT * FROM a RIGHT ANTI JOIN b", Lenient).is_err(),
+            parse_with(
+                "SELECT * FROM a RIGHT ANTI JOIN b",
+                crate::ParseConfig::new(Lenient)
+            )
+            .is_err(),
             "a bare RIGHT ANTI JOIN without a constraint rejects"
         );
     }
@@ -4670,27 +4876,27 @@ mod tests {
         // are genuinely separate and the side-less flag does not leak the sided form.
         let sql = "SELECT * FROM a RIGHT ANTI JOIN b ON a.i = b.i";
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI rejects RIGHT ANTI JOIN"
         );
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects RIGHT ANTI JOIN"
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects RIGHT ANTI JOIN"
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects RIGHT ANTI JOIN"
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB rejects the sided RIGHT ANTI JOIN despite accepting side-less ANTI JOIN"
         );
         assert!(
-            parse_with(sql, Lenient).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
             "Lenient accepts RIGHT ANTI JOIN"
         );
     }
@@ -4704,8 +4910,11 @@ mod tests {
         // `asof` aliases `l` and the join parses as a plain inner join. The DuckDB
         // meaning needs the DuckDb preset's reservation. After an explicit alias the
         // word cannot alias, so the AsOf arm fires — the documented split.
-        let parsed = parse_with("SELECT * FROM l ASOF JOIN r ON l.t >= r.t", Lenient)
-            .expect("Lenient parses via the alias reading");
+        let parsed = parse_with(
+            "SELECT * FROM l ASOF JOIN r ON l.t >= r.t",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses via the alias reading");
         let from = &select_of(&parsed).from[0];
         let TableFactor::Table {
             alias: Some(alias), ..
@@ -4724,8 +4933,11 @@ mod tests {
             },
         ));
 
-        let parsed = parse_with("SELECT * FROM l AS a ASOF JOIN r ON a.t >= r.t", Lenient)
-            .expect("Lenient parses the AsOf join after an explicit alias");
+        let parsed = parse_with(
+            "SELECT * FROM l AS a ASOF JOIN r ON a.t >= r.t",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses the AsOf join after an explicit alias");
         assert!(matches!(
             select_of(&parsed).from[0].joins[0].operator,
             JoinOperator::AsOf { .. },
@@ -4734,8 +4946,11 @@ mod tests {
 
     #[test]
     fn comma_separated_from_yields_multiple_relations() {
-        let parsed =
-            parse_with("SELECT * FROM t1, t2, t3", TestDialect).expect("comma FROM parses");
+        let parsed = parse_with(
+            "SELECT * FROM t1, t2, t3",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("comma FROM parses");
         assert_eq!(select_of(&parsed).from.len(), 3, "three table references");
     }
 
@@ -4744,15 +4959,22 @@ mod tests {
         // PostgreSQL caps a relation at catalog.schema.table (three parts); a fourth is
         // rejected (tighten-pg-overacceptance-trio). A column reference reaches four parts
         // through a different grammar position, so it stays accepted.
-        parse_with("SELECT * FROM a.b.c", TestDialect).expect("a three-part relation parses");
-        let err = parse_with("SELECT * FROM a.b.c.d", TestDialect)
-            .expect_err("a four-part relation is rejected");
+        parse_with("SELECT * FROM a.b.c", crate::ParseConfig::new(TestDialect))
+            .expect("a three-part relation parses");
+        let err = parse_with(
+            "SELECT * FROM a.b.c.d",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("a four-part relation is rejected");
         assert_eq!(
             err.expected.as_str(),
             "a relation name of at most three parts (catalog.schema.table)"
         );
-        parse_with("SELECT a.b.c.d FROM t", TestDialect)
-            .expect("a four-part column reference is unaffected");
+        parse_with(
+            "SELECT a.b.c.d FROM t",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("a four-part column reference is unaffected");
     }
 
     #[test]
@@ -4773,15 +4995,16 @@ mod tests {
             "CREATE TABLE a.b.c (x INTEGER)",
             "ALTER TABLE a.b.c RENAME TO d",
         ] {
-            parse_with(sql, Sqlite)
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
                 .expect_err(&format!("SQLite caps relations at two parts {sql:?}"));
         }
         // Two-part stays accepted for SQLite; PostgreSQL keeps the three-part form; and a
         // column reference is a separate, deeper position (three parts unaffected).
-        parse_with("SELECT * FROM a.b", Sqlite).expect("SQLite accepts schema.table");
-        parse_with("SELECT * FROM a.b.c", Postgres)
+        parse_with("SELECT * FROM a.b", crate::ParseConfig::new(Sqlite))
+            .expect("SQLite accepts schema.table");
+        parse_with("SELECT * FROM a.b.c", crate::ParseConfig::new(Postgres))
             .expect("PostgreSQL accepts catalog.schema.table");
-        parse_with("SELECT a.b.c FROM t", Sqlite)
+        parse_with("SELECT a.b.c FROM t", crate::ParseConfig::new(Sqlite))
             .expect("a three-part column reference is unaffected");
     }
 
@@ -4798,12 +5021,14 @@ mod tests {
             "SELECT x.update",
             "SELECT * FROM schema.case",
         ] {
-            parse_with(sql, Sqlite).expect_err(&format!("SQLite reserves the ColLabel {sql:?}"));
-            parse_with(sql, Postgres)
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
+                .expect_err(&format!("SQLite reserves the ColLabel {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
                 .unwrap_or_else(|err| panic!("PostgreSQL accepts {sql:?}: {err:?}"));
         }
         // A non-reserved keyword stays a usable label under SQLite.
-        parse_with("SELECT 1 AS abs", Sqlite).expect("SQLite admits a non-reserved AS-label");
+        parse_with("SELECT 1 AS abs", crate::ParseConfig::new(Sqlite))
+            .expect("SQLite admits a non-reserved AS-label");
     }
 
     #[test]
@@ -4816,23 +5041,26 @@ mod tests {
             "SELECT 1 FROM a JOIN b JOIN c ON b.id = c.id ON a.id = b.id",
             "SELECT * FROM a JOIN b JOIN c USING (id) USING (id)",
         ] {
-            parse_with(sql, Sqlite)
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
                 .expect_err(&format!("SQLite rejects stacked qualifiers {sql:?}"));
-            parse_with(sql, Postgres)
+            parse_with(sql, crate::ParseConfig::new(Postgres))
                 .unwrap_or_else(|err| panic!("PostgreSQL accepts {sql:?}: {err:?}"));
         }
         // Each join with its own immediately-following constraint is unaffected.
         parse_with(
             "SELECT * FROM a JOIN b ON a.id = b.id JOIN c ON b.id = c.id",
-            Sqlite,
+            crate::ParseConfig::new(Sqlite),
         )
         .expect("SQLite accepts non-stacked per-join constraints");
     }
 
     #[test]
     fn derived_table_subquery_with_alias() {
-        let parsed = parse_with("SELECT * FROM ( SELECT 1 ) AS s", TestDialect)
-            .expect("derived table parses");
+        let parsed = parse_with(
+            "SELECT * FROM ( SELECT 1 ) AS s",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("derived table parses");
         let TableFactor::Derived {
             subquery, alias, ..
         } = &select_of(&parsed).from[0].relation
@@ -4849,8 +5077,11 @@ mod tests {
 
     #[test]
     fn table_name_can_be_qualified_and_aliased() {
-        let parsed =
-            parse_with("SELECT * FROM s.t AS x", TestDialect).expect("qualified table parses");
+        let parsed = parse_with(
+            "SELECT * FROM s.t AS x",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("qualified table parses");
         let TableFactor::Table { name, alias, .. } = &select_of(&parsed).from[0].relation else {
             panic!("expected a plain table factor");
         };
@@ -4861,8 +5092,11 @@ mod tests {
 
     #[test]
     fn table_alias_column_lists_are_structural() {
-        let parsed = parse_with("SELECT * FROM t AS x(a, b)", TestDialect)
-            .expect("table alias column list parses");
+        let parsed = parse_with(
+            "SELECT * FROM t AS x(a, b)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("table alias column list parses");
         let TableFactor::Table { alias, .. } = &select_of(&parsed).from[0].relation else {
             panic!("expected a table factor");
         };
@@ -4886,7 +5120,8 @@ mod tests {
             ("SELECT * FROM pragma_index_info('i1')", 1),
             ("SELECT name, type FROM pragma_table_list('v1')", 1),
         ] {
-            let parsed = parse_with(sql, Sqlite).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Sqlite))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let TableFactor::Function {
                 lateral,
                 function,
@@ -4906,7 +5141,7 @@ mod tests {
     fn postgres_lateral_table_function_with_ordinality_parses() {
         let parsed = parse_with(
             "SELECT * FROM LATERAL generate_series(1, 3) WITH ORDINALITY AS g(x, ord)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("PostgreSQL lateral table function parses");
         let TableFactor::Function {
@@ -4931,7 +5166,7 @@ mod tests {
     fn postgres_rows_from_parses() {
         let parsed = parse_with(
             "SELECT * FROM LATERAL ROWS FROM (generate_series(1, 2), generate_series(3, 4)) WITH ORDINALITY AS r(a, b, ord)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("PostgreSQL ROWS FROM parses");
         let TableFactor::RowsFrom {
@@ -4954,7 +5189,7 @@ mod tests {
     fn postgres_table_function_column_definition_list_is_typed() {
         let parsed = parse_with(
             "SELECT * FROM json_to_record('{}') AS x(a INTEGER, b TEXT)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("typed column definition list parses");
         let TableFactor::Function {
@@ -4987,7 +5222,7 @@ mod tests {
     fn postgres_table_function_column_definition_list_can_omit_the_correlation_name() {
         let parsed = parse_with(
             "SELECT * FROM json_to_record('{}') AS (a INTEGER, b TEXT)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("anonymous column definition list parses");
         let TableFactor::Function {
@@ -5007,8 +5242,11 @@ mod tests {
     fn postgres_table_function_alias_column_list_stays_untyped() {
         // `AS x(a, b)` is an alias column-name list, never a typed definition list:
         // an entry without a type must stay an alias column.
-        let parsed = parse_with("SELECT * FROM generate_series(1, 3) AS x(a, b)", Postgres)
-            .expect("alias column list parses");
+        let parsed = parse_with(
+            "SELECT * FROM generate_series(1, 3) AS x(a, b)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("alias column list parses");
         let TableFactor::Function {
             alias, column_defs, ..
         } = &select_of(&parsed).from[0].relation
@@ -5036,7 +5274,8 @@ mod tests {
             ("SELECT * FROM f(x => 1)", ArgSyntax::Arrow),
             ("SELECT * FROM f(x := 1)", ArgSyntax::ColonEquals),
         ] {
-            let parsed = parse_with(sql, Postgres).expect("named table-function arg parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect("named table-function arg parses");
             let TableFactor::Function { function, .. } = &select_of(&parsed).from[0].relation
             else {
                 panic!("expected a table function factor, not a scalar call: {sql}");
@@ -5054,8 +5293,11 @@ mod tests {
 
         // A mixed positional-then-named list is admissible in the same position and
         // records the name only on the named tail.
-        let parsed = parse_with("SELECT * FROM generate_series(1, 3, step => 1)", Postgres)
-            .expect("mixed positional/named table-function args parse");
+        let parsed = parse_with(
+            "SELECT * FROM generate_series(1, 3, step => 1)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("mixed positional/named table-function args parse");
         let TableFactor::Function { function, .. } = &select_of(&parsed).from[0].relation else {
             panic!("expected a table function factor");
         };
@@ -5075,7 +5317,7 @@ mod tests {
         // admitting the form (engine-probed: pg_query accepts, our SQLite preset rejects).
         for sql in ["SELECT * FROM f(x => 1)", "SELECT * FROM f(x := 1)"] {
             assert!(
-                parse_with(sql, Sqlite).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
                 "SQLite rejects the named-argument arrow in FROM: {sql}",
             );
         }
@@ -5085,7 +5327,7 @@ mod tests {
     fn postgres_rows_from_items_carry_per_function_column_definitions() {
         let parsed = parse_with(
             "SELECT * FROM ROWS FROM (json_to_record('{}') AS (a INTEGER), generate_series(1, 2) AS (b INTEGER)) AS r",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("ROWS FROM with per-function column definitions parses");
         let TableFactor::RowsFrom {
@@ -5118,7 +5360,8 @@ mod tests {
             "SELECT * FROM json_to_record('{}') AS (a INTEGER, b TEXT)",
             "SELECT * FROM ROWS FROM (json_to_record('{}') AS (a INTEGER), generate_series(1, 2) AS (b INTEGER)) AS r",
         ] {
-            let parsed = parse_with(sql, Postgres).expect("column definition list parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect("column definition list parses");
             let rendered = Renderer::new(Postgres)
                 .render_parsed(&parsed)
                 .expect("column definition list renders");
@@ -5151,7 +5394,8 @@ mod tests {
             "SELECT * FROM UNNEST(ARRAY[1, 2, 3]) WITH ORDINALITY AS u(v, ord)",
             "SELECT * FROM t CROSS JOIN LATERAL UNNEST(t.arr) AS e(x)",
         ] {
-            let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let has_unnest = select_of(&parsed)
                 .from
                 .iter()
@@ -5177,7 +5421,7 @@ mod tests {
     fn postgres_unnest_carries_its_fields() {
         let parsed = parse_with(
             "SELECT * FROM UNNEST(ARRAY[1, 2], ARRAY[3, 4]) WITH ORDINALITY AS u(a, b, ord)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("UNNEST parses");
         let TableFactor::Unnest {
@@ -5216,7 +5460,8 @@ mod tests {
             "SELECT * FROM UNNEST([1, 2, 3])",
             "SELECT * FROM UNNEST([1, 2, 3]) WITH ORDINALITY AS t(x)",
         ] {
-            let parsed = parse_with(sql, DUCKDB).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert!(
                 matches!(
                     select_of(&parsed).from[0].relation,
@@ -5245,10 +5490,16 @@ mod tests {
         const DUCKDB: FeatureDialect = FeatureDialect {
             features: &FeatureSet::DUCKDB,
         };
-        let duckdb = parse_with("SELECT * FROM UNNEST([1, 2], [3, 4])", DUCKDB)
-            .expect("DuckDb parse-accepts multi-array UNNEST (reject is bind-layer)");
-        let postgres = parse_with("SELECT * FROM unnest(ARRAY[1, 2], ARRAY[3, 4])", Postgres)
-            .expect("Postgres parse-accepts multi-array unnest (it zips)");
+        let duckdb = parse_with(
+            "SELECT * FROM UNNEST([1, 2], [3, 4])",
+            crate::ParseConfig::new(DUCKDB),
+        )
+        .expect("DuckDb parse-accepts multi-array UNNEST (reject is bind-layer)");
+        let postgres = parse_with(
+            "SELECT * FROM unnest(ARRAY[1, 2], ARRAY[3, 4])",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("Postgres parse-accepts multi-array unnest (it zips)");
         for parsed in [duckdb, postgres] {
             let TableFactor::Unnest { array_exprs, .. } = &select_of(&parsed).from[0].relation
             else {
@@ -5273,16 +5524,19 @@ mod tests {
         for dialect_name in ["ansi", "mysql"] {
             let sql = "SELECT * FROM UNNEST(ARRAY[1, 2, 3])";
             let result = match dialect_name {
-                "ansi" => parse_with(sql, Ansi),
-                _ => parse_with(sql, MySql),
+                "ansi" => parse_with(sql, crate::ParseConfig::new(Ansi)),
+                _ => parse_with(sql, crate::ParseConfig::new(MySql)),
             };
             assert!(result.is_err(), "{dialect_name} rejects the UNNEST factor");
         }
 
         // A bare `UNNEST` with no `(` is left to the named-table path as an ordinary
         // relation name (the interception fires only on `UNNEST (`).
-        let parsed = parse_with("SELECT * FROM unnest AS u", Postgres)
-            .expect("a bare UNNEST is a table name");
+        let parsed = parse_with(
+            "SELECT * FROM unnest AS u",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("a bare UNNEST is a table name");
         assert!(
             matches!(
                 select_of(&parsed).from[0].relation,
@@ -5302,7 +5556,7 @@ mod tests {
             "SELECT * FROM UNNEST(ARRAY[1, 2, 3]) WITH OFFSET",
             "SELECT * FROM UNNEST(ARRAY[1, 2, 3]) WITH OFFSET AS pos",
         ] {
-            let parsed = parse_with(sql, UNNEST_OFFSET_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(UNNEST_OFFSET_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let TableFactor::Unnest {
                 with_offset,
@@ -5327,9 +5581,9 @@ mod tests {
             ("SELECT * FROM UNNEST([1, 2, 3]) WITH OFFSET", "duckdb"),
         ] {
             let result = if dialect_name == "pg" {
-                parse_with(sql, Postgres)
+                parse_with(sql, crate::ParseConfig::new(Postgres))
             } else {
-                parse_with(sql, DuckDb)
+                parse_with(sql, crate::ParseConfig::new(DuckDb))
             };
             assert!(
                 result.is_err(),
@@ -5342,7 +5596,7 @@ mod tests {
     fn postgres_only_and_tablesample_parse_with_alias_before_sample() {
         let parsed = parse_with(
             "SELECT * FROM ONLY (t) AS x TABLESAMPLE BERNOULLI (10) REPEATABLE (42)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("PostgreSQL ONLY TABLESAMPLE parses");
         let TableFactor::Table {
@@ -5382,7 +5636,8 @@ mod tests {
             "SELECT * FROM t * AS x",
             "SELECT * FROM s.t *",
         ] {
-            let parsed = parse_with(sql, Postgres).expect("PostgreSQL descendant `*` parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect("PostgreSQL descendant `*` parses");
             let TableFactor::Table { inheritance, .. } = &select_of(&parsed).from[0].relation
             else {
                 panic!("expected a plain table factor");
@@ -5396,7 +5651,7 @@ mod tests {
 
         // The descendant `*` shares the `ONLY` inheritance gate, so a dialect
         // without PostgreSQL inheritance syntax rejects it.
-        parse_with("SELECT * FROM t *", TestDialect)
+        parse_with("SELECT * FROM t *", crate::ParseConfig::new(TestDialect))
             .expect_err("ANSI has no descendant-table `*` marker");
     }
 
@@ -5404,7 +5659,7 @@ mod tests {
     fn parenthesized_join_tree_can_be_join_relation() {
         let parsed = parse_with(
             "SELECT * FROM t JOIN (u JOIN v ON u.id = v.id) AS j ON t.id = j.id",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("parenthesized join tree parses");
         let join = &select_of(&parsed).from[0].joins[0];
@@ -5422,8 +5677,11 @@ mod tests {
 
     #[test]
     fn redundant_parenthesized_join_tree_collapses_to_join_grouping() {
-        let parsed = parse_with("SELECT * FROM ((t JOIN u ON TRUE)) AS j", Postgres)
-            .expect("redundantly parenthesized join tree parses");
+        let parsed = parse_with(
+            "SELECT * FROM ((t JOIN u ON TRUE)) AS j",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("redundantly parenthesized join tree parses");
         let TableFactor::NestedJoin { table, alias, .. } = &select_of(&parsed).from[0].relation
         else {
             panic!("expected nested join relation");
@@ -5448,7 +5706,7 @@ mod tests {
         // trailing set-op keyword.
         let parsed = parse_with(
             "SELECT * FROM ((SELECT 1 UNION ALL SELECT 2) UNION ALL SELECT 3) AS x",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("parenthesized set-op operand in derived-table position parses");
         let TableFactor::Derived {
@@ -5485,8 +5743,11 @@ mod tests {
         // `((SELECT 1))` is `select_with_parens` nested in `select_with_parens` — a
         // query, not a parenthesized join — so the extra parens collapse to a plain
         // derived table rather than being rejected like `((t))`.
-        let parsed = parse_with("SELECT * FROM ((SELECT 1)) AS x", TestDialect)
-            .expect("doubly parenthesized subquery parses as a derived table");
+        let parsed = parse_with(
+            "SELECT * FROM ((SELECT 1)) AS x",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("doubly parenthesized subquery parses as a derived table");
         let TableFactor::Derived {
             subquery, alias, ..
         } = &select_of(&parsed).from[0].relation
@@ -5511,7 +5772,7 @@ mod tests {
         // reaching the group's closing `)`.
         let parsed = parse_with(
             "SELECT * FROM ((SELECT 1) AS a JOIN (SELECT 2) AS b ON TRUE) AS j",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("parenthesized join of derived tables parses");
         let TableFactor::NestedJoin { table, alias, .. } = &select_of(&parsed).from[0].relation
@@ -5533,8 +5794,11 @@ mod tests {
 
     #[test]
     fn postgres_join_using_alias_is_constraint_alias() {
-        let parsed = parse_with("SELECT * FROM t JOIN u USING (id) AS merged", Postgres)
-            .expect("JOIN USING alias parses");
+        let parsed = parse_with(
+            "SELECT * FROM t JOIN u USING (id) AS merged",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("JOIN USING alias parses");
         let JoinOperator::Inner {
             constraint: JoinConstraint::Using { columns, alias, .. },
             ..
@@ -5558,7 +5822,7 @@ mod tests {
             "SELECT * FROM LATERAL ONLY t",
             "SELECT * FROM LATERAL ONLY (t)",
         ] {
-            parse_with(sql, Postgres).unwrap_err();
+            parse_with(sql, crate::ParseConfig::new(Postgres)).unwrap_err();
         }
     }
 
@@ -5571,7 +5835,7 @@ mod tests {
             "SELECT * FROM ((t JOIN u ON TRUE) AS inner_j)",
             "SELECT * FROM ((t JOIN u ON TRUE) AS inner_j) AS outer_j",
         ] {
-            parse_with(sql, Postgres).unwrap_err();
+            parse_with(sql, crate::ParseConfig::new(Postgres)).unwrap_err();
         }
     }
 
@@ -5588,7 +5852,7 @@ mod tests {
             "SELECT * FROM t AS x TABLESAMPLE SYSTEM (10)",
             "SELECT * FROM t JOIN u USING (id) AS merged",
         ] {
-            parse_with(sql, TestDialect).unwrap_err();
+            parse_with(sql, crate::ParseConfig::new(TestDialect)).unwrap_err();
         }
     }
 
@@ -5596,7 +5860,7 @@ mod tests {
     fn non_reserved_keyword_can_be_a_table_name() {
         // `Nulls` is an unreserved keyword (`asc`/`desc` became reserved under the
         // PostgreSQL category model), so it is admissible as a bare `ColId`.
-        let parsed = parse_with("SELECT * FROM Nulls", TestDialect)
+        let parsed = parse_with("SELECT * FROM Nulls", crate::ParseConfig::new(TestDialect))
             .expect("contextual keyword table name parses");
         let TableFactor::Table { name, .. } = &select_of(&parsed).from[0].relation else {
             panic!("expected a plain table factor");
@@ -5606,7 +5870,7 @@ mod tests {
 
     #[test]
     fn reserved_keyword_cannot_be_a_table_name() {
-        let err = parse_with("SELECT * FROM FROM", TestDialect)
+        let err = parse_with("SELECT * FROM FROM", crate::ParseConfig::new(TestDialect))
             .expect_err("reserved keyword table name is rejected");
         assert_eq!(err.span, crate::ast::Span::new(14, 18));
     }
@@ -5655,8 +5919,8 @@ mod tests {
 
     #[test]
     fn double_quoted_identifier_is_a_table_name_with_quote_style() {
-        let parsed =
-            parse_with("SELECT * FROM \"x\"", Postgres).expect("double-quoted table name parses");
+        let parsed = parse_with("SELECT * FROM \"x\"", crate::ParseConfig::new(Postgres))
+            .expect("double-quoted table name parses");
         let name = sole_table_name(&parsed);
         assert_eq!(name.0.len(), 1);
         assert_eq!(parsed.resolver().resolve(name.0[0].sym), "x");
@@ -5665,8 +5929,8 @@ mod tests {
 
     #[test]
     fn backtick_identifier_is_a_column_reference_with_quote_style() {
-        let parsed =
-            parse_with("SELECT `c`", BACKTICK_DIALECT).expect("backtick column ref parses");
+        let parsed = parse_with("SELECT `c`", crate::ParseConfig::new(BACKTICK_DIALECT))
+            .expect("backtick column ref parses");
         let name = sole_column_name(&parsed);
         assert_eq!(parsed.resolver().resolve(name.0[0].sym), "c");
         assert_eq!(name.0[0].quote, QuoteStyle::Backtick);
@@ -5674,8 +5938,11 @@ mod tests {
 
     #[test]
     fn bracket_identifier_is_a_table_name_with_quote_style() {
-        let parsed =
-            parse_with("SELECT * FROM [t]", BRACKET_DIALECT).expect("bracket table name parses");
+        let parsed = parse_with(
+            "SELECT * FROM [t]",
+            crate::ParseConfig::new(BRACKET_DIALECT),
+        )
+        .expect("bracket table name parses");
         let name = sole_table_name(&parsed);
         assert_eq!(parsed.resolver().resolve(name.0[0].sym), "t");
         assert_eq!(name.0[0].quote, QuoteStyle::Bracket);
@@ -5684,8 +5951,8 @@ mod tests {
     #[test]
     fn doubled_close_delimiter_round_trips_through_the_parser() {
         // `"a""b"` is one identifier whose body is `a"b`, not two adjacent items.
-        let parsed =
-            parse_with("SELECT \"a\"\"b\"", Postgres).expect("doubled double-quote parses");
+        let parsed = parse_with("SELECT \"a\"\"b\"", crate::ParseConfig::new(Postgres))
+            .expect("doubled double-quote parses");
         assert_eq!(
             parsed
                 .resolver()
@@ -5693,8 +5960,11 @@ mod tests {
             "a\"b"
         );
 
-        let parsed =
-            parse_with("SELECT * FROM [a]]b]", BRACKET_DIALECT).expect("doubled bracket parses");
+        let parsed = parse_with(
+            "SELECT * FROM [a]]b]",
+            crate::ParseConfig::new(BRACKET_DIALECT),
+        )
+        .expect("doubled bracket parses");
         assert_eq!(
             parsed.resolver().resolve(sole_table_name(&parsed).0[0].sym),
             "a]b"
@@ -5703,8 +5973,11 @@ mod tests {
 
     #[test]
     fn qualified_quoted_name_collects_each_quoted_part() {
-        let parsed = parse_with("SELECT * FROM \"s\".\"t\"", Postgres)
-            .expect("qualified quoted name parses");
+        let parsed = parse_with(
+            "SELECT * FROM \"s\".\"t\"",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("qualified quoted name parses");
         let name = sole_table_name(&parsed);
         assert_eq!(name.0.len(), 2);
         assert_eq!(parsed.resolver().resolve(name.0[0].sym), "s");
@@ -5714,8 +5987,8 @@ mod tests {
 
     #[test]
     fn quoted_identifier_is_valid_as_an_alias() {
-        let parsed =
-            parse_with("SELECT 1 AS \"x\"", Postgres).expect("quoted projection alias parses");
+        let parsed = parse_with("SELECT 1 AS \"x\"", crate::ParseConfig::new(Postgres))
+            .expect("quoted projection alias parses");
         let [
             SelectItem::Expr {
                 alias: Some(alias), ..
@@ -5732,7 +6005,8 @@ mod tests {
     fn quoting_lets_a_reserved_word_be_an_identifier() {
         // `FROM` is reserved and cannot be a bare table name, but quoting bypasses
         // reservation, so `"from"` is a perfectly good column name.
-        let parsed = parse_with("SELECT \"from\"", Postgres).expect("quoted reserved word parses");
+        let parsed = parse_with("SELECT \"from\"", crate::ParseConfig::new(Postgres))
+            .expect("quoted reserved word parses");
         let name = sole_column_name(&parsed);
         assert_eq!(parsed.resolver().resolve(name.0[0].sym), "from");
         assert_eq!(name.0[0].quote, QuoteStyle::Double);
@@ -5750,7 +6024,8 @@ mod tests {
             "SELECT * FROM \"s\".\"t\"",
             "SELECT 1 AS \"from\"",
         ] {
-            let parsed = parse_with(sql, Postgres).expect("double-quoted identifier parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect("double-quoted identifier parses");
             let rendered = Renderer::new(Postgres)
                 .render_parsed(&parsed)
                 .expect("double-quoted identifier renders");
@@ -5758,7 +6033,8 @@ mod tests {
         }
 
         for sql in ["SELECT `c`", "SELECT `a``b`"] {
-            let parsed = parse_with(sql, BACKTICK_DIALECT).expect("backtick identifier parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(BACKTICK_DIALECT))
+                .expect("backtick identifier parses");
             let rendered = Renderer::new(BACKTICK_DIALECT)
                 .render_parsed(&parsed)
                 .expect("backtick identifier renders");
@@ -5766,7 +6042,8 @@ mod tests {
         }
 
         for sql in ["SELECT * FROM [t]", "SELECT * FROM [a]]b]"] {
-            let parsed = parse_with(sql, BRACKET_DIALECT).expect("bracket identifier parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(BRACKET_DIALECT))
+                .expect("bracket identifier parses");
             let rendered = Renderer::new(BRACKET_DIALECT)
                 .render_parsed(&parsed)
                 .expect("bracket identifier renders");
@@ -5797,8 +6074,11 @@ mod tests {
         use crate::dialect::{Ansi, MySql};
 
         // `USE INDEX (idx)` — the default action/keyword, no scope, one index.
-        let parsed = parse_with("SELECT a FROM th USE INDEX (idx_a)", MySql)
-            .expect("MySQL parses USE INDEX");
+        let parsed = parse_with(
+            "SELECT a FROM th USE INDEX (idx_a)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses USE INDEX");
         let (_, hints) = first_table(&parsed);
         assert!(matches!(
             hints[..],
@@ -5812,8 +6092,11 @@ mod tests {
         assert_eq!(hints[0].indexes.len(), 1);
 
         // `FORCE KEY FOR ORDER BY (idx)` — the `KEY` spelling with a scope.
-        let parsed = parse_with("SELECT a FROM th FORCE KEY FOR ORDER BY (idx_a)", MySql)
-            .expect("MySQL parses FORCE KEY FOR ORDER BY");
+        let parsed = parse_with(
+            "SELECT a FROM th FORCE KEY FOR ORDER BY (idx_a)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses FORCE KEY FOR ORDER BY");
         let (_, hints) = first_table(&parsed);
         assert!(matches!(
             hints[0],
@@ -5826,14 +6109,20 @@ mod tests {
         ));
 
         // `IGNORE INDEX FOR JOIN` and `FOR GROUP BY` reach the other scopes.
-        let parsed = parse_with("SELECT a FROM th IGNORE INDEX FOR JOIN (idx_a)", MySql)
-            .expect("MySQL parses IGNORE INDEX FOR JOIN");
+        let parsed = parse_with(
+            "SELECT a FROM th IGNORE INDEX FOR JOIN (idx_a)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses IGNORE INDEX FOR JOIN");
         assert!(matches!(
             first_table(&parsed).1[0].scope,
             Some(IndexHintScope::Join)
         ));
-        let parsed = parse_with("SELECT a FROM th USE INDEX FOR GROUP BY (idx_a)", MySql)
-            .expect("MySQL parses USE INDEX FOR GROUP BY");
+        let parsed = parse_with(
+            "SELECT a FROM th USE INDEX FOR GROUP BY (idx_a)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses USE INDEX FOR GROUP BY");
         assert!(matches!(
             first_table(&parsed).1[0].scope,
             Some(IndexHintScope::GroupBy)
@@ -5842,30 +6131,48 @@ mod tests {
         // Several hints are juxtaposed (space-separated, no comma).
         let parsed = parse_with(
             "SELECT a FROM th USE INDEX (idx_a) IGNORE INDEX (idx_a)",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("MySQL parses juxtaposed hints");
         assert_eq!(first_table(&parsed).1.len(), 2);
 
         // `USE INDEX ()` — the empty list ("use no index") is valid only for `USE`.
-        let parsed =
-            parse_with("SELECT a FROM th USE INDEX ()", MySql).expect("MySQL parses USE INDEX ()");
+        let parsed = parse_with(
+            "SELECT a FROM th USE INDEX ()",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses USE INDEX ()");
         assert!(first_table(&parsed).1[0].indexes.is_empty());
-        parse_with("SELECT a FROM th FORCE INDEX ()", MySql)
-            .expect_err("FORCE INDEX requires a non-empty list");
-        parse_with("SELECT a FROM th IGNORE INDEX ()", MySql)
-            .expect_err("IGNORE INDEX requires a non-empty list");
+        parse_with(
+            "SELECT a FROM th FORCE INDEX ()",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("FORCE INDEX requires a non-empty list");
+        parse_with(
+            "SELECT a FROM th IGNORE INDEX ()",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("IGNORE INDEX requires a non-empty list");
 
         // Hints bind *after* the alias: `AS x` after a hint is leftover input, while the
         // alias-then-hint order parses.
-        parse_with("SELECT a FROM th USE INDEX (idx_a) AS x", MySql)
-            .expect_err("an index hint must follow the alias, not precede it");
-        parse_with("SELECT a FROM th AS x USE INDEX (idx_a)", MySql)
-            .expect("a hint follows the alias");
+        parse_with(
+            "SELECT a FROM th USE INDEX (idx_a) AS x",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("an index hint must follow the alias, not precede it");
+        parse_with(
+            "SELECT a FROM th AS x USE INDEX (idx_a)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("a hint follows the alias");
 
         // Gated: ANSI has no index-hint grammar, so the construct is a parse error.
-        parse_with("SELECT a FROM th USE INDEX (idx_a)", Ansi)
-            .expect_err("ANSI has no index hints");
+        parse_with(
+            "SELECT a FROM th USE INDEX (idx_a)",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no index hints");
     }
 
     /// Borrow the first FROM relation's MSSQL `WITH (...)` table-hint list.
@@ -5882,8 +6189,11 @@ mod tests {
         use crate::dialect::{Ansi, Lenient, Mssql, Postgres};
 
         // A single bare-keyword hint after the relation, typed into `TableHintKeyword`.
-        let parsed = parse_with("SELECT a FROM th WITH (NOLOCK)", Mssql)
-            .expect("MSSQL parses WITH (NOLOCK)");
+        let parsed = parse_with(
+            "SELECT a FROM th WITH (NOLOCK)",
+            crate::ParseConfig::new(Mssql),
+        )
+        .expect("MSSQL parses WITH (NOLOCK)");
         assert!(matches!(
             first_table_hints(&parsed)[..],
             [TableHint::Keyword {
@@ -5896,7 +6206,7 @@ mod tests {
         // form, and a bare `FORCESEEK`.
         let parsed = parse_with(
             "SELECT a FROM th WITH (HOLDLOCK, INDEX (ix_a, ix_b), FORCESEEK)",
-            Mssql,
+            crate::ParseConfig::new(Mssql),
         )
         .expect("MSSQL parses a mixed hint list");
         let hints = first_table_hints(&parsed);
@@ -5918,16 +6228,22 @@ mod tests {
         ));
 
         // `INDEX = ix` and `INDEX = (a, b)` — the `=` spelling, single and list.
-        let parsed = parse_with("SELECT a FROM th WITH (INDEX = ix_a)", Mssql)
-            .expect("MSSQL parses INDEX = ix");
+        let parsed = parse_with(
+            "SELECT a FROM th WITH (INDEX = ix_a)",
+            crate::ParseConfig::new(Mssql),
+        )
+        .expect("MSSQL parses INDEX = ix");
         assert!(matches!(
             &first_table_hints(&parsed)[0],
             TableHint::Index { equals: true, indexes, .. } if indexes.len() == 1
         ));
 
         // `FORCESEEK ( ix ( col ) )` — the pinned index + column-prefix form.
-        let parsed = parse_with("SELECT a FROM th WITH (FORCESEEK (ix_a (c1, c2)))", Mssql)
-            .expect("MSSQL parses FORCESEEK with a target");
+        let parsed = parse_with(
+            "SELECT a FROM th WITH (FORCESEEK (ix_a (c1, c2)))",
+            crate::ParseConfig::new(Mssql),
+        )
+        .expect("MSSQL parses FORCESEEK with a target");
         assert!(matches!(
             &first_table_hints(&parsed)[0],
             TableHint::ForceSeek {
@@ -5937,8 +6253,11 @@ mod tests {
         ));
 
         // An unrecognized word is preserved verbatim rather than over-rejecting.
-        let parsed = parse_with("SELECT a FROM th WITH (SOMEFUTUREHINT)", Mssql)
-            .expect("MSSQL preserves an unmodelled hint word");
+        let parsed = parse_with(
+            "SELECT a FROM th WITH (SOMEFUTUREHINT)",
+            crate::ParseConfig::new(Mssql),
+        )
+        .expect("MSSQL preserves an unmodelled hint word");
         assert!(matches!(
             &first_table_hints(&parsed)[0],
             TableHint::Other { ident, .. }
@@ -5946,8 +6265,11 @@ mod tests {
         ));
 
         // Hints bind after the alias and the tablesample clause (`FROM t AS x WITH (...)`).
-        let parsed = parse_with("SELECT a FROM th AS x WITH (NOLOCK)", Mssql)
-            .expect("a table hint follows the alias");
+        let parsed = parse_with(
+            "SELECT a FROM th AS x WITH (NOLOCK)",
+            crate::ParseConfig::new(Mssql),
+        )
+        .expect("a table hint follows the alias");
         assert_eq!(first_table_hints(&parsed).len(), 1);
 
         // Round-trip: each surface renders back to its canonical spelling. Rendered
@@ -5965,7 +6287,8 @@ mod tests {
             "SELECT a FROM th WITH (FORCESEEK (ix_a (c1, c2)))",
             "SELECT a FROM th AS x WITH (NOLOCK, READPAST)",
         ] {
-            let parsed = parse_with(sql, Lenient).expect("Lenient parses the hint surface");
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .expect("Lenient parses the hint surface");
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .expect("the hint surface renders");
@@ -5974,9 +6297,16 @@ mod tests {
 
         // Gated: ANSI and PostgreSQL have no table-hint grammar, so the trailing `WITH`
         // is unconsumed and the statement rejects (`WITH` stays CTE-only there).
-        parse_with("SELECT a FROM th WITH (NOLOCK)", Ansi).expect_err("ANSI has no table hints");
-        parse_with("SELECT a FROM th WITH (NOLOCK)", Postgres)
-            .expect_err("PostgreSQL keeps `WITH` CTE-only");
+        parse_with(
+            "SELECT a FROM th WITH (NOLOCK)",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no table hints");
+        parse_with(
+            "SELECT a FROM th WITH (NOLOCK)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL keeps `WITH` CTE-only");
     }
 
     #[test]
@@ -5988,15 +6318,20 @@ mod tests {
         // that admits table hints. The CTE `WITH` at statement start is never taken as a
         // hint, and the hint `WITH` on the base table is never taken as a CTE.
         let sql = "WITH c AS (SELECT 1) SELECT a FROM th WITH (NOLOCK)";
-        let parsed = parse_with(sql, Mssql).expect("MSSQL: CTE and table hint coexist");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Mssql))
+            .expect("MSSQL: CTE and table hint coexist");
         assert_eq!(first_table_hints(&parsed).len(), 1);
         // Lenient (the permissive superset) admits both, too.
-        let parsed = parse_with(sql, Lenient).expect("Lenient parses CTE + table hint");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+            .expect("Lenient parses CTE + table hint");
         assert_eq!(first_table_hints(&parsed).len(), 1);
         // A plain leading CTE without any hint still parses cleanly under PostgreSQL,
         // proving the hint gate never disturbs the CTE reading.
-        parse_with("WITH c AS (SELECT 1) SELECT a FROM c", Postgres)
-            .expect("a bare CTE still parses where table hints are off");
+        parse_with(
+            "WITH c AS (SELECT 1) SELECT a FROM c",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("a bare CTE still parses where table hints are off");
     }
 
     /// Snowflake/Oracle's `TABLE(<expr>)` first-class table-expression factor
@@ -6011,8 +6346,11 @@ mod tests {
 
         // Lenient parses `TABLE(<expr>)` into the dedicated factor, capturing the inner
         // expression and no alias.
-        let parsed =
-            parse_with("SELECT * FROM TABLE(f(1))", Lenient).expect("Lenient parses TABLE(...)");
+        let parsed = parse_with(
+            "SELECT * FROM TABLE(f(1))",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses TABLE(...)");
         let TableFactor::TableExpr { expr, alias, .. } = &select_of(&parsed).from[0].relation
         else {
             panic!("expected a TableExpr factor");
@@ -6025,8 +6363,11 @@ mod tests {
 
         // An alias — including the column-list form, since Lenient enables
         // `table_alias_column_lists` — attaches to the factor like any other.
-        let parsed = parse_with("SELECT * FROM TABLE(f(1)) AS t(a, b)", Lenient)
-            .expect("Lenient parses a TABLE(...) column-list alias");
+        let parsed = parse_with(
+            "SELECT * FROM TABLE(f(1)) AS t(a, b)",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses a TABLE(...) column-list alias");
         let TableFactor::TableExpr { alias, .. } = &select_of(&parsed).from[0].relation else {
             panic!("expected a TableExpr factor");
         };
@@ -6040,7 +6381,8 @@ mod tests {
             "SELECT * FROM TABLE(f(1)) AS t",
             "SELECT * FROM TABLE(f(1)) AS t(a, b)",
         ] {
-            let parsed = parse_with(sql, Lenient).expect("Lenient parses the TABLE(...) surface");
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .expect("Lenient parses the TABLE(...) surface");
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .expect("the TABLE(...) surface renders");
@@ -6051,15 +6393,15 @@ mod tests {
         // is a globally reserved keyword, so it is never an admissible relation name
         // either way, and this construct is the unrelated statement-position `TABLE t`
         // query form the parser reaches through a different entry point entirely.
-        assert!(parse_with("SELECT * FROM TABLE", Lenient).is_err());
-        assert!(parse_with("TABLE t", Lenient).is_ok());
+        assert!(parse_with("SELECT * FROM TABLE", crate::ParseConfig::new(Lenient)).is_err());
+        assert!(parse_with("TABLE t", crate::ParseConfig::new(Lenient)).is_ok());
 
         // Gated off (ANSI/PostgreSQL/DuckDB): `TABLE(` falls through to the named-table
         // path, where the reserved `TABLE` keyword is not an admissible relation name —
         // the same clean parse error the construct already gave before this factor
         // existed (captured here so a future change to the flag cannot silently widen
         // acceptance without this test noticing).
-        let err = parse_with("SELECT * FROM TABLE(f(1))", Ansi)
+        let err = parse_with("SELECT * FROM TABLE(f(1))", crate::ParseConfig::new(Ansi))
             .expect_err("ANSI has no TABLE(...) factor")
             .to_string();
         assert_eq!(
@@ -6068,9 +6410,12 @@ mod tests {
              gave before `TABLE(<expr>)` existed as a factor — a change here signals the flag \
              stopped gating the fallthrough",
         );
-        parse_with("SELECT * FROM TABLE(f(1))", Postgres)
-            .expect_err("PostgreSQL has no TABLE(...) factor (engine-probed reject)");
-        parse_with("SELECT * FROM TABLE(f(1))", DuckDb)
+        parse_with(
+            "SELECT * FROM TABLE(f(1))",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no TABLE(...) factor (engine-probed reject)");
+        parse_with("SELECT * FROM TABLE(f(1))", crate::ParseConfig::new(DuckDb))
             .expect_err("DuckDB has no TABLE(...) factor (engine-probed reject)");
     }
 
@@ -6079,13 +6424,19 @@ mod tests {
         use crate::dialect::{MySql, Postgres};
 
         // `PARTITION (p0, p1)` — a non-empty list between the name and the alias.
-        let parsed = parse_with("SELECT a FROM tp PARTITION (p0, p1)", MySql)
-            .expect("MySQL parses partition selection");
+        let parsed = parse_with(
+            "SELECT a FROM tp PARTITION (p0, p1)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses partition selection");
         assert_eq!(first_table(&parsed).0.len(), 2);
 
         // Partition then alias parses; alias then partition is leftover input.
-        let parsed = parse_with("SELECT a FROM tp PARTITION (p0) AS x", MySql)
-            .expect("partition precedes the alias");
+        let parsed = parse_with(
+            "SELECT a FROM tp PARTITION (p0) AS x",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("partition precedes the alias");
         let TableFactor::Table {
             partition, alias, ..
         } = &select_of(&parsed).from[0].relation
@@ -6094,12 +6445,18 @@ mod tests {
         };
         assert_eq!(partition.len(), 1);
         assert!(alias.is_some());
-        parse_with("SELECT a FROM tp AS x PARTITION (p0)", MySql)
-            .expect_err("PARTITION must precede the alias");
+        parse_with(
+            "SELECT a FROM tp AS x PARTITION (p0)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("PARTITION must precede the alias");
 
         // Partition and an index hint coexist (partition before alias, hint after).
-        let parsed = parse_with("SELECT a FROM tp PARTITION (p0) USE INDEX (idx_a)", MySql)
-            .expect("partition and index hint coexist");
+        let parsed = parse_with(
+            "SELECT a FROM tp PARTITION (p0) USE INDEX (idx_a)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("partition and index hint coexist");
         let (partition, hints) = first_table(&parsed);
         assert_eq!(partition.len(), 1);
         assert_eq!(hints.len(), 1);
@@ -6108,8 +6465,11 @@ mod tests {
         // `PARTITION` is a non-reserved word under PostgreSQL, so it reads as the table
         // alias with a `(p0)` derived-column list — the `partition` field stays empty
         // (a structural divergence, not accept/reject), demonstrating the gate is off.
-        let pg = parse_with("SELECT a FROM tp PARTITION (p0)", Postgres)
-            .expect("PostgreSQL reads PARTITION as an alias, not partition selection");
+        let pg = parse_with(
+            "SELECT a FROM tp PARTITION (p0)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("PostgreSQL reads PARTITION as an alias, not partition selection");
         let TableFactor::Table {
             partition, alias, ..
         } = &select_of(&pg).from[0].relation
@@ -6143,7 +6503,7 @@ mod tests {
         // source, wrapping the described query (a SELECT here); the alias trails.
         let parsed = parse_with(
             "SELECT column_name FROM (DESCRIBE SELECT 1 AS a, 2 AS b) t",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("DESCRIBE of a query as a table source parses");
         let TableFactor::ShowRef { show, alias, .. } = first_relation(&parsed) else {
@@ -6166,7 +6526,7 @@ mod tests {
         // ShowRef target is a `SetExpr::Pivot`/`Unpivot` — the two families composing.
         let parsed = parse_with(
             "SELECT mode(column_type) FROM (DESCRIBE PIVOT monthly_sales ON MONTH USING SUM(AMOUNT)::INTEGER)",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("DESCRIBE of a PIVOT parses");
         let TableFactor::ShowRef { show, .. } = first_relation(&parsed) else {
@@ -6179,7 +6539,7 @@ mod tests {
 
         let parsed = parse_with(
             "SELECT column_name, column_type FROM (DESCRIBE unpivot (select 42) on columns(*))",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("DESCRIBE of an UNPIVOT parses");
         let TableFactor::ShowRef { show, .. } = first_relation(&parsed) else {
@@ -6194,8 +6554,11 @@ mod tests {
     #[test]
     fn describe_of_a_table_is_a_named_show_ref() {
         // A bare table name after DESCRIBE is the `Name` target (not a query).
-        let parsed = parse_with("SELECT * FROM (DESCRIBE some_table) d", DuckDb)
-            .expect("DESCRIBE of a table parses");
+        let parsed = parse_with(
+            "SELECT * FROM (DESCRIBE some_table) d",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DESCRIBE of a table parses");
         let TableFactor::ShowRef { show, .. } = first_relation(&parsed) else {
             panic!("expected a ShowRef table factor");
         };
@@ -6206,8 +6569,8 @@ mod tests {
     #[test]
     fn show_databases_is_a_named_show_ref() {
         // `FROM (SHOW databases) t` — SHOW always names its target.
-        let parsed =
-            parse_with("FROM (SHOW databases) t", DuckDb).expect("SHOW as a table source parses");
+        let parsed = parse_with("FROM (SHOW databases) t", crate::ParseConfig::new(DuckDb))
+            .expect("SHOW as a table source parses");
         // Bare FROM-first select: dig the relation out of the FROM-first body.
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
@@ -6232,7 +6595,8 @@ mod tests {
             "SELECT * FROM (SHOW databases) AS t",
             "SELECT * FROM (DESCRIBE monthly_sales) AS d",
         ] {
-            let parsed = parse_with(sql, DuckDb).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -6249,11 +6613,11 @@ mod tests {
             "SELECT * FROM (SHOW databases) t",
         ] {
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects the show_ref table source {sql:?}",
             );
             assert!(
-                parse_with(sql, Lenient).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
                 "Lenient accepts the show_ref table source {sql:?}",
             );
         }
@@ -6276,17 +6640,20 @@ mod tests {
         // The statement form is DuckDB's `SHOW_REF` at statement position: a query target
         // (`DESCRIBE SELECT …`, `SUMMARIZE SELECT …`) or a bare table name
         // (`SUMMARIZE t`), reusing the same `ShowRef` core as the `FROM (…)` table factor.
-        let q = parse_with("DESCRIBE SELECT 42 AS a", DuckDb).expect("DESCRIBE <query>");
+        let q = parse_with("DESCRIBE SELECT 42 AS a", crate::ParseConfig::new(DuckDb))
+            .expect("DESCRIBE <query>");
         let show = statement_show_ref(&q);
         assert!(matches!(show.kind, ShowRefKind::Describe));
         assert!(matches!(show.target, ShowRefTarget::Query { .. }));
 
-        let s = parse_with("SUMMARIZE SELECT 42 AS a", DuckDb).expect("SUMMARIZE <query>");
+        let s = parse_with("SUMMARIZE SELECT 42 AS a", crate::ParseConfig::new(DuckDb))
+            .expect("SUMMARIZE <query>");
         let show = statement_show_ref(&s);
         assert!(matches!(show.kind, ShowRefKind::Summarize));
         assert!(matches!(show.target, ShowRefTarget::Query { .. }));
 
-        let n = parse_with("SUMMARIZE arrays", DuckDb).expect("SUMMARIZE <table>");
+        let n = parse_with("SUMMARIZE arrays", crate::ParseConfig::new(DuckDb))
+            .expect("SUMMARIZE <table>");
         let show = statement_show_ref(&n);
         assert!(matches!(show.kind, ShowRefKind::Summarize));
         assert!(matches!(show.target, ShowRefTarget::Name { .. }));
@@ -6302,7 +6669,8 @@ mod tests {
             "DESCRIBE arrays",
             "SUMMARIZE arrays",
         ] {
-            let parsed = parse_with(sql, DuckDb).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -6314,8 +6682,8 @@ mod tests {
     fn describe_summarize_statement_is_gated_and_bounded() {
         // Off the gate (PostgreSQL): neither keyword is a statement leader — `DESCRIBE`
         // falls through to the unknown-statement error, `SUMMARIZE` is never a leader.
-        assert!(parse_with("DESCRIBE SELECT 1", Postgres).is_err());
-        assert!(parse_with("SUMMARIZE arrays", Postgres).is_err());
+        assert!(parse_with("DESCRIBE SELECT 1", crate::ParseConfig::new(Postgres)).is_err());
+        assert!(parse_with("SUMMARIZE arrays", crate::ParseConfig::new(Postgres)).is_err());
 
         // Reject boundaries DuckDB itself enforces (oracle-probed on 1.5.4): the named
         // target takes no trailing clause, and bare `SUMMARIZE` has no target.
@@ -6324,7 +6692,10 @@ mod tests {
             "SUMMARIZE arrays LIMIT 1",
             "SUMMARIZE",
         ] {
-            assert!(parse_with(sql, DuckDb).is_err(), "DuckDB rejects {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
+                "DuckDB rejects {sql:?}"
+            );
         }
     }
 
@@ -6337,7 +6708,7 @@ mod tests {
              a int PATH '$.a' WITH WRAPPER NULL ON EMPTY ERROR ON ERROR, \
              e int EXISTS PATH '$.b' TRUE ON ERROR, \
              NESTED PATH '$.c' AS n COLUMNS (d text)) ERROR ON ERROR)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("JSON_TABLE parses");
         let TableFactor::JsonTable { json_table, .. } = &select_of(&parsed).from[0].relation else {
@@ -6371,7 +6742,7 @@ mod tests {
         let parsed = parse_with(
             "SELECT * FROM XMLTABLE(XMLNAMESPACES('u' AS n, DEFAULT 'd'), '/root' \
              PASSING BY REF doc COLUMNS a int PATH 'x' DEFAULT 5 NOT NULL, o FOR ORDINALITY)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("XMLTABLE parses");
         let TableFactor::XmlTable { xml_table, .. } = &select_of(&parsed).from[0].relation else {
@@ -6409,7 +6780,8 @@ mod tests {
             "SELECT * FROM XMLTABLE('/root' PASSING doc COLUMNS a INTEGER PATH 'x' NOT NULL, o FOR ORDINALITY) AS t(x, y)",
             "SELECT * FROM XMLTABLE(('/a' || '/b') PASSING BY REF doc COLUMNS a INTEGER)",
         ] {
-            let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Postgres)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -6427,9 +6799,18 @@ mod tests {
             "SELECT * FROM JSON_TABLE(js, '$' COLUMNS (a int))",
             "SELECT * FROM XMLTABLE('/root' PASSING doc COLUMNS a int)",
         ] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
-            assert!(parse_with(sql, DuckDb).is_err(), "DuckDB rejects {sql:?}");
-            assert!(parse_with(sql, Lenient).is_ok(), "Lenient accepts {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
+                "DuckDB rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
+                "Lenient accepts {sql:?}"
+            );
         }
     }
 
@@ -6439,7 +6820,7 @@ mod tests {
         let parsed = parse_with(
             "SELECT * FROM OPENJSON(@doc, '$.items') \
              WITH (id INT '$.id', name NVARCHAR '$.name', raw NVARCHAR '$.raw' AS JSON, plain INT)",
-            Mssql,
+            crate::ParseConfig::new(Mssql),
         )
         .expect("MSSQL parses OPENJSON WITH");
         let TableFactor::OpenJson { open_json, .. } = &select_of(&parsed).from[0].relation else {
@@ -6468,7 +6849,8 @@ mod tests {
             "SELECT * FROM OPENJSON(@doc, '$.items')",
             "SELECT * FROM OPENJSON(@doc, '$.items') WITH (id INTEGER '$.id', raw NVARCHAR '$.raw' AS JSON, plain INTEGER) AS j",
         ] {
-            let parsed = parse_with(sql, Mssql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Mssql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             // Parsed under MSSQL; rendered under Lenient (the `RenderDialect` superset the
             // other MSSQL round-trip tests use) — the stored spelling round-trips either way.
             let rendered = Renderer::new(Lenient)
@@ -6484,13 +6866,22 @@ mod tests {
         // With `open_json` off, `OPENJSON(` falls to the ordinary function/name path, which
         // rejects at the `WITH (…)` clause tail. MSSQL and Lenient (gate on) accept.
         let sql = "SELECT * FROM OPENJSON(doc, '$.a') WITH (id INT)";
-        assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+            "ANSI rejects {sql:?}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects {sql:?}"
         );
-        assert!(parse_with(sql, Mssql).is_ok(), "MSSQL accepts {sql:?}");
-        assert!(parse_with(sql, Lenient).is_ok(), "Lenient accepts {sql:?}");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Mssql)).is_ok(),
+            "MSSQL accepts {sql:?}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
+            "Lenient accepts {sql:?}"
+        );
     }
 
     #[test]
@@ -6499,7 +6890,7 @@ mod tests {
         // `BareValues`: a `VALUES` body plus the mandatory alias, no wrapping parens.
         let parsed = parse_with(
             "SELECT c1 FROM VALUES ('CS', 'Bachelor'), ('CS', 'PhD') AS t(c1, c2)",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("DuckDb parses a bare FROM VALUES table factor");
         let TableFactor::Derived {
@@ -6540,7 +6931,8 @@ mod tests {
             "WITH c AS (FROM VALUES (1), (2) AS c(a)) SELECT * FROM c",
             "CREATE TABLE t1 AS FROM VALUES ('A', 1), ('B', 3) t(a, b)",
         ] {
-            parse_with(sql, DuckDb).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         }
     }
 
@@ -6554,7 +6946,7 @@ mod tests {
             "SELECT * FROM VALUES (1, 2) WHERE true",
             "FROM VALUES (1), (2)",
         ] {
-            let err = parse_with(sql, DuckDb)
+            let err = parse_with(sql, crate::ParseConfig::new(DuckDb))
                 .expect_err(&format!("a bare FROM VALUES needs an alias {sql:?}"));
             assert_eq!(
                 err.expected.as_str(),
@@ -6575,17 +6967,20 @@ mod tests {
             "SELECT a FROM VALUES (1), (2) t(a)",
         ] {
             assert!(
-                parse_with(sql, Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
                 "ANSI rejects a bare FROM VALUES {sql:?}",
             );
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects a bare FROM VALUES {sql:?}",
             );
         }
         // The parenthesized derived table is a different, always-on path — still accepted.
-        parse_with("SELECT * FROM (VALUES (1, 2)) AS t", Ansi)
-            .expect("the parenthesized VALUES derived table stays accepted");
+        parse_with(
+            "SELECT * FROM (VALUES (1, 2)) AS t",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("the parenthesized VALUES derived table stays accepted");
     }
 
     #[test]
@@ -6598,7 +6993,8 @@ mod tests {
             "SELECT * FROM VALUES (1, 2) AS t(a, b)",
             "SELECT a FROM VALUES (1), (2) AS t(a) ORDER BY a",
         ] {
-            let parsed = parse_with(sql, DuckDb).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -6611,8 +7007,11 @@ mod tests {
         // DuckDB admits a single-quoted string in table-alias position (probed on 1.5.4):
         // the correlation name after `AS` and each entry of the alias column list. The
         // string's value becomes the identifier, its `'` quote recorded so it round-trips.
-        let parsed = parse_with("SELECT t.k FROM integers AS 't'('k') ORDER BY ALL", DuckDb)
-            .expect("DuckDb parses a string-literal table alias with a string column list");
+        let parsed = parse_with(
+            "SELECT t.k FROM integers AS 't'('k') ORDER BY ALL",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDb parses a string-literal table alias with a string column list");
         let TableFactor::Table { alias, .. } = &select_of(&parsed).from[0].relation else {
             panic!("expected a plain table factor");
         };
@@ -6624,8 +7023,11 @@ mod tests {
         assert_eq!(alias.columns[0].quote, QuoteStyle::Single);
 
         // The bare-name variant keeps the string only in the column list (`t('k')`).
-        let parsed = parse_with("SELECT t.k FROM integers t('k') ORDER BY ALL", DuckDb)
-            .expect("DuckDb parses a bare alias name with a string column list");
+        let parsed = parse_with(
+            "SELECT t.k FROM integers t('k') ORDER BY ALL",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDb parses a bare alias name with a string column list");
         let TableFactor::Table { alias, .. } = &select_of(&parsed).from[0].relation else {
             panic!("expected a plain table factor");
         };
@@ -6645,7 +7047,8 @@ mod tests {
             "SELECT * FROM integers AS 't'('k')",
             "SELECT * FROM integers AS 't'",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -6660,7 +7063,11 @@ mod tests {
         // is not a column-name start, so the alias parse never begins and the string is
         // leftover input.
         assert!(
-            parse_with("SELECT * FROM integers 't'", DuckDb).is_err(),
+            parse_with(
+                "SELECT * FROM integers 't'",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err(),
             "DuckDb rejects a bare (no-`AS`) string table alias",
         );
     }
@@ -6674,12 +7081,18 @@ mod tests {
         // (engine-measured on mysql:8), so the flag is deliberately off there and both
         // forms reject — the string is not a `ColId`.
         for sql in ["SELECT * FROM t AS 'x'", "SELECT * FROM t AS 't'('k')"] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects {sql:?}"
             );
-            assert!(parse_with(sql, MySql).is_err(), "MySQL rejects {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+                "MySQL rejects {sql:?}"
+            );
         }
     }
 
@@ -6693,7 +7106,7 @@ mod tests {
             "SELECT * FROM count(*) FILTER (WHERE true)",
             "SELECT * FROM percentile_cont(0.5) WITHIN GROUP (ORDER BY x)",
         ] {
-            parse_with(sql, Postgres)
+            parse_with(sql, crate::ParseConfig::new(Postgres))
                 .expect_err(&format!("a function in FROM is windowless: {sql:?}"));
         }
         // Plain table functions — arguments, a `DISTINCT` quantifier, an in-parenthesis
@@ -6703,7 +7116,8 @@ mod tests {
             "SELECT * FROM count(DISTINCT x)",
             "SELECT * FROM string_agg(x, ',' ORDER BY x)",
         ] {
-            parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         }
     }
 
@@ -6719,7 +7133,7 @@ mod tests {
         // 3.43/3.53). Single named window, `t` unaliased:
         let parsed = parse_with(
             "SELECT sum(b) OVER w FROM t WINDOW w AS (ORDER BY a)",
-            Sqlite,
+            crate::ParseConfig::new(Sqlite),
         )
         .expect("named WINDOW clause parses");
         let select = select_of(&parsed);
@@ -6732,15 +7146,18 @@ mod tests {
         // Multiple named windows in one clause.
         let parsed = parse_with(
             "SELECT sum(b) OVER w1, count(*) OVER w2 FROM t WINDOW w1 AS (ORDER BY a), w2 AS (ORDER BY b)",
-            Sqlite,
+            crate::ParseConfig::new(Sqlite),
         )
         .expect("multi-window clause parses");
         assert_eq!(select_of(&parsed).windows.len(), 2);
 
         // A bare `window` that is NOT the clause head stays a correlation alias — SQLite
         // admits `window` as a bare alias (`FROM t window`, `FROM t window WHERE …`).
-        let parsed = parse_with("SELECT * FROM t window WHERE a > 0", Sqlite)
-            .expect("`window` binds as a bare correlation alias");
+        let parsed = parse_with(
+            "SELECT * FROM t window WHERE a > 0",
+            crate::ParseConfig::new(Sqlite),
+        )
+        .expect("`window` binds as a bare correlation alias");
         let select = select_of(&parsed);
         assert!(select.windows.is_empty(), "no WINDOW clause here");
         let TableFactor::Table {
@@ -6754,7 +7171,11 @@ mod tests {
         // An explicit `AS window` is definitely the alias, so a trailing windowdefn is a
         // reject — SQLite rejects `FROM t AS window w AS (…)`; only the bare form pivots.
         assert!(
-            parse_with("SELECT * FROM t AS window w AS (ORDER BY a)", Sqlite).is_err(),
+            parse_with(
+                "SELECT * FROM t AS window w AS (ORDER BY a)",
+                crate::ParseConfig::new(Sqlite)
+            )
+            .is_err(),
             "explicit `AS window` is an alias; the trailing windowdefn must reject",
         );
     }

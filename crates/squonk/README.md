@@ -29,14 +29,14 @@ Several dialects ship (`BuiltinDialect::ALL` is the selectable list). `Ansi` —
 
 ```toml
 [dependencies]
-squonk = { version = "1.0", features = ["postgres"] }
+squonk = { version = "2.0", features = ["postgres"] }
 ```
 
-`postgres`, `mysql`, `sqlite`, `duckdb`, the permissive `lenient` "parse-anything" union, and the conservative `bigquery`, `clickhouse`, `databricks`, `hive`, `mssql`, `redshift`, and `snowflake` presets each gate one dialect; `full` turns on all of them. Select one at runtime with `parse_with` (or `parse_with_builtin`), render *for* a target dialect with the `Renderer`, or `transpile` between two in one call. Each engine-backed dialect is held to its real engine by a differential accept/reject oracle, so its surface is engine-verified rather than merely self-consistent; the conservative presets are ANSI-derived and ship without an oracle (excluded from the oracle conformance sets, they reject unmodelled syntax cleanly). The per-dialect 100%-conformance programmes are ongoing, so this is verified breadth, not a finished spec-level audit.
+`postgres`, `mysql`, `sqlite`, `duckdb`, the permissive `lenient` "parse-anything" union, and the conservative `bigquery`, `clickhouse`, `databricks`, `hive`, `mssql`, `redshift`, and `snowflake` presets each gate one dialect; `full` turns on all of them. Select a statically typed dialect with `parse_with` and `ParseConfig`, or choose a compiled preset at runtime with `parse_builtin`; render *for* a target dialect with the `Renderer`, or `transpile` between two in one call. Each engine-backed dialect is held to its real engine by a differential accept/reject oracle, so its surface is engine-verified rather than merely self-consistent; the conservative presets are ANSI-derived and ship without an oracle (excluded from the oracle conformance sets, they reject unmodelled syntax cleanly). The per-dialect 100%-conformance programmes are ongoing, so this is verified breadth, not a finished spec-level audit.
 
 ## Status
 
-Stable (1.0) — the public API is frozen and covered by the SemVer contract in [docs/stable-api.md](https://github.com/moderately-ai/squonk/blob/main/docs/stable-api.md); no breaking change lands without a major bump. The engine-backed dialects (ANSI, PostgreSQL, MySQL, SQLite, DuckDB) are the strongest surface, each held to its real engine by a differential oracle; the conservative presets reject unmodelled syntax cleanly. The per-dialect conformance work continues additively under `1.x`, with design rationale recorded in `docs/adr/`.
+Stable (2.0) — the public API is frozen and covered by the SemVer contract in [docs/stable-api.md](https://github.com/moderately-ai/squonk/blob/main/docs/stable-api.md); no breaking change lands without a major bump. The engine-backed dialects (ANSI, PostgreSQL, MySQL, SQLite, DuckDB) are the strongest surface, each held to its real engine by a differential oracle; the conservative presets reject unmodelled syntax cleanly. The per-dialect conformance work continues additively under `2.x`, with design rationale recorded in `docs/adr/`.
 
 On the repository's frozen 256-statement publication workload, the Rust API measured 2.37×
 the full-AST throughput of `datafusion-sqlparser-rs` on the recorded Linux host. The exact

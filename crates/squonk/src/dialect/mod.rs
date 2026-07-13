@@ -17,8 +17,8 @@
 //! dialect is gated behind its own cargo feature (the whole module — struct + impls +
 //! tests — compiles only with the feature). Reach a non-default dialect with
 //! [`parse_with`], e.g.
-//! `parse_with(src, Postgres)`, or pick one by runtime name/value with
-//! [`BuiltinDialect`] and [`parse_with_builtin`].
+//! `parse_with(src, crate::ParseConfig::new(Postgres))`, or pick one by runtime name/value with
+//! [`BuiltinDialect`] and [`parse_builtin`].
 //!
 //! # Choosing a dialect: the permissiveness spectrum
 //!
@@ -90,9 +90,9 @@ pub use ansi::Ansi;
 #[cfg(feature = "bigquery")]
 pub use bigquery::BigQuery;
 pub use builtin::{
-    BuiltinDialect, ParseBuiltinDialectError, parse_recovering_with_builtin,
-    parse_recovering_with_builtin_options, parse_with_builtin, parse_with_builtin_options,
-    tokenize_with_builtin, tokenize_with_builtin_trivia,
+    BuiltinDialect, ParseBuiltinDialectError, parse_builtin, parse_builtin_with,
+    parse_recovering_builtin, parse_recovering_builtin_with, tokenize_with_builtin,
+    tokenize_with_builtin_trivia,
 };
 #[cfg(feature = "clickhouse")]
 pub use clickhouse::ClickHouse;
@@ -121,8 +121,8 @@ pub use support::ProductSurface;
 /// Parse `src` under the default [`Ansi`] dialect into an owned [`Parsed`] tree.
 ///
 /// To parse under a specific dialect, call [`parse_with`]
-/// directly, e.g. `parse_with(src, Postgres)`, or select one by runtime name with
-/// [`BuiltinDialect`]/[`parse_with_builtin`].
+/// directly, e.g. `parse_with(src, crate::ParseConfig::new(Postgres))`, or select one by runtime name with
+/// [`BuiltinDialect`]/[`parse_builtin`].
 ///
 /// For high-throughput or alloc-heavy parsing, see the crate-level [Performance note](crate#performance) on choosing a fast global allocator.
 ///
@@ -138,7 +138,7 @@ pub use support::ProductSurface;
 ///
 /// [`ParseError`]: crate::error::ParseError
 pub fn parse(src: &str) -> ParseResult<Parsed> {
-    parse_with(src, Ansi)
+    parse_with(src, crate::parser::ParseConfig::default())
 }
 
 /// Shared scaffolding for the per-dialect test modules: the representative query and
@@ -171,7 +171,8 @@ pub(crate) mod test_support {
     /// driving the same full grammar (the exhaustive per-clause shape checks live with
     /// the engine in `parser::query`).
     pub(crate) fn assert_full_grammar<D: Dialect<Ext = NoExt>>(dialect: D) {
-        let parsed = parse_with(REPRESENTATIVE, dialect).expect("the representative query parses");
+        let parsed = parse_with(REPRESENTATIVE, crate::ParseConfig::new(dialect))
+            .expect("the representative query parses");
         assert_eq!(parsed.statements().len(), 1, "exactly one statement");
 
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
@@ -216,7 +217,8 @@ pub(crate) mod test_support {
     /// under `dialect`. The column type grammar is shared with `CAST`, so this is the
     /// precise lens onto `parse_data_type`'s dialect-gated recognition.
     pub(crate) fn first_column_type<D: Dialect<Ext = NoExt>>(dialect: D, sql: &str) -> DataType {
-        let parsed = parse_with(sql, dialect).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(dialect))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let Statement::CreateTable { create, .. } = &parsed.statements()[0] else {
             panic!("{sql:?}: expected a CREATE TABLE statement");
         };

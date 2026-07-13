@@ -17,7 +17,7 @@ use squonk_ast::render::RenderMode;
 
 /// Parse `sql` under PostgreSQL (the M1 superset) and return its redacted render.
 fn fingerprint(sql: &str) -> String {
-    let parsed = parse_with(sql, Postgres)
+    let parsed = parse_with(sql, squonk::ParseConfig::new(Postgres))
         .unwrap_or_else(|err| panic!("expected {sql:?} to parse under PostgreSQL: {err:?}"));
     redacted(&parsed)
 }
@@ -97,8 +97,11 @@ fn fingerprint_masks_pg_special_literal_values() {
 
     // The genuine national-string constant masks whole under a dialect that arms it
     // (MySQL), keeping the value out of the fingerprint.
-    let mysql_national = parse_with("SELECT N'secret'", squonk::dialect::MySql)
-        .expect("MySQL lexes the national string");
+    let mysql_national = parse_with(
+        "SELECT N'secret'",
+        squonk::ParseConfig::new(squonk::dialect::MySql),
+    )
+    .expect("MySQL lexes the national string");
     assert_eq!(redacted(&mysql_national), "SELECT ?");
 
     // Two bit strings with different radix and digits collapse to one fingerprint.
@@ -145,11 +148,11 @@ fn redacted_output_is_a_fingerprint_not_guaranteed_reparseable() {
     let with_literal = fingerprint("SELECT 1");
     assert_eq!(with_literal, "SELECT ?");
     assert!(
-        parse_with(with_literal.as_str(), Postgres).is_err(),
+        parse_with(with_literal.as_str(), squonk::ParseConfig::new(Postgres)).is_err(),
         "redacted `?` must not re-parse under PostgreSQL",
     );
     assert!(
-        parse_with(with_literal.as_str(), Ansi).is_err(),
+        parse_with(with_literal.as_str(), squonk::ParseConfig::new(Ansi)).is_err(),
         "redacted `?` must not re-parse under ANSI",
     );
 
@@ -159,7 +162,7 @@ fn redacted_output_is_a_fingerprint_not_guaranteed_reparseable() {
     let names_only = fingerprint("SELECT a FROM t");
     assert_eq!(names_only, "SELECT id FROM id");
     assert!(
-        parse_with(names_only.as_str(), Postgres).is_ok(),
+        parse_with(names_only.as_str(), squonk::ParseConfig::new(Postgres)).is_ok(),
         "the identifier-only redaction is incidentally parseable",
     );
 }

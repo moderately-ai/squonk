@@ -7,7 +7,7 @@
 
 use super::{FormatOptions, KeywordCase, format_parsed, format_sql};
 use crate::tokenizer::TokenKind;
-use crate::{BuiltinDialect, ParseOptions, parse_with_builtin_options, tokenize_with_builtin};
+use crate::{BuiltinDialect, ParseConfig, parse_builtin_with, tokenize_with_builtin};
 
 const D: BuiltinDialect = BuiltinDialect::Ansi;
 
@@ -59,7 +59,7 @@ const CORPUS: &[&str] = &[
 ];
 
 fn parse_stmts(sql: &str) -> Vec<crate::ast::Statement> {
-    parse_with_builtin_options(sql, D, ParseOptions::default())
+    parse_builtin_with(sql, ParseConfig::new(D))
         .expect("parses")
         .into_statements()
 }
@@ -88,7 +88,7 @@ fn format_output_always_reparses() {
     for &sql in CORPUS {
         let formatted = fmt(sql);
         assert!(
-            parse_with_builtin_options(&formatted, D, ParseOptions::default()).is_ok(),
+            parse_builtin_with(&formatted, ParseConfig::new(D)).is_ok(),
             "formatted output failed to reparse for {sql:?}:\n{formatted}"
         );
     }
@@ -178,8 +178,7 @@ fn comments_survive_the_format() {
     ];
     for sql in cases {
         let parsed =
-            parse_with_builtin_options(sql, D, ParseOptions::default().with_trivia_capture(true))
-                .expect("parses");
+            parse_builtin_with(sql, ParseConfig::new(D).capture_trivia(true)).expect("parses");
         let comment_count = parsed
             .trivia()
             .iter()
@@ -198,7 +197,7 @@ fn comments_survive_the_format() {
             "comment dropped for {sql:?}\n--- out ---\n{out}"
         );
         assert!(
-            parse_with_builtin_options(&out, D, ParseOptions::default()).is_ok(),
+            parse_builtin_with(&out, ParseConfig::new(D)).is_ok(),
             "output with comments failed to reparse for {sql:?}:\n{out}"
         );
     }
@@ -223,9 +222,7 @@ fn tokenize_out_comment_count(sql: &str) -> usize {
 #[test]
 fn comment_before_group_by_renders_before_the_keyword() {
     let sql = "SELECT a FROM t WHERE a = 1\n-- note\nGROUP BY a";
-    let parsed =
-        parse_with_builtin_options(sql, D, ParseOptions::default().with_trivia_capture(true))
-            .expect("parses");
+    let parsed = parse_builtin_with(sql, ParseConfig::new(D).capture_trivia(true)).expect("parses");
     let out = format_parsed(&parsed, D, &FormatOptions::default());
     // The comment must appear on its own line *before* GROUP BY, never after it.
     let note = out.find("-- note").expect("comment present");
@@ -310,8 +307,7 @@ fn corpus_formatting_is_byte_stable_idempotent() {
 fn comment_corpus_never_drops_and_reparses() {
     for &sql in COMMENT_CORPUS {
         let parsed =
-            parse_with_builtin_options(sql, D, ParseOptions::default().with_trivia_capture(true))
-                .expect("parses");
+            parse_builtin_with(sql, ParseConfig::new(D).capture_trivia(true)).expect("parses");
         let comment_count = parsed
             .trivia()
             .iter()
@@ -330,7 +326,7 @@ fn comment_corpus_never_drops_and_reparses() {
             "comment dropped for {sql:?}\n--- out ---\n{out}"
         );
         assert!(
-            parse_with_builtin_options(&out, D, ParseOptions::default()).is_ok(),
+            parse_builtin_with(&out, ParseConfig::new(D)).is_ok(),
             "output failed to reparse for {sql:?}:\n{out}"
         );
     }

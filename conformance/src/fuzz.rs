@@ -342,22 +342,22 @@ pub fn parse_no_panic(input: &[u8]) {
         return;
     };
 
-    if let Ok(parsed) = parse_with(sql, Ansi) {
+    if let Ok(parsed) = parse_with(sql, squonk::ParseConfig::new(Ansi)) {
         assert_render_no_panic(&parsed);
     }
-    if let Ok(parsed) = parse_with(sql, Postgres) {
+    if let Ok(parsed) = parse_with(sql, squonk::ParseConfig::new(Postgres)) {
         assert_render_no_panic(&parsed);
     }
-    if let Ok(parsed) = parse_with(sql, MySql) {
+    if let Ok(parsed) = parse_with(sql, squonk::ParseConfig::new(MySql)) {
         assert_render_no_panic(&parsed);
     }
-    if let Ok(parsed) = parse_with(sql, Lenient) {
+    if let Ok(parsed) = parse_with(sql, squonk::ParseConfig::new(Lenient)) {
         assert_render_no_panic(&parsed);
     }
-    if let Ok(parsed) = parse_with(sql, DuckDb) {
+    if let Ok(parsed) = parse_with(sql, squonk::ParseConfig::new(DuckDb)) {
         assert_render_no_panic(&parsed);
     }
-    if let Ok(parsed) = parse_with(sql, Sqlite) {
+    if let Ok(parsed) = parse_with(sql, squonk::ParseConfig::new(Sqlite)) {
         assert_render_no_panic(&parsed);
     }
 }
@@ -411,7 +411,7 @@ pub fn roundtrip_arbitrary_input(input: &[u8]) -> bool {
 /// rendered inputs into that same regression guard, continuously.
 pub fn roundtrip_statement(statement: &Statement<NoExt>) {
     let rendered = render_generated(statement, RenderMode::Parenthesized);
-    let reparsed = match parse_with(&rendered, Ansi) {
+    let reparsed = match parse_with(&rendered, squonk::ParseConfig::new(Ansi)) {
         Ok(reparsed) => reparsed,
         Err(err) => {
             assert!(
@@ -1042,7 +1042,7 @@ mod tests {
         // ticket deleted, re-arming this surface) sees no divergence.
         const VT: &str = "\u{0b}";
         assert!(
-            parse_with(VT, Postgres).is_ok(),
+            parse_with(VT, squonk::ParseConfig::new(Postgres)).is_ok(),
             "our PostgreSQL tokenizer should fold a lone vertical tab as an empty statement",
         );
         assert!(
@@ -1187,7 +1187,7 @@ mod tests {
         // from PostgreSQL, and (c) carries a provenance label — so a silent fix flips
         // this test and forces re-including the class in the loop.
         let parse_one = |sql: &str| {
-            parse_with(sql, Ansi)
+            parse_with(sql, squonk::ParseConfig::new(Ansi))
                 .expect("known-divergence case parses")
                 .statements()[0]
                 .clone()

@@ -179,7 +179,7 @@ fn bench_table() {
     for &(name, sql) in CASES {
         // Skip a case only if a parser genuinely rejects it (keeps the harness
         // honest if the embedded SQL drifts past either surface).
-        if parse_with(sql, Postgres).is_err()
+        if parse_with(sql, squonk::ParseConfig::new(Postgres)).is_err()
             || UpstreamParser::parse_sql(&PostgreSqlDialect {}, sql).is_err()
         {
             println!("{name:<13}  (skipped: one parser rejects it)");
@@ -215,10 +215,22 @@ fn bench_dialects() {
     );
     for &(name, sql) in CASES {
         let checks = [
-            ("ansi", parse_with(sql, Ansi).is_ok()),
-            ("sqlite", parse_with(sql, Sqlite).is_ok()),
-            ("duckdb", parse_with(sql, DuckDb).is_ok()),
-            ("lenient", parse_with(sql, Lenient).is_ok()),
+            (
+                "ansi",
+                parse_with(sql, squonk::ParseConfig::new(Ansi)).is_ok(),
+            ),
+            (
+                "sqlite",
+                parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok(),
+            ),
+            (
+                "duckdb",
+                parse_with(sql, squonk::ParseConfig::new(DuckDb)).is_ok(),
+            ),
+            (
+                "lenient",
+                parse_with(sql, squonk::ParseConfig::new(Lenient)).is_ok(),
+            ),
         ];
         if let Some((rejecter, _)) = checks.iter().find(|(_, accepts)| !accepts) {
             println!("{name:<13}  (skipped: {rejecter} rejects it)");

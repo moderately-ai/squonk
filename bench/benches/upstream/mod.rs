@@ -252,15 +252,15 @@ impl Pair {
 // ---------------------------------------------------------------------------
 //
 // Each side is driven through its *default entry point* only — ours
-// `parse_with(sql, dialect)`, theirs `Parser::parse_sql(&dialect, sql)` — with no
+// `parse_with(sql, squonk::ParseConfig::new(dialect))`, theirs `Parser::parse_sql(&dialect, sql)` — with no
 // rendering and no extra passes. Neither side is crippled; the feature set is the
 // shipped default (theirs therefore includes `recursive-protection`, see caveats).
 
 /// `true` iff our parser accepts `sql` under `pair`'s dialect.
 pub fn ours_parses(pair: Pair, sql: &str) -> bool {
     match pair {
-        Pair::AnsiGeneric => parse_with(sql, Ansi).is_ok(),
-        Pair::PostgresPostgres => parse_with(sql, Postgres).is_ok(),
+        Pair::AnsiGeneric => parse_with(sql, squonk::ParseConfig::new(Ansi)).is_ok(),
+        Pair::PostgresPostgres => parse_with(sql, squonk::ParseConfig::new(Postgres)).is_ok(),
     }
 }
 
@@ -286,10 +286,11 @@ pub fn parse_theirs(pair: Pair, sql: &str) -> usize {
 /// Parse to our owned AST root, kept for retained-heap measurement.
 pub fn parse_ours_owned(pair: Pair, sql: &str) -> StockParsed {
     match pair {
-        Pair::AnsiGeneric => parse_with(sql, Ansi).expect("subset statement parses (ours)"),
-        Pair::PostgresPostgres => {
-            parse_with(sql, Postgres).expect("subset statement parses (ours)")
+        Pair::AnsiGeneric => {
+            parse_with(sql, squonk::ParseConfig::new(Ansi)).expect("subset statement parses (ours)")
         }
+        Pair::PostgresPostgres => parse_with(sql, squonk::ParseConfig::new(Postgres))
+            .expect("subset statement parses (ours)"),
     }
 }
 

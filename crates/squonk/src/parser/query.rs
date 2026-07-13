@@ -3505,12 +3505,12 @@ mod tests {
             "WITH c AS (SELECT 1) SELECT * FROM c",
             "(SELECT 1)",
         ] {
-            let parsed =
-                parse_with(sql, TestDialect).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(TestDialect))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let _ = query_of(&parsed);
         }
         // A leading word that opens no statement family hits the router's final arm.
-        assert!(parse_with("kangaroo", TestDialect).is_err());
+        assert!(parse_with("kangaroo", crate::ParseConfig::new(TestDialect)).is_err());
     }
 
     #[test]
@@ -3519,7 +3519,8 @@ mod tests {
                    FROM t1 JOIN t2 ON t1.id = t2.id \
                    WHERE a > 1 GROUP BY a HAVING a < 9 \
                    ORDER BY a DESC, b LIMIT 10 OFFSET 5";
-        let parsed = parse_with(src, TestDialect).expect("the whole query grammar parses");
+        let parsed = parse_with(src, crate::ParseConfig::new(TestDialect))
+            .expect("the whole query grammar parses");
         let query = query_of(&parsed);
         let select = select_of(&parsed);
 
@@ -3583,7 +3584,11 @@ mod tests {
 
     #[test]
     fn union_all_builds_a_set_operation() {
-        let parsed = parse_with("SELECT 1 UNION ALL SELECT 2", TestDialect).expect("set op parses");
+        let parsed = parse_with(
+            "SELECT 1 UNION ALL SELECT 2",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("set op parses");
         let SetExpr::SetOperation {
             op: SetOperator::Union,
             all,
@@ -3612,8 +3617,11 @@ mod tests {
         // `UNION BY NAME`: name-matched, not `ALL`. `by_name` and `all` are independent
         // (DuckDB serializes `setop_type: UNION_BY_NAME` with a separate `setop_all`;
         // probed on 1.5.4).
-        let parsed = parse_with("SELECT 1 a UNION BY NAME SELECT 2 a", DuckDb)
-            .expect("UNION BY NAME parses");
+        let parsed = parse_with(
+            "SELECT 1 a UNION BY NAME SELECT 2 a",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("UNION BY NAME parses");
         let SetExpr::SetOperation {
             op: SetOperator::Union,
             all,
@@ -3627,8 +3635,11 @@ mod tests {
         assert!(*by_name, "BY NAME was written");
 
         // `UNION ALL BY NAME`: both modifiers set.
-        let parsed = parse_with("SELECT 1 a UNION ALL BY NAME SELECT 2 a", DuckDb)
-            .expect("UNION ALL BY NAME parses");
+        let parsed = parse_with(
+            "SELECT 1 a UNION ALL BY NAME SELECT 2 a",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("UNION ALL BY NAME parses");
         let SetExpr::SetOperation { all, by_name, .. } = &query_of(&parsed).body else {
             panic!("expected a set operation");
         };
@@ -3645,7 +3656,7 @@ mod tests {
         // second `UNION BY NAME`, whose left operand is the first.
         let parsed = parse_with(
             "SELECT 1 a UNION ALL BY NAME SELECT 2 a UNION BY NAME SELECT 3 a",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("a chained BY NAME set operation parses");
         let SetExpr::SetOperation {
@@ -3681,7 +3692,8 @@ mod tests {
             "SELECT 1 UNION ALL BY NAME SELECT 2",
             "SELECT 1 UNION ALL BY NAME SELECT 2 UNION BY NAME SELECT 3",
         ] {
-            let parsed = parse_with(sql, UNION_BY_NAME_DIALECT).expect("UNION BY NAME parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(UNION_BY_NAME_DIALECT))
+                .expect("UNION BY NAME parses");
             assert_eq!(
                 Renderer::new(UNION_BY_NAME_DIALECT)
                     .render_parsed(&parsed)
@@ -3697,8 +3709,11 @@ mod tests {
 
         // One `|> WHERE` operator: it lands on the query's `pipe_operators` tail (not the
         // SELECT's `WHERE`), carrying the predicate expression, and round-trips verbatim.
-        let parsed = parse_with("SELECT a FROM t |> WHERE a > 1", PIPE_SYNTAX_DIALECT)
-            .expect("pipe WHERE parses");
+        let parsed = parse_with(
+            "SELECT a FROM t |> WHERE a > 1",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect("pipe WHERE parses");
         let query = query_of(&parsed);
         assert!(
             matches!(&query.body, SetExpr::Select { select, .. } if select.selection.is_none()),
@@ -3725,7 +3740,7 @@ mod tests {
         // The chain loops: two `|>` operators produce two tail elements, in written order.
         let chained = parse_with(
             "SELECT a FROM t |> WHERE a > 1 |> WHERE a < 9",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect("pipe chain parses");
         assert_eq!(query_of(&chained).pipe_operators.len(), 2);
@@ -3743,9 +3758,16 @@ mod tests {
 
         // The gate is shared by the tokenizer, so with it off `|>` never lexes (the bytes
         // stay `|` then `>`); a `|>` after a query is trailing junk the parser rejects.
-        parse_with("SELECT a FROM t |> WHERE a > 1", Ansi).expect_err("ANSI has no pipe syntax");
-        parse_with("SELECT a FROM t |> WHERE a > 1", Postgres)
-            .expect_err("PostgreSQL has no pipe syntax");
+        parse_with(
+            "SELECT a FROM t |> WHERE a > 1",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no pipe syntax");
+        parse_with(
+            "SELECT a FROM t |> WHERE a > 1",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no pipe syntax");
     }
 
     #[test]
@@ -3754,8 +3776,11 @@ mod tests {
 
         // `LIMIT n BY expr` populates the dedicated `limit_by` field, leaving the ordinary
         // `limit` tail `None` — the two are represented distinctly.
-        let parsed =
-            parse_with("SELECT a FROM t LIMIT 2 BY x", LIMIT_BY_DIALECT).expect("LIMIT BY parses");
+        let parsed = parse_with(
+            "SELECT a FROM t LIMIT 2 BY x",
+            crate::ParseConfig::new(LIMIT_BY_DIALECT),
+        )
+        .expect("LIMIT BY parses");
         let query = query_of(&parsed);
         let LimitBy {
             limit, offset, by, ..
@@ -3782,8 +3807,11 @@ mod tests {
         // `LIMIT n OFFSET m BY a, b` — the `OFFSET`-spelled skip is valid *and* is the
         // disambiguation crux: the `BY` after `OFFSET m` diverts to LIMIT BY rather than
         // the ordinary `LIMIT n OFFSET m`.
-        let parsed = parse_with("SELECT a FROM t LIMIT 5 OFFSET 3 BY x, y", LIMIT_BY_DIALECT)
-            .expect("LIMIT BY with OFFSET parses");
+        let parsed = parse_with(
+            "SELECT a FROM t LIMIT 5 OFFSET 3 BY x, y",
+            crate::ParseConfig::new(LIMIT_BY_DIALECT),
+        )
+        .expect("LIMIT BY with OFFSET parses");
         let query = query_of(&parsed);
         let by = query.limit_by.as_deref().expect("limit_by populated");
         assert!(by.offset.is_some(), "OFFSET skip captured");
@@ -3805,7 +3833,7 @@ mod tests {
         // limit first, whole-result cap second).
         let parsed = parse_with(
             "SELECT a FROM t ORDER BY a LIMIT 2 BY x LIMIT 10",
-            LIMIT_BY_DIALECT,
+            crate::ParseConfig::new(LIMIT_BY_DIALECT),
         )
         .expect("LIMIT BY + LIMIT parses");
         let query = query_of(&parsed);
@@ -3828,13 +3856,19 @@ mod tests {
         // With the gate on, a `LIMIT` with no trailing `BY` is still the ordinary tail:
         // the speculative LIMIT-BY read rewinds. `LIMIT n` and `LIMIT n OFFSET m` both
         // land on `limit`, not `limit_by`.
-        let plain =
-            parse_with("SELECT a FROM t LIMIT 10", LIMIT_BY_DIALECT).expect("plain LIMIT parses");
+        let plain = parse_with(
+            "SELECT a FROM t LIMIT 10",
+            crate::ParseConfig::new(LIMIT_BY_DIALECT),
+        )
+        .expect("plain LIMIT parses");
         assert!(query_of(&plain).limit_by.is_none());
         assert!(query_of(&plain).limit.is_some());
 
-        let with_offset = parse_with("SELECT a FROM t LIMIT 10 OFFSET 5", LIMIT_BY_DIALECT)
-            .expect("LIMIT/OFFSET parses");
+        let with_offset = parse_with(
+            "SELECT a FROM t LIMIT 10 OFFSET 5",
+            crate::ParseConfig::new(LIMIT_BY_DIALECT),
+        )
+        .expect("LIMIT/OFFSET parses");
         assert!(query_of(&with_offset).limit_by.is_none());
         let limit = query_of(&with_offset)
             .limit
@@ -3852,12 +3886,21 @@ mod tests {
 
         // No shipped preset but Lenient spells LIMIT BY; the ungated presets parse the
         // leading `LIMIT 2` as the ordinary tail and reject the trailing `BY x` as junk.
-        parse_with("SELECT a FROM t LIMIT 2 BY x", Ansi).expect_err("ANSI has no LIMIT BY");
-        parse_with("SELECT a FROM t LIMIT 2 BY x", Postgres)
-            .expect_err("PostgreSQL has no LIMIT BY");
+        parse_with(
+            "SELECT a FROM t LIMIT 2 BY x",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no LIMIT BY");
+        parse_with(
+            "SELECT a FROM t LIMIT 2 BY x",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no LIMIT BY");
         // The plain LIMIT those presets DO support is unaffected.
-        parse_with("SELECT a FROM t LIMIT 2", Ansi).expect("plain LIMIT still parses");
-        parse_with("SELECT a FROM t LIMIT 2", Postgres).expect("plain LIMIT still parses");
+        parse_with("SELECT a FROM t LIMIT 2", crate::ParseConfig::new(Ansi))
+            .expect("plain LIMIT still parses");
+        parse_with("SELECT a FROM t LIMIT 2", crate::ParseConfig::new(Postgres))
+            .expect("plain LIMIT still parses");
     }
 
     #[test]
@@ -3868,7 +3911,8 @@ mod tests {
         // populates `Cte::using_key` with the bare key columns and round-trips verbatim.
         let sql = "WITH RECURSIVE cte(x, y) USING KEY (x) AS (SELECT 1, 0 \
                    UNION SELECT x, y + 1 FROM cte WHERE y < 10) TABLE cte";
-        let parsed = parse_with(sql, USING_KEY_DIALECT).expect("USING KEY parses");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(USING_KEY_DIALECT)).expect("USING KEY parses");
         let with = query_of(&parsed)
             .with
             .as_ref()
@@ -3889,8 +3933,8 @@ mod tests {
         // Multi-column key round-trips too.
         let multi = "WITH RECURSIVE cte(x, y) USING KEY (x, y) AS (SELECT 1, 0 \
                      UNION ALL SELECT x, y + 1 FROM cte WHERE y < 10) TABLE cte";
-        let parsed_multi =
-            parse_with(multi, USING_KEY_DIALECT).expect("multi-key USING KEY parses");
+        let parsed_multi = parse_with(multi, crate::ParseConfig::new(USING_KEY_DIALECT))
+            .expect("multi-key USING KEY parses");
         assert_eq!(
             Renderer::new(USING_KEY_DIALECT)
                 .render_parsed(&parsed_multi)
@@ -3907,12 +3951,13 @@ mod tests {
         // after the CTE column list is unexpected where `AS` is required.
         let sql = "WITH RECURSIVE cte(x) USING KEY (x) AS (SELECT 1 UNION SELECT x FROM cte) \
                    TABLE cte";
-        parse_with(sql, Ansi).expect_err("ANSI has no USING KEY");
-        parse_with(sql, Postgres).expect_err("PostgreSQL has no USING KEY");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no USING KEY");
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect_err("PostgreSQL has no USING KEY");
         // The ordinary recursive CTE those presets DO support is unaffected.
         parse_with(
             "WITH RECURSIVE cte(x) AS (SELECT 1 UNION SELECT x FROM cte) TABLE cte",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("plain recursive CTE still parses");
     }
@@ -3925,7 +3970,7 @@ mod tests {
         // numeric, a string, and an identifier value all reuse the `Expr` value node.
         let parsed = parse_with(
             "SELECT a FROM t SETTINGS max_threads = 8, join_algorithm = 'auto', mode = best_effort",
-            SETTINGS_DIALECT,
+            crate::ParseConfig::new(SETTINGS_DIALECT),
         )
         .expect("SETTINGS parses");
         let query = query_of(&parsed);
@@ -3971,7 +4016,7 @@ mod tests {
             }
         };
         let sql = "SELECT a FROM t ORDER BY a LIMIT 2 BY x LIMIT 10 SETTINGS max_threads = 8";
-        let parsed = parse_with(sql, BOTH).expect("all three tails parse");
+        let parsed = parse_with(sql, crate::ParseConfig::new(BOTH)).expect("all three tails parse");
         let query = query_of(&parsed);
         assert!(query.limit_by.is_some(), "LIMIT BY captured");
         assert!(query.limit.is_some(), "trailing LIMIT captured");
@@ -3986,12 +4031,18 @@ mod tests {
     fn plain_query_is_untouched_under_the_settings_gate() {
         // With the gate on, a query writing no `SETTINGS` carries an empty list — the
         // contextual keyword only diverts when the word `SETTINGS` actually leads.
-        let parsed =
-            parse_with("SELECT a FROM t LIMIT 10", SETTINGS_DIALECT).expect("plain query parses");
+        let parsed = parse_with(
+            "SELECT a FROM t LIMIT 10",
+            crate::ParseConfig::new(SETTINGS_DIALECT),
+        )
+        .expect("plain query parses");
         assert!(query_of(&parsed).settings.is_empty());
         // `settings` stays an ordinary bare alias when no `name =` head follows.
-        let aliased =
-            parse_with("SELECT a FROM t settings", SETTINGS_DIALECT).expect("bare alias parses");
+        let aliased = parse_with(
+            "SELECT a FROM t settings",
+            crate::ParseConfig::new(SETTINGS_DIALECT),
+        )
+        .expect("bare alias parses");
         assert!(query_of(&aliased).settings.is_empty());
     }
 
@@ -4000,8 +4051,11 @@ mod tests {
         // A FROM-less `SELECT <expr> SETTINGS …` reaches the tail — the projection-alias
         // position declines the `SETTINGS name =` head just as the table-alias position
         // does, so the clause parses instead of aliasing the projection.
-        let parsed = parse_with("SELECT 1 SETTINGS max_threads = 8", SETTINGS_DIALECT)
-            .expect("FROM-less SETTINGS parses");
+        let parsed = parse_with(
+            "SELECT 1 SETTINGS max_threads = 8",
+            crate::ParseConfig::new(SETTINGS_DIALECT),
+        )
+        .expect("FROM-less SETTINGS parses");
         assert_eq!(query_of(&parsed).settings.len(), 1);
     }
 
@@ -4012,12 +4066,18 @@ mod tests {
         // No shipped preset but Lenient spells SETTINGS; the ungated presets leave the
         // trailing `SETTINGS …` unconsumed and reject it as junk. `SETTINGS` stays an
         // ordinary identifier there, so it is usable as an alias.
-        parse_with("SELECT a FROM t SETTINGS max_threads = 8", Ansi)
-            .expect_err("ANSI has no SETTINGS tail");
-        parse_with("SELECT a FROM t SETTINGS max_threads = 8", Postgres)
-            .expect_err("PostgreSQL has no SETTINGS tail");
+        parse_with(
+            "SELECT a FROM t SETTINGS max_threads = 8",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no SETTINGS tail");
+        parse_with(
+            "SELECT a FROM t SETTINGS max_threads = 8",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no SETTINGS tail");
         // The bare word is a plain identifier off this position (a column alias).
-        parse_with("SELECT a AS settings FROM t", Ansi)
+        parse_with("SELECT a AS settings FROM t", crate::ParseConfig::new(Ansi))
             .expect("SETTINGS is an ordinary identifier");
     }
 
@@ -4027,8 +4087,11 @@ mod tests {
 
         // `FORMAT <name>` populates `Query::format` with the bare format name, preserving
         // its source spelling (`JSON`, not lowered) so it round-trips case-sensitively.
-        let parsed =
-            parse_with("SELECT a FROM t FORMAT JSON", FORMAT_DIALECT).expect("FORMAT parses");
+        let parsed = parse_with(
+            "SELECT a FROM t FORMAT JSON",
+            crate::ParseConfig::new(FORMAT_DIALECT),
+        )
+        .expect("FORMAT parses");
         let query = query_of(&parsed);
         let FormatClause { name, .. } = query
             .format
@@ -4047,7 +4110,8 @@ mod tests {
         // name (`FORMAT Null` discards output in ClickHouse) — both round-trip.
         for name in ["TabSeparated", "Null"] {
             let sql = format!("SELECT a FROM t FORMAT {name}");
-            let parsed = parse_with(&sql, FORMAT_DIALECT).expect("format name parses");
+            let parsed = parse_with(&sql, crate::ParseConfig::new(FORMAT_DIALECT))
+                .expect("format name parses");
             assert_eq!(
                 parsed
                     .resolver()
@@ -4084,7 +4148,7 @@ mod tests {
         };
         let sql =
             "SELECT a FROM t ORDER BY a LIMIT 2 BY x LIMIT 10 SETTINGS max_threads = 8 FORMAT JSON";
-        let parsed = parse_with(sql, ALL).expect("all four tails parse");
+        let parsed = parse_with(sql, crate::ParseConfig::new(ALL)).expect("all four tails parse");
         let query = query_of(&parsed);
         assert!(query.limit_by.is_some(), "LIMIT BY captured");
         assert!(query.limit.is_some(), "trailing LIMIT captured");
@@ -4100,16 +4164,25 @@ mod tests {
     fn plain_query_and_bare_alias_untouched_under_the_format_gate() {
         // With the gate on, a query naming no format carries `None` — the contextual
         // keyword only diverts when the word `FORMAT` actually leads a name.
-        let parsed =
-            parse_with("SELECT a FROM t LIMIT 10", FORMAT_DIALECT).expect("plain query parses");
+        let parsed = parse_with(
+            "SELECT a FROM t LIMIT 10",
+            crate::ParseConfig::new(FORMAT_DIALECT),
+        )
+        .expect("plain query parses");
         assert!(query_of(&parsed).format.is_none());
         // `format` stays an ordinary bare table alias when no format-name head follows.
-        let aliased =
-            parse_with("SELECT a FROM t format", FORMAT_DIALECT).expect("bare alias parses");
+        let aliased = parse_with(
+            "SELECT a FROM t format",
+            crate::ParseConfig::new(FORMAT_DIALECT),
+        )
+        .expect("bare alias parses");
         assert!(query_of(&aliased).format.is_none());
         // Even before a following clause keyword, `format` is the alias, not the clause.
-        let aliased_where = parse_with("SELECT a FROM t format WHERE a > 1", FORMAT_DIALECT)
-            .expect("bare alias before WHERE parses");
+        let aliased_where = parse_with(
+            "SELECT a FROM t format WHERE a > 1",
+            crate::ParseConfig::new(FORMAT_DIALECT),
+        )
+        .expect("bare alias before WHERE parses");
         assert!(query_of(&aliased_where).format.is_none());
     }
 
@@ -4118,8 +4191,11 @@ mod tests {
         // A FROM-less `SELECT <expr> FORMAT <name>` reaches the tail — the projection-alias
         // position declines the `FORMAT <name>` head just as the table-alias position does,
         // so the clause parses instead of aliasing the projection.
-        let parsed =
-            parse_with("SELECT 1 FORMAT JSON", FORMAT_DIALECT).expect("FROM-less FORMAT parses");
+        let parsed = parse_with(
+            "SELECT 1 FORMAT JSON",
+            crate::ParseConfig::new(FORMAT_DIALECT),
+        )
+        .expect("FROM-less FORMAT parses");
         assert!(query_of(&parsed).format.is_some());
     }
 
@@ -4130,11 +4206,16 @@ mod tests {
         // No shipped preset but Lenient spells FORMAT; the ungated presets leave the
         // trailing `FORMAT …` unconsumed and reject it as junk. `FORMAT` stays an ordinary
         // identifier there, so it is usable as an alias.
-        parse_with("SELECT a FROM t FORMAT JSON", Ansi).expect_err("ANSI has no FORMAT tail");
-        parse_with("SELECT a FROM t FORMAT JSON", Postgres)
-            .expect_err("PostgreSQL has no FORMAT tail");
+        parse_with("SELECT a FROM t FORMAT JSON", crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no FORMAT tail");
+        parse_with(
+            "SELECT a FROM t FORMAT JSON",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no FORMAT tail");
         // The bare word is a plain identifier off this position (a column alias).
-        parse_with("SELECT a AS format FROM t", Ansi).expect("FORMAT is an ordinary identifier");
+        parse_with("SELECT a AS format FROM t", crate::ParseConfig::new(Ansi))
+            .expect("FORMAT is an ordinary identifier");
     }
 
     #[test]
@@ -4159,7 +4240,8 @@ mod tests {
             "SELECT a FROM t FOR XML AUTO, ELEMENTS ABSENT",
             "SELECT a FROM t FOR XML RAW('r'), BINARY BASE64, TYPE, ROOT('root'), ELEMENTS XSINIL",
         ] {
-            let parsed = parse_with(sql, FOR_DIALECT).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(FOR_DIALECT))
+                .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
             assert!(
                 matches!(
                     query_of(&parsed).for_clause.as_deref(),
@@ -4179,7 +4261,7 @@ mod tests {
         // Directives are order-independent on parse but canonicalized on render.
         let reordered = parse_with(
             "SELECT a FROM t FOR XML AUTO, TYPE, BINARY BASE64",
-            FOR_DIALECT,
+            crate::ParseConfig::new(FOR_DIALECT),
         )
         .expect("out-of-order directives parse");
         assert_eq!(
@@ -4191,7 +4273,11 @@ mod tests {
         );
 
         // Structural check: the mode and typed flag land where expected.
-        let parsed = parse_with("SELECT a FROM t FOR XML PATH('p'), TYPE", FOR_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SELECT a FROM t FOR XML PATH('p'), TYPE",
+            crate::ParseConfig::new(FOR_DIALECT),
+        )
+        .unwrap();
         let Some(ForClause::Xml { mode, typed, .. }) = query_of(&parsed).for_clause.as_deref()
         else {
             panic!("expected FOR XML");
@@ -4213,7 +4299,8 @@ mod tests {
             "SELECT a FROM t FOR JSON AUTO, WITHOUT_ARRAY_WRAPPER",
             "SELECT a FROM t FOR JSON PATH, ROOT('r'), INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER",
         ] {
-            let parsed = parse_with(sql, FOR_DIALECT).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(FOR_DIALECT))
+                .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
             assert!(
                 matches!(
                     query_of(&parsed).for_clause.as_deref(),
@@ -4237,9 +4324,16 @@ mod tests {
 
         // No shipped preset but MSSQL and Lenient spells `FOR XML`/`FOR JSON`; the ungated
         // presets leave the trailing `FOR XML …` unconsumed and reject it as junk.
-        parse_with("SELECT a FROM t FOR XML AUTO", Ansi).expect_err("ANSI has no FOR XML tail");
-        parse_with("SELECT a FROM t FOR JSON AUTO", Postgres)
-            .expect_err("PostgreSQL has no FOR JSON tail");
+        parse_with(
+            "SELECT a FROM t FOR XML AUTO",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no FOR XML tail");
+        parse_with(
+            "SELECT a FROM t FOR JSON AUTO",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no FOR JSON tail");
     }
 
     #[test]
@@ -4247,14 +4341,20 @@ mod tests {
         // Under Lenient both gates are on; `FOR` disambiguates on its follow token —
         // `XML`/`JSON` is the result-shaping clause, `UPDATE`/`SHARE` a locking clause.
         // A bare locking clause is unaffected.
-        let locking =
-            parse_with("SELECT a FROM t FOR UPDATE", FOR_AND_LOCKING_DIALECT).expect("FOR UPDATE");
+        let locking = parse_with(
+            "SELECT a FROM t FOR UPDATE",
+            crate::ParseConfig::new(FOR_AND_LOCKING_DIALECT),
+        )
+        .expect("FOR UPDATE");
         assert_eq!(query_of(&locking).locking.len(), 1);
         assert!(query_of(&locking).for_clause.is_none());
 
         // A `FOR XML` lead is the result-shaping clause even with locking enabled.
-        let shaping = parse_with("SELECT a FROM t FOR XML AUTO", FOR_AND_LOCKING_DIALECT)
-            .expect("FOR XML AUTO");
+        let shaping = parse_with(
+            "SELECT a FROM t FOR XML AUTO",
+            crate::ParseConfig::new(FOR_AND_LOCKING_DIALECT),
+        )
+        .expect("FOR XML AUTO");
         assert!(query_of(&shaping).locking.is_empty());
         assert!(query_of(&shaping).for_clause.is_some());
 
@@ -4263,7 +4363,7 @@ mod tests {
         use crate::render::Renderer;
         let both = parse_with(
             "SELECT a FROM t FOR UPDATE FOR XML AUTO",
-            FOR_AND_LOCKING_DIALECT,
+            crate::ParseConfig::new(FOR_AND_LOCKING_DIALECT),
         )
         .expect("stacked locking + FOR XML");
         assert_eq!(query_of(&both).locking.len(), 1);
@@ -4280,8 +4380,11 @@ mod tests {
     fn pipe_operator_rejects_unknown_keyword() {
         // The framework ships only `WHERE`; an unrecognised keyword after `|>` is a clean
         // reject (the seam for the `planner-parity-pipe-*` operator tickets).
-        parse_with("SELECT a FROM t |> BOGUS a", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> BOGUS` is not a known pipe operator");
+        parse_with(
+            "SELECT a FROM t |> BOGUS a",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> BOGUS` is not a known pipe operator");
     }
 
     #[test]
@@ -4290,8 +4393,11 @@ mod tests {
 
         // `|> SELECT` carries an ordinary projection-item list (`SelectItem`), including an
         // aliased item — the same node a leading `SELECT` list builds — and round-trips.
-        let parsed = parse_with("SELECT a FROM t |> SELECT a, b AS x", PIPE_SYNTAX_DIALECT)
-            .expect("pipe SELECT parses");
+        let parsed = parse_with(
+            "SELECT a FROM t |> SELECT a, b AS x",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect("pipe SELECT parses");
         let query = query_of(&parsed);
         assert_eq!(query.pipe_operators.len(), 1);
         let PipeOperator::Select { items, .. } = &query.pipe_operators[0] else {
@@ -4307,8 +4413,11 @@ mod tests {
         );
 
         // An empty projection has no first item to parse — a clean reject.
-        parse_with("SELECT a FROM t |> SELECT", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> SELECT` needs at least one item");
+        parse_with(
+            "SELECT a FROM t |> SELECT",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> SELECT` needs at least one item");
     }
 
     #[test]
@@ -4317,8 +4426,11 @@ mod tests {
 
         // `|> EXTEND` appends computed columns; it shares `SELECT`'s `SelectItem` shape, so a
         // computed-and-aliased item parses to the same node and round-trips.
-        let parsed = parse_with("SELECT a FROM t |> EXTEND a + 1 AS b", PIPE_SYNTAX_DIALECT)
-            .expect("pipe EXTEND parses");
+        let parsed = parse_with(
+            "SELECT a FROM t |> EXTEND a + 1 AS b",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect("pipe EXTEND parses");
         let query = query_of(&parsed);
         assert_eq!(query.pipe_operators.len(), 1);
         let PipeOperator::Extend { items, .. } = &query.pipe_operators[0] else {
@@ -4334,8 +4446,11 @@ mod tests {
         );
 
         // An empty computed-column list is a clean reject, like `|> SELECT`.
-        parse_with("SELECT a FROM t |> EXTEND", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> EXTEND` needs at least one item");
+        parse_with(
+            "SELECT a FROM t |> EXTEND",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> EXTEND` needs at least one item");
     }
 
     #[test]
@@ -4344,8 +4459,11 @@ mod tests {
 
         // `|> AS` names a range variable only: it parses a single identifier into a
         // `TableAlias` whose column list is empty, and round-trips.
-        let parsed =
-            parse_with("SELECT a FROM t |> AS u", PIPE_SYNTAX_DIALECT).expect("pipe AS parses");
+        let parsed = parse_with(
+            "SELECT a FROM t |> AS u",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect("pipe AS parses");
         let query = query_of(&parsed);
         assert_eq!(query.pipe_operators.len(), 1);
         let PipeOperator::As { alias, .. } = &query.pipe_operators[0] else {
@@ -4364,10 +4482,16 @@ mod tests {
 
         // The alias is required, and a column-alias list is not part of the pipe form — the
         // trailing `(x)` is left unconsumed and surfaces as a reject.
-        parse_with("SELECT a FROM t |> AS", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> AS` needs an alias name");
-        parse_with("SELECT a FROM t |> AS u (x)", PIPE_SYNTAX_DIALECT)
-            .expect_err("pipe AS admits no column-alias list");
+        parse_with(
+            "SELECT a FROM t |> AS",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> AS` needs an alias name");
+        parse_with(
+            "SELECT a FROM t |> AS u (x)",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("pipe AS admits no column-alias list");
     }
 
     #[test]
@@ -4376,8 +4500,11 @@ mod tests {
 
         // `|> ORDER BY` reuses the ordinary sort-key list (`OrderByExpr`), directions and
         // all, and round-trips.
-        let parsed = parse_with("SELECT a FROM t |> ORDER BY a DESC, b", PIPE_SYNTAX_DIALECT)
-            .expect("pipe ORDER BY parses");
+        let parsed = parse_with(
+            "SELECT a FROM t |> ORDER BY a DESC, b",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect("pipe ORDER BY parses");
         let query = query_of(&parsed);
         assert_eq!(query.pipe_operators.len(), 1);
         let PipeOperator::OrderBy { keys, .. } = &query.pipe_operators[0] else {
@@ -4394,8 +4521,11 @@ mod tests {
         );
 
         // `BY` is required after `ORDER` — a bare `|> ORDER a` is a clean reject.
-        parse_with("SELECT a FROM t |> ORDER a", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> ORDER` requires `BY`");
+        parse_with(
+            "SELECT a FROM t |> ORDER a",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> ORDER` requires `BY`");
     }
 
     #[test]
@@ -4404,8 +4534,11 @@ mod tests {
 
         // `|> LIMIT <count> OFFSET <skip>`: both operands present, boxed on the narrow pipe
         // variant, round-tripping verbatim.
-        let parsed = parse_with("SELECT a FROM t |> LIMIT 10 OFFSET 5", PIPE_SYNTAX_DIALECT)
-            .expect("pipe LIMIT+OFFSET parses");
+        let parsed = parse_with(
+            "SELECT a FROM t |> LIMIT 10 OFFSET 5",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect("pipe LIMIT+OFFSET parses");
         let query = query_of(&parsed);
         assert_eq!(query.pipe_operators.len(), 1);
         let PipeOperator::Limit { offset, .. } = &query.pipe_operators[0] else {
@@ -4420,8 +4553,11 @@ mod tests {
         );
 
         // The bare `|> LIMIT <count>` form omits the OFFSET tail and round-trips.
-        let bare = parse_with("SELECT a FROM t |> LIMIT 10", PIPE_SYNTAX_DIALECT)
-            .expect("pipe LIMIT parses");
+        let bare = parse_with(
+            "SELECT a FROM t |> LIMIT 10",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect("pipe LIMIT parses");
         assert!(matches!(
             &query_of(&bare).pipe_operators[0],
             PipeOperator::Limit { offset: None, .. }
@@ -4434,8 +4570,11 @@ mod tests {
         );
 
         // A `|> LIMIT` with no count has no operand to parse — a clean reject.
-        parse_with("SELECT a FROM t |> LIMIT", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> LIMIT` needs a count");
+        parse_with(
+            "SELECT a FROM t |> LIMIT",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> LIMIT` needs a count");
     }
 
     #[test]
@@ -4446,7 +4585,8 @@ mod tests {
         // element per `|>` in written order, and the whole chain round-trips verbatim.
         let src = "SELECT a FROM t |> WHERE a > 1 |> SELECT a, b \
                    |> EXTEND a + 1 AS c |> AS u |> ORDER BY a |> LIMIT 10 OFFSET 5";
-        let parsed = parse_with(src, PIPE_SYNTAX_DIALECT).expect("pipe chain parses");
+        let parsed = parse_with(src, crate::ParseConfig::new(PIPE_SYNTAX_DIALECT))
+            .expect("pipe chain parses");
         let ops = &query_of(&parsed).pipe_operators;
         assert_eq!(ops.len(), 6);
         assert!(matches!(
@@ -4479,7 +4619,8 @@ mod tests {
             ("SELECT a FROM t |> LEFT JOIN u USING (a)", true),
             ("SELECT a FROM t |> CROSS JOIN u", false),
         ] {
-            let parsed = parse_with(src, PIPE_SYNTAX_DIALECT).expect("pipe JOIN parses");
+            let parsed = parse_with(src, crate::ParseConfig::new(PIPE_SYNTAX_DIALECT))
+                .expect("pipe JOIN parses");
             let query = query_of(&parsed);
             assert_eq!(query.pipe_operators.len(), 1);
             let PipeOperator::Join { join, .. } = &query.pipe_operators[0] else {
@@ -4504,8 +4645,11 @@ mod tests {
 
         // A bare `|> JOIN` with no relation to join has nothing for the table factor to
         // parse — a clean reject.
-        parse_with("SELECT a FROM t |> JOIN", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> JOIN` needs a relation");
+        parse_with(
+            "SELECT a FROM t |> JOIN",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> JOIN` needs a relation");
     }
 
     #[test]
@@ -4516,7 +4660,7 @@ mod tests {
         // `ALL`/`DISTINCT` quantifier and a comma-separated list of parenthesized queries.
         let parsed = parse_with(
             "SELECT a FROM t |> UNION ALL (SELECT a FROM u), (SELECT a FROM v)",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect("pipe UNION parses");
         let query = query_of(&parsed);
@@ -4552,7 +4696,8 @@ mod tests {
                 SetOperator::Except,
             ),
         ] {
-            let parsed = parse_with(src, PIPE_SYNTAX_DIALECT).expect("pipe set op parses");
+            let parsed = parse_with(src, crate::ParseConfig::new(PIPE_SYNTAX_DIALECT))
+                .expect("pipe set op parses");
             let PipeOperator::SetOperation { op, .. } = &query_of(&parsed).pipe_operators[0] else {
                 panic!("expected a pipe set operation");
             };
@@ -4568,7 +4713,7 @@ mod tests {
         // The operand must be a parenthesized query — a bare `SELECT` has no leading `(`.
         parse_with(
             "SELECT a FROM t |> UNION SELECT a FROM u",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect_err("a pipe set-operation operand must be parenthesized");
     }
@@ -4581,7 +4726,7 @@ mod tests {
         // comma-separated assignment, and round-trips.
         let parsed = parse_with(
             "SELECT a FROM t |> SET a = a + 1, b = 2",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect("pipe SET parses");
         let query = query_of(&parsed);
@@ -4599,8 +4744,11 @@ mod tests {
         );
 
         // An assignment needs an `=`; a bare column is a clean reject.
-        parse_with("SELECT a FROM t |> SET a", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> SET` needs `<column> = <expr>`");
+        parse_with(
+            "SELECT a FROM t |> SET a",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> SET` needs `<column> = <expr>`");
     }
 
     #[test]
@@ -4610,7 +4758,7 @@ mod tests {
         // `|> CALL` reuses the `FunctionCall` node and carries an optional name-only alias.
         let parsed = parse_with(
             "SELECT a FROM t |> CALL tvf(a, 1) AS u",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect("pipe CALL parses");
         let query = query_of(&parsed);
@@ -4632,8 +4780,11 @@ mod tests {
         );
 
         // The alias is optional — a bare `|> CALL f()` round-trips with no alias.
-        let bare = parse_with("SELECT a FROM t |> CALL f()", PIPE_SYNTAX_DIALECT)
-            .expect("bare pipe CALL parses");
+        let bare = parse_with(
+            "SELECT a FROM t |> CALL f()",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect("bare pipe CALL parses");
         assert!(matches!(
             &query_of(&bare).pipe_operators[0],
             PipeOperator::Call { alias: None, .. }
@@ -4646,8 +4797,11 @@ mod tests {
         );
 
         // `CALL` requires a call, not a bare name — the missing `(` is a clean reject.
-        parse_with("SELECT a FROM t |> CALL f", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> CALL` needs a function call");
+        parse_with(
+            "SELECT a FROM t |> CALL f",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> CALL` needs a function call");
     }
 
     #[test]
@@ -4658,7 +4812,8 @@ mod tests {
         // order, and the whole chain round-trips verbatim.
         let src = "SELECT a FROM t |> JOIN u ON t.a = u.a \
                    |> SET a = a + 1 |> UNION ALL (SELECT a FROM w) |> CALL tvf(a) AS r";
-        let parsed = parse_with(src, PIPE_SYNTAX_DIALECT).expect("pipe batch-2 chain parses");
+        let parsed = parse_with(src, crate::ParseConfig::new(PIPE_SYNTAX_DIALECT))
+            .expect("pipe batch-2 chain parses");
         let ops = &query_of(&parsed).pipe_operators;
         assert_eq!(ops.len(), 4);
         assert!(matches!(
@@ -4687,7 +4842,7 @@ mod tests {
         // `PipeAggregateExpr` shape), and round-trip.
         let parsed = parse_with(
             "SELECT a FROM t |> AGGREGATE SUM(x) AS total DESC GROUP BY city ASC",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect("pipe AGGREGATE parses");
         let query = query_of(&parsed);
@@ -4716,7 +4871,7 @@ mod tests {
         // still round-trips without a stray separating space.
         let grouping_only = parse_with(
             "SELECT a FROM t |> AGGREGATE GROUP BY city",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect("grouping-only pipe AGGREGATE parses");
         let PipeOperator::Aggregate { aggregates, .. } =
@@ -4733,8 +4888,11 @@ mod tests {
         );
 
         // A bare `|> AGGREGATE` has no aggregate to parse and no grouping — a clean reject.
-        parse_with("SELECT a FROM t |> AGGREGATE", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> AGGREGATE` needs an aggregate or a GROUP BY");
+        parse_with(
+            "SELECT a FROM t |> AGGREGATE",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> AGGREGATE` needs an aggregate or a GROUP BY");
     }
 
     #[test]
@@ -4742,8 +4900,11 @@ mod tests {
         use crate::render::Renderer;
 
         // `|> DROP` is a bare identifier list.
-        let parsed = parse_with("SELECT a FROM t |> DROP a, b", PIPE_SYNTAX_DIALECT)
-            .expect("pipe DROP parses");
+        let parsed = parse_with(
+            "SELECT a FROM t |> DROP a, b",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect("pipe DROP parses");
         let query = query_of(&parsed);
         let PipeOperator::Drop { columns, .. } = &query.pipe_operators[0] else {
             panic!("expected a pipe DROP operator");
@@ -4757,8 +4918,11 @@ mod tests {
         );
 
         // An empty column list has no first identifier to parse — a clean reject.
-        parse_with("SELECT a FROM t |> DROP", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> DROP` needs at least one column");
+        parse_with(
+            "SELECT a FROM t |> DROP",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> DROP` needs at least one column");
     }
 
     #[test]
@@ -4769,7 +4933,7 @@ mod tests {
         // alias, and round-trips.
         let parsed = parse_with(
             "SELECT a FROM t |> RENAME a AS x, b AS y",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect("pipe RENAME parses");
         let query = query_of(&parsed);
@@ -4785,8 +4949,11 @@ mod tests {
         );
 
         // A mapping needs the `AS` keyword — a bare column is a clean reject.
-        parse_with("SELECT a FROM t |> RENAME a", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> RENAME` needs `<old> AS <new>`");
+        parse_with(
+            "SELECT a FROM t |> RENAME a",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> RENAME` needs `<old> AS <new>`");
     }
 
     #[test]
@@ -4798,7 +4965,7 @@ mod tests {
         // tail, and round-trips.
         let parsed = parse_with(
             "SELECT a FROM t |> PIVOT (SUM(sales) FOR quarter IN (1, 2))",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect("pipe PIVOT parses");
         let query = query_of(&parsed);
@@ -4818,8 +4985,11 @@ mod tests {
         );
 
         // The `FOR` head is mandatory — an aggregate-only body is a clean reject.
-        parse_with("SELECT a FROM t |> PIVOT (SUM(sales))", PIPE_SYNTAX_DIALECT)
-            .expect_err("`|> PIVOT` needs a `FOR` column");
+        parse_with(
+            "SELECT a FROM t |> PIVOT (SUM(sales))",
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
+        )
+        .expect_err("`|> PIVOT` needs a `FOR` column");
     }
 
     #[test]
@@ -4830,7 +5000,7 @@ mod tests {
         // with no `source`, `NULLS`, or alias, and round-trips.
         let parsed = parse_with(
             "SELECT a FROM t |> UNPIVOT (sales FOR quarter IN (q1, q2))",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect("pipe UNPIVOT parses");
         let query = query_of(&parsed);
@@ -4856,7 +5026,7 @@ mod tests {
         // The `IN` list is mandatory — omitting it is a clean reject.
         parse_with(
             "SELECT a FROM t |> UNPIVOT (sales FOR quarter)",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect_err("`|> UNPIVOT` needs an `IN` column list");
     }
@@ -4871,7 +5041,8 @@ mod tests {
             "SELECT a FROM t |> TABLESAMPLE BERNOULLI (10)",
             "SELECT a FROM t |> TABLESAMPLE SYSTEM (10) REPEATABLE (42)",
         ] {
-            let parsed = parse_with(src, PIPE_SYNTAX_DIALECT).expect("pipe TABLESAMPLE parses");
+            let parsed = parse_with(src, crate::ParseConfig::new(PIPE_SYNTAX_DIALECT))
+                .expect("pipe TABLESAMPLE parses");
             assert!(matches!(
                 &query_of(&parsed).pipe_operators[0],
                 PipeOperator::TableSample { .. }
@@ -4887,7 +5058,7 @@ mod tests {
         // The argument list is mandatory — a bare method has no `(` to open it.
         parse_with(
             "SELECT a FROM t |> TABLESAMPLE BERNOULLI",
-            PIPE_SYNTAX_DIALECT,
+            crate::ParseConfig::new(PIPE_SYNTAX_DIALECT),
         )
         .expect_err("`|> TABLESAMPLE` needs an argument list");
     }
@@ -4901,7 +5072,8 @@ mod tests {
         let src = "SELECT a FROM t |> AGGREGATE COUNT(*) AS c GROUP BY a \
                    |> DROP c |> RENAME a AS b |> PIVOT (SUM(x) FOR b IN (1, 2)) \
                    |> UNPIVOT (v FOR n IN (p, q)) |> TABLESAMPLE SYSTEM (5)";
-        let parsed = parse_with(src, PIPE_SYNTAX_DIALECT).expect("pipe batch-3 chain parses");
+        let parsed = parse_with(src, crate::ParseConfig::new(PIPE_SYNTAX_DIALECT))
+            .expect("pipe batch-3 chain parses");
         let ops = &query_of(&parsed).pipe_operators;
         assert_eq!(ops.len(), 6);
         assert!(matches!(
@@ -4929,10 +5101,16 @@ mod tests {
 
         // `BY NAME` is a DuckDB-only modifier: with the gate off, `BY` after the set
         // operator is left unconsumed and cannot open a set operand — a clean reject.
-        parse_with("SELECT 1 a UNION BY NAME SELECT 2 a", Ansi)
-            .expect_err("ANSI has no UNION BY NAME");
-        parse_with("SELECT 1 a UNION ALL BY NAME SELECT 2 a", Postgres)
-            .expect_err("PostgreSQL has no UNION BY NAME");
+        parse_with(
+            "SELECT 1 a UNION BY NAME SELECT 2 a",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no UNION BY NAME");
+        parse_with(
+            "SELECT 1 a UNION ALL BY NAME SELECT 2 a",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no UNION BY NAME");
     }
 
     #[test]
@@ -4942,15 +5120,25 @@ mod tests {
         // `BY NAME` is UNION-only: DuckDB syntax-errors on `INTERSECT BY NAME` /
         // `EXCEPT BY NAME` (probed on 1.5.4), so even with the gate on, `BY` after a
         // non-`UNION` operator is left unconsumed and surfaces as the usual reject.
-        parse_with("SELECT 1 a INTERSECT BY NAME SELECT 2 a", DuckDb)
-            .expect_err("INTERSECT BY NAME is not a DuckDB set operation");
-        parse_with("SELECT 1 a EXCEPT BY NAME SELECT 2 a", DuckDb)
-            .expect_err("EXCEPT BY NAME is not a DuckDB set operation");
+        parse_with(
+            "SELECT 1 a INTERSECT BY NAME SELECT 2 a",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("INTERSECT BY NAME is not a DuckDB set operation");
+        parse_with(
+            "SELECT 1 a EXCEPT BY NAME SELECT 2 a",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("EXCEPT BY NAME is not a DuckDB set operation");
     }
 
     #[test]
     fn values_query_body_parses() {
-        let parsed = parse_with("VALUES (1, 2), (3, 4)", TestDialect).expect("VALUES parses");
+        let parsed = parse_with(
+            "VALUES (1, 2), (3, 4)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("VALUES parses");
         let SetExpr::Values { values, .. } = &query_of(&parsed).body else {
             panic!("expected a VALUES query body");
         };
@@ -4963,8 +5151,11 @@ mod tests {
     fn values_row_default_item_parses_as_default_not_column() {
         // `DEFAULT` in a VALUES row is its own item (PostgreSQL `SetToDefault`), not a
         // column reference smuggled in through the expression grammar.
-        let parsed =
-            parse_with("VALUES (1, DEFAULT), (DEFAULT, 2)", TestDialect).expect("VALUES parses");
+        let parsed = parse_with(
+            "VALUES (1, DEFAULT), (DEFAULT, 2)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("VALUES parses");
         let SetExpr::Values { values, .. } = &query_of(&parsed).body else {
             panic!("expected a VALUES query body");
         };
@@ -4992,7 +5183,11 @@ mod tests {
         use crate::render::Renderer;
 
         // Structural spot-checks on the operation shapes and the arity asymmetry.
-        let open = parse_with("HANDLER db.t OPEN AS a", MYSQL_RENDER).unwrap();
+        let open = parse_with(
+            "HANDLER db.t OPEN AS a",
+            crate::ParseConfig::new(MYSQL_RENDER),
+        )
+        .unwrap();
         let Statement::Handler { handler, .. } = &open.statements()[0] else {
             panic!("expected a HANDLER statement");
         };
@@ -5009,7 +5204,11 @@ mod tests {
             },
         ));
 
-        let key = parse_with("HANDLER t READ idx >= (1, 2)", MYSQL_RENDER).unwrap();
+        let key = parse_with(
+            "HANDLER t READ idx >= (1, 2)",
+            crate::ParseConfig::new(MYSQL_RENDER),
+        )
+        .unwrap();
         let Statement::Handler { handler, .. } = &key.statements()[0] else {
             panic!("expected a HANDLER statement");
         };
@@ -5025,7 +5224,11 @@ mod tests {
         // The MySQL `LIMIT <offset>, <count>` comma form parses (its own `CommaOffset` tag);
         // the canonical render below rewrites it to `LIMIT <count> OFFSET <offset>`, so it is
         // asserted structurally here rather than in the byte-identical round-trip list.
-        let comma_limit = parse_with("HANDLER t READ idx = (1) LIMIT 2, 5", MYSQL_RENDER).unwrap();
+        let comma_limit = parse_with(
+            "HANDLER t READ idx = (1) LIMIT 2, 5",
+            crate::ParseConfig::new(MYSQL_RENDER),
+        )
+        .unwrap();
         let Statement::Handler { handler, .. } = &comma_limit.statements()[0] else {
             panic!("expected a HANDLER statement");
         };
@@ -5066,8 +5269,8 @@ mod tests {
             "HANDLER t READ idx = (1) WHERE a > 1 LIMIT 5",
             "HANDLER t READ idx = (1) LIMIT 5 OFFSET 2",
         ] {
-            let parsed =
-                parse_with(sql, MYSQL_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_RENDER))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -5094,7 +5297,7 @@ mod tests {
             "HANDLER t",
         ] {
             assert!(
-                parse_with(sql, MYSQL_RENDER).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MYSQL_RENDER)).is_err(),
                 "{sql:?} must reject",
             );
         }
@@ -5108,8 +5311,11 @@ mod tests {
         // MySQL spells the query-position constructor `VALUES ROW( ... )`; the bare `(...)`
         // row is `ER_PARSE_ERROR`. The `explicit_row` surface tag records the spelling and the
         // `ROW` keyword round-trips.
-        let parsed =
-            parse_with("VALUES ROW(1, 2), ROW(3, 4)", MYSQL_RENDER).expect("VALUES ROW parses");
+        let parsed = parse_with(
+            "VALUES ROW(1, 2), ROW(3, 4)",
+            crate::ParseConfig::new(MYSQL_RENDER),
+        )
+        .expect("VALUES ROW parses");
         let SetExpr::Values { values, .. } = &query_of(&parsed).body else {
             panic!("expected a VALUES query body");
         };
@@ -5127,12 +5333,13 @@ mod tests {
         );
 
         // A bare `(...)` row is rejected in query position under MySQL.
-        parse_with("VALUES (1, 2)", MYSQL_RENDER)
+        parse_with("VALUES (1, 2)", crate::ParseConfig::new(MYSQL_RENDER))
             .expect_err("MySQL query-position VALUES requires the ROW( ... ) spelling");
 
         // The bare form is the ANSI/PostgreSQL/DuckDB spelling; `explicit_row` is off there
         // and the constructor round-trips with bare parentheses.
-        let bare = parse_with("VALUES (1, 2), (3, 4)", Ansi).expect("bare VALUES parses");
+        let bare = parse_with("VALUES (1, 2), (3, 4)", crate::ParseConfig::new(Ansi))
+            .expect("bare VALUES parses");
         let SetExpr::Values { values, .. } = &query_of(&bare).body else {
             panic!("expected a VALUES query body");
         };
@@ -5187,7 +5394,7 @@ mod tests {
             "INSERT INTO t VALUES (1, 2), (3)",
         ] {
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
                 "DuckDb should reject the ragged VALUES: {sql:?}",
             );
         }
@@ -5206,7 +5413,7 @@ mod tests {
             "INSERT INTO t VALUES (1, 2), (3, 4)",
         ] {
             assert!(
-                parse_with(sql, DuckDb).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
                 "DuckDb should accept the equal-arity VALUES: {sql:?}",
             );
         }
@@ -5219,17 +5426,20 @@ mod tests {
         // On (the flag alone over ANSI, and the DuckDb preset) rejects; off (ANSI default,
         // PostgreSQL, and DuckDb with only this flag cleared) accepts — so the reject is
         // this flag's doing and no other DuckDb delta's.
-        assert!(parse_with(RAGGED, VALUES_ARITY_DIALECT).is_err());
-        assert!(parse_with(RAGGED, DuckDb).is_err());
-        assert!(parse_with(RAGGED, TestDialect).is_ok());
-        assert!(parse_with(RAGGED, Postgres).is_ok());
-        assert!(parse_with(RAGGED, DUCKDB_NO_ARITY_DIALECT).is_ok());
+        assert!(parse_with(RAGGED, crate::ParseConfig::new(VALUES_ARITY_DIALECT)).is_err());
+        assert!(parse_with(RAGGED, crate::ParseConfig::new(DuckDb)).is_err());
+        assert!(parse_with(RAGGED, crate::ParseConfig::new(TestDialect)).is_ok());
+        assert!(parse_with(RAGGED, crate::ParseConfig::new(Postgres)).is_ok());
+        assert!(parse_with(RAGGED, crate::ParseConfig::new(DUCKDB_NO_ARITY_DIALECT)).is_ok());
     }
 
     #[test]
     fn with_clause_parses_cte_shape() {
-        let parsed = parse_with("WITH c AS (SELECT 1) SELECT * FROM c", TestDialect)
-            .expect("WITH query parses");
+        let parsed = parse_with(
+            "WITH c AS (SELECT 1) SELECT * FROM c",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("WITH query parses");
         let Some(with) = &query_of(&parsed).with else {
             panic!("expected a WITH clause");
         };
@@ -5248,7 +5458,7 @@ mod tests {
     fn recursive_cte_column_list_and_materialization_hint_parse() {
         let parsed = parse_with(
             "WITH RECURSIVE seed(n) AS NOT MATERIALIZED (VALUES (1)) SELECT n FROM seed",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("recursive CTE query parses");
         let Some(with) = &query_of(&parsed).with else {
@@ -5271,7 +5481,7 @@ mod tests {
     fn cte_materialized_hint_parses() {
         let parsed = parse_with(
             "WITH seed AS MATERIALIZED (SELECT 1) SELECT * FROM seed",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("MATERIALIZED CTE query parses");
         let cte = &query_of(&parsed).with.as_ref().expect("WITH clause").ctes[0];
@@ -5290,7 +5500,8 @@ mod tests {
                    del AS (DELETE FROM t RETURNING *), \
                    mrg AS (MERGE INTO t USING u ON true WHEN MATCHED THEN DELETE RETURNING *) \
                    SELECT * FROM ins, upd, del, mrg";
-        let parsed = parse_with(sql, Postgres).expect("all four DML CTE bodies parse");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("all four DML CTE bodies parse");
         let with = query_of(&parsed).with.as_ref().expect("a WITH clause");
         assert!(matches!(with.ctes[0].body, CteBody::Insert { .. }));
         assert!(matches!(with.ctes[1].body, CteBody::Update { .. }));
@@ -5312,13 +5523,13 @@ mod tests {
         use crate::dialect::Postgres;
         parse_with(
             "WITH t AS (INSERT INTO x VALUES (1)) SELECT * FROM t",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("a DML CTE body parses without RETURNING");
         let parsed = parse_with(
             "WITH t AS (WITH u AS (SELECT 1) INSERT INTO x SELECT * FROM u RETURNING *) \
              SELECT * FROM t",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("a WITH-led DML CTE body parses");
         let with = query_of(&parsed).with.as_ref().expect("a WITH clause");
@@ -5343,10 +5554,14 @@ mod tests {
             "WITH t AS (UPDATE x SET a = 1 RETURNING a) SELECT * FROM t",
             "WITH t AS (DELETE FROM x RETURNING *) SELECT * FROM t",
         ] {
-            parse_with(sql, Ansi).expect_err("ANSI CTE bodies are queries only");
-            parse_with(sql, DuckDb).expect_err("DuckDB CTE bodies are queries only");
-            parse_with(sql, Sqlite).expect_err("SQLite CTE bodies are queries only");
-            parse_with(sql, MySql).expect_err("MySQL CTE bodies are queries only");
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err("ANSI CTE bodies are queries only");
+            parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .expect_err("DuckDB CTE bodies are queries only");
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
+                .expect_err("SQLite CTE bodies are queries only");
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err("MySQL CTE bodies are queries only");
         }
     }
 
@@ -5363,7 +5578,8 @@ mod tests {
             "WITH t AS ((INSERT INTO x VALUES (1))) SELECT * FROM t",
             "SELECT * FROM (INSERT INTO x VALUES (1) RETURNING *) s",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("PostgreSQL parse-rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("PostgreSQL parse-rejects {sql:?}"));
         }
     }
 
@@ -5383,8 +5599,8 @@ mod tests {
             "WITH RECURSIVE t(f) AS (SELECT 1) CYCLE f SET c TO point '(1,1)' DEFAULT point '(0,0)' USING p SELECT * FROM t",
             "WITH RECURSIVE t(f) AS (SELECT 1) SEARCH DEPTH FIRST BY f SET seq CYCLE f SET c USING p SELECT * FROM t",
         ] {
-            let parsed =
-                parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?} parses: {e}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .unwrap_or_else(|e| panic!("{sql:?} parses: {e}"));
             assert_eq!(
                 Renderer::new(Postgres)
                     .render_parsed(&parsed)
@@ -5404,7 +5620,7 @@ mod tests {
         let parsed = parse_with(
             "WITH RECURSIVE t(f) AS (SELECT 1) SEARCH BREADTH FIRST BY f SET seq \
              CYCLE f SET c TO 1 DEFAULT 0 USING p SELECT * FROM t",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("SEARCH + CYCLE parse");
         let cte = &query_of(&parsed).with.as_ref().expect("a WITH clause").ctes[0];
@@ -5420,7 +5636,7 @@ mod tests {
         // The short form leaves the mark absent.
         let short = parse_with(
             "WITH RECURSIVE t(f) AS (SELECT 1) CYCLE f SET c USING p SELECT * FROM t",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("short CYCLE parses");
         assert!(
@@ -5453,7 +5669,8 @@ mod tests {
             "WITH RECURSIVE t(n) AS (SELECT 1) CYCLE n SET c TO CAST(1 AS int) DEFAULT 0 USING p SELECT * FROM t",
             "WITH RECURSIVE t(n) AS (SELECT 1) CYCLE n SET c TO true USING p SELECT * FROM t",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("PostgreSQL parse-rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("PostgreSQL parse-rejects {sql:?}"));
         }
     }
 
@@ -5474,10 +5691,12 @@ mod tests {
             "WITH RECURSIVE t(n) AS (SELECT 1) SEARCH DEPTH FIRST BY n SET seq SELECT * FROM t",
             "WITH RECURSIVE t(n) AS (SELECT 1) CYCLE n SET c USING p SELECT * FROM t",
         ] {
-            parse_with(sql, Ansi).expect_err("ANSI has no SEARCH/CYCLE");
-            parse_with(sql, DuckDb).expect_err("DuckDB parse-rejects SEARCH/CYCLE");
-            parse_with(sql, MySql).expect_err("MySQL has no SEARCH/CYCLE");
-            parse_with(sql, Sqlite).expect_err("SQLite ships neither SEARCH nor CYCLE");
+            parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no SEARCH/CYCLE");
+            parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .expect_err("DuckDB parse-rejects SEARCH/CYCLE");
+            parse_with(sql, crate::ParseConfig::new(MySql)).expect_err("MySQL has no SEARCH/CYCLE");
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
+                .expect_err("SQLite ships neither SEARCH nor CYCLE");
         }
     }
 
@@ -5499,10 +5718,10 @@ mod tests {
             "WITH RECURSIVE t AS MATERIALIZED (SELECT 1 AS x UNION ALL SELECT x + 1 FROM t WHERE x < 3 LIMIT 1) SELECT * FROM t",
             "WITH RECURSIVE t AS MATERIALIZED (SELECT 1 AS x UNION SELECT sum(x + 1) FROM t WHERE x < 3 OFFSET 1) SELECT * FROM t",
         ] {
-            parse_with(sql, DuckDb).expect_err(&format!(
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).expect_err(&format!(
                 "DuckDB parse-rejects the recursive-query modifier: {sql:?}"
             ));
-            parse_with(sql, Postgres)
+            parse_with(sql, crate::ParseConfig::new(Postgres))
                 .unwrap_or_else(|e| panic!("PostgreSQL parse-accepts {sql:?}: {e}"));
         }
     }
@@ -5532,7 +5751,7 @@ mod tests {
             // A non-recursive UNION-bodied CTE keeps its modifiers.
             "WITH t AS (SELECT 1 AS x UNION ALL SELECT 2 ORDER BY x) SELECT * FROM t",
         ] {
-            parse_with(sql, DuckDb)
+            parse_with(sql, crate::ParseConfig::new(DuckDb))
                 .unwrap_or_else(|e| panic!("DuckDB parse-accepts the boundary case {sql:?}: {e}"));
         }
     }
@@ -5541,8 +5760,11 @@ mod tests {
     fn same_precedence_set_operations_left_associate() {
         // UNION and EXCEPT share one precedence level, so the chain is
         // `(a UNION b) EXCEPT c`.
-        let parsed =
-            parse_with("SELECT 1 UNION SELECT 2 EXCEPT SELECT 3", TestDialect).expect("parses");
+        let parsed = parse_with(
+            "SELECT 1 UNION SELECT 2 EXCEPT SELECT 3",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("parses");
         let SetExpr::SetOperation {
             op: SetOperator::Except,
             left,
@@ -5565,8 +5787,11 @@ mod tests {
 
     #[test]
     fn intersect_binds_tighter_than_union_and_except() {
-        let parsed = parse_with("SELECT 1 UNION SELECT 2 INTERSECT SELECT 3", TestDialect)
-            .expect("mixed set operation parses");
+        let parsed = parse_with(
+            "SELECT 1 UNION SELECT 2 INTERSECT SELECT 3",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("mixed set operation parses");
         let SetExpr::SetOperation {
             op: SetOperator::Union,
             right,
@@ -5586,8 +5811,11 @@ mod tests {
             "right arm is the tighter INTERSECT",
         );
 
-        let parsed = parse_with("SELECT 1 INTERSECT SELECT 2 EXCEPT SELECT 3", TestDialect)
-            .expect("mixed set operation parses");
+        let parsed = parse_with(
+            "SELECT 1 INTERSECT SELECT 2 EXCEPT SELECT 3",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("mixed set operation parses");
         let SetExpr::SetOperation {
             op: SetOperator::Except,
             left,
@@ -5610,8 +5838,11 @@ mod tests {
 
     #[test]
     fn parenthesized_set_operands_group_without_stored_query_when_simple() {
-        let parsed = parse_with("SELECT 1 UNION (SELECT 2 EXCEPT SELECT 3)", TestDialect)
-            .expect("parenthesized set operand parses");
+        let parsed = parse_with(
+            "SELECT 1 UNION (SELECT 2 EXCEPT SELECT 3)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("parenthesized set operand parses");
         let SetExpr::SetOperation {
             op: SetOperator::Union,
             right,
@@ -5634,8 +5865,11 @@ mod tests {
 
     #[test]
     fn parenthesized_set_operands_keep_query_clauses() {
-        let parsed = parse_with("SELECT 1 UNION (SELECT 2 ORDER BY 1 LIMIT 1)", TestDialect)
-            .expect("parenthesized set operand with query clauses parses");
+        let parsed = parse_with(
+            "SELECT 1 UNION (SELECT 2 ORDER BY 1 LIMIT 1)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("parenthesized set operand with query clauses parses");
         let SetExpr::SetOperation { right, .. } = &query_of(&parsed).body else {
             panic!("expected a UNION set operation");
         };
@@ -5650,8 +5884,11 @@ mod tests {
     fn leading_parenthesized_set_operand_parses_as_a_statement() {
         // The renderer emits a leading `(` when a looser-binding set operation
         // sits on the left of a tighter parent; re-parsing must accept it.
-        let parsed = parse_with("(SELECT 1 UNION SELECT 2) EXCEPT SELECT 3", TestDialect)
-            .expect("leading parenthesized set operand parses");
+        let parsed = parse_with(
+            "(SELECT 1 UNION SELECT 2) EXCEPT SELECT 3",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("leading parenthesized set operand parses");
         let SetExpr::SetOperation {
             op: SetOperator::Except,
             left,
@@ -5676,7 +5913,7 @@ mod tests {
     fn with_clause_then_leading_parenthesized_operand_parses() {
         let parsed = parse_with(
             "WITH x AS (SELECT 1) (SELECT 2 UNION SELECT 3) EXCEPT SELECT 4",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("WITH then a leading parenthesized operand parses");
         let query = query_of(&parsed);
@@ -5695,8 +5932,11 @@ mod tests {
 
     #[test]
     fn order_by_and_limit_attach_outside_a_set_operation() {
-        let parsed = parse_with("SELECT 1 UNION SELECT 2 ORDER BY 1 LIMIT 3", TestDialect)
-            .expect("query-level clauses parse");
+        let parsed = parse_with(
+            "SELECT 1 UNION SELECT 2 ORDER BY 1 LIMIT 3",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("query-level clauses parse");
         let query = query_of(&parsed);
         assert!(
             matches!(query.body, SetExpr::SetOperation { .. }),
@@ -5708,7 +5948,11 @@ mod tests {
 
     #[test]
     fn offset_first_limit_form_is_accepted() {
-        let parsed = parse_with("SELECT 1 OFFSET 5 LIMIT 10", TestDialect).expect("offset-first");
+        let parsed = parse_with(
+            "SELECT 1 OFFSET 5 LIMIT 10",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("offset-first");
         let Some(Limit {
             limit: Some(_),
             offset: Some(_),
@@ -5722,8 +5966,11 @@ mod tests {
 
     #[test]
     fn fetch_first_only_folds_into_the_fetch_first_syntax() {
-        let parsed = parse_with("SELECT 1 FETCH FIRST 2 ROWS ONLY", TestDialect)
-            .expect("FETCH FIRST … ROWS ONLY parses");
+        let parsed = parse_with(
+            "SELECT 1 FETCH FIRST 2 ROWS ONLY",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("FETCH FIRST … ROWS ONLY parses");
         let Some(Limit {
             limit: Some(_),
             offset: None,
@@ -5739,8 +5986,11 @@ mod tests {
     fn offset_rows_then_fetch_next_captures_both_counts() {
         // `OFFSET … ROWS` (the ANSI offset, distinguished by `ROWS`) pairs with
         // `FETCH NEXT … ROW ONLY`; `NEXT`/`ROW` are accepted as `FIRST`/`ROWS` aliases.
-        let parsed = parse_with("SELECT 1 OFFSET 5 ROWS FETCH NEXT 2 ROW ONLY", TestDialect)
-            .expect("ANSI offset + fetch parses");
+        let parsed = parse_with(
+            "SELECT 1 OFFSET 5 ROWS FETCH NEXT 2 ROW ONLY",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("ANSI offset + fetch parses");
         let Some(Limit {
             limit: Some(_),
             offset: Some(_),
@@ -5756,8 +6006,11 @@ mod tests {
     fn ansi_offset_rows_without_fetch_is_fetch_first_syntax() {
         // A bare `OFFSET <n> ROWS` (with the `ROWS` noise word) is the SQL:2008
         // offset, distinct from the PostgreSQL `OFFSET <n>` LIMIT/OFFSET spelling.
-        let parsed =
-            parse_with("SELECT 1 OFFSET 5 ROWS", TestDialect).expect("ANSI bare offset parses");
+        let parsed = parse_with(
+            "SELECT 1 OFFSET 5 ROWS",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("ANSI bare offset parses");
         let Some(Limit {
             limit: None,
             offset: Some(_),
@@ -5771,8 +6024,11 @@ mod tests {
 
     #[test]
     fn fetch_first_is_rejected_without_the_dialect_gate() {
-        let err = parse_with("SELECT 1 FETCH FIRST 2 ROWS ONLY", NO_FETCH_DIALECT)
-            .expect_err("a dialect without fetch_first rejects FETCH FIRST");
+        let err = parse_with(
+            "SELECT 1 FETCH FIRST 2 ROWS ONLY",
+            crate::ParseConfig::new(NO_FETCH_DIALECT),
+        )
+        .expect_err("a dialect without fetch_first rejects FETCH FIRST");
         // `FETCH` at bytes 9..14 is leftover after the query and is not a statement.
         assert_eq!(err.span, Span::new(9, 14));
     }
@@ -5807,8 +6063,11 @@ mod tests {
 
     #[test]
     fn limit_percent_keyword_spelling_is_captured() {
-        let parsed = parse_with("SELECT a FROM t LIMIT 40 PERCENT", LIMIT_PERCENT_DIALECT)
-            .expect("`LIMIT 40 PERCENT` parses under the gate");
+        let parsed = parse_with(
+            "SELECT a FROM t LIMIT 40 PERCENT",
+            crate::ParseConfig::new(LIMIT_PERCENT_DIALECT),
+        )
+        .expect("`LIMIT 40 PERCENT` parses under the gate");
         assert_eq!(percent_of(&parsed), (true, Some(LimitPercent::Keyword)));
     }
 
@@ -5821,7 +6080,8 @@ mod tests {
             "SELECT a FROM t LIMIT 79.9%",
             "SELECT a FROM t LIMIT 20 %",
         ] {
-            let parsed = parse_with(sql, LIMIT_PERCENT_DIALECT).expect("`%` percent parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(LIMIT_PERCENT_DIALECT))
+                .expect("`%` percent parses");
             assert_eq!(
                 percent_of(&parsed),
                 (true, Some(LimitPercent::Symbol)),
@@ -5834,7 +6094,7 @@ mod tests {
     fn limit_percent_composes_with_a_trailing_offset() {
         let parsed = parse_with(
             "SELECT a FROM t LIMIT 40 PERCENT OFFSET 1",
-            LIMIT_PERCENT_DIALECT,
+            crate::ParseConfig::new(LIMIT_PERCENT_DIALECT),
         )
         .expect("percentage LIMIT + OFFSET parses");
         let Some(Limit {
@@ -5852,8 +6112,11 @@ mod tests {
     fn limit_percent_leaves_ordinary_modulo_untouched() {
         // `%` with a right operand is ordinary modulo, never a percentage marker, even
         // under the gate — DuckDB reads `LIMIT 10 % 3` as `LIMIT 1`.
-        let parsed = parse_with("SELECT a FROM t LIMIT 10 % 3", LIMIT_PERCENT_DIALECT)
-            .expect("`LIMIT 10 % 3` is a modulo count");
+        let parsed = parse_with(
+            "SELECT a FROM t LIMIT 10 % 3",
+            crate::ParseConfig::new(LIMIT_PERCENT_DIALECT),
+        )
+        .expect("`LIMIT 10 % 3` is a modulo count");
         let Some(Limit {
             limit:
                 Some(Expr::BinaryOp {
@@ -5878,7 +6141,7 @@ mod tests {
             "SELECT a FROM t LIMIT (1 + 1) PERCENT",
             "SELECT a FROM t LIMIT RANDOM() PERCENT",
         ] {
-            parse_with(sql, LIMIT_PERCENT_DIALECT).expect_err(sql);
+            parse_with(sql, crate::ParseConfig::new(LIMIT_PERCENT_DIALECT)).expect_err(sql);
         }
     }
 
@@ -5894,7 +6157,8 @@ mod tests {
             "SELECT * FROM t LIMIT (SELECT d FROM t) %",
             "SELECT a FROM t LIMIT -5 %",
         ] {
-            let parsed = parse_with(sql, LIMIT_PERCENT_DIALECT).expect(sql);
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(LIMIT_PERCENT_DIALECT)).expect(sql);
             assert_eq!(
                 percent_of(&parsed),
                 (true, Some(LimitPercent::Symbol)),
@@ -5914,7 +6178,7 @@ mod tests {
             "SELECT * FROM t LIMIT ?::VARCHAR %",
             "SELECT a FROM t LIMIT abs(a)[1] %",
         ] {
-            parse_with(sql, DuckDb).expect(sql);
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).expect(sql);
         }
     }
 
@@ -5928,7 +6192,7 @@ mod tests {
             "SELECT a FROM t LIMIT 1+2 %",
             "SELECT a FROM t LIMIT 1||2 %",
         ] {
-            parse_with(sql, LIMIT_PERCENT_DIALECT).expect_err(sql);
+            parse_with(sql, crate::ParseConfig::new(LIMIT_PERCENT_DIALECT)).expect_err(sql);
         }
     }
 
@@ -5936,8 +6200,11 @@ mod tests {
     fn limit_percent_is_rejected_without_the_dialect_gate() {
         // ANSI has no percentage LIMIT: the trailing `PERCENT` at bytes 23..30 is leftover
         // after `LIMIT 40` and is not a statement.
-        let err = parse_with("SELECT a FROM t LIMIT 40 PERCENT", TestDialect)
-            .expect_err("ANSI rejects the percentage LIMIT");
+        let err = parse_with(
+            "SELECT a FROM t LIMIT 40 PERCENT",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI rejects the percentage LIMIT");
         assert_eq!(err.span, Span::new(25, 32));
     }
 
@@ -5951,7 +6218,7 @@ mod tests {
         // `asc`), preserving the exact operator spelling.
         let parsed = parse_with(
             "SELECT a FROM t ORDER BY a USING <, b USING OPERATOR(pg_catalog.>) NULLS LAST",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("ORDER BY USING parses under Postgres");
         let order_by = &query_of(&parsed).order_by;
@@ -5986,16 +6253,22 @@ mod tests {
     fn order_by_using_is_rejected_without_the_dialect_gate() {
         // ANSI (`TestDialect`) has only ASC/DESC, so `USING` is left unconsumed and the
         // trailing `USING <` fails as leftover input rather than opening a sort form.
-        parse_with("SELECT a FROM t ORDER BY a USING <", TestDialect)
-            .expect_err("a dialect without order_by_using rejects the USING sort");
+        parse_with(
+            "SELECT a FROM t ORDER BY a USING <",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("a dialect without order_by_using rejects the USING sort");
     }
 
     #[test]
     fn order_by_all_parses_as_the_clause_mode() {
         use crate::dialect::DuckDb;
 
-        let parsed =
-            parse_with("SELECT * FROM t ORDER BY ALL", DuckDb).expect("ORDER BY ALL parses");
+        let parsed = parse_with(
+            "SELECT * FROM t ORDER BY ALL",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("ORDER BY ALL parses");
         let query = query_of(&parsed);
         assert!(
             query.order_by.is_empty(),
@@ -6014,7 +6287,7 @@ mod tests {
         // carries the ordinary sort-key modifier surface — and `LIMIT` follows it.
         let parsed = parse_with(
             "SELECT * FROM t ORDER BY ALL DESC NULLS LAST LIMIT 2",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("modifiers and LIMIT compose with the mode");
         let query = query_of(&parsed);
@@ -6030,7 +6303,7 @@ mod tests {
 
         let parsed = parse_with(
             "SELECT i FROM t UNION ALL SELECT j FROM t ORDER BY ALL",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the mode is the query tail of a set operation");
         let query = query_of(&parsed);
@@ -6047,7 +6320,7 @@ mod tests {
         // operand-level clause; probed on 1.5.4).
         let parsed = parse_with(
             "(SELECT i FROM t ORDER BY ALL) UNION SELECT j FROM t",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("an operand-level ORDER BY ALL parses");
         let SetExpr::SetOperation { left, .. } = &query_of(&parsed).body else {
@@ -6066,9 +6339,27 @@ mod tests {
         // Probed on DuckDB 1.5.4: `ALL` admits no sibling keys in either order and
         // no `USING` tail; the mode consumes only its keyword and modifiers, so the
         // leftovers fail as trailing input — the same verdict as the engine.
-        assert!(parse_with("SELECT * FROM t ORDER BY ALL, i", DuckDb).is_err());
-        assert!(parse_with("SELECT * FROM t ORDER BY i, ALL", DuckDb).is_err());
-        assert!(parse_with("SELECT * FROM t ORDER BY ALL USING <", DuckDb).is_err());
+        assert!(
+            parse_with(
+                "SELECT * FROM t ORDER BY ALL, i",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT * FROM t ORDER BY i, ALL",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT * FROM t ORDER BY ALL USING <",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -6078,8 +6369,11 @@ mod tests {
         // The disambiguation trap: `ALL` is reserved under DuckDB, so a column named
         // `all` must be quoted — and the quoted spelling tokenizes as an identifier,
         // never the mode keyword.
-        let parsed =
-            parse_with("SELECT \"all\" FROM t ORDER BY \"all\" DESC", DuckDb).expect("parses");
+        let parsed = parse_with(
+            "SELECT \"all\" FROM t ORDER BY \"all\" DESC",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("parses");
         let query = query_of(&parsed);
         assert!(query.order_by_all.is_none());
         assert_eq!(query.order_by.len(), 1);
@@ -6093,17 +6387,20 @@ mod tests {
         // Every shipped dialect reserves `ALL`, so with the gate off the keyword
         // cannot open a sort expression — the over-acceptance guard on all four.
         let sql = "SELECT a FROM t ORDER BY ALL";
-        assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects ORDER BY ALL");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+            "ANSI rejects ORDER BY ALL"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects ORDER BY ALL"
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects ORDER BY ALL"
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects ORDER BY ALL"
         );
     }
@@ -6120,7 +6417,8 @@ mod tests {
             "SELECT * FROM t ORDER BY ALL DESC NULLS LAST",
             "SELECT * FROM t ORDER BY ALL LIMIT 2",
         ] {
-            let parsed = parse_with(sql, ORDER_BY_ALL_DIALECT).expect("ORDER BY ALL parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(ORDER_BY_ALL_DIALECT))
+                .expect("ORDER BY ALL parses");
             assert_eq!(
                 Renderer::new(ORDER_BY_ALL_DIALECT)
                     .render_parsed(&parsed)
@@ -6132,7 +6430,8 @@ mod tests {
 
     #[test]
     fn qualified_column_keeps_every_dotted_part() {
-        let parsed = parse_with("SELECT t.c", TestDialect).expect("qualified column parses");
+        let parsed = parse_with("SELECT t.c", crate::ParseConfig::new(TestDialect))
+            .expect("qualified column parses");
         let SelectItem::Expr {
             expr: Expr::Column { name, .. },
             ..
@@ -6147,7 +6446,11 @@ mod tests {
 
     #[test]
     fn where_predicate_is_a_full_expression() {
-        let parsed = parse_with("SELECT a FROM t WHERE a > 1", TestDialect).expect("where parses");
+        let parsed = parse_with(
+            "SELECT a FROM t WHERE a > 1",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("where parses");
         assert!(matches!(
             select_of(&parsed).selection,
             Some(Expr::BinaryOp {
@@ -6159,20 +6462,26 @@ mod tests {
 
     #[test]
     fn from_with_no_table_errors_at_end_of_input() {
-        let err = parse_with("SELECT a FROM", TestDialect).expect_err("FROM needs a relation");
+        let err = parse_with("SELECT a FROM", crate::ParseConfig::new(TestDialect))
+            .expect_err("FROM needs a relation");
         // The relation is missing at end of input: an empty span past `FROM`.
         assert_eq!(err.span, Span::new(13, 13));
     }
 
     #[test]
     fn order_by_with_no_expression_errors_at_end_of_input() {
-        let err = parse_with("SELECT 1 ORDER BY", TestDialect).expect_err("ORDER BY needs a key");
+        let err = parse_with("SELECT 1 ORDER BY", crate::ParseConfig::new(TestDialect))
+            .expect_err("ORDER BY needs a key");
         assert_eq!(err.span, Span::new(17, 17));
     }
 
     #[test]
     fn group_by_without_by_reports_the_missing_keyword() {
-        let err = parse_with("SELECT a FROM t GROUP a", TestDialect).expect_err("GROUP needs BY");
+        let err = parse_with(
+            "SELECT a FROM t GROUP a",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("GROUP needs BY");
         // `GROUP` at 16..21, `a` at 22..23: the error points at the stray `a`.
         assert_eq!(err.span, Span::new(22, 23));
     }
@@ -6182,7 +6491,8 @@ mod tests {
         // `TABLE t` is a query primary (`<explicit table>`), so it routes through the
         // statement dispatcher to a `Statement::Query` whose body is the canonical
         // `SELECT`-shaped operand tagged as a TABLE command.
-        let parsed = parse_with("TABLE t", TestDialect).expect("TABLE dispatches as a statement");
+        let parsed = parse_with("TABLE t", crate::ParseConfig::new(TestDialect))
+            .expect("TABLE dispatches as a statement");
         let SetExpr::Select { select, .. } = &query_of(&parsed).body else {
             panic!("expected the canonicalized SELECT body");
         };
@@ -6194,8 +6504,11 @@ mod tests {
         // Each `TABLE` operand is a star-projection Select, so set operations fold over
         // them exactly as over `SELECT` operands (`TABLE a UNION TABLE b`), and the
         // `TABLE` form mixes with a `SELECT` operand.
-        let parsed =
-            parse_with("TABLE a UNION TABLE b", TestDialect).expect("TABLE set operation parses");
+        let parsed = parse_with(
+            "TABLE a UNION TABLE b",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("TABLE set operation parses");
         let SetExpr::SetOperation {
             op: SetOperator::Union,
             left,
@@ -6212,8 +6525,11 @@ mod tests {
             assert_eq!(select.spelling, SelectSpelling::TableCommand);
         }
 
-        let mixed = parse_with("TABLE a UNION ALL SELECT 1", TestDialect)
-            .expect("TABLE mixes with SELECT operands");
+        let mixed = parse_with(
+            "TABLE a UNION ALL SELECT 1",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("TABLE mixes with SELECT operands");
         assert!(matches!(
             query_of(&mixed).body,
             SetExpr::SetOperation {
@@ -6228,8 +6544,11 @@ mod tests {
     fn table_command_binds_query_level_order_and_limit() {
         // `ORDER BY`/`LIMIT` bind the whole query, outside the `TABLE` primary, exactly
         // as they do for a bare `SELECT` body.
-        let parsed = parse_with("TABLE t ORDER BY 1 LIMIT 2", TestDialect)
-            .expect("query-level clauses follow a TABLE command");
+        let parsed = parse_with(
+            "TABLE t ORDER BY 1 LIMIT 2",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("query-level clauses follow a TABLE command");
         let query = query_of(&parsed);
         assert!(matches!(query.body, SetExpr::Select { .. }));
         assert_eq!(query.order_by.len(), 1);
@@ -6241,8 +6560,11 @@ mod tests {
         use crate::dialect::MySql;
 
         // The sole locking clause on a query, with the modern spelling and no tails.
-        let update =
-            parse_with("SELECT a FROM t1 FOR UPDATE", MySql).expect("MySQL parses FOR UPDATE");
+        let update = parse_with(
+            "SELECT a FROM t1 FOR UPDATE",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses FOR UPDATE");
         let clause = &query_of(&update).locking[..];
         assert!(matches!(
             clause,
@@ -6256,35 +6578,47 @@ mod tests {
         assert!(clause[0].of.is_empty(), "no OF clause was written");
 
         // `FOR SHARE` reaches the other shared strength.
-        let share =
-            parse_with("SELECT a FROM t1 FOR SHARE", MySql).expect("MySQL parses FOR SHARE");
+        let share = parse_with("SELECT a FROM t1 FOR SHARE", crate::ParseConfig::new(MySql))
+            .expect("MySQL parses FOR SHARE");
         assert!(matches!(
             query_of(&share).locking[0].strength,
             LockStrength::Share
         ));
 
         // `OF <table>` records the single restricted relation.
-        let of = parse_with("SELECT a FROM t1 FOR UPDATE OF t1", MySql)
-            .expect("MySQL parses FOR UPDATE OF t1");
+        let of = parse_with(
+            "SELECT a FROM t1 FOR UPDATE OF t1",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses FOR UPDATE OF t1");
         assert_eq!(query_of(&of).locking[0].of.len(), 1);
 
         // `NOWAIT` and `SKIP LOCKED` wait policies.
-        let nowait =
-            parse_with("SELECT a FROM t1 FOR UPDATE NOWAIT", MySql).expect("MySQL parses NOWAIT");
+        let nowait = parse_with(
+            "SELECT a FROM t1 FOR UPDATE NOWAIT",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses NOWAIT");
         assert!(matches!(
             query_of(&nowait).locking[0].wait,
             Some(LockWait::NoWait)
         ));
-        let skip = parse_with("SELECT a FROM t1 FOR SHARE SKIP LOCKED", MySql)
-            .expect("MySQL parses SKIP LOCKED");
+        let skip = parse_with(
+            "SELECT a FROM t1 FOR SHARE SKIP LOCKED",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses SKIP LOCKED");
         assert!(matches!(
             query_of(&skip).locking[0].wait,
             Some(LockWait::SkipLocked)
         ));
 
         // The legacy `LOCK IN SHARE MODE` folds onto `FOR SHARE` with the spelling tag.
-        let legacy = parse_with("SELECT a FROM t1 LOCK IN SHARE MODE", MySql)
-            .expect("MySQL parses LOCK IN SHARE MODE");
+        let legacy = parse_with(
+            "SELECT a FROM t1 LOCK IN SHARE MODE",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses LOCK IN SHARE MODE");
         assert!(matches!(
             query_of(&legacy).locking[0],
             crate::ast::LockingClause {
@@ -6300,19 +6634,28 @@ mod tests {
         use crate::dialect::{Ansi, MySql, Postgres};
 
         // The clause trails `LIMIT` (MySQL's fixed position).
-        let after = parse_with("SELECT a FROM t1 LIMIT 1 FOR UPDATE", MySql)
-            .expect("locking follows LIMIT");
+        let after = parse_with(
+            "SELECT a FROM t1 LIMIT 1 FOR UPDATE",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("locking follows LIMIT");
         assert_eq!(query_of(&after).locking.len(), 1);
         assert!(query_of(&after).limit.is_some());
         // Before `LIMIT` is not MySQL's grammar — the leftover `LIMIT` fails the parse.
-        parse_with("SELECT a FROM t1 FOR UPDATE LIMIT 1", MySql)
-            .expect_err("MySQL rejects a locking clause before LIMIT");
+        parse_with(
+            "SELECT a FROM t1 FOR UPDATE LIMIT 1",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("MySQL rejects a locking clause before LIMIT");
 
         // PostgreSQL shares the modern `FOR UPDATE`/`FOR SHARE` core.
         assert_eq!(
             query_of(
-                &parse_with("SELECT a FROM t1 FOR UPDATE", Postgres)
-                    .expect("PostgreSQL parses FOR UPDATE")
+                &parse_with(
+                    "SELECT a FROM t1 FOR UPDATE",
+                    crate::ParseConfig::new(Postgres)
+                )
+                .expect("PostgreSQL parses FOR UPDATE")
             )
             .locking
             .len(),
@@ -6320,7 +6663,7 @@ mod tests {
         );
 
         // ANSI has no locking gate, so the trailing `FOR` is a clean parse error.
-        parse_with("SELECT a FROM t1 FOR UPDATE", Ansi)
+        parse_with("SELECT a FROM t1 FOR UPDATE", crate::ParseConfig::new(Ansi))
             .expect_err("ANSI has no query-tail locking clause");
     }
 
@@ -6344,9 +6687,9 @@ mod tests {
             "CREATE TABLE z AS (WITH cte AS (SELECT 1) SELECT * FROM cte)",
             "INSERT INTO x (SELECT * FROM y)",
         ] {
-            parse_with(sql, Sqlite)
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
                 .expect_err(&format!("SQLite rejects the paren operand {sql:?}"));
-            parse_with(sql, Postgres)
+            parse_with(sql, crate::ParseConfig::new(Postgres))
                 .unwrap_or_else(|err| panic!("PostgreSQL accepts {sql:?}: {err:?}"));
         }
 
@@ -6361,7 +6704,7 @@ mod tests {
             "SELECT ((SELECT 1))",
             "SELECT (SELECT 1)",
         ] {
-            parse_with(sql, Sqlite)
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
                 .unwrap_or_else(|err| panic!("SQLite keeps the grouping {sql:?}: {err:?}"));
         }
 
@@ -6372,9 +6715,9 @@ mod tests {
             "SELECT * FROM ((SELECT 1) LIMIT 1)",
             "SELECT * FROM (((SELECT 1) UNION SELECT 2) ORDER BY x LIMIT 1 OFFSET 1)",
         ] {
-            parse_with(sql, Sqlite)
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
                 .expect_err(&format!("SQLite rejects the extended grouping {sql:?}"));
-            parse_with(sql, Postgres)
+            parse_with(sql, crate::ParseConfig::new(Postgres))
                 .unwrap_or_else(|err| panic!("PostgreSQL accepts {sql:?}: {err:?}"));
         }
 
@@ -6384,17 +6727,17 @@ mod tests {
         // `(` after `WITH` is an operand, not a grouping (engine-measured via rusqlite).
         parse_with(
             "SELECT * FROM ((WITH a AS (SELECT 1) SELECT * FROM a))",
-            Sqlite,
+            crate::ParseConfig::new(Sqlite),
         )
         .expect("SQLite keeps a grouped WITH-query subquery");
         for sql in [
             "SELECT * FROM ((WITH a AS (SELECT 1) (SELECT 2)))",
             "SELECT ((WITH a AS (SELECT 1) (SELECT 2)))",
         ] {
-            parse_with(sql, Sqlite).expect_err(&format!(
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).expect_err(&format!(
                 "SQLite rejects a WITH-query with a paren body {sql:?}"
             ));
-            parse_with(sql, Postgres)
+            parse_with(sql, crate::ParseConfig::new(Postgres))
                 .unwrap_or_else(|err| panic!("PostgreSQL accepts {sql:?}: {err:?}"));
         }
     }
@@ -6404,11 +6747,14 @@ mod tests {
         use crate::dialect::Postgres;
         // PostgreSQL's `gram.y` `insertSelectOptions` guards, raised during raw parsing:
         // `WITH TIES` needs a governing `ORDER BY`, and cannot combine with `SKIP LOCKED`.
-        parse_with("SELECT a FROM t FETCH FIRST 1 ROW WITH TIES", Postgres)
-            .expect_err("WITH TIES requires ORDER BY");
+        parse_with(
+            "SELECT a FROM t FETCH FIRST 1 ROW WITH TIES",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("WITH TIES requires ORDER BY");
         parse_with(
             "SELECT a FROM t ORDER BY a FETCH FIRST 1 ROW WITH TIES FOR UPDATE SKIP LOCKED",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect_err("WITH TIES cannot combine with SKIP LOCKED");
         // The valid forms parse: WITH TIES under an ORDER BY, and WITH TIES with a non-SKIP
@@ -6418,7 +6764,8 @@ mod tests {
             "SELECT a FROM t ORDER BY a FETCH FIRST 1 ROW WITH TIES FOR UPDATE",
             "SELECT a FROM t ORDER BY a FETCH FIRST 1 ROW ONLY FOR UPDATE SKIP LOCKED",
         ] {
-            parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         }
     }
 }

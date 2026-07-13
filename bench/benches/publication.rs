@@ -34,8 +34,11 @@ fn corpus() -> Corpus {
 fn parse_squonk(sql: &[String]) -> Vec<squonk::StockParsed> {
     sql.iter()
         .map(|statement| {
-            parse_with(black_box(statement.as_str()), Ansi)
-                .expect("publication corpus was qualified for Squonk ANSI")
+            parse_with(
+                black_box(statement.as_str()),
+                squonk::ParseConfig::new(Ansi),
+            )
+            .expect("publication corpus was qualified for Squonk ANSI")
         })
         .collect()
 }

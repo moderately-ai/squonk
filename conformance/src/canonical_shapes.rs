@@ -83,8 +83,11 @@ fn cast_spellings_share_one_canonical_shape() {
     // written. The prefix form's operand is always a string constant, so all three
     // cast the same `'42'` constant here. Parsing them in one statement shares one
     // interner, so the operand and target type compare by value.
-    let parsed = parse_with("SELECT CAST('42' AS int4), '42'::int4, int4 '42'", Postgres)
-        .expect("postgres parses all three spellings");
+    let parsed = parse_with(
+        "SELECT CAST('42' AS int4), '42'::int4, int4 '42'",
+        squonk::ParseConfig::new(Postgres),
+    )
+    .expect("postgres parses all three spellings");
     let exprs = projection_exprs(&parsed);
     let cast = |expr: &'static str, e: &Expr<NoExt>| match e {
         Expr::Cast {
@@ -117,11 +120,11 @@ fn cast_spellings_share_one_canonical_shape() {
     // Acceptance is a `FeatureSet` gate (`expression_syntax.typecast_operator`),
     // not a shape: ANSI rejects `::` while accepting the standard `CAST(...)`.
     assert!(
-        parse_with("SELECT a::INT", Ansi).is_err(),
+        parse_with("SELECT a::INT", squonk::ParseConfig::new(Ansi)).is_err(),
         "ANSI lacks the `::` typecast operator",
     );
     assert!(
-        parse_with("SELECT CAST(a AS INT)", Ansi).is_ok(),
+        parse_with("SELECT CAST(a AS INT)", squonk::ParseConfig::new(Ansi)).is_ok(),
         "ANSI accepts the standard CAST(...) call",
     );
 }
@@ -132,9 +135,13 @@ fn limit_and_fetch_first_share_one_canonical_shape() {
     // `Limit`; the `LimitSyntax` tag records the spelling. The row count is a
     // literal (its value rides the source span, not the interner), so the canonical
     // operands compare by value across the two parses.
-    let limit = parse_with("SELECT 1 LIMIT 10", Postgres).expect("postgres parses LIMIT");
-    let fetch = parse_with("SELECT 1 FETCH FIRST 10 ROWS ONLY", Postgres)
-        .expect("postgres parses FETCH FIRST");
+    let limit = parse_with("SELECT 1 LIMIT 10", squonk::ParseConfig::new(Postgres))
+        .expect("postgres parses LIMIT");
+    let fetch = parse_with(
+        "SELECT 1 FETCH FIRST 10 ROWS ONLY",
+        squonk::ParseConfig::new(Postgres),
+    )
+    .expect("postgres parses FETCH FIRST");
     let limit = sole_limit(&limit);
     let fetch = sole_limit(&fetch);
     assert_eq!(
@@ -152,11 +159,15 @@ fn limit_and_fetch_first_share_one_canonical_shape() {
     // a dialect with it off rejects `FETCH FIRST` but still accepts `LIMIT`.
     let no_fetch = AdHocDialect(&NO_FETCH_FIRST_FEATURES);
     assert!(
-        parse_with("SELECT 1 FETCH FIRST 10 ROWS ONLY", no_fetch).is_err(),
+        parse_with(
+            "SELECT 1 FETCH FIRST 10 ROWS ONLY",
+            squonk::ParseConfig::new(no_fetch)
+        )
+        .is_err(),
         "a fetch_first-off dialect rejects FETCH FIRST",
     );
     assert!(
-        parse_with("SELECT 1 LIMIT 10", no_fetch).is_ok(),
+        parse_with("SELECT 1 LIMIT 10", squonk::ParseConfig::new(no_fetch)).is_ok(),
         "a fetch_first-off dialect still accepts LIMIT",
     );
 }
@@ -169,9 +180,13 @@ fn limit_offset_comma_shares_one_canonical_shape() {
     // source-fidelity render replays the comma spelling. The counts are literals whose
     // value rides the source span, so the canonical operands compare by value across
     // the two parses; only the spelling tag differs.
-    let comma = parse_with("SELECT 1 LIMIT 5, 10", MySql).expect("mysql parses LIMIT a, b");
-    let explicit =
-        parse_with("SELECT 1 LIMIT 10 OFFSET 5", MySql).expect("mysql parses LIMIT/OFFSET");
+    let comma = parse_with("SELECT 1 LIMIT 5, 10", squonk::ParseConfig::new(MySql))
+        .expect("mysql parses LIMIT a, b");
+    let explicit = parse_with(
+        "SELECT 1 LIMIT 10 OFFSET 5",
+        squonk::ParseConfig::new(MySql),
+    )
+    .expect("mysql parses LIMIT/OFFSET");
     let comma = sole_limit(&comma);
     let explicit = sole_limit(&explicit);
     assert_eq!(
@@ -200,11 +215,19 @@ fn limit_offset_comma_shares_one_canonical_shape() {
     // shape: with it off the comma is trailing input, but `LIMIT 10` still parses.
     let no_comma = feature_set_with("limit_offset_comma", &FeatureSet::MYSQL, false);
     assert!(
-        parse_with("SELECT 1 LIMIT 5, 10", AdHocDialect(&no_comma)).is_err(),
+        parse_with(
+            "SELECT 1 LIMIT 5, 10",
+            squonk::ParseConfig::new(AdHocDialect(&no_comma))
+        )
+        .is_err(),
         "a limit_offset_comma-off dialect rejects the comma form",
     );
     assert!(
-        parse_with("SELECT 1 LIMIT 10", AdHocDialect(&no_comma)).is_ok(),
+        parse_with(
+            "SELECT 1 LIMIT 10",
+            squonk::ParseConfig::new(AdHocDialect(&no_comma))
+        )
+        .is_ok(),
         "a limit_offset_comma-off dialect still accepts plain LIMIT",
     );
 }
@@ -216,7 +239,8 @@ fn not_equal_spellings_share_one_operator_with_a_surface_tag() {
     // only in the tag (like `=`/`==` on `Eq`), so a source-fidelity render replays the
     // exact spelling. Parsing both in one statement, they share the operator but *not*
     // the tag.
-    let parsed = parse_with("SELECT a <> b, a != b", Postgres).expect("postgres parses both");
+    let parsed = parse_with("SELECT a <> b, a != b", squonk::ParseConfig::new(Postgres))
+        .expect("postgres parses both");
     let exprs = projection_exprs(&parsed);
     let (angle, bang) = (exprs[0], exprs[1]);
     assert!(
@@ -258,11 +282,11 @@ fn not_equal_spellings_share_one_operator_with_a_surface_tag() {
     // No acceptance fork: both spellings are universally accepted (the `!` byte is
     // operator-class in the shared lexer), so ANSI accepts both too.
     assert!(
-        parse_with("SELECT a <> b", Ansi).is_ok(),
+        parse_with("SELECT a <> b", squonk::ParseConfig::new(Ansi)).is_ok(),
         "ANSI accepts `<>`"
     );
     assert!(
-        parse_with("SELECT a != b", Ansi).is_ok(),
+        parse_with("SELECT a != b", squonk::ParseConfig::new(Ansi)).is_ok(),
         "ANSI accepts `!=`"
     );
 }
@@ -273,10 +297,16 @@ fn join_keyword_noise_words_share_one_operator_with_a_surface_tag() {
     // `LEFT JOIN` ≡ `LEFT OUTER JOIN`. One canonical `JoinOperator` variant per join
     // kind carrying an `inner`/`outer` bool surface tag — the same variant, differing
     // only in the tag, so a source-fidelity render replays the written keyword.
-    let bare_inner =
-        parse_with("SELECT 1 FROM a JOIN b ON a = b", Postgres).expect("bare JOIN parses");
-    let spelled_inner =
-        parse_with("SELECT 1 FROM a INNER JOIN b ON a = b", Postgres).expect("INNER JOIN parses");
+    let bare_inner = parse_with(
+        "SELECT 1 FROM a JOIN b ON a = b",
+        squonk::ParseConfig::new(Postgres),
+    )
+    .expect("bare JOIN parses");
+    let spelled_inner = parse_with(
+        "SELECT 1 FROM a INNER JOIN b ON a = b",
+        squonk::ParseConfig::new(Postgres),
+    )
+    .expect("INNER JOIN parses");
     assert!(matches!(
         first_join_operator(&bare_inner),
         JoinOperator::Inner { inner: false, .. }
@@ -289,10 +319,16 @@ fn join_keyword_noise_words_share_one_operator_with_a_surface_tag() {
         "`INNER JOIN` is the same Inner variant with the `inner` tag set",
     );
 
-    let bare_left =
-        parse_with("SELECT 1 FROM a LEFT JOIN b ON a = b", Postgres).expect("LEFT JOIN parses");
-    let spelled_left = parse_with("SELECT 1 FROM a LEFT OUTER JOIN b ON a = b", Postgres)
-        .expect("LEFT OUTER JOIN parses");
+    let bare_left = parse_with(
+        "SELECT 1 FROM a LEFT JOIN b ON a = b",
+        squonk::ParseConfig::new(Postgres),
+    )
+    .expect("LEFT JOIN parses");
+    let spelled_left = parse_with(
+        "SELECT 1 FROM a LEFT OUTER JOIN b ON a = b",
+        squonk::ParseConfig::new(Postgres),
+    )
+    .expect("LEFT OUTER JOIN parses");
     assert!(matches!(
         first_join_operator(&bare_left),
         JoinOperator::LeftOuter { outer: false, .. }
@@ -329,10 +365,16 @@ fn straight_join_shares_inner_join_shape_with_a_surface_tag() {
     // `straight` surface tag — never a new variant — so it is the same shape as a
     // bare `JOIN` save for the tag (which, unlike INNER/OUTER, is preserved so the
     // spelling round-trips).
-    let straight = parse_with("SELECT 1 FROM a STRAIGHT_JOIN b ON a = b", MySql)
-        .expect("MySQL parses STRAIGHT_JOIN");
-    let plain =
-        parse_with("SELECT 1 FROM a JOIN b ON a = b", MySql).expect("MySQL parses a bare JOIN");
+    let straight = parse_with(
+        "SELECT 1 FROM a STRAIGHT_JOIN b ON a = b",
+        squonk::ParseConfig::new(MySql),
+    )
+    .expect("MySQL parses STRAIGHT_JOIN");
+    let plain = parse_with(
+        "SELECT 1 FROM a JOIN b ON a = b",
+        squonk::ParseConfig::new(MySql),
+    )
+    .expect("MySQL parses a bare JOIN");
     assert!(matches!(
         first_join_operator(&straight),
         JoinOperator::Inner { straight: true, .. },
@@ -350,8 +392,11 @@ fn straight_join_shares_inner_join_shape_with_a_surface_tag() {
 
     // The `SELECT STRAIGHT_JOIN ...` modifier rides `Select` as a flag — the
     // query-wide form of the same hint, mirroring how `distinct` rides `Select`.
-    let modifier = parse_with("SELECT STRAIGHT_JOIN a FROM t", MySql)
-        .expect("MySQL parses the SELECT STRAIGHT_JOIN modifier");
+    let modifier = parse_with(
+        "SELECT STRAIGHT_JOIN a FROM t",
+        squonk::ParseConfig::new(MySql),
+    )
+    .expect("MySQL parses the SELECT STRAIGHT_JOIN modifier");
     let SetExpr::Select { select, .. } = query_body(&modifier) else {
         panic!("expected a SELECT body");
     };
@@ -376,11 +421,19 @@ fn straight_join_shares_inner_join_shape_with_a_surface_tag() {
     // non-reserved word the table factor takes as an alias, leaving `b ON ...` as
     // leftover input).
     assert!(
-        parse_with("SELECT 1 FROM a STRAIGHT_JOIN b ON a = b", Ansi).is_err(),
+        parse_with(
+            "SELECT 1 FROM a STRAIGHT_JOIN b ON a = b",
+            squonk::ParseConfig::new(Ansi)
+        )
+        .is_err(),
         "ANSI lacks the STRAIGHT_JOIN join operator",
     );
     assert!(
-        parse_with("SELECT 1 FROM a STRAIGHT_JOIN b ON a = b", Postgres).is_err(),
+        parse_with(
+            "SELECT 1 FROM a STRAIGHT_JOIN b ON a = b",
+            squonk::ParseConfig::new(Postgres)
+        )
+        .is_err(),
         "PostgreSQL lacks the STRAIGHT_JOIN join operator",
     );
 }
@@ -395,8 +448,11 @@ fn nonstandard_joins_are_new_operators_under_duckdb() {
     // as the left factor's alias.
     use squonk::ast::{AsOfJoinKind, JoinConstraint};
 
-    let asof = parse_with("SELECT 1 FROM a ASOF JOIN b ON a.t >= b.t", DuckDb)
-        .expect("DuckDb parses ASOF JOIN");
+    let asof = parse_with(
+        "SELECT 1 FROM a ASOF JOIN b ON a.t >= b.t",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses ASOF JOIN");
     assert!(matches!(
         first_join_operator(&asof),
         JoinOperator::AsOf {
@@ -406,8 +462,11 @@ fn nonstandard_joins_are_new_operators_under_duckdb() {
     ));
     // `ASOF INNER JOIN` and `ASOF LEFT OUTER JOIN` collapse onto the canonical
     // side (INNER/OUTER are noise words here exactly as in the standard joins).
-    let spelled_inner = parse_with("SELECT 1 FROM a ASOF INNER JOIN b ON a.t >= b.t", DuckDb)
-        .expect("DuckDb parses ASOF INNER JOIN");
+    let spelled_inner = parse_with(
+        "SELECT 1 FROM a ASOF INNER JOIN b ON a.t >= b.t",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses ASOF INNER JOIN");
     assert!(matches!(
         first_join_operator(&spelled_inner),
         JoinOperator::AsOf {
@@ -433,7 +492,8 @@ fn nonstandard_joins_are_new_operators_under_duckdb() {
             AsOfJoinKind::Full,
         ),
     ] {
-        let parsed = parse_with(sql, DuckDb).expect("DuckDb parses every ASOF side");
+        let parsed = parse_with(sql, squonk::ParseConfig::new(DuckDb))
+            .expect("DuckDb parses every ASOF side");
         match first_join_operator(&parsed) {
             JoinOperator::AsOf { kind, .. } => assert_eq!(*kind, want, "{sql:?}"),
             other => panic!("{sql:?} is an AsOf join: {other:?}"),
@@ -441,8 +501,11 @@ fn nonstandard_joins_are_new_operators_under_duckdb() {
     }
     // The USING form carries the ordinary `Using` constraint; POSITIONAL carries
     // none at all (the variant has no constraint field, like `Cross`).
-    let using = parse_with("SELECT 1 FROM a ASOF JOIN b USING (t)", DuckDb)
-        .expect("DuckDb parses ASOF JOIN USING");
+    let using = parse_with(
+        "SELECT 1 FROM a ASOF JOIN b USING (t)",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses ASOF JOIN USING");
     assert!(matches!(
         first_join_operator(&using),
         JoinOperator::AsOf {
@@ -450,8 +513,11 @@ fn nonstandard_joins_are_new_operators_under_duckdb() {
             ..
         },
     ));
-    let positional = parse_with("SELECT 1 FROM a POSITIONAL JOIN b", DuckDb)
-        .expect("DuckDb parses POSITIONAL JOIN");
+    let positional = parse_with(
+        "SELECT 1 FROM a POSITIONAL JOIN b",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses POSITIONAL JOIN");
     assert!(matches!(
         first_join_operator(&positional),
         JoinOperator::Positional { .. },
@@ -470,12 +536,16 @@ fn nonstandard_joins_are_new_operators_under_duckdb() {
         "SELECT 1 FROM a ASOF CROSS JOIN b",
     ] {
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, squonk::ParseConfig::new(DuckDb)).is_err(),
             "DuckDb must reject (engine parse-rejects): {sql:?}",
         );
     }
     assert!(
-        parse_with("SELECT 1 FROM a ASOF JOIN b ON a.t = b.t", DuckDb).is_ok(),
+        parse_with(
+            "SELECT 1 FROM a ASOF JOIN b ON a.t = b.t",
+            squonk::ParseConfig::new(DuckDb)
+        )
+        .is_ok(),
         "an equality ON parses (the inequality check is DuckDB bind-time)",
     );
 
@@ -501,10 +571,22 @@ fn nonstandard_joins_are_new_operators_under_duckdb() {
     // next word is `JOIN`, so the text still parses, as an aliased *plain*
     // join: a different, dialect-correct tree, not a reject.
     for parse in [
-        parse_with("SELECT 1 FROM a ASOF JOIN b ON a.t >= b.t", Ansi),
-        parse_with("SELECT 1 FROM a ASOF JOIN b ON a.t >= b.t", Postgres),
-        parse_with("SELECT 1 FROM a POSITIONAL JOIN b", Ansi),
-        parse_with("SELECT 1 FROM a POSITIONAL JOIN b", Postgres),
+        parse_with(
+            "SELECT 1 FROM a ASOF JOIN b ON a.t >= b.t",
+            squonk::ParseConfig::new(Ansi),
+        ),
+        parse_with(
+            "SELECT 1 FROM a ASOF JOIN b ON a.t >= b.t",
+            squonk::ParseConfig::new(Postgres),
+        ),
+        parse_with(
+            "SELECT 1 FROM a POSITIONAL JOIN b",
+            squonk::ParseConfig::new(Ansi),
+        ),
+        parse_with(
+            "SELECT 1 FROM a POSITIONAL JOIN b",
+            squonk::ParseConfig::new(Postgres),
+        ),
     ] {
         let parsed = parse.expect("the alias reading parses outside DuckDb");
         assert!(
@@ -530,8 +612,11 @@ fn semi_anti_joins_are_new_operators_under_duckdb() {
     use squonk::ast::JoinConstraint;
 
     // Bare SEMI/ANTI (REGULAR ref-type): the ON and USING constraint forms.
-    let semi = parse_with("SELECT 1 FROM a SEMI JOIN b ON a.i = b.i", DuckDb)
-        .expect("DuckDb parses SEMI JOIN");
+    let semi = parse_with(
+        "SELECT 1 FROM a SEMI JOIN b ON a.i = b.i",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses SEMI JOIN");
     assert!(matches!(
         first_join_operator(&semi),
         JoinOperator::Semi {
@@ -540,8 +625,11 @@ fn semi_anti_joins_are_new_operators_under_duckdb() {
             ..
         },
     ));
-    let anti = parse_with("SELECT 1 FROM a ANTI JOIN b ON a.i = b.i", DuckDb)
-        .expect("DuckDb parses ANTI JOIN");
+    let anti = parse_with(
+        "SELECT 1 FROM a ANTI JOIN b ON a.i = b.i",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses ANTI JOIN");
     assert!(matches!(
         first_join_operator(&anti),
         JoinOperator::Anti {
@@ -550,8 +638,11 @@ fn semi_anti_joins_are_new_operators_under_duckdb() {
             ..
         },
     ));
-    let using = parse_with("SELECT 1 FROM a SEMI JOIN b USING (i)", DuckDb)
-        .expect("DuckDb parses SEMI JOIN USING");
+    let using = parse_with(
+        "SELECT 1 FROM a SEMI JOIN b USING (i)",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses SEMI JOIN USING");
     assert!(matches!(
         first_join_operator(&using),
         JoinOperator::Semi {
@@ -561,8 +652,11 @@ fn semi_anti_joins_are_new_operators_under_duckdb() {
         },
     ));
     // NATURAL SEMI/ANTI: the shared-column match is the constraint (no ON/USING).
-    let natural_semi = parse_with("SELECT 1 FROM a NATURAL SEMI JOIN b", DuckDb)
-        .expect("DuckDb parses NATURAL SEMI JOIN");
+    let natural_semi = parse_with(
+        "SELECT 1 FROM a NATURAL SEMI JOIN b",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses NATURAL SEMI JOIN");
     assert!(matches!(
         first_join_operator(&natural_semi),
         JoinOperator::Semi {
@@ -571,8 +665,11 @@ fn semi_anti_joins_are_new_operators_under_duckdb() {
             ..
         },
     ));
-    let natural_anti = parse_with("SELECT 1 FROM a NATURAL ANTI JOIN b", DuckDb)
-        .expect("DuckDb parses NATURAL ANTI JOIN");
+    let natural_anti = parse_with(
+        "SELECT 1 FROM a NATURAL ANTI JOIN b",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses NATURAL ANTI JOIN");
     assert!(matches!(
         first_join_operator(&natural_anti),
         JoinOperator::Anti {
@@ -582,8 +679,11 @@ fn semi_anti_joins_are_new_operators_under_duckdb() {
         },
     ));
     // ASOF SEMI/ANTI: the `asof: true` composition, constraint mandatory.
-    let asof_semi = parse_with("SELECT 1 FROM a ASOF SEMI JOIN b ON a.t >= b.t", DuckDb)
-        .expect("DuckDb parses ASOF SEMI JOIN");
+    let asof_semi = parse_with(
+        "SELECT 1 FROM a ASOF SEMI JOIN b ON a.t >= b.t",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses ASOF SEMI JOIN");
     assert!(matches!(
         first_join_operator(&asof_semi),
         JoinOperator::Semi {
@@ -592,8 +692,11 @@ fn semi_anti_joins_are_new_operators_under_duckdb() {
             ..
         },
     ));
-    let asof_anti = parse_with("SELECT 1 FROM a ASOF ANTI JOIN b USING (t)", DuckDb)
-        .expect("DuckDb parses ASOF ANTI JOIN USING");
+    let asof_anti = parse_with(
+        "SELECT 1 FROM a ASOF ANTI JOIN b USING (t)",
+        squonk::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDb parses ASOF ANTI JOIN USING");
     assert!(matches!(
         first_join_operator(&asof_anti),
         JoinOperator::Anti {
@@ -622,12 +725,16 @@ fn semi_anti_joins_are_new_operators_under_duckdb() {
         "SELECT 1 FROM a ASOF SEMI JOIN b",
     ] {
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, squonk::ParseConfig::new(DuckDb)).is_err(),
             "DuckDb must reject (engine parse-rejects): {sql:?}",
         );
     }
     assert!(
-        parse_with("SELECT 1 FROM a SEMI JOIN b ON a.i = b.i", DuckDb).is_ok(),
+        parse_with(
+            "SELECT 1 FROM a SEMI JOIN b ON a.i = b.i",
+            squonk::ParseConfig::new(DuckDb)
+        )
+        .is_ok(),
         "an equality ON parses",
     );
 
@@ -656,10 +763,22 @@ fn semi_anti_joins_are_new_operators_under_duckdb() {
     // the text still parses, as an aliased *plain* join: a different, dialect-correct
     // tree, not a reject (the ASOF/POSITIONAL precedent).
     for parse in [
-        parse_with("SELECT 1 FROM a SEMI JOIN b ON a.i = b.i", Ansi),
-        parse_with("SELECT 1 FROM a SEMI JOIN b ON a.i = b.i", Postgres),
-        parse_with("SELECT 1 FROM a ANTI JOIN b ON a.i = b.i", Ansi),
-        parse_with("SELECT 1 FROM a ANTI JOIN b ON a.i = b.i", Postgres),
+        parse_with(
+            "SELECT 1 FROM a SEMI JOIN b ON a.i = b.i",
+            squonk::ParseConfig::new(Ansi),
+        ),
+        parse_with(
+            "SELECT 1 FROM a SEMI JOIN b ON a.i = b.i",
+            squonk::ParseConfig::new(Postgres),
+        ),
+        parse_with(
+            "SELECT 1 FROM a ANTI JOIN b ON a.i = b.i",
+            squonk::ParseConfig::new(Ansi),
+        ),
+        parse_with(
+            "SELECT 1 FROM a ANTI JOIN b ON a.i = b.i",
+            squonk::ParseConfig::new(Postgres),
+        ),
     ] {
         let parsed = parse.expect("the alias reading parses outside DuckDb");
         assert!(

@@ -423,7 +423,7 @@ pub struct Renderer<D> {
 
 impl<D: RenderDialect> Renderer<D> {
     /// Build a renderer using the target's preferred Tier-1 spelling.
-    // See the builder convention note at `Parser::with_recursion_limit`: a
+    // See the builder convention note at `Parser::recursion_limit`: a
     // `-> Self` builder is `#[must_use]` so a discarded construction cannot silently
     // no-op.
     #[must_use]
@@ -582,7 +582,7 @@ where
     Src: Dialect<Ext = NoExt>,
     Tgt: RenderDialect,
 {
-    let parsed = crate::parse_with(sql, source)?;
+    let parsed = crate::parse_with(sql, crate::ParseConfig::new(source))?;
     Renderer::new(target)
         .render_parsed(&parsed)
         .map_err(Into::into)
@@ -797,7 +797,7 @@ mod fragment_tests {
 
     #[test]
     fn render_fragment_renders_an_expression_standalone() {
-        let parsed = parse_with("SELECT a + 1", Ansi).expect("parses");
+        let parsed = parse_with("SELECT a + 1", crate::ParseConfig::new(Ansi)).expect("parses");
         let expr = first_projection_expr(&parsed);
         // Just the sub-tree, canonically — not the owning `SELECT`.
         assert_eq!(parsed.render_fragment(expr), "a + 1");
@@ -805,7 +805,11 @@ mod fragment_tests {
 
     #[test]
     fn render_fragment_by_id_matches_the_by_reference_path() {
-        let parsed = parse_with("SELECT a + 1 FROM t WHERE b > 2", Ansi).expect("parses");
+        let parsed = parse_with(
+            "SELECT a + 1 FROM t WHERE b > 2",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("parses");
         let expr = first_projection_expr(&parsed);
         let id = expr.fragment_node_id();
         let by_ref = parsed.render_fragment(expr);
@@ -818,8 +822,11 @@ mod fragment_tests {
 
     #[test]
     fn render_fragment_by_id_renders_a_whole_query_and_statement() {
-        let parsed =
-            parse_with("SELECT a FROM t WHERE b IN (SELECT c FROM u)", Ansi).expect("parses");
+        let parsed = parse_with(
+            "SELECT a FROM t WHERE b IN (SELECT c FROM u)",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("parses");
         let Statement::Query { query, meta, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };
@@ -841,7 +848,7 @@ mod fragment_tests {
 
     #[test]
     fn render_fragment_by_id_rejects_a_context_dependent_node() {
-        let parsed = parse_with("SELECT a FROM t", Ansi).expect("parses");
+        let parsed = parse_with("SELECT a FROM t", crate::ParseConfig::new(Ansi)).expect("parses");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };
@@ -859,7 +866,7 @@ mod fragment_tests {
 
     #[test]
     fn render_fragment_by_id_rejects_an_absent_id() {
-        let parsed = parse_with("SELECT 1", Ansi).expect("parses");
+        let parsed = parse_with("SELECT 1", crate::ParseConfig::new(Ansi)).expect("parses");
         let absent = NodeId::new(u32::MAX).expect("non-zero id");
         parsed
             .render_fragment_by_id(absent, &RenderConfig::default())
@@ -868,7 +875,8 @@ mod fragment_tests {
 
     #[test]
     fn render_fragment_with_honours_redacted_mode() {
-        let parsed = parse_with("SELECT secret + 42", Ansi).expect("parses");
+        let parsed =
+            parse_with("SELECT secret + 42", crate::ParseConfig::new(Ansi)).expect("parses");
         let expr = first_projection_expr(&parsed);
         let config = RenderConfig {
             mode: RenderMode::Redacted,
@@ -882,11 +890,12 @@ mod fragment_tests {
     fn expression_fragment_reparses_inside_a_select() {
         // An `Expr` fragment is a parseable unit once placed in expression position:
         // re-parsing `SELECT <fragment>` and re-rendering the projection reproduces it.
-        let parsed = parse_with("SELECT (a + 1) * b - c / 2", Ansi).expect("parses");
+        let parsed = parse_with("SELECT (a + 1) * b - c / 2", crate::ParseConfig::new(Ansi))
+            .expect("parses");
         let expr = first_projection_expr(&parsed);
         let fragment = parsed.render_fragment(expr);
 
-        let reparsed = parse_with(&format!("SELECT {fragment}"), Ansi)
+        let reparsed = parse_with(&format!("SELECT {fragment}"), crate::ParseConfig::new(Ansi))
             .expect("the expression fragment re-parses in projection position");
         let reparsed_expr = first_projection_expr(&reparsed);
         assert_eq!(reparsed.render_fragment(reparsed_expr), fragment);
@@ -898,7 +907,7 @@ mod fragment_tests {
         // re-rendering reproduces it.
         let parsed = parse_with(
             "SELECT a FROM t WHERE b IN (SELECT c FROM u WHERE d > 1)",
-            Ansi,
+            crate::ParseConfig::new(Ansi),
         )
         .expect("parses");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
@@ -914,7 +923,7 @@ mod fragment_tests {
         let fragment = parsed.render_fragment(subquery.as_ref());
         assert_eq!(fragment, "SELECT c FROM u WHERE d > 1");
 
-        let reparsed = parse_with(&fragment, Ansi)
+        let reparsed = parse_with(&fragment, crate::ParseConfig::new(Ansi))
             .expect("the query fragment re-parses as a standalone statement");
         assert_eq!(reparsed.to_sql(), fragment);
     }
@@ -922,7 +931,11 @@ mod fragment_tests {
     #[test]
     fn data_type_fragment_reparses_inside_a_cast() {
         // A `DataType` fragment is a parseable unit in a `CAST(... AS <type>)` position.
-        let parsed = parse_with("SELECT CAST(x AS DECIMAL(10, 2))", Ansi).expect("parses");
+        let parsed = parse_with(
+            "SELECT CAST(x AS DECIMAL(10, 2))",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("parses");
         let expr = first_projection_expr(&parsed);
         let Expr::Cast { data_type, .. } = expr else {
             panic!("expected a CAST expression");
@@ -930,8 +943,11 @@ mod fragment_tests {
         let fragment = parsed.render_fragment(data_type.as_ref());
         assert_eq!(fragment, "DECIMAL(10, 2)");
 
-        let reparsed = parse_with(&format!("SELECT CAST(x AS {fragment})"), Ansi)
-            .expect("the data-type fragment re-parses in a CAST");
+        let reparsed = parse_with(
+            &format!("SELECT CAST(x AS {fragment})"),
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("the data-type fragment re-parses in a CAST");
         let reparsed_expr = first_projection_expr(&reparsed);
         let Expr::Cast { data_type, .. } = reparsed_expr else {
             panic!("expected a CAST expression");
@@ -999,8 +1015,11 @@ mod tests {
             "SELECT CAST(a AS CHARACTER VARYING(5))",
         );
 
-        let postgres = crate::parse_with("SELECT CAST(a AS TIMESTAMP(3) WITH TIME ZONE)", Postgres)
-            .expect("PostgreSQL cast parses");
+        let postgres = crate::parse_with(
+            "SELECT CAST(a AS TIMESTAMP(3) WITH TIME ZONE)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("PostgreSQL cast parses");
         assert_eq!(
             Renderer::new(Postgres)
                 .render_parsed(&postgres)
@@ -1078,7 +1097,7 @@ mod tests {
              INSERT INTO t VALUES (1) ON CONFLICT ON CONSTRAINT t_pkey DO NOTHING; \
              UPDATE t SET a = 1 WHERE id = 2 RETURNING a, id; \
              DELETE FROM t WHERE id = 1 RETURNING *",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("RETURNING and ON CONFLICT parse under PostgreSQL");
 
@@ -1144,7 +1163,7 @@ mod tests {
             ),
         ];
         for (sql, needle) in cases {
-            let parsed = parse_with(sql, Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} parses under PostgreSQL: {err:?}"));
 
             Renderer::new(Postgres)
@@ -1190,7 +1209,7 @@ mod tests {
             features: &ANON_PARAM,
         };
 
-        let parsed = parse_with("SELECT ?", ANON_PARAM_DIALECT)
+        let parsed = parse_with("SELECT ?", crate::ParseConfig::new(ANON_PARAM_DIALECT))
             .expect("anonymous-parameter dialect parses ?");
 
         assert_eq!(

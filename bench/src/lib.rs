@@ -164,23 +164,23 @@ pub fn render_parenthesized_sql(sql: &str) -> usize {
 }
 
 fn parse_ansi(sql: &str) -> Parsed {
-    parse_with(sql, Ansi).expect("benchmark SQL parses")
+    parse_with(sql, squonk::ParseConfig::new(Ansi)).expect("benchmark SQL parses")
 }
 
 fn parse_postgres(sql: &str) -> Parsed {
-    parse_with(sql, Postgres).expect("benchmark SQL parses")
+    parse_with(sql, squonk::ParseConfig::new(Postgres)).expect("benchmark SQL parses")
 }
 
 fn parse_sqlite(sql: &str) -> Parsed {
-    parse_with(sql, Sqlite).expect("benchmark SQL parses")
+    parse_with(sql, squonk::ParseConfig::new(Sqlite)).expect("benchmark SQL parses")
 }
 
 fn parse_duckdb(sql: &str) -> Parsed {
-    parse_with(sql, DuckDb).expect("benchmark SQL parses")
+    parse_with(sql, squonk::ParseConfig::new(DuckDb)).expect("benchmark SQL parses")
 }
 
 fn parse_lenient(sql: &str) -> Parsed {
-    parse_with(sql, Lenient).expect("benchmark SQL parses")
+    parse_with(sql, squonk::ParseConfig::new(Lenient)).expect("benchmark SQL parses")
 }
 
 fn render_sql(parsed: &Parsed, mode: RenderMode) -> String {

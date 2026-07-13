@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn parse_convenience_defaults_to_ansi() {
-        // `parse` is exactly `parse_with(.., Ansi)`; `SELECT 1` is the smoke test.
+        // `parse` is exactly `parse_with(.., crate::ParseConfig::new(Ansi))`; `SELECT 1` is the smoke test.
         let parsed = parse("SELECT 1").expect("`SELECT 1` parses");
         assert_eq!(parsed.statements().len(), 1, "one statement");
         assert!(

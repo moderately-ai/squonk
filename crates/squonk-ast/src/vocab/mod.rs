@@ -349,7 +349,7 @@ pub trait Resolver {
 /// `Box<str>` — or be a `'static` borrow (`&'static str`); either way the parsed
 /// tree is `'static`, so it never forces a lifetime parameter onto node types.
 ///
-/// The public parse entry points (`parse_with` → `Arc<str>`, `parse_with_rc` →
+/// The public parse entry points (`parse_with` → `Arc<str>`, `parse_rc_with` →
 /// `Rc<str>`) always *materialize* an owned refcounted store from the borrowed
 /// `&str` input; they never hand back a tree that borrows the caller's source.
 /// Naming any other `'static` store is a deliberate opt-in, never the default.

@@ -40,7 +40,7 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fmt::Write as _;
 
-use squonk::dialect::{BuiltinDialect, parse_with_builtin, tokenize_with_builtin};
+use squonk::dialect::{BuiltinDialect, parse_builtin, tokenize_with_builtin};
 use squonk::tokenizer::{Punctuation, Token, TokenKind};
 use squonk_ast::render::RenderMode;
 
@@ -310,7 +310,7 @@ fn statement_fidelity(
     dialects: &[BuiltinDialect],
 ) -> Option<Result<(BuiltinDialect, String, Fidelity), String>> {
     for &dialect in dialects {
-        let Ok(parsed) = parse_with_builtin(sql, dialect) else {
+        let Ok(parsed) = parse_builtin(sql, dialect) else {
             continue;
         };
         let rendered = crate::render_statements(&parsed, RenderMode::Canonical);

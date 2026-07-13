@@ -205,7 +205,7 @@ mod tests {
     fn accept_corpus_parses_under_clickhouse_preset() {
         for sql in ACCEPT_CORPUS {
             assert!(
-                parse_with(sql, ClickHouse).is_ok(),
+                parse_with(sql, squonk::ParseConfig::new(ClickHouse)).is_ok(),
                 "ClickHouse preset should parse {sql:?}"
             );
         }
@@ -215,7 +215,7 @@ mod tests {
     fn reject_corpus_rejects_under_clickhouse_preset() {
         for sql in REJECT_CORPUS {
             assert!(
-                parse_with(sql, ClickHouse).is_err(),
+                parse_with(sql, squonk::ParseConfig::new(ClickHouse)).is_err(),
                 "ClickHouse preset should reject {sql:?}"
             );
         }
@@ -283,7 +283,7 @@ mod tests {
     /// allowlisted, or the oracle hiccups mid-sweep (a per-fragment spawn failure is a skip,
     /// never a false divergence — the start-of-sweep liveness check already gated the binary).
     fn clickhouse_generative_divergence(oracle: &ClickHouseOracle, sql: &str) -> Option<String> {
-        let ours = parse_with(sql, ClickHouse).is_ok();
+        let ours = parse_with(sql, squonk::ParseConfig::new(ClickHouse)).is_ok();
         let theirs = match oracle.verdict(sql) {
             Ok(verdict) => verdict.accepts(),
             Err(OracleUnavailable(_)) => return None,
@@ -378,7 +378,7 @@ mod tests {
     // - Engine recognition: every head must parse under `clickhouse local` (EXPLAIN AST),
     //   verified by the oracle-gated cross-check below — so the denominator is real ClickHouse
     //   grammar, not invented SQL.
-    // - squonk reach: `parse_with(probe, ClickHouse).is_ok()` per head, partitioned into
+    // - squonk reach: `parse_with(probe, squonk::ParseConfig::new(ClickHouse)).is_ok()` per head, partitioned into
     //   the covered set and the measured, pinned uncovered residual (the honest promotion gap).
     //
     // This is a deliberately-bounded baseline document/pin, NOT an exhaustive grammar
@@ -460,7 +460,7 @@ mod tests {
 
         let uncovered: Vec<&str> = CLICKHOUSE_STATEMENT_HEADS
             .iter()
-            .filter(|(_, sql)| parse_with(sql, ClickHouse).is_err())
+            .filter(|(_, sql)| parse_with(sql, squonk::ParseConfig::new(ClickHouse)).is_err())
             .map(|(head, _)| *head)
             .collect();
         let covered = CLICKHOUSE_STATEMENT_HEADS.len() - uncovered.len();

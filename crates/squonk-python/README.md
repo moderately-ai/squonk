@@ -1,12 +1,13 @@
 # squonk-python
 
 Python bindings for `squonk`: a maturin-built Rust extension plus typed Python
-views over the serialized AST.
+views over a lazily materialized AST.
 
 ## API
 
-`parse()` returns a `Document`, which is both a mapping-compatible view of the raw
-JSON and a typed helper object for common operations:
+`parse()` returns a `Document` backed by an opaque Rust-owned parse result. Source
+metadata and parse → render stay native; mapping access, `to_dict()`, and typed node
+traversal materialize the JSON tree only when requested:
 
 ```python
 import squonk
@@ -78,7 +79,7 @@ helpers expose `TypedDict` shapes such as `ParseDocumentJson`,
 `RecoveredDocumentJson`, `TokenizeResultJson`, `TokenJson`, `TriviaJson`, and
 `DiagnosticJson`.
 
-The AST itself is represented as serde JSON. `Document`, `Node`, `Ident`,
+The materialized AST is represented as serde JSON. `Document`, `Node`, `Ident`,
 `ObjectName`, `Diagnostic`, and `Trivia` provide ergonomic wrappers without hiding
 the raw JSON: `to_dict()` returns Python structures and `to_json()` returns compact
 JSON text. The generated `squonk.ast` module exhaustively types the serialized node

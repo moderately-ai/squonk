@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Moderately AI Inc.
 
 //! Whole-tree invariant coverage for the recovering parse path
-//! ([`parse_recovering`]).
+//! ([`parse_recovering_with`]).
 //!
 //! The invariant walkers (`spans::assert_parsed_span_invariants`, the `NodeIdWalk`
 //! uniqueness check, and symbol resolvability) historically only ever swept trees
@@ -23,7 +23,7 @@
 use std::collections::HashSet;
 
 use squonk::dialect::{Ansi, Lenient, MySql, Postgres};
-use squonk::{Dialect, Parsed, parse_recovering};
+use squonk::{Dialect, Parsed, parse_recovering_with};
 use squonk_ast::generated::NodeIdWalk;
 use squonk_ast::generated::visit::{self, Visit};
 use squonk_ast::{Expr, FunctionArg, Ident, NamedOperatorExpr, NoExt, ParameterKind, Resolver};
@@ -32,7 +32,7 @@ use squonk_ast::{Statement, Symbol};
 use crate::spans;
 
 /// Matches `fuzz::MAX_PARSE_INPUT_BYTES`: a per-iteration budget, not a stress size.
-/// Well under `u32::MAX`, so `parse_recovering`'s streaming setup never fails on an
+/// Well under `u32::MAX`, so `parse_recovering_with`'s streaming setup never fails on an
 /// in-bounds buffer (its only error path is the `u32`-bytes guard).
 const MAX_RECOVER_INPUT_BYTES: usize = 65536;
 
@@ -56,7 +56,7 @@ pub const RECOVER_INVARIANTS_REPLAYS: &[&[u8]] = &[
     b"",
 ];
 
-/// Feed raw bytes to [`parse_recovering`] under every built-in dialect and assert the
+/// Feed raw bytes to [`parse_recovering_with`] under every built-in dialect and assert the
 /// recovered partial tree holds the whole-tree invariants: no panic, unique nonzero
 /// NodeIds across the whole tree, non-synthetic in-bounds spans, and every surviving
 /// symbol resolvable in the root's interner.
@@ -87,7 +87,7 @@ pub fn recover_invariants(input: &[u8]) {
 fn assert_recovering_invariants<D: Dialect<Ext = NoExt>>(src: &str, dialect: D) {
     // The only error path is the `u32`-bytes streaming guard, unreachable for an
     // in-bounds buffer; treat a setup error as a non-input rather than a failure.
-    let Ok(recovered) = parse_recovering(src, dialect) else {
+    let Ok(recovered) = parse_recovering_with(src, squonk::ParseConfig::new(dialect)) else {
         return;
     };
     let parsed = recovered.parsed();
@@ -237,8 +237,11 @@ mod tests {
         // Guard against a trivially-passing suite: recovery must actually produce a
         // partial tree (survivors on both sides of a broken middle statement, plus a
         // recorded error) AND that real tree must pass all three walkers.
-        let recovered =
-            parse_recovering("SELECT alpha; FROM x; SELECT beta", Ansi).expect("streaming setup");
+        let recovered = parse_recovering_with(
+            "SELECT alpha; FROM x; SELECT beta",
+            squonk::ParseConfig::new(Ansi),
+        )
+        .expect("streaming setup");
         assert_eq!(
             recovered.statements().len(),
             2,
@@ -260,7 +263,8 @@ mod tests {
         // Survivors on both sides of several broken statements share one monotonic
         // counter; a resync that reset or reused ids would collide across the gaps.
         let src = "SELECT a; )); SELECT b; FROM; SELECT c; SELECT d WHERE; SELECT e";
-        let recovered = parse_recovering(src, Ansi).expect("streaming setup");
+        let recovered =
+            parse_recovering_with(src, squonk::ParseConfig::new(Ansi)).expect("streaming setup");
         assert!(
             recovered.statements().len() >= 4,
             "several survivors across resync boundaries: got {}",

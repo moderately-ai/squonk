@@ -1003,7 +1003,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             return Ok(None);
         }
         // Consume (and drop) the inert `[INTEGER|INT]` tail — its span is folded into the
-        // node's meta below, so the whole target still round-trips through `parse_with_trivia`.
+        // node's meta below, so the whole target still round-trips with trivia capture.
         let _ = self.eat_contextual_keyword("INTEGER")? || self.eat_contextual_keyword("INT")?;
         let meta = self.make_meta(start.union(self.preceding_span()));
         Ok(Some(DataType::NumericModifier {
@@ -1195,7 +1195,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // hard error rather than a rewind.
         if let Some(token) = self.peek()? {
             if token.kind == TokenKind::Number
-                && number_literal_kind(self.span_text(token.span), self.parse_float_as_decimal())
+                && number_literal_kind(self.span_text(token.span), self.float_as_decimal_enabled())
                     == LiteralKind::Integer
             {
                 self.advance()?;
@@ -1996,7 +1996,8 @@ mod tests {
     /// Parse `CAST(x AS <ty>)` under the gate and return the parse.
     fn parse_cast(ty: &str) -> Parsed {
         let sql = format!("SELECT CAST(x AS {ty})");
-        parse_with(&sql, NULLABLE_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
+        parse_with(&sql, crate::ParseConfig::new(NULLABLE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
     }
 
     #[test]
@@ -2091,9 +2092,12 @@ mod tests {
         // Off-gate, `Nullable(String)` resolves its head to a user-defined type name whose
         // `(String)` numeric-modifier list then fails to parse — a clean rejection, no
         // wrapper. (A bare `Nullable` name is still accepted, unaffected by the gate.)
-        parse_with("SELECT CAST(x AS Nullable(String))", Ansi)
-            .expect_err("ANSI has no Nullable(T) combinator");
-        parse_with("SELECT CAST(x AS Nullable)", Ansi)
+        parse_with(
+            "SELECT CAST(x AS Nullable(String))",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no Nullable(T) combinator");
+        parse_with("SELECT CAST(x AS Nullable)", crate::ParseConfig::new(Ansi))
             .expect("a bare `Nullable` name is unaffected by the gate");
     }
 
@@ -2127,7 +2131,8 @@ mod tests {
     /// Parse `CAST(x AS <ty>)` under `dialect` and return the parse.
     fn parse_cast_with(ty: &str, dialect: FeatureDialect) -> Parsed {
         let sql = format!("SELECT CAST(x AS {ty})");
-        parse_with(&sql, dialect).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
+        parse_with(&sql, crate::ParseConfig::new(dialect))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
     }
 
     #[test]
@@ -2248,10 +2253,16 @@ mod tests {
         // Off-gate, `LowCardinality(String)` resolves its head to a user-defined type name
         // whose `(String)` numeric-modifier list then fails to parse — a clean rejection, no
         // wrapper. (A bare `LowCardinality` name is still accepted, unaffected by the gate.)
-        parse_with("SELECT CAST(x AS LowCardinality(String))", Ansi)
-            .expect_err("ANSI has no LowCardinality(T) combinator");
-        parse_with("SELECT CAST(x AS LowCardinality)", Ansi)
-            .expect("a bare `LowCardinality` name is unaffected by the gate");
+        parse_with(
+            "SELECT CAST(x AS LowCardinality(String))",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no LowCardinality(T) combinator");
+        parse_with(
+            "SELECT CAST(x AS LowCardinality)",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("a bare `LowCardinality` name is unaffected by the gate");
     }
 
     /// ANSI plus the `fixed_string_type` flag alone, isolating this gate from the wrapper
@@ -2355,15 +2366,21 @@ mod tests {
         // `(16)` numeric-modifier list then... parses (`FixedString` is a valid user-defined
         // name with a `(16)` modifier), so off-gate it is a `UserDefined`, never the ClickHouse
         // constructor. A bare `FixedString` name is likewise unaffected by the gate.
-        let parsed = parse_with("SELECT CAST(x AS FixedString(16))", Ansi)
-            .expect("`FixedString(16)` off-gate is a user-defined name with a modifier");
+        let parsed = parse_with(
+            "SELECT CAST(x AS FixedString(16))",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("`FixedString(16)` off-gate is a user-defined name with a modifier");
         assert!(
             matches!(cast_type(&parsed), DataType::UserDefined { .. }),
             "off-gate `FixedString(16)` must be a user-defined type, got {:?}",
             cast_type(&parsed),
         );
-        parse_with("SELECT CAST(x AS FixedString)", Ansi)
-            .expect("a bare `FixedString` name is unaffected by the gate");
+        parse_with(
+            "SELECT CAST(x AS FixedString)",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("a bare `FixedString` name is unaffected by the gate");
     }
 
     /// ANSI plus the `datetime64_type` flag alone, isolating this gate from the rest of the
@@ -2488,8 +2505,11 @@ mod tests {
         // The KEY off-gate boundary. `DateTime64(3)` resolves its head to a user-defined type
         // name whose `(3)` numeric-modifier list then parses, so off-gate it is a
         // `UserDefined`, exactly like `FixedString(16)`.
-        let parsed = parse_with("SELECT CAST(x AS DateTime64(3))", Ansi)
-            .expect("`DateTime64(3)` off-gate is a user-defined name with a numeric modifier");
+        let parsed = parse_with(
+            "SELECT CAST(x AS DateTime64(3))",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("`DateTime64(3)` off-gate is a user-defined name with a numeric modifier");
         assert!(
             matches!(cast_type(&parsed), DataType::UserDefined { .. }),
             "off-gate `DateTime64(3)` must be a user-defined type, got {:?}",
@@ -2500,13 +2520,20 @@ mod tests {
         // `FixedString(16)`, whose whole argument is numeric. This asymmetry is why the flag
         // buys real coverage on the timezone form even though the bare-precision form already
         // parse-accepts off-gate.
-        parse_with("SELECT CAST(x AS DateTime64(3, 'UTC'))", Ansi).expect_err(
+        parse_with(
+            "SELECT CAST(x AS DateTime64(3, 'UTC'))",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err(
             "off-gate `DateTime64(3, 'UTC')` must reject: a string does not fit the u32 \
              modifier grammar",
         );
         // A bare `DateTime64` name is likewise unaffected by the gate.
-        parse_with("SELECT CAST(x AS DateTime64)", Ansi)
-            .expect("a bare `DateTime64` name is unaffected by the gate");
+        parse_with(
+            "SELECT CAST(x AS DateTime64)",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("a bare `DateTime64` name is unaffected by the gate");
     }
 
     /// ANSI plus the `nested_type` flag alone, isolating this gate from the rest of the
@@ -2750,9 +2777,12 @@ mod tests {
         // modifier list is `u32`-only, so the two-word `a UInt8` field has no grammar to fit —
         // a clean rejection, no composite (the wrapper off-gate reject, unlike the asymmetric
         // `DateTime64(3)` numeric-modifier accept). A bare `Nested` name is unaffected.
-        parse_with("SELECT CAST(x AS Nested(a UInt8))", Ansi)
-            .expect_err("ANSI has no Nested(...) constructor and `a UInt8` is not a u32 modifier");
-        parse_with("SELECT CAST(x AS Nested)", Ansi)
+        parse_with(
+            "SELECT CAST(x AS Nested(a UInt8))",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no Nested(...) constructor and `a UInt8` is not a u32 modifier");
+        parse_with("SELECT CAST(x AS Nested)", crate::ParseConfig::new(Ansi))
             .expect("a bare `Nested` name is unaffected by the gate");
     }
 
@@ -2763,8 +2793,11 @@ mod tests {
         // bare `Int256`/`UInt256` is simply an ordinary user-defined type name (like a bare
         // `Nullable`), never a parse error.
         for input in ["Int256", "UInt256"] {
-            let parsed = parse_with(&format!("SELECT CAST(x AS {input})"), Ansi)
-                .unwrap_or_else(|_| panic!("off-gate `{input}` is a user-defined name"));
+            let parsed = parse_with(
+                &format!("SELECT CAST(x AS {input})"),
+                crate::ParseConfig::new(Ansi),
+            )
+            .unwrap_or_else(|_| panic!("off-gate `{input}` is a user-defined name"));
             assert!(
                 matches!(cast_type(&parsed), DataType::UserDefined { .. }),
                 "off-gate `{input}` must be a user-defined type, got {:?}",
@@ -2779,7 +2812,11 @@ mod tests {
         use crate::dialect::{Ansi, BigQuery};
 
         // ARRAY<T>
-        let parsed = parse_with("SELECT CAST(x AS ARRAY<INT64>)", BigQuery).expect("ARRAY<> type");
+        let parsed = parse_with(
+            "SELECT CAST(x AS ARRAY<INT64>)",
+            crate::ParseConfig::new(BigQuery),
+        )
+        .expect("ARRAY<> type");
         assert!(
             matches!(
                 cast_type(&parsed),
@@ -2793,8 +2830,11 @@ mod tests {
         );
 
         // STRUCT<field type>
-        let parsed = parse_with("SELECT CAST(x AS STRUCT<a INT64, b STRING>)", BigQuery)
-            .expect("STRUCT<> type");
+        let parsed = parse_with(
+            "SELECT CAST(x AS STRUCT<a INT64, b STRING>)",
+            crate::ParseConfig::new(BigQuery),
+        )
+        .expect("STRUCT<> type");
         assert!(
             matches!(
                 cast_type(&parsed),
@@ -2809,17 +2849,34 @@ mod tests {
         );
 
         // Nested STRUCT with >> closer
-        parse_with("SELECT CAST(x AS STRUCT<a STRUCT<b INT64>>)", BigQuery)
-            .expect("nested STRUCT<> with >>");
+        parse_with(
+            "SELECT CAST(x AS STRUCT<a STRUCT<b INT64>>)",
+            crate::ParseConfig::new(BigQuery),
+        )
+        .expect("nested STRUCT<> with >>");
 
         // Column definitions
-        parse_with("CREATE TABLE t (a ARRAY<STRING>)", BigQuery).expect("column ARRAY<>");
-        parse_with("CREATE TABLE t (s STRUCT<x INT64>)", BigQuery).expect("column STRUCT<>");
+        parse_with(
+            "CREATE TABLE t (a ARRAY<STRING>)",
+            crate::ParseConfig::new(BigQuery),
+        )
+        .expect("column ARRAY<>");
+        parse_with(
+            "CREATE TABLE t (s STRUCT<x INT64>)",
+            crate::ParseConfig::new(BigQuery),
+        )
+        .expect("column STRUCT<>");
 
         // Gate: ANSI rejects
-        parse_with("SELECT CAST(x AS ARRAY<INT64>)", Ansi)
-            .expect_err("ANSI has no angle-bracket types");
-        parse_with("SELECT CAST(x AS STRUCT<a INT64>)", Ansi)
-            .expect_err("ANSI has no angle-bracket STRUCT");
+        parse_with(
+            "SELECT CAST(x AS ARRAY<INT64>)",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no angle-bracket types");
+        parse_with(
+            "SELECT CAST(x AS STRUCT<a INT64>)",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no angle-bracket STRUCT");
     }
 }

@@ -136,7 +136,7 @@ pub(crate) fn generate_corpus(seed: u64, count: usize) -> Vec<GeneratedCase> {
 /// If `case.sql` fails to parse, parses to other than one statement, or re-parses to
 /// a tree that is not structurally equal to `case.statement`.
 pub(crate) fn replay_case(case: &GeneratedCase) {
-    let reparsed = parse_with(&case.sql, Ansi)
+    let reparsed = parse_with(&case.sql, squonk::ParseConfig::new(Ansi))
         .unwrap_or_else(|err| panic!("generated SQL did not parse: {:?}: {err:?}", case.sql));
 
     let [reparsed_statement] = reparsed.statements() else {

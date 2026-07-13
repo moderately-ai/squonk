@@ -45,7 +45,7 @@ Two structural properties of the `Other(X)` seam surfaced during the dialect-pac
 
 So the in-tree extension axis is "add canonical variants/fields, compose dialect behaviour as `FeatureSet` data, and *package* per dialect behind a cargo feature"; the `Other(X)`/`X = Box<dyn AstExt>` axis is the separate out-of-tree affordance.
 
-**Runtime selection is now built.** The `BuiltinDialect` value-enum + object-safe runtime path this ADR sketched (the `&dyn Dialect`-non-object-safe escape) is implemented as `squonk::dialect::{BuiltinDialect, parse_with_builtin}`: a value-enum over the `NoExt` builtins dispatched by value to the monomorphized parser (no `dyn Dialect` needed), each arm gated by the dialect's cargo feature, with a name for a disabled/unknown dialect resolving to a clean `None`.
+**Runtime selection is now built.** The `BuiltinDialect` value-enum + object-safe runtime path this ADR sketched (the `&dyn Dialect`-non-object-safe escape) is implemented as `squonk::dialect::{BuiltinDialect, parse_builtin}`: a value-enum over the `NoExt` builtins dispatched by value to the monomorphized parser (no `dyn Dialect` needed), each arm gated by the dialect's cargo feature, with a name for a disabled/unknown dialect resolving to a clean `None`.
 
 ## Amendment (2026-07-06): the sixth seam — `DataType::Other` + `Dialect::parse_data_type_hook`
 

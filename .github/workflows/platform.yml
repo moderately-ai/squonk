@@ -36,7 +36,7 @@
 #             build/install smoke stays in `stable-release-python-distribution`.
 #
 # The core crates are `squonk`, `squonk-ast`, `squonk-sourcegen`, and
-# `squonk-wasm` (its native mirror). The conformance/bench/oracle crates are
+# `squonk-wasm` and `squonk-node` (the JavaScript binding backends). The conformance/bench/oracle crates are
 # deliberately excluded: they need a build-time `libduckdb` and a MySQL server, which
 # stay nightly-only on Linux (`oracle-nightly.yml`) and have no place on a lean
 # cross-OS runner.
@@ -129,7 +129,7 @@ jobs:
         # core crates. Excludes conformance/bench/oracle (system-dep-gated: they need a
         # build-time libduckdb and a MySQL server, so no oracle engine is compiled or
         # skipped here) and the pyo3/wasm-target surfaces.
-        run: cargo nextest run -p squonk -p squonk-ast -p squonk-sourcegen -p squonk-wasm
+        run: cargo nextest run -p squonk -p squonk-ast -p squonk-sourcegen -p squonk-node -p squonk-wasm
 
       - name: Compile-check Python extension boundary (pyo3)
         # Both OSes: the pyo3 binding is where platform-specific linking bites, so its

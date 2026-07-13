@@ -744,7 +744,7 @@ const MIN_SWEPT: usize = 1_000;
 
 /// Whether the fitted MySQL preset accepts `sql`.
 fn ours_accepts(sql: &str) -> bool {
-    parse_with(sql, MySql).is_ok()
+    parse_with(sql, squonk::ParseConfig::new(MySql)).is_ok()
 }
 
 /// Turn a liveness-checked wire verdict into a trustworthy [`WireVerdict`] — or abort the
@@ -1198,7 +1198,7 @@ fn mysql_divergence_allowlist_entries_name_tickets_and_still_diverge() {
 /// wrapper exactly as every other comment form is dropped. `parse(render(x)) == x`
 /// still holds (the reparse sees the already-included body); what is lost is the
 /// wrapper *spelling* — its version number stays offset-recoverable through
-/// `parse_with_trivia`, and byte-level wrapper fidelity is the deferred
+/// `ParseConfig::capture_trivia`, and byte-level wrapper fidelity is the deferred
 /// `prod-render-byte-fidelity-marker-spike` seam.
 #[test]
 fn versioned_comment_wrapper_is_dropped_on_render_by_recorded_trade() {
@@ -1206,7 +1206,8 @@ fn versioned_comment_wrapper_is_dropped_on_render_by_recorded_trade() {
     use squonk_ast::render::RenderMode;
 
     let sql = "SELECT /*!50000 STRAIGHT_JOIN */ 1";
-    let parsed = parse_with(sql, MySql).expect("the versioned body is live input");
+    let parsed =
+        parse_with(sql, squonk::ParseConfig::new(MySql)).expect("the versioned body is live input");
     let rendered = crate::render_statements(&parsed, RenderMode::Canonical);
     assert!(
         rendered.contains("STRAIGHT_JOIN") && !rendered.contains("/*!"),
@@ -1271,7 +1272,7 @@ fn mysql_generative_divergence(
     provisioned: &MySqlOracle,
     sql: &str,
 ) -> Option<String> {
-    let ours = parse_with(sql, MySql).is_ok();
+    let ours = parse_with(sql, squonk::ParseConfig::new(MySql)).is_ok();
     let bare_ok = mysql_accepts(bare, "generative-bare", sql);
     let schema_ok = mysql_accepts(provisioned, "generative-schema", sql);
     let theirs = bare_ok || schema_ok;

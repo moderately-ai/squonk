@@ -92,7 +92,7 @@ fn qualify(tool: Tool, corpus: &Corpus) {
     let mut failures = Vec::new();
     for case in &corpus.statements {
         let rendered = match tool {
-            Tool::Squonk => parse_with(&case.sql, Ansi)
+            Tool::Squonk => parse_with(&case.sql, squonk::ParseConfig::new(Ansi))
                 .map(|document| document.to_string())
                 .map_err(|error| error.to_string()),
             Tool::Sqlparser => Parser::parse_sql(&AnsiDialect {}, &case.sql)
@@ -119,7 +119,7 @@ fn qualify(tool: Tool, corpus: &Corpus) {
             "schema": "squonk.publication-adapter/1",
             "ecosystem": "rust",
             "tool": tool.name(),
-            "version": if matches!(tool, Tool::Squonk) { "1.0.0" } else { "0.62.0" },
+            "version": if matches!(tool, Tool::Squonk) { env!("CARGO_PKG_VERSION") } else { "0.62.0" },
             "mode": "qualify",
             "corpus_sha256": corpus.sha256,
             "requested": corpus.statements.len(),
@@ -133,9 +133,12 @@ fn qualify(tool: Tool, corpus: &Corpus) {
 fn parse_batch(tool: Tool, sql: &[&str]) -> usize {
     sql.iter()
         .map(|statement| match tool {
-            Tool::Squonk => black_box(parse_with(black_box(statement), Ansi).expect("qualified"))
-                .statements()
-                .len(),
+            Tool::Squonk => black_box(
+                parse_with(black_box(statement), squonk::ParseConfig::new(Ansi))
+                    .expect("qualified"),
+            )
+            .statements()
+            .len(),
             Tool::Sqlparser => black_box(
                 Parser::parse_sql(&AnsiDialect {}, black_box(statement)).expect("qualified"),
             )
@@ -178,7 +181,7 @@ fn throughput(tool: Tool, corpus: &Corpus) {
             "schema": "squonk.publication-adapter/1",
             "ecosystem": "rust",
             "tool": tool.name(),
-            "version": if matches!(tool, Tool::Squonk) { "1.0.0" } else { "0.62.0" },
+            "version": if matches!(tool, Tool::Squonk) { env!("CARGO_PKG_VERSION") } else { "0.62.0" },
             "mode": "throughput",
             "corpus_sha256": corpus.sha256,
             "passes_per_sample": passes,
@@ -195,7 +198,7 @@ fn wait_with_roots<T>(tool: Tool, corpus: &Corpus, roots: Vec<T>) {
             "schema": "squonk.publication-adapter/1",
             "ecosystem": "rust",
             "tool": tool.name(),
-            "version": if matches!(tool, Tool::Squonk) { "1.0.0" } else { "0.62.0" },
+            "version": if matches!(tool, Tool::Squonk) { env!("CARGO_PKG_VERSION") } else { "0.62.0" },
             "mode": "retain",
             "corpus_sha256": corpus.sha256,
             "retained_documents": roots.len(),
@@ -221,7 +224,7 @@ fn retain(tool: Tool, corpus: &Corpus, count: usize) {
                 .map(|index| {
                     parse_with(
                         &corpus.statements[index % corpus.statements.len()].sql,
-                        Ansi,
+                        squonk::ParseConfig::new(Ansi),
                     )
                     .expect("qualified")
                 })
@@ -246,7 +249,7 @@ fn retain(tool: Tool, corpus: &Corpus, count: usize) {
 fn cold(tool: Tool, corpus: &Corpus) {
     let statement = &corpus.statements[0].sql;
     let sink = match tool {
-        Tool::Squonk => parse_with(statement, Ansi)
+        Tool::Squonk => parse_with(statement, squonk::ParseConfig::new(Ansi))
             .expect("qualified")
             .statements()
             .len(),
@@ -260,7 +263,7 @@ fn cold(tool: Tool, corpus: &Corpus) {
             "schema": "squonk.publication-adapter/1",
             "ecosystem": "rust",
             "tool": tool.name(),
-            "version": if matches!(tool, Tool::Squonk) { "1.0.0" } else { "0.62.0" },
+            "version": if matches!(tool, Tool::Squonk) { env!("CARGO_PKG_VERSION") } else { "0.62.0" },
             "mode": "cold",
             "corpus_sha256": corpus.sha256,
             "sink": sink,

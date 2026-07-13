@@ -82,8 +82,8 @@ mod dyn_extension;
 pub use clause_marks::{ClauseKw, ClauseMark, ClauseMarkIndex};
 pub use engine::{Checkpoint, DEFAULT_RECURSION_LIMIT, Parser};
 pub use parsed::{Parsed, StockParsed};
-pub use recovery::{Recovered, parse_recovering, parse_recovering_with_options};
-pub use streaming::{Statements, statements};
+pub use recovery::{Recovered, parse_recovering, parse_recovering_with};
+pub use streaming::Statements;
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -204,7 +204,7 @@ pub enum HookResult<T> {
 /// }
 ///
 /// // `^` parses and round-trips through the custom node's Render impl.
-/// let parsed = parse_with("SELECT a ^ b", MatchDialect).expect("custom operator parses");
+/// let parsed = parse_with("SELECT a ^ b", crate::ParseConfig::new(MatchDialect)).expect("custom operator parses");
 /// assert_eq!(parsed.to_string(), "SELECT a ^ b");
 /// ```
 pub trait Dialect {
@@ -408,32 +408,16 @@ pub trait Dialect {
     }
 }
 
-/// Parse `src` under `dialect` into an owned [`Parsed`] tree.
+/// Configuration shared by every SQL parsing result shape.
 ///
-/// Lazily tokenizes (mapping any lexical error into the parser's error channel),
-/// dispatches statements until end of input, then freezes the interner into the
-/// resolver shipped on the root. The root's AST extension type is the dialect's
-/// associated [`Dialect::Ext`].
-///
-/// The convenience `parse(src)` that defaults to ANSI arrives with the public
-/// dialects in `m1-dialects-pg-ansi`; it is intentionally not defined here, since
-/// this ticket must not define `Ansi`.
-///
-/// For high-throughput or alloc-heavy parsing, see the crate-level [Performance note](crate#performance) on choosing a fast global allocator.
-///
-/// # Errors
-///
-/// Returns the first [`ParseError`] — a lexical error surfaced through the same
-/// channel, or a grammar error from statement parsing (fail-fast).
-pub fn parse_with<D: Dialect>(src: &str, dialect: D) -> ParseResult<Parsed<Arc<str>, D::Ext>> {
-    collect_parsed::<Arc<str>, D>(src, dialect, DEFAULT_RECURSION_LIMIT, false)
-}
-
-/// Parse-time tuning knobs.
-///
-/// The universal combining form for every entry point that returns a [`Parsed`] tree — the crate's entry-point rule (see the crate docs' `# Entry points` section) routes a same-shape knob through a field here rather than a new `parse_with_x` name. Today that is the recursion-depth limit and trivia capture; a future knob joins them the same way instead of growing the free-function matrix. Pass it to [`parse_with_options`] or [`parse_recovering_with_options`] (both return a `Parsed`-carrying root); [`ParseOptions::default`] reproduces the behaviour the argument-free [`parse_with`]/[`statements`] use.
+/// The universal combining form for entry points that return a [`Parsed`] tree:
+/// same-shape knobs are fields here rather than new `parse_with_x` names. Pass it
+/// to [`parse_with`] or [`parse_recovering_with`]. [`ParseConfig::default`]
+/// reproduces the behaviour of [`parse`](crate::parse) and [`statements`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ParseOptions {
+pub struct ParseConfig<D = crate::dialect::Ansi> {
+    /// Dialect implementation used to interpret the input.
+    pub dialect: D,
     /// Maximum recursive-descent nesting depth before a parse fails with a
     /// [`ParseErrorKind::RecursionLimitExceeded`](crate::error::ParseErrorKind::RecursionLimitExceeded)
     /// error instead of recursing further and risking a stack overflow. Defaults
@@ -441,7 +425,7 @@ pub struct ParseOptions {
     pub recursion_limit: usize,
     /// Capture out-of-band comment/whitespace trivia alongside the statements, recoverable afterwards through [`Parsed::trivia`]/[`Parsed::trivia_in`]/[`Parsed::trivia_before`]. Defaults to `false`, the zero-allocation-when-off path [`parse_with`] uses.
     ///
-    /// Honoured by [`parse_with_options`] and [`parse_recovering_with_options`], whose results both embed an owned [`Parsed`] root to hang the index on. The streaming [`statements`]/[`statements_with_options`] iterator does **not** read this field: it yields bare statements one at a time with no owned root to carry a trivia index, and staying trivia-free is precisely what keeps it bounded-memory rather than a `Parsed`-shaped alternative — so trivia there would need a new accessor on [`Statements`] (a different shape), not a flag this struct can honour. This is a deliberate, documented boundary rather than a half-plumbed option.
+    /// Honoured by [`parse_with`] and [`parse_recovering_with`], whose results both embed an owned [`Parsed`] root to hang the index on. The streaming [`statements`]/[`statements_with`] iterator does **not** read this field: it yields bare statements one at a time with no owned root to carry a trivia index, and staying trivia-free is precisely what keeps it bounded-memory rather than a `Parsed`-shaped alternative — so trivia there would need a new accessor on [`Statements`] (a different shape), not a flag this struct can honour. This is a deliberate, documented boundary rather than a half-plumbed option.
     pub capture_trivia: bool,
     /// Classify a fractional or scientific numeric literal as
     /// [`LiteralKind::Decimal`](crate::ast::LiteralKind::Decimal) rather than
@@ -450,85 +434,103 @@ pub struct ParseOptions {
     /// tag and their numeric-literal classification is byte-for-byte the historical one.
     ///
     /// This is a *consumer request*, not a dialect grammar rule, which is why it rides
-    /// [`ParseOptions`] rather than the [`Dialect`]: the same
+    /// [`ParseConfig`] rather than the [`Dialect`]: the same
     /// SQL text is grammatically identical to the parser either way — the source spelling
     /// round-trips unchanged and only the AST classification tag differs — so the choice
     /// belongs to the caller who knows whether their downstream planner distinguishes
     /// exact `DECIMAL`/`NUMERIC` from binary floating point (the sqlparser-rs
     /// `parse_float_as_decimal` / BigQuery-planner distinction). Honoured by every
     /// `Parsed`-returning entry point and by the streaming
-    /// [`statements_with_options`] iterator (unlike [`capture_trivia`](Self::capture_trivia),
+    /// [`statements_with`] iterator (unlike [`capture_trivia`](Self::capture_trivia),
     /// it is classification metadata on each literal, carrying no owned-root cost, so the
     /// bounded-memory iterator honours it too).
     pub parse_float_as_decimal: bool,
 }
 
-impl Default for ParseOptions {
+impl Default for ParseConfig<crate::dialect::Ansi> {
     fn default() -> Self {
+        Self::new(crate::dialect::Ansi)
+    }
+}
+
+impl<D> ParseConfig<D> {
+    /// A parse configuration for `dialect` with every tuning knob at its default.
+    pub const fn new(dialect: D) -> Self {
         Self {
+            dialect,
             recursion_limit: DEFAULT_RECURSION_LIMIT,
             capture_trivia: false,
             parse_float_as_decimal: false,
         }
     }
-}
 
-impl ParseOptions {
-    /// These options with the recursion-depth limit set to `recursion_limit`.
+    /// This configuration retargeted to `dialect` with every tuning knob preserved.
     #[must_use]
-    pub fn with_recursion_limit(mut self, recursion_limit: usize) -> Self {
+    pub fn dialect<E>(self, dialect: E) -> ParseConfig<E> {
+        ParseConfig {
+            dialect,
+            recursion_limit: self.recursion_limit,
+            capture_trivia: self.capture_trivia,
+            parse_float_as_decimal: self.parse_float_as_decimal,
+        }
+    }
+
+    /// This configuration with the recursion-depth limit set to `recursion_limit`.
+    #[must_use]
+    pub const fn recursion_limit(mut self, recursion_limit: usize) -> Self {
         self.recursion_limit = recursion_limit;
         self
     }
 
-    /// These options with trivia capture toggled to `capture_trivia`.
+    /// This configuration with trivia capture toggled to `capture_trivia`.
     #[must_use]
-    pub fn with_trivia_capture(mut self, capture_trivia: bool) -> Self {
+    pub const fn capture_trivia(mut self, capture_trivia: bool) -> Self {
         self.capture_trivia = capture_trivia;
         self
     }
 
-    /// These options with float-as-decimal classification toggled to
+    /// This configuration with float-as-decimal classification toggled to
     /// `parse_float_as_decimal`.
     #[must_use]
-    pub fn with_parse_float_as_decimal(mut self, parse_float_as_decimal: bool) -> Self {
+    pub const fn parse_float_as_decimal(mut self, parse_float_as_decimal: bool) -> Self {
         self.parse_float_as_decimal = parse_float_as_decimal;
         self
     }
 }
 
-/// Parse `src` under `dialect` into an owned [`Parsed`] tree, honouring `options`.
+/// Parse `src` into an owned [`Parsed`] tree using `config`.
 ///
-/// The universal combining form for the `Parsed`-returning entry points (the entry-point rule; see the crate docs' `# Entry points` section): every [`ParseOptions`] field applies here, so a caller reaches for this one function rather than a dedicated `parse_with_x` per combination. Today that means the recursion-depth limit — a caller fronting untrusted SQL on a small stack can tighten it, and one parsing deeply nested machine-generated SQL on a large stack can loosen it — and [`capture_trivia`](ParseOptions::capture_trivia), which additionally attaches the out-of-band trivia index [`parse_with_trivia`] documents. [`parse_with_trivia`] is one-line sugar over this with `capture_trivia` set.
+/// Every same-shape parse option is carried here rather than growing a family of
+/// option-specific free functions. In particular, `capture_trivia` attaches the
+/// out-of-band trivia index to the returned root.
 ///
 /// # Errors
 ///
-/// As [`parse_with`], plus a
-/// [`ParseErrorKind::RecursionLimitExceeded`](crate::error::ParseErrorKind::RecursionLimitExceeded)
-/// error when the input nests past `options.recursion_limit`.
-pub fn parse_with_options<D: Dialect>(
+/// Returns the first lexical or grammar error. Inputs nested beyond
+/// `config.recursion_limit` return
+/// [`ParseErrorKind::RecursionLimitExceeded`](crate::error::ParseErrorKind::RecursionLimitExceeded).
+pub fn parse_with<D: Dialect>(
     src: &str,
-    dialect: D,
-    options: ParseOptions,
+    config: ParseConfig<D>,
 ) -> ParseResult<Parsed<Arc<str>, D::Ext>> {
-    if options.capture_trivia {
+    if config.capture_trivia {
         collect_parsed_with_trivia::<Arc<str>, D>(
             src,
-            dialect,
-            options.recursion_limit,
-            options.parse_float_as_decimal,
+            config.dialect,
+            config.recursion_limit,
+            config.parse_float_as_decimal,
         )
     } else {
         collect_parsed::<Arc<str>, D>(
             src,
-            dialect,
-            options.recursion_limit,
-            options.parse_float_as_decimal,
+            config.dialect,
+            config.recursion_limit,
+            config.parse_float_as_decimal,
         )
     }
 }
 
-/// Parse `src` under `dialect` into an `Rc`-rooted [`Parsed`] tree.
+/// Parse `src` under ANSI into an `Rc`-rooted [`Parsed`] tree.
 ///
 /// The single-thread ownership tier: an `Rc<str>` source is the
 /// cheapest refcount when the parsed tree never crosses a thread boundary,
@@ -538,67 +540,67 @@ pub fn parse_with_options<D: Dialect>(
 /// # Errors
 ///
 /// Identical to [`parse_with`].
-pub fn parse_with_rc<D: Dialect>(src: &str, dialect: D) -> ParseResult<Parsed<Rc<str>, D::Ext>> {
-    collect_parsed::<Rc<str>, D>(src, dialect, DEFAULT_RECURSION_LIMIT, false)
+pub fn parse_rc(src: &str) -> ParseResult<Parsed<Rc<str>>> {
+    parse_rc_with(src, ParseConfig::default())
 }
 
-/// Parse `src` under `dialect`, additionally recovering out-of-band trivia.
-///
-/// One-line sugar over [`parse_with_options`] with [`capture_trivia`](ParseOptions::capture_trivia) set — the documented, discoverable name for the common case of wanting trivia at the default recursion limit. Reach for [`parse_with_options`] directly to combine trivia capture with a non-default recursion limit.
-///
-/// Identical to [`parse_with`] in the tree it returns, but the root also carries a
-/// [`TriviaIndex`](crate::tokenizer::TriviaIndex) of every skipped comment and
-/// whitespace run, queryable by offset through [`Parsed::trivia`],
-/// [`Parsed::trivia_in`], and [`Parsed::trivia_before`] — the recovery surface for
-/// formatters, linters, and diagnostics. The token stream the grammar saw stays
-/// trivia-free; trivia lives only on the root.
-///
-/// This is the opt-in path: capturing every trivia span costs an allocation and a
-/// push per token gap, which [`parse_with`] avoids entirely, so use this only when a
-/// tool needs the comments/whitespace. Because the root holds the whole source's
-/// trivia, this is the *collecting* entry point, not the bounded-memory
-/// [`statements`] iterator (which stays trivia-free).
+/// Parse `src` into an `Rc`-rooted [`Parsed`] tree using `config`.
 ///
 /// # Errors
 ///
 /// Identical to [`parse_with`].
-pub fn parse_with_trivia<D: Dialect>(
+pub fn parse_rc_with<D: Dialect>(
     src: &str,
-    dialect: D,
-) -> ParseResult<Parsed<Arc<str>, D::Ext>> {
-    parse_with_options(
-        src,
-        dialect,
-        ParseOptions::default().with_trivia_capture(true),
-    )
+    config: ParseConfig<D>,
+) -> ParseResult<Parsed<Rc<str>, D::Ext>> {
+    if config.capture_trivia {
+        collect_parsed_with_trivia::<Rc<str>, D>(
+            src,
+            config.dialect,
+            config.recursion_limit,
+            config.parse_float_as_decimal,
+        )
+    } else {
+        collect_parsed::<Rc<str>, D>(
+            src,
+            config.dialect,
+            config.recursion_limit,
+            config.parse_float_as_decimal,
+        )
+    }
 }
 
-/// Parse `src` as a lazy [`Statements`] iterator, honouring `options`.
+/// Parse ANSI `src` as a lazy [`Statements`] iterator.
 ///
-/// The bounded-memory streaming counterpart to [`parse_with_options`]: the entry a
-/// caller streaming untrusted SQL reaches for to bound recursion depth. Identical
-/// to [`statements`] but applies `options.recursion_limit`.
+/// The bounded-memory streaming counterpart to [`parse_with`]: the entry a
+/// caller streaming untrusted SQL reaches for to bound recursion depth.
 ///
-/// Reads `options.recursion_limit` and [`options.parse_float_as_decimal`](ParseOptions::parse_float_as_decimal) — the latter is per-literal classification metadata this bounded-memory iterator can honour at no owned-root cost. It does **not** read [`options.capture_trivia`](ParseOptions::capture_trivia), by design: `Statements` yields bare statements one at a time with no owned root to carry a trivia index, and staying trivia-free is what keeps this iterator bounded-memory (see [`ParseOptions::capture_trivia`]'s docs for the full boundary).
+/// Reads `config.recursion_limit` and `config.parse_float_as_decimal`. It does not
+/// read `config.capture_trivia`: `Statements` yields bare statements and has no
+/// owned root on which to retain a trivia index.
 ///
 /// # Errors
 ///
 /// As [`statements`]; per-statement recursion-limit errors surface as `Err` items
 /// from the iterator, like other grammar errors.
-pub fn statements_with_options<D: Dialect>(
+pub fn statements(src: &str) -> ParseResult<Statements<'_, crate::dialect::Ansi>> {
+    streaming::statements(src, crate::dialect::Ansi)
+}
+
+/// Parse `src` as a lazy [`Statements`] iterator using `config`.
+pub fn statements_with<D: Dialect>(
     src: &str,
-    dialect: D,
-    options: ParseOptions,
+    config: ParseConfig<D>,
 ) -> ParseResult<Statements<'_, D>> {
     streaming::statements_with_limit(
         src,
-        dialect,
-        options.recursion_limit,
-        options.parse_float_as_decimal,
+        config.dialect,
+        config.recursion_limit,
+        config.parse_float_as_decimal,
     )
 }
 
-/// Shared collecting body behind [`parse_with`] / [`parse_with_rc`], generic over
+/// Shared collecting body behind [`parse_with`] / [`parse_rc_with`], generic over
 /// the source store `S` (the ownership tiers).
 ///
 /// Streams statements over the lazy token buffer, then freezes the interner into
@@ -636,7 +638,8 @@ where
     ))
 }
 
-/// [`collect_parsed`] with trivia capture enabled, backing [`parse_with_options`] when [`ParseOptions::capture_trivia`] is set (and so, transitively, its [`parse_with_trivia`] sugar).
+/// [`collect_parsed`] with trivia capture enabled, backing [`parse_with`] when
+/// [`ParseConfig::capture_trivia`] is set.
 ///
 /// Drives the trivia-recording [`Parser`] directly rather than through the public
 /// [`statements`] iterator: the iterator is the bounded-memory path and stays
@@ -661,8 +664,8 @@ where
     // wants comments *and* the clause-keyword offsets that anchor them), so this one
     // path enables both — the default `collect_parsed` records neither.
     let mut parser = Parser::streaming_with_trivia(src, dialect)?
-        .with_recursion_limit(recursion_limit)
-        .with_parse_float_as_decimal(parse_float_as_decimal)
+        .recursion_limit(recursion_limit)
+        .parse_float_as_decimal(parse_float_as_decimal)
         .with_clause_mark_capture(true);
     let mut collected = Vec::new();
     while let Some(statement) = parser.parse_next_statement()? {
@@ -769,7 +772,8 @@ mod tests {
     #[test]
     fn parses_minimal_select_projection_end_to_end() {
         let src = "SELECT 1, foo, *";
-        let parsed = parse_with(src, TestDialect).expect("a well-formed SELECT parses");
+        let parsed = parse_with(src, crate::ParseConfig::new(TestDialect))
+            .expect("a well-formed SELECT parses");
 
         assert_eq!(parsed.statements().len(), 1, "exactly one statement");
         let Statement::Query { query, meta } = &parsed.statements()[0] else {
@@ -829,7 +833,8 @@ mod tests {
         // untouched. Its text must therefore still resolve to the keyword's fixed
         // slot: a quoted `"select"` and a bare `select` keyword-token share one
         // `Symbol`, keeping the same-text-same-symbol identity invariant intact.
-        let parsed = parse_with(r#"SELECT "select""#, TestDialect).expect("valid");
+        let parsed =
+            parse_with(r#"SELECT "select""#, crate::ParseConfig::new(TestDialect)).expect("valid");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query");
         };
@@ -855,7 +860,8 @@ mod tests {
 
     #[test]
     fn float_and_integer_literals_are_classified_by_spelling() {
-        let parsed = parse_with("SELECT 42, 3.14, 1e9", TestDialect).expect("valid");
+        let parsed = parse_with("SELECT 42, 3.14, 1e9", crate::ParseConfig::new(TestDialect))
+            .expect("valid");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query");
         };
@@ -886,14 +892,16 @@ mod tests {
 
     #[test]
     fn leading_non_select_word_is_a_parse_error_at_the_word() {
-        let err = parse_with("from t", TestDialect).expect_err("FROM is not a supported statement");
+        let err = parse_with("from t", crate::ParseConfig::new(TestDialect))
+            .expect_err("FROM is not a supported statement");
         // The error points at the offending leading word `from`.
         assert_eq!(err.span, Span::new(0, 4));
     }
 
     #[test]
     fn trailing_comma_in_projection_errors_at_end_of_input() {
-        let err = parse_with("SELECT 1,", TestDialect).expect_err("a dangling comma has no item");
+        let err = parse_with("SELECT 1,", crate::ParseConfig::new(TestDialect))
+            .expect_err("a dangling comma has no item");
         // The missing item is at end of input: an empty span past the last token.
         assert_eq!(err.span, Span::new(9, 9));
         assert_eq!(err.found, Found::EndOfInput);
@@ -902,7 +910,8 @@ mod tests {
     #[test]
     fn non_item_token_in_projection_errors_at_that_token() {
         // A bare comma where an item is required reports against the comma, not EOF.
-        let err = parse_with("SELECT ,", TestDialect).expect_err("`,` is not a select item");
+        let err = parse_with("SELECT ,", crate::ParseConfig::new(TestDialect))
+            .expect_err("`,` is not a select item");
         assert_eq!(err.span, Span::new(7, 8));
         assert_eq!(err.found, Found::from(","));
     }
@@ -911,7 +920,8 @@ mod tests {
     fn lexical_errors_surface_through_the_parse_channel_with_their_span() {
         // Unterminated string: the tokenizer fails, mapped into a ParseError that
         // keeps the literal's byte span.
-        let err = parse_with("SELECT 'oops", TestDialect).expect_err("the string never closes");
+        let err = parse_with("SELECT 'oops", crate::ParseConfig::new(TestDialect))
+            .expect_err("the string never closes");
         assert_eq!(err.span, Span::new(7, 12));
     }
 
@@ -938,7 +948,8 @@ mod tests {
 
     #[test]
     fn empty_input_parses_to_zero_statements() {
-        let parsed = parse_with("   ; ;  ", TestDialect).expect("only separators and trivia");
+        let parsed = parse_with("   ; ;  ", crate::ParseConfig::new(TestDialect))
+            .expect("only separators and trivia");
         assert!(parsed.statements().is_empty());
         assert_eq!(parsed.source(), "   ; ;  ");
     }
@@ -988,7 +999,8 @@ mod tests {
 
     #[test]
     fn typed_prefix_hook_can_handle_a_production() {
-        let parsed = parse_with("SELECT TRUE", HookDialect).expect("hook handles TRUE");
+        let parsed = parse_with("SELECT TRUE", crate::ParseConfig::new(HookDialect))
+            .expect("hook handles TRUE");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };
@@ -1008,9 +1020,11 @@ mod tests {
 
     #[test]
     fn typed_statement_hook_can_decline_or_error() {
-        parse_with("SELECT 1", HookDialect).expect("NotHandled falls back to built-in SELECT");
+        parse_with("SELECT 1", crate::ParseConfig::new(HookDialect))
+            .expect("NotHandled falls back to built-in SELECT");
 
-        let err = parse_with("CREATE", HookDialect).expect_err("hook returns its parse error");
+        let err = parse_with("CREATE", crate::ParseConfig::new(HookDialect))
+            .expect_err("hook returns its parse error");
         assert_eq!(err.expected.as_str(), "a hook-provided statement");
         assert_eq!(err.span, Span::new(0, 6));
     }
@@ -1184,7 +1198,8 @@ mod tests {
     #[test]
     fn custom_statement_hook_returns_custom_parsed_root() {
         let parsed: Parsed<_, CustomExt> =
-            parse_with("custom_statement", CustomDialect).expect("custom statement parses");
+            parse_with("custom_statement", crate::ParseConfig::new(CustomDialect))
+                .expect("custom statement parses");
 
         assert_eq!(parsed.source(), "custom_statement");
         let [Statement::Other { ext, .. }] = parsed.statements() else {
@@ -1196,9 +1211,11 @@ mod tests {
 
     #[test]
     fn custom_expr_hook_keeps_source_and_resolver_on_parsed_root() {
-        let parsed: Parsed<_, CustomExt> =
-            parse_with("SELECT custom_expr AS marker", CustomDialect)
-                .expect("custom expression parses");
+        let parsed: Parsed<_, CustomExt> = parse_with(
+            "SELECT custom_expr AS marker",
+            crate::ParseConfig::new(CustomDialect),
+        )
+        .expect("custom expression parses");
         let [Statement::Query { query, .. }] = parsed.statements() else {
             panic!("expected one query statement");
         };
@@ -1222,8 +1239,11 @@ mod tests {
 
     #[test]
     fn custom_table_factor_hook_returns_other_table_factor() {
-        let parsed: Parsed<_, CustomExt> = parse_with("SELECT * FROM custom_table", CustomDialect)
-            .expect("custom table factor parses");
+        let parsed: Parsed<_, CustomExt> = parse_with(
+            "SELECT * FROM custom_table",
+            crate::ParseConfig::new(CustomDialect),
+        )
+        .expect("custom table factor parses");
         let [Statement::Query { query, .. }] = parsed.statements() else {
             panic!("expected one query statement");
         };
@@ -1242,9 +1262,11 @@ mod tests {
     fn custom_data_type_hook_accepts_a_custom_type_and_declines_to_stock() {
         // Accept: the hook claims `custom_type` in a CAST target and lands a
         // `DataType::Other`, so a host-owned type need not masquerade as `UserDefined`.
-        let parsed: Parsed<_, CustomExt> =
-            parse_with("SELECT CAST(x AS custom_type)", CustomDialect)
-                .expect("custom data type parses");
+        let parsed: Parsed<_, CustomExt> = parse_with(
+            "SELECT CAST(x AS custom_type)",
+            crate::ParseConfig::new(CustomDialect),
+        )
+        .expect("custom data type parses");
         let [Statement::Query { query, .. }] = parsed.statements() else {
             panic!("expected one query statement");
         };
@@ -1266,8 +1288,11 @@ mod tests {
 
         // Decline: a stock type name in the same position falls through to the built-in
         // grammar (the hook returned `NotHandled` without consuming input).
-        let parsed: Parsed<_, CustomExt> =
-            parse_with("SELECT CAST(x AS INT)", CustomDialect).expect("stock data type parses");
+        let parsed: Parsed<_, CustomExt> = parse_with(
+            "SELECT CAST(x AS INT)",
+            crate::ParseConfig::new(CustomDialect),
+        )
+        .expect("stock data type parses");
         let [Statement::Query { query, .. }] = parsed.statements() else {
             panic!("expected one query statement");
         };
@@ -1290,7 +1315,7 @@ mod tests {
             "CREATE TABLE t (id INT custom_column_option, \
              custom_table_constraint, \
              CONSTRAINT named_custom custom_table_constraint)",
-            CustomDialect,
+            crate::ParseConfig::new(CustomDialect),
         )
         .expect("custom DDL extension nodes parse");
         let [Statement::CreateTable { create, .. }] = parsed.statements() else {
@@ -1352,7 +1377,8 @@ mod tests {
     #[test]
     fn custom_hooks_decline_to_stock_grammar() {
         let parsed: Parsed<_, CustomExt> =
-            parse_with("SELECT a FROM t", CustomDialect).expect("stock SELECT still parses");
+            parse_with("SELECT a FROM t", crate::ParseConfig::new(CustomDialect))
+                .expect("stock SELECT still parses");
         let [Statement::Query { query, .. }] = parsed.statements() else {
             panic!("expected one query statement");
         };
@@ -1374,7 +1400,7 @@ mod tests {
 
         let parsed: Parsed<_, CustomExt> = parse_with(
             "CREATE TABLE t (id INT NOT NULL, PRIMARY KEY (id))",
-            CustomDialect,
+            crate::ParseConfig::new(CustomDialect),
         )
         .expect("stock CREATE TABLE still parses");
         let [Statement::CreateTable { create, .. }] = parsed.statements() else {
@@ -1433,7 +1459,8 @@ mod tests {
                 Span::new(17, 25),
             ),
         ] {
-            let err = parse_with(sql, CustomDialect).expect_err("hook returns its parse error");
+            let err = parse_with(sql, crate::ParseConfig::new(CustomDialect))
+                .expect_err("hook returns its parse error");
             assert_eq!(err.expected.as_str(), expected, "{sql}");
             assert_eq!(err.span, span, "{sql}");
         }

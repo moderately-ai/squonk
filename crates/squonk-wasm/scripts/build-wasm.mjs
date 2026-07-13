@@ -101,6 +101,33 @@ function buildVariant({ label, description, pkgDir, features }) {
     wasmInput,
   ], workspaceRoot);
 
+  // Deno can import WebAssembly modules directly without filesystem permission.
+  // The bundler target wires those module exports into wasm-bindgen's JS glue.
+  const denoDir = join(pkgDir, "deno");
+  mkdirSync(denoDir, { recursive: true });
+  run("wasm-bindgen", [
+    "--target",
+    "bundler",
+    "--remove-name-section",
+    "--remove-producers-section",
+    "--out-dir",
+    denoDir,
+    wasmInput,
+  ], workspaceRoot);
+  const denoWasm = join(denoDir, "squonk_wasm_bg.wasm");
+  const denoOptimized = join(denoDir, "squonk_wasm_bg.opt.wasm");
+  run("wasm-opt", [
+    "-all",
+    "-Oz",
+    "--strip-debug",
+    "--strip-producers",
+    denoWasm,
+    "-o",
+    denoOptimized,
+  ], crateDir);
+  copyFileSync(denoOptimized, denoWasm);
+  rmSync(denoOptimized, { force: true });
+
   copyFileSync(wasmOutput, wasmBaseline);
   run("wasm-opt", [
     "-all",
@@ -145,6 +172,7 @@ function buildVariant({ label, description, pkgDir, features }) {
       candidates.map((candidate) => [candidate.label, printable(candidate.size)]),
     ),
     final: printable(sizeOf(wasmOutput)),
+    deno: printable(sizeOf(denoWasm)),
   };
   writeFileSync(join(reportsDir, `${label}.json`), JSON.stringify(report, null, 2) + "\n");
 

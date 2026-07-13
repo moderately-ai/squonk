@@ -25,7 +25,8 @@ mod wasm;
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm::{
-    parse, parse_recovering, parse_recovering_with_options, parse_with_limit, parse_with_options,
+    NativeDocument, NativeRecoveredDocument, parse, parse_document_with, parse_recovering,
+    parse_recovering_document_with, parse_recovering_with, parse_with, parse_with_limit,
     render_sql, schema_version, supported_dialects, tokenize, transpile, version,
 };
 

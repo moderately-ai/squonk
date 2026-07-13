@@ -131,6 +131,6 @@ fn usage() {
         "       cargo xtask feature-matrix   # feature-combination build gate: each dialect feature solo + no-default + full + serde (check), tests at full"
     );
     eprintln!(
-        "       cargo xtask semver   # validate the first-stable baseline; on 1.x compare both published crates against v1.0.0 with all features"
+        "       cargo xtask semver   # validate the current-major baseline; compare both published crates against v<major>.0.0 with all features"
     );
 }

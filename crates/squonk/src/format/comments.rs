@@ -433,10 +433,11 @@ impl<'ast> Visit<'ast, NoExt> for EmptyBracketWalk {
 mod tests {
     use super::*;
     use crate::dialect::Ansi;
-    use crate::parse_with_trivia;
+    use crate::parse_with;
 
     fn attach(sql: &str) -> (CommentAttachments, crate::Parsed) {
-        let parsed = parse_with_trivia(sql, Ansi).expect("parses");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(Ansi).capture_trivia(true)).expect("parses");
         let attachments = CommentAttachments::compute(&parsed);
         (attachments, parsed)
     }
@@ -451,7 +452,7 @@ mod tests {
 
     #[test]
     fn empty_when_no_trivia_captured() {
-        let parsed = crate::parse_with("SELECT 1", Ansi).expect("parses");
+        let parsed = crate::parse_with("SELECT 1", crate::ParseConfig::new(Ansi)).expect("parses");
         assert!(CommentAttachments::compute(&parsed).is_empty());
     }
 

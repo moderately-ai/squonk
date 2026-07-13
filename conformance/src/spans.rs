@@ -316,7 +316,7 @@ mod tests {
         sql: &str,
         dialect: D,
     ) -> SyntheticSpanFinder<'_> {
-        let parsed = parse_with(sql, dialect)
+        let parsed = parse_with(sql, squonk::ParseConfig::new(dialect))
             .unwrap_or_else(|err| panic!("corpus SQL must parse: {sql:?}: {err:?}"));
         let mut finder = SyntheticSpanFinder::new(sql);
         for statement in parsed.statements() {
@@ -668,7 +668,8 @@ mod tests {
         // marker is an *absent-source* case, not a synthetic one: it carries a real
         // zero-width span at the join point, so it is `is_empty` (a true position) and
         // never `is_synthetic` (no position at all).
-        let parsed = parse_with("SELECT * FROM t1 JOIN t2", Ansi).expect("bare JOIN parses");
+        let parsed = parse_with("SELECT * FROM t1 JOIN t2", squonk::ParseConfig::new(Ansi))
+            .expect("bare JOIN parses");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };
@@ -702,7 +703,8 @@ mod tests {
         );
 
         // A parsed name always has at least one part, so its folded span is real.
-        let parsed = parse_with("SELECT * FROM s.t", Ansi).expect("qualified name parses");
+        let parsed = parse_with("SELECT * FROM s.t", squonk::ParseConfig::new(Ansi))
+            .expect("qualified name parses");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };

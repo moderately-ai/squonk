@@ -87,7 +87,7 @@ impl<'a, D: Dialect> Iterator for Statements<'a, D> {
 /// Returns a [`ParseError`](crate::error::ParseError) only if streaming setup fails
 /// (the tokenizer guards that `src` fits in `u32` bytes). Per-statement lexical and
 /// grammar errors surface as `Err` items from the iterator, not here.
-pub fn statements<D: Dialect>(src: &str, dialect: D) -> ParseResult<Statements<'_, D>> {
+pub(crate) fn statements<D: Dialect>(src: &str, dialect: D) -> ParseResult<Statements<'_, D>> {
     statements_with_limit(src, dialect, super::engine::DEFAULT_RECURSION_LIMIT, false)
 }
 
@@ -95,8 +95,8 @@ pub fn statements<D: Dialect>(src: &str, dialect: D) -> ParseResult<Statements<'
 /// classification request.
 ///
 /// Backs the public options-bearing entries
-/// ([`statements_with_options`](super::statements_with_options) and the collecting
-/// [`parse_with_options`](super::parse_with_options)); the plain [`statements`] is
+/// ([`statements_with`](super::statements_with) and the collecting
+/// [`parse_with`](super::parse_with)); the plain [`statements`] is
 /// this with [`DEFAULT_RECURSION_LIMIT`](super::DEFAULT_RECURSION_LIMIT).
 pub(crate) fn statements_with_limit<D: Dialect>(
     src: &str,
@@ -105,8 +105,8 @@ pub(crate) fn statements_with_limit<D: Dialect>(
     parse_float_as_decimal: bool,
 ) -> ParseResult<Statements<'_, D>> {
     let parser = Parser::streaming(src, dialect)?
-        .with_recursion_limit(recursion_limit)
-        .with_parse_float_as_decimal(parse_float_as_decimal);
+        .recursion_limit(recursion_limit)
+        .parse_float_as_decimal(parse_float_as_decimal);
     Ok(Statements {
         parser,
         done: false,
@@ -207,7 +207,7 @@ mod tests {
         // parse_with is the collecting convenience over the same iterator, so the two
         // produce identical statement trees (source compatibility).
         let src = "SELECT a, b FROM t; SELECT 1 + 2";
-        let collected = parse_with(src, TestDialect).expect("collects");
+        let collected = parse_with(src, crate::ParseConfig::new(TestDialect)).expect("collects");
 
         let mut iter = statements(src, TestDialect).expect("streams");
         let streamed: Vec<_> = std::iter::from_fn(|| iter.next())
@@ -240,7 +240,7 @@ mod tests {
             "TABLE t SELECT 1",
         ] {
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "separator-less statement pair must reject: {sql:?}",
             );
         }
@@ -259,7 +259,7 @@ mod tests {
             "TABLE t",
         ] {
             assert!(
-                parse_with(sql, Postgres).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
                 "`;`-delimited (or lone) statements must accept: {sql:?}",
             );
         }

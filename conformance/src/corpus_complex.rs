@@ -218,9 +218,9 @@ enum Class {
 
 /// Classify one statement: Ansi first, then Postgres as a fallback.
 fn classify(sql: &str) -> Class {
-    if parse_with(sql, Ansi).is_ok() {
+    if parse_with(sql, squonk::ParseConfig::new(Ansi)).is_ok() {
         Class::Ansi
-    } else if parse_with(sql, Postgres).is_ok() {
+    } else if parse_with(sql, squonk::ParseConfig::new(Postgres)).is_ok() {
         Class::PostgresOnly
     } else {
         Class::Unparsed

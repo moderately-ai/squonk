@@ -1086,7 +1086,7 @@ mod tests {
         // gap, not the over-acceptance proof it is meant to be.
         for sql in SQLITE_MISFEATURE_SEEDS {
             assert!(
-                squonk::parse_with(sql, Sqlite).is_ok(),
+                squonk::parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok(),
                 "committed misfeature seed does not parse under Sqlite: {sql:?}",
             );
         }
@@ -1118,7 +1118,7 @@ mod tests {
         use squonk::dialect::MySql;
         for sql in MYSQL_FEATURE_SEEDS {
             assert!(
-                squonk::parse_with(sql, MySql).is_ok(),
+                squonk::parse_with(sql, squonk::ParseConfig::new(MySql)).is_ok(),
                 "committed MySQL seed does not parse under MySql: {sql:?}",
             );
         }
@@ -1157,7 +1157,7 @@ mod tests {
         use squonk::dialect::Postgres;
         for sql in POSTGRES_FEATURE_SEEDS {
             assert!(
-                squonk::parse_with(sql, Postgres).is_ok(),
+                squonk::parse_with(sql, squonk::ParseConfig::new(Postgres)).is_ok(),
                 "committed PG seed does not parse under Postgres: {sql:?}",
             );
         }
@@ -1201,9 +1201,10 @@ mod tests {
                 .expect("arb_statement is infallible to instantiate");
             let statement = tree.current();
             let rendered = render_generated(&statement, RenderMode::Canonical);
-            let reparsed = parse_with(&rendered, Ansi).unwrap_or_else(|e| {
-                panic!("arb_statement render must reparse under Ansi: {rendered:?}: {e:?}")
-            });
+            let reparsed =
+                parse_with(&rendered, squonk::ParseConfig::new(Ansi)).unwrap_or_else(|e| {
+                    panic!("arb_statement render must reparse under Ansi: {rendered:?}: {e:?}")
+                });
             let comparison = shared_interner::compare_statement_with_shared_symbols(
                 &statement,
                 &GENERATED_RESOLVER,
@@ -1250,7 +1251,7 @@ mod tests {
         use squonk::dialect::DuckDb;
         for sql in DUCKDB_FEATURE_SEEDS {
             assert!(
-                squonk::parse_with(sql, DuckDb).is_ok(),
+                squonk::parse_with(sql, squonk::ParseConfig::new(DuckDb)).is_ok(),
                 "committed DuckDB feature seed does not parse under DuckDb: {sql:?}",
             );
         }
@@ -1289,7 +1290,7 @@ mod tests {
         use squonk::dialect::BigQuery;
         for sql in BIGQUERY_FEATURE_SEEDS {
             assert!(
-                squonk::parse_with(sql, BigQuery).is_ok(),
+                squonk::parse_with(sql, squonk::ParseConfig::new(BigQuery)).is_ok(),
                 "committed BigQuery feature seed does not parse under BigQuery: {sql:?}",
             );
         }
@@ -1328,7 +1329,7 @@ mod tests {
         use squonk::dialect::ClickHouse;
         for sql in CLICKHOUSE_FEATURE_SEEDS {
             assert!(
-                squonk::parse_with(sql, ClickHouse).is_ok(),
+                squonk::parse_with(sql, squonk::ParseConfig::new(ClickHouse)).is_ok(),
                 "committed ClickHouse feature seed does not parse under ClickHouse: {sql:?}",
             );
         }

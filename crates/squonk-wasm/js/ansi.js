@@ -8,4 +8,4 @@ const api = createNodeSquonk(initSync, wasm, new URL("../pkg-ansi/squonk_wasm_bg
     defaultDialect: "ansi", supportedDialects: ["ansi"],
 });
 export { SqlParseError, Document, RecoveredDocument, Node, Ident, ObjectName, Diagnostic } from "./runtime.js";
-export const { isDialectName, assertDialectName, canonicalDialectName, parse, parseJson, parseWithLimit, parseRecovering, parseRecoveringJson, supportedDialects, tokenize, render, redact, format, transpile, version, schemaVersion } = api;
+export const { isDialectName, assertDialectName, canonicalDialectName, parse, parseJson, parseWithLimit, parseRecovering, parseRecoveringJson, supportedDialects, tokenize, render, redact, format, transpile, version, schemaVersion, runtimeInfo } = api;

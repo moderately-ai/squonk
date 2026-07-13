@@ -234,7 +234,7 @@ impl CorpusSpec {
         for case in self.ansi_roundtrip_defects {
             let sql = case.sql;
             assert!(
-                parse_with(sql, Ansi).is_ok(),
+                parse_with(sql, squonk::ParseConfig::new(Ansi)).is_ok(),
                 "{sql:?} should still parse under Ansi"
             );
             assert!(

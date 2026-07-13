@@ -41,6 +41,8 @@ const PREFLIGHT_STEPS: &[PreflightStep] = &[
             "-p",
             "squonk-python",
             "-p",
+            "squonk-node",
+            "-p",
             "squonk-wasm",
             "--all-targets",
             "--",
@@ -61,7 +63,10 @@ const PREFLIGHT_STEPS: &[PreflightStep] = &[
         ],
     ),
     cargo_step("nextest-default", &["nextest", "run"]),
-    cargo_step("nextest-wasm", &["nextest", "run", "-p", "squonk-wasm"]),
+    cargo_step(
+        "nextest-bindings",
+        &["nextest", "run", "-p", "squonk-node", "-p", "squonk-wasm"],
+    ),
     cargo_step(
         "nextest-schema",
         &["nextest", "run", "-p", "squonk", "--features", "serde"],

@@ -83,7 +83,7 @@ const CORPUS: &[(&str, &str)] = &[
 /// Parse one statement under Postgres to its owned root; return the statement
 /// count so the optimizer cannot elide the parse.
 fn parse_one(sql: &str) -> usize {
-    parse_with(sql, Postgres)
+    parse_with(sql, squonk::ParseConfig::new(Postgres))
         .expect("small-corpus SQL parses under Postgres")
         .statements()
         .len()
@@ -148,7 +148,7 @@ fn bench_table() {
     // input, which still runs Parser::new + interner new/freeze + an Arc<str> root.
     let floor = time_loop(
         |s| {
-            parse_with(s, Postgres)
+            parse_with(s, squonk::ParseConfig::new(Postgres))
                 .expect("empty input parses to zero statements")
                 .statements()
                 .len()
@@ -457,7 +457,7 @@ fn main() {
     // Fail loudly if a corpus entry ever drifts off the parser surface.
     for &(name, sql) in CORPUS {
         assert!(
-            parse_with(sql, Postgres).is_ok(),
+            parse_with(sql, squonk::ParseConfig::new(Postgres)).is_ok(),
             "corpus case {name} no longer parses",
         );
     }

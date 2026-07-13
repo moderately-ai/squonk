@@ -116,7 +116,7 @@ mod tests {
         #[test]
         fn generated_ast_round_trips_structurally(statement in arb_statement()) {
             let rendered = render_generated(&statement, RenderMode::Parenthesized);
-            let reparsed = parse_with(&rendered, Ansi)
+            let reparsed = parse_with(&rendered, squonk::ParseConfig::new(Ansi))
                 .map_err(|err| TestCaseError::fail(format!("rendered SQL did not parse: {rendered:?}: {err:?}")))?;
 
             let [reparsed_statement] = reparsed.statements() else {
@@ -243,7 +243,8 @@ mod tests {
         assert!(!comparison.structurally_equal());
 
         let rendered = render_generated(&statement, RenderMode::Parenthesized);
-        let reparsed = parse_with(&rendered, Ansi).expect("rendered SQL parses");
+        let reparsed =
+            parse_with(&rendered, squonk::ParseConfig::new(Ansi)).expect("rendered SQL parses");
         let comparison = shared_interner::compare_statement_with_shared_symbols(
             &statement,
             &GENERATED_RESOLVER,
@@ -303,7 +304,8 @@ mod tests {
 
         let rendered = render_generated(&statement, RenderMode::Canonical);
         assert_eq!(rendered, "SELECT b");
-        let reparsed = parse_with(&rendered, Ansi).expect("rendered SQL parses");
+        let reparsed =
+            parse_with(&rendered, squonk::ParseConfig::new(Ansi)).expect("rendered SQL parses");
 
         assert_ne!(
             statement,
@@ -369,7 +371,8 @@ mod tests {
         });
 
         let rendered = render_generated(&statement, RenderMode::Canonical);
-        let reparsed = parse_with(&rendered, Ansi).expect("rendered SQL parses");
+        let reparsed =
+            parse_with(&rendered, squonk::ParseConfig::new(Ansi)).expect("rendered SQL parses");
 
         assert_eq!(
             normalize_statement(&statement, &GENERATED_RESOLVER),
@@ -382,7 +385,7 @@ mod tests {
     /// uses, but on a fixed, replayable tree.
     fn assert_round_trips(label: &str, statement: &Statement<NoExt>) {
         let rendered = render_generated(statement, RenderMode::Parenthesized);
-        let reparsed = parse_with(&rendered, Ansi)
+        let reparsed = parse_with(&rendered, squonk::ParseConfig::new(Ansi))
             .unwrap_or_else(|err| panic!("{label}: rendered {rendered:?} did not parse: {err:?}"));
         let statements = reparsed.statements();
         assert_eq!(
@@ -826,7 +829,7 @@ mod tests {
     }
 
     fn parse_and_render(sql: &str, mode: RenderMode) -> String {
-        let parsed = parse_with(sql, Ansi)
+        let parsed = parse_with(sql, squonk::ParseConfig::new(Ansi))
             .unwrap_or_else(|err| panic!("expected {sql:?} to parse: {err:?}"));
         crate::render_statements(&parsed, mode)
     }

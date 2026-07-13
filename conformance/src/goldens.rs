@@ -23,7 +23,7 @@ use crate::{pg, shape};
 pub fn postgres_golden(sql: &str) -> String {
     let sql = sql_input(sql);
     let pg_result = pg_query::parse(sql);
-    let ours_result = parse_with(sql, Postgres);
+    let ours_result = parse_with(sql, squonk::ParseConfig::new(Postgres));
 
     let mut out = String::new();
     writeln!(out, "pg_query: {}", verdict(pg_result.is_ok())).expect("write to string");
@@ -51,7 +51,7 @@ pub fn postgres_golden(sql: &str) -> String {
 /// Generate the ANSI golden output for one SQL string.
 pub fn ansi_golden(sql: &str) -> String {
     let sql = sql_input(sql);
-    let parsed = parse_with(sql, Ansi);
+    let parsed = parse_with(sql, squonk::ParseConfig::new(Ansi));
 
     let mut out = String::new();
     writeln!(out, "squonk_ansi: {}", verdict(parsed.is_ok())).expect("write to string");
@@ -76,7 +76,7 @@ pub fn ansi_golden(sql: &str) -> String {
 /// redacted block, while keywords, operators, and qualified-name arity are kept.
 pub fn redacted_golden(sql: &str) -> String {
     let sql = sql_input(sql);
-    let parsed = parse_with(sql, Postgres);
+    let parsed = parse_with(sql, squonk::ParseConfig::new(Postgres));
 
     let mut out = String::new();
     writeln!(out, "parse: {}", verdict(parsed.is_ok())).expect("write to string");
@@ -108,7 +108,7 @@ pub fn redacted_golden(sql: &str) -> String {
 /// rejected with an unsupported-construct diagnostic instead of being mis-rendered.
 pub fn target_render_golden(sql: &str) -> String {
     let sql = sql_input(sql);
-    let parsed = parse_with(sql, Postgres);
+    let parsed = parse_with(sql, squonk::ParseConfig::new(Postgres));
 
     let mut out = String::new();
     writeln!(out, "parse (postgres): {}", verdict(parsed.is_ok())).expect("write to string");
@@ -226,12 +226,18 @@ mod tests {
 
     #[test]
     fn debug_ast_snapshots() {
-        let parsed = parse_with("SELECT a + b * c FROM t WHERE a = b ORDER BY a", Postgres)
-            .expect("debug snapshot query parses");
+        let parsed = parse_with(
+            "SELECT a + b * c FROM t WHERE a = b ORDER BY a",
+            squonk::ParseConfig::new(Postgres),
+        )
+        .expect("debug snapshot query parses");
         insta::assert_debug_snapshot!("m1_select_debug_ast", parsed.statements());
 
-        let parsed = parse_with("SELECT 1 UNION ALL SELECT 2", Postgres)
-            .expect("debug snapshot set operation parses");
+        let parsed = parse_with(
+            "SELECT 1 UNION ALL SELECT 2",
+            squonk::ParseConfig::new(Postgres),
+        )
+        .expect("debug snapshot set operation parses");
         let [Statement::Query { query, .. }] = parsed.statements() else {
             panic!("expected one query statement");
         };

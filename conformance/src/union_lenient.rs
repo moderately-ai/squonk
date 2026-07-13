@@ -87,7 +87,7 @@ impl Dialect for AdHocFeatures {
 }
 
 fn accepts<D: Dialect + Copy>(sql: &str, dialect: D) -> bool {
-    parse_with(sql, dialect).is_ok()
+    parse_with(sql, squonk::ParseConfig::new(dialect)).is_ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,11 @@ fn lenient_with_reserved_of(src: &FeatureSet) -> FeatureSet {
 /// Whether the `Lenient` reject of `sql` recovers when `Lenient` borrows `src`'s reserved
 /// model — the algorithmic proof that the reject is a rule-5 reserved-identifier sacrifice.
 fn reserved_model_recovers(sql: &str, src: &FeatureSet) -> bool {
-    parse_with(sql, AdHocFeatures(lenient_with_reserved_of(src))).is_ok()
+    parse_with(
+        sql,
+        squonk::ParseConfig::new(AdHocFeatures(lenient_with_reserved_of(src))),
+    )
+    .is_ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +292,7 @@ fn assert_union_over_seeds<D: Dialect + Copy>(preset: &str, dialect: D, seeds: &
             sanctioned_reject(sql, src).is_some(),
             "UNION VIOLATION: {preset} accepts but Lenient rejects with no sanctioned \
              exception — {sql:?}: {:?}",
-            parse_with(sql, Lenient).err(),
+            parse_with(sql, squonk::ParseConfig::new(Lenient)).err(),
         );
     }
 }
@@ -515,7 +519,12 @@ mod tests {
                     .expect("arb_feature_statement is infallible to instantiate")
                     .current();
                 // Only the preset-accepted surface is in scope for the union property.
-                if parse_with(&sql, AdHocFeatures((*features).clone())).is_err() {
+                if parse_with(
+                    &sql,
+                    squonk::ParseConfig::new(AdHocFeatures((*features).clone())),
+                )
+                .is_err()
+                {
                     continue;
                 }
                 if accepts(&sql, Lenient) {
@@ -525,7 +534,7 @@ mod tests {
                     sanctioned_reject(&sql, features).is_some(),
                     "UNION VIOLATION ({preset} generative): preset accepts but Lenient rejects \
                      with no sanctioned exception — {sql:?}: {:?}",
-                    parse_with(&sql, Lenient).err(),
+                    parse_with(&sql, squonk::ParseConfig::new(Lenient)).err(),
                 );
             }
         }

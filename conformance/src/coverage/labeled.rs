@@ -1669,7 +1669,7 @@ impl Expect {
             Self::Accept => accepts_under(sql, features),
             Self::Reject => !accepts_under(sql, features),
             Self::Shape(matches_shape) => {
-                matches!(parse_with(sql, AdHocDialect(features)), Ok(parsed) if matches_shape(&parsed))
+                matches!(parse_with(sql, squonk::ParseConfig::new(AdHocDialect(features))), Ok(parsed) if matches_shape(&parsed))
             }
         }
     }
@@ -1695,7 +1695,7 @@ impl Expect {
             Self::Accept => !accepts_under(sql, flipped),
             Self::Reject => accepts_under(sql, flipped),
             Self::Shape(matches_shape) => {
-                matches!(parse_with(sql, AdHocDialect(flipped)), Ok(parsed) if !matches_shape(&parsed))
+                matches!(parse_with(sql, squonk::ParseConfig::new(AdHocDialect(flipped))), Ok(parsed) if !matches_shape(&parsed))
             }
         }
     }
@@ -5250,8 +5250,8 @@ pub(crate) fn feature_flip_changes_parse(sql: &str, name: &str) -> bool {
     // introduces a lexical/grammar conflict — those need a second enabled claimant).
     let flipped = feature_set_with(name, &baseline, false).without_dangling_dependents();
     match (
-        parse_with(sql, AdHocDialect(&baseline)),
-        parse_with(sql, AdHocDialect(&flipped)),
+        parse_with(sql, squonk::ParseConfig::new(AdHocDialect(&baseline))),
+        parse_with(sql, squonk::ParseConfig::new(AdHocDialect(&flipped))),
     ) {
         (Ok(_), Err(_)) => true,
         (Ok(on), Ok(off)) => !crate::shared_interner::compare_statements_with_shared_symbols(
@@ -5373,7 +5373,7 @@ mod tests {
         // column reference (the accept/reject flip lives in table-name position, the
         // `SELECT * FROM "x"` labelled case above).
         let on = (DOUBLE_QUOTED_STRINGS.set_enabled)(&FeatureSet::POSTGRES, true);
-        let parsed = parse_with("SELECT \"x\"", AdHocDialect(&on))
+        let parsed = parse_with("SELECT \"x\"", squonk::ParseConfig::new(AdHocDialect(&on)))
             .expect("`\"x\"` parses with double_quoted_strings on");
         assert!(
             matches!(sole_projection_expr(&parsed), Expr::Literal { .. }),
@@ -5381,7 +5381,7 @@ mod tests {
         );
 
         let off = (DOUBLE_QUOTED_STRINGS.set_enabled)(&FeatureSet::POSTGRES, false);
-        let parsed = parse_with("SELECT \"x\"", AdHocDialect(&off))
+        let parsed = parse_with("SELECT \"x\"", squonk::ParseConfig::new(AdHocDialect(&off)))
             .expect("`\"x\"` parses with double_quoted_strings off");
         assert!(
             matches!(sole_projection_expr(&parsed), Expr::Column { .. }),

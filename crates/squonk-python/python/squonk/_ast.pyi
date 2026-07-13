@@ -9,6 +9,7 @@ from typing import Any, Generic, Optional, TypeVar, Union
 
 from .ast import AstNodeJson, IdentJson, StatementJson
 from ._types import ParseDocumentJson, RecoveredDocumentJson
+from ._native import NativeDocument, NativeRecoveredDocument
 
 JsonDict = dict[str, Any]
 _TRaw = TypeVar("_TRaw")
@@ -27,7 +28,7 @@ class Span:
     end: int
 
 class Document(Mapping[str, Any], Generic[_TDialect]):
-    def __init__(self, raw: JsonDict) -> None: ...
+    def __init__(self, raw: Optional[JsonDict] = None, *, native: Optional[Union[NativeDocument, NativeRecoveredDocument]] = None) -> None: ...
     @property
     def raw(self) -> ParseDocumentJson: ...
     @property
@@ -132,3 +133,4 @@ class Trivia(Mapping[str, Any]):
     def __len__(self) -> int: ...
 
 def document_from_json(text: str, *, recovered: bool = False) -> Document: ...
+def document_from_native(native: Union[NativeDocument, NativeRecoveredDocument], *, recovered: bool = False) -> Document: ...

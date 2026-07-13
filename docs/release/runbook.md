@@ -5,9 +5,9 @@
 
 Operational, no-surprises procedure for publishing the two Rust crates to crates.io. Every real `cargo publish` is individually human-gated: the maintainer confirms each upload. Nothing in this file should be automated end-to-end.
 
-Version 1.0.0 completed this procedure on 2026-07-12. For a later release, update the
-version-specific checks and examples before using the runbook; do not rerun the literal
-1.0.0 publish commands.
+Version 1.0.0 completed this procedure on 2026-07-12. The current coordinated release
+candidate is **2.0.0**; `v1.0.0` remains the historical 1.x baseline and
+`v2.0.0` becomes the 2.x baseline at release.
 
 ## What publishes where
 
@@ -23,7 +23,7 @@ Only `squonk-ast` and `squonk` go to crates.io. `release/semver-baseline.toml` a
 
 ## Publish order (load-bearing)
 
-`squonk` declares `squonk-ast = { path = "…", version = "1.0.0" }`. crates.io resolves that `version` against the registry at upload time, so **`squonk-ast` must exist on crates.io before `squonk` uploads.** Publishing `squonk` first fails with `no matching package named 'squonk-ast' found`.
+`squonk` declares `squonk-ast = { path = "…", version = "2.0.0" }`. crates.io resolves that `version` against the registry at upload time, so **`squonk-ast` 2.0.0 must exist on crates.io before `squonk` 2.0.0 uploads.** Publishing `squonk` first fails with `no matching package named 'squonk-ast' found`.
 
 Two supported ways to satisfy the order:
 
@@ -33,16 +33,13 @@ Two supported ways to satisfy the order:
 ## Pre-publish checklist (do all before the first upload)
 
 - [ ] **Repository metadata.** Confirm shipped metadata points at `https://github.com/moderately-ai/squonk` and public branch URLs use `main`.
-- [ ] **Version.** `1.0.0` is ratified and the workspace is already bumped (see "Version number" below). Confirm the `v1.0.0` git tag has been created at the release commit — the semver gate requires it once the major is ≥ 1.
-- [ ] **Names.** Per the ratified decision, there are **no placeholder reservations** — the first real `1.0.0` publish is what claims `squonk` and `squonk-ast` on crates.io. Re-verify both names are free the same day (the availability re-check below) and that the publishing account will own them.
+- [ ] **Version.** The workspace, Python, and npm build manifests all resolve to `2.0.0`. Confirm the historical `v1.0.0` baseline tag exists and create `v2.0.0` only from the final release commit.
+- [ ] **Ownership.** Confirm the publishing account still owns `squonk` and `squonk-ast`, and that version `2.0.0` does not already exist.
 - [ ] **Token.** `cargo login <token>` with a token scoped to publish, owned by the account that owns both names.
 - [ ] **Green tree.** On the exact release commit: `cargo fmt --all --check` clean, `cargo xtask preflight` green, working tree clean (no `--allow-dirty` on the real publish).
-- [ ] **Same-day availability re-check.** Re-confirm the names/versions are still free the day of release:
+- [ ] **Same-day version re-check.** Inspect the registry records and confirm `2.0.0` is absent:
   ```sh
-  # 404 == not yet published (expected for a first release of this version)
-  curl -sI https://index.crates.io/sq/uo/squonk-ast
-  curl -sI https://index.crates.io/sq/uo/squonk
-  # Or the JSON API (404 body == name unclaimed):
+  # The JSON must list 1.0.0 but not 2.0.0 before this release.
   curl -s https://crates.io/api/v1/crates/squonk-ast
   curl -s https://crates.io/api/v1/crates/squonk
   ```
@@ -126,23 +123,32 @@ cargo yank --version <version> --undo squonk
 
 Recovery from a bad publish is **a new patch version**, not an edit: yank the bad one, fix, bump the patch, republish. Yank `squonk` before `squonk-ast` (unblock the dependency last) so no window leaves `squonk` selectable against a yanked `squonk-ast`.
 
-## Version number — ratified: `1.0.0`
+## Version lineage
 
-The first stable version is **`1.0.0`**. The workspace, Python wheel, six scoped npm packages, and npm umbrella move in lockstep. `1.0.0` is a hard commitment — no breaking public-API change without a `2.0`.
+The first stable version is **`1.0.0`** and the current release candidate is **`2.0.0`**.
+The workspace, Python wheel, six scoped npm facades, npm umbrella, and eight native npm
+platform packages move in lockstep. The `1.0.0` baseline is a hard commitment—no breaking
+public-API change is permitted before `2.0.0`.
 
-### Semver gate bootstrap (at 1.0.0)
+### Semver baseline rotation (at 2.0.0)
 
-The stable-release infrastructure is hard-wired to `v1.0.0`, and the gate has a deliberate bootstrap ordering:
+Each major line is checked against its own first release. The workspace major and
+`release/semver-baseline.toml` must agree: major 2 requires `v2.0.0`. This prevents
+future 2.x checks from comparing against `v1.0.0`, which would classify every change
+as a permitted major change and skip the compatibility lints.
 
-- `xtask/src/semver.rs` is **inert below 1.0.0** — at major `0` it prints `pre-stable workspace` and returns success. At major ≥ 1 it *activates*: it requires the `v1.0.0` baseline git tag and `cargo-semver-checks`, then compares each published crate against the baseline.
-- `release/semver-baseline.toml` pins `baseline_tag = "v1.0.0"` (the xtask rejects any other baseline).
-- `docs/stable-api.md`: the SemVer policy starts at the `v1.0.0` tag.
+The `.0.0` release necessarily establishes rather than consumes its baseline. Use
+this ordering:
 
-**The chicken-and-egg, and the resolution.** At `1.0.0` *before* the tag exists, `cargo xtask semver` exits non-zero with `stable workspace requires baseline tag v1.0.0` (observed: exit 2). This is expected and not a blocker, because **`semver` is not a preflight step** — it never runs in `cargo xtask preflight`, `ci.yml`, or the everyday gate stack, so a missing baseline tag does not block landing the 1.0.0 bump or any subsequent PR. It is a dedicated release-gating command. The bootstrap order is therefore:
+1. Land the reviewed `2.0.0` release commit with `baseline_tag = "v2.0.0"`.
+2. Create the annotated `v2.0.0` tag at exactly that commit.
+3. Run `cargo xtask semver`. On the release commit this is an identity comparison;
+   on every later 2.x commit it checks both published crates against that immutable
+   tag with all features.
+4. Publish only after the tag-backed gate passes.
 
-1. **Land the `1.0.0` version bump.** The gate now *reports as active* but has no baseline to compare against yet — expected, non-blocking.
-2. **At cutover, create the annotated `v1.0.0` tag** at the release commit. This tag *is* the immutable API baseline.
-3. From that point, `cargo xtask semver` compares the published crates (`squonk-ast`, `squonk`) against `v1.0.0`. On the release commit itself the comparison is a no-op identity check (HEAD == the tag), so it passes once `cargo-semver-checks` is installed (`cargo install cargo-semver-checks --locked`).
-4. Every future `1.x` release runs the gate against the frozen `v1.0.0` baseline; a breaking API change fails it and demands a `2.0`.
-
-So the very first release establishes the baseline rather than being checked against one — there is nothing earlier to compare to. The gate protects `1.0.1` onward.
+Before step 2 the command fails because `v2.0.0` does not exist. That is the expected
+pre-tag bootstrap state, not permission to publish. `cargo xtask preflight` remains
+independent so the release commit can land before its tag is created. At the next
+major, rotate the manifest to `v3.0.0` in the 3.0 release commit and repeat this
+procedure. Historical baseline tags are never moved or deleted.

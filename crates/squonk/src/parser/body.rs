@@ -1088,7 +1088,7 @@ mod tests {
         // `BEGIN` parses as a transaction start, `SELECT 1` as a query, and the trailing
         // `END` is an unknown statement.
         use crate::parser::parse_with;
-        let err = parse_with("BEGIN SELECT 1; END", MYSQL)
+        let err = parse_with("BEGIN SELECT 1; END", crate::ParseConfig::new(MYSQL))
             .expect_err("a top-level compound block must reject");
         assert_eq!(err.kind, ParseErrorKind::Syntax);
     }

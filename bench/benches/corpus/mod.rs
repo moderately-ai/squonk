@@ -162,8 +162,8 @@ impl Preset {
 /// predicate ("parse each candidate; keep those our parser accepts").
 pub fn parses(preset: Preset, sql: &str) -> bool {
     match preset {
-        Preset::Ansi => parse_with(sql, Ansi).is_ok(),
-        Preset::Postgres => parse_with(sql, Postgres).is_ok(),
+        Preset::Ansi => parse_with(sql, squonk::ParseConfig::new(Ansi)).is_ok(),
+        Preset::Postgres => parse_with(sql, squonk::ParseConfig::new(Postgres)).is_ok(),
     }
 }
 
@@ -172,8 +172,11 @@ pub fn parses(preset: Preset, sql: &str) -> bool {
 /// fire on the selected subset.
 pub fn parse_owned(preset: Preset, sql: &str) -> StockParsed {
     match preset {
-        Preset::Ansi => parse_with(sql, Ansi).expect("subset statement parses (Ansi)"),
-        Preset::Postgres => parse_with(sql, Postgres).expect("subset statement parses (Postgres)"),
+        Preset::Ansi => {
+            parse_with(sql, squonk::ParseConfig::new(Ansi)).expect("subset statement parses (Ansi)")
+        }
+        Preset::Postgres => parse_with(sql, squonk::ParseConfig::new(Postgres))
+            .expect("subset statement parses (Postgres)"),
     }
 }
 

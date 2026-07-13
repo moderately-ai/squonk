@@ -37,7 +37,7 @@
 //! gaps between adjacent token spans are exactly the trivia. A tool that needs the
 //! comments/whitespace themselves can *opt in* to capturing each trivia run's
 //! [`Span`] into a [`TriviaIndex`] — [`tokenize_with_trivia`] returns one alongside
-//! the tokens, and `parse_with_trivia` homes one on the parse root. Capture is off
+//! the tokens, and `ParseConfig::capture_trivia` homes one on the parse root. Capture is off
 //! by default so the hot lexer path pays nothing for it.
 
 mod cursor;
@@ -111,7 +111,7 @@ pub fn tokenize_with(src: &str, features: &FeatureSet) -> Result<Vec<Token>, Lex
 /// skipped comments and whitespace.
 ///
 /// The tokenizer-output recovery path (the parse-root path is
-/// [`parse_with_trivia`](crate::parse_with_trivia)): the returned tokens are
+/// [`ParseConfig::capture_trivia`](crate::ParseConfig::capture_trivia)): the returned tokens are
 /// *identical* to [`tokenize_with`]'s — trivia stays out of the token stream — while
 /// the [`TriviaIndex`] carries each `--`/`#`/`/* */` comment and whitespace run as a
 /// queryable span. This pays the capture cost [`tokenize_with`] avoids, so reach for
@@ -159,7 +159,7 @@ pub(crate) struct BufferedTokenCursor<'s> {
     /// compile-time-dead [`NoTrivia`] sink. Unlike `buffer`, this is *not* drained
     /// between statements ([`discard_consumed`](Self::discard_consumed)) — a parse
     /// root keeps the whole source's trivia — which is why trivia capture is the
-    /// collecting `parse_with_trivia` path, not the bounded streaming iterator.
+    /// collecting trivia-capture path, not the bounded streaming iterator.
     trivia: Option<Vec<TriviaRange>>,
 }
 

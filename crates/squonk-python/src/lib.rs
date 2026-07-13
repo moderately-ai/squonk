@@ -15,8 +15,8 @@ use squonk::bindings::{
 };
 use squonk::render::{RenderConfig, RenderMode, Renderer};
 use squonk::{
-    BuiltinDialect, ParseOptions, Parsed, parse_recovering_with_builtin_options,
-    parse_with_builtin_options, tokenize_with_builtin, tokenize_with_builtin_trivia,
+    BuiltinDialect, ParseConfig, Parsed, Recovered, parse_builtin_with,
+    parse_recovering_builtin_with, tokenize_with_builtin, tokenize_with_builtin_trivia,
 };
 
 import_exception!(squonk, SqlParseError);
@@ -26,6 +26,119 @@ import_exception!(squonk, LexError);
 import_exception!(squonk, RenderError);
 import_exception!(squonk, SerializationError);
 import_exception!(squonk, UnsupportedNodeRenderError);
+
+#[pyclass(frozen, module = "squonk._native")]
+struct NativeDocument {
+    parsed: Parsed,
+    dialect: BuiltinDialect,
+}
+
+#[pymethods]
+impl NativeDocument {
+    #[getter]
+    fn source(&self) -> &str {
+        self.parsed.source()
+    }
+
+    #[getter]
+    fn dialect(&self) -> &'static str {
+        self.dialect.name()
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        to_json(&ParseDocument::new(&self.parsed, self.dialect))
+    }
+
+    #[pyo3(signature = (dialect, mode = "canonical"))]
+    fn render(&self, dialect: &str, mode: &str) -> PyResult<String> {
+        render_parsed(&self.parsed, resolve_dialect(dialect)?, mode)
+    }
+
+    #[pyo3(signature = (node_id, dialect, mode = "canonical"))]
+    fn render_fragment(&self, node_id: u32, dialect: &str, mode: &str) -> PyResult<String> {
+        render_parsed_fragment(&self.parsed, node_id, resolve_dialect(dialect)?, mode)
+    }
+}
+
+#[pyclass(frozen, module = "squonk._native")]
+struct NativeRecoveredDocument {
+    recovered: Recovered,
+    dialect: BuiltinDialect,
+}
+
+#[pymethods]
+impl NativeRecoveredDocument {
+    #[getter]
+    fn source(&self) -> &str {
+        self.recovered.parsed().source()
+    }
+
+    #[getter]
+    fn dialect(&self) -> &'static str {
+        self.dialect.name()
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        to_json(&RecoveredDocument::new(&self.recovered, self.dialect))
+    }
+
+    #[pyo3(signature = (dialect, mode = "canonical"))]
+    fn render(&self, dialect: &str, mode: &str) -> PyResult<String> {
+        render_parsed(self.recovered.parsed(), resolve_dialect(dialect)?, mode)
+    }
+
+    #[pyo3(signature = (node_id, dialect, mode = "canonical"))]
+    fn render_fragment(&self, node_id: u32, dialect: &str, mode: &str) -> PyResult<String> {
+        render_parsed_fragment(
+            self.recovered.parsed(),
+            node_id,
+            resolve_dialect(dialect)?,
+            mode,
+        )
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (sql, dialect = "ansi", recursion_limit = None, capture_trivia = false, parse_float_as_decimal = false))]
+fn parse_document(
+    sql: &str,
+    dialect: &str,
+    recursion_limit: Option<usize>,
+    capture_trivia: bool,
+    parse_float_as_decimal: bool,
+) -> PyResult<NativeDocument> {
+    let dialect = resolve_dialect(dialect)?;
+    let config = parse_config(
+        dialect,
+        recursion_limit,
+        capture_trivia,
+        parse_float_as_decimal,
+    );
+    let parsed = Python::attach(|py| py.detach(|| parse_builtin_with(sql, config)))
+        .map_err(|error| parse_error_to_pyerr(&error))?;
+    Ok(NativeDocument { parsed, dialect })
+}
+
+#[pyfunction]
+#[pyo3(signature = (sql, dialect = "ansi", recursion_limit = None, capture_trivia = false, parse_float_as_decimal = false))]
+fn parse_recovering_document(
+    sql: &str,
+    dialect: &str,
+    recursion_limit: Option<usize>,
+    capture_trivia: bool,
+    parse_float_as_decimal: bool,
+) -> PyResult<NativeRecoveredDocument> {
+    let dialect = resolve_dialect(dialect)?;
+    let config = parse_config(
+        dialect,
+        recursion_limit,
+        capture_trivia,
+        parse_float_as_decimal,
+    );
+    let recovered = Python::attach(|py| py.detach(|| parse_recovering_builtin_with(sql, config)))
+        .map_err(|error| parse_error_to_pyerr(&error))?;
+    Ok(NativeRecoveredDocument { recovered, dialect })
+}
 
 #[pyfunction]
 #[pyo3(signature = (sql, dialect = "ansi", recursion_limit = None, capture_trivia = false, parse_float_as_decimal = false))]
@@ -37,8 +150,13 @@ fn parse(
     parse_float_as_decimal: bool,
 ) -> PyResult<String> {
     let builtin = resolve_dialect(dialect)?;
-    let options = parse_options(recursion_limit, capture_trivia, parse_float_as_decimal);
-    match parse_with_builtin_options(sql, builtin, options) {
+    let config = parse_config(
+        builtin,
+        recursion_limit,
+        capture_trivia,
+        parse_float_as_decimal,
+    );
+    match parse_builtin_with(sql, config) {
         Ok(parsed) => to_json(&ParseDocument::new(&parsed, builtin)),
         Err(error) => Err(parse_error_to_pyerr(&error)),
     }
@@ -54,9 +172,14 @@ fn parse_recovering(
     parse_float_as_decimal: bool,
 ) -> PyResult<String> {
     let builtin = resolve_dialect(dialect)?;
-    let options = parse_options(recursion_limit, capture_trivia, parse_float_as_decimal);
-    let recovered = parse_recovering_with_builtin_options(sql, builtin, options)
-        .map_err(|error| parse_error_to_pyerr(&error))?;
+    let config = parse_config(
+        builtin,
+        recursion_limit,
+        capture_trivia,
+        parse_float_as_decimal,
+    );
+    let recovered =
+        parse_recovering_builtin_with(sql, config).map_err(|error| parse_error_to_pyerr(&error))?;
     to_json(&RecoveredDocument::new(&recovered, builtin))
 }
 
@@ -109,12 +232,21 @@ fn render_fragment(
     dialect: &str,
     mode: &str,
 ) -> PyResult<String> {
-    use squonk::ast::NodeId;
-
     let builtin = resolve_dialect(dialect)?;
     let parsed: Parsed = serde_json::from_str(document_json).map_err(|error| {
         SerializationError::new_err(format!("failed to deserialize parse document: {error}"))
     })?;
+    render_parsed_fragment(&parsed, node_id, builtin, mode)
+}
+
+fn render_parsed_fragment(
+    parsed: &Parsed,
+    node_id: u32,
+    dialect: BuiltinDialect,
+    mode: &str,
+) -> PyResult<String> {
+    use squonk::ast::NodeId;
+
     let node_id = NodeId::new(node_id)
         .ok_or_else(|| UnsupportedNodeRenderError::new_err("node id must be non-zero"))?;
     // Render for the target dialect with the requested mode, matching `render_document`.
@@ -122,7 +254,7 @@ fn render_fragment(
         mode: render_mode(mode)?,
         ..RenderConfig::default()
     };
-    let renderer = Renderer::with_config(builtin, config);
+    let renderer = Renderer::with_config(dialect, config);
     parsed
         .render_fragment_by_id(node_id, renderer.config())
         .map_err(|error| UnsupportedNodeRenderError::new_err(error.to_string()))
@@ -137,9 +269,8 @@ fn render_sql(
     recursion_limit: Option<usize>,
 ) -> PyResult<String> {
     let builtin = resolve_dialect(dialect)?;
-    let parsed =
-        parse_with_builtin_options(sql, builtin, parse_options(recursion_limit, false, false))
-            .map_err(|error| parse_error_to_pyerr(&error))?;
+    let parsed = parse_builtin_with(sql, parse_config(builtin, recursion_limit, false, false))
+        .map_err(|error| parse_error_to_pyerr(&error))?;
     render_parsed(&parsed, builtin, mode)
 }
 
@@ -153,9 +284,8 @@ fn transpile(
 ) -> PyResult<String> {
     let source = resolve_dialect(source_dialect)?;
     let target = resolve_dialect(target_dialect)?;
-    let parsed =
-        parse_with_builtin_options(sql, source, parse_options(recursion_limit, false, false))
-            .map_err(|error| parse_error_to_pyerr(&error))?;
+    let parsed = parse_builtin_with(sql, parse_config(source, recursion_limit, false, false))
+        .map_err(|error| parse_error_to_pyerr(&error))?;
     Renderer::new(target)
         .render_parsed(&parsed)
         .map_err(|error| RenderError::new_err(error.to_string()))
@@ -218,18 +348,19 @@ fn render_mode(mode: &str) -> PyResult<RenderMode> {
     }
 }
 
-fn parse_options(
+fn parse_config(
+    dialect: BuiltinDialect,
     recursion_limit: Option<usize>,
     capture_trivia: bool,
     parse_float_as_decimal: bool,
-) -> ParseOptions {
-    let mut options = ParseOptions::default()
-        .with_trivia_capture(capture_trivia)
-        .with_parse_float_as_decimal(parse_float_as_decimal);
+) -> ParseConfig<BuiltinDialect> {
+    let mut config = ParseConfig::new(dialect)
+        .capture_trivia(capture_trivia)
+        .parse_float_as_decimal(parse_float_as_decimal);
     if let Some(limit) = recursion_limit {
-        options = options.with_recursion_limit(limit);
+        config = config.recursion_limit(limit);
     }
-    options
+    config
 }
 
 fn resolve_dialect(name: &str) -> PyResult<BuiltinDialect> {
@@ -278,8 +409,12 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     // package version (docs/schema-contract.md). Mirrors `schemaVersion()` in the
     // WASM/npm binding.
     module.add("__schema_version__", WIRE_SCHEMA_VERSION)?;
+    module.add_class::<NativeDocument>()?;
+    module.add_class::<NativeRecoveredDocument>()?;
     module.add_function(wrap_pyfunction!(parse, module)?)?;
+    module.add_function(wrap_pyfunction!(parse_document, module)?)?;
     module.add_function(wrap_pyfunction!(parse_recovering, module)?)?;
+    module.add_function(wrap_pyfunction!(parse_recovering_document, module)?)?;
     module.add_function(wrap_pyfunction!(supported_dialects, module)?)?;
     module.add_function(wrap_pyfunction!(tokenize, module)?)?;
     module.add_function(wrap_pyfunction!(render_document, module)?)?;

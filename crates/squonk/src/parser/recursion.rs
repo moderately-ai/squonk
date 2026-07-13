@@ -19,7 +19,7 @@ use crate::ast::{NoExt, Statement};
 use crate::error::{ParseErrorKind, ParseResult};
 use crate::tokenizer::tokenize;
 
-use super::{FeatureDialect, ParseOptions, Parser, TestDialect, parse_with, parse_with_options};
+use super::{FeatureDialect, ParseConfig, Parser, TestDialect, parse_with};
 
 /// `SELECT ((( … 1 … )))` with `n` nested parentheses — expression recursion
 /// through [`parse_expr_bp`](Parser::parse_expr_bp); one guard entry per level.
@@ -73,14 +73,14 @@ fn nested_explains(n: usize) -> String {
 /// hundreds.
 const LOW_LIMIT: usize = 16;
 
-fn limit(n: usize) -> ParseOptions {
-    ParseOptions::default().with_recursion_limit(n)
+fn limit(n: usize) -> ParseConfig {
+    ParseConfig::default().recursion_limit(n)
 }
 
 #[test]
 fn nested_parentheses_past_the_limit_reject_cleanly() {
     let sql = nested_parens(LOW_LIMIT + 8);
-    let err = parse_with_options(&sql, TestDialect, limit(LOW_LIMIT))
+    let err = parse_with(&sql, limit(LOW_LIMIT).dialect(TestDialect))
         .expect_err("parentheses nested past the limit must be rejected, not crash");
     assert_eq!(err.kind, ParseErrorKind::RecursionLimitExceeded);
     // The error carries a real source span (the offending location), not the
@@ -101,7 +101,7 @@ fn nested_subqueries_past_the_limit_reject_cleanly() {
     // `every_audited_recursion_site_rejects_past_the_limit` below also drives this
     // exact vector.
     let sql = nested_paren_queries(LOW_LIMIT + 8);
-    let err = parse_with_options(&sql, TestDialect, limit(LOW_LIMIT))
+    let err = parse_with(&sql, limit(LOW_LIMIT).dialect(TestDialect))
         .expect_err("subqueries nested past the limit must be rejected, not crash");
     assert_eq!(err.kind, ParseErrorKind::RecursionLimitExceeded);
 }
@@ -111,9 +111,13 @@ fn high_but_safe_nesting_is_accepted_at_the_default_limit() {
     // 64 levels is far past anything legitimate yet well within the default 128, so
     // both the parenthesis and subquery vectors must parse — the guard rejects DoS
     // input without clipping ordinary (even pathological-but-bounded) queries.
-    parse_with(&nested_parens(64), TestDialect).expect("64 nested parens parse under the default");
-    parse_with(&nested_paren_queries(64), TestDialect)
-        .expect("64 nested subqueries parse under the default");
+    parse_with(&nested_parens(64), crate::ParseConfig::new(TestDialect))
+        .expect("64 nested parens parse under the default");
+    parse_with(
+        &nested_paren_queries(64),
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("64 nested subqueries parse under the default");
 }
 
 #[test]
@@ -121,23 +125,23 @@ fn the_recursion_limit_is_configurable() {
     // The very same input is rejected under a tight limit and accepted under a
     // generous one — proving the knob, not just a hard-coded constant, is in force.
     let sql = nested_parens(40);
-    let err = parse_with_options(&sql, TestDialect, limit(20))
+    let err = parse_with(&sql, limit(20).dialect(TestDialect))
         .expect_err("40 nested parens exceed a limit of 20");
     assert_eq!(err.kind, ParseErrorKind::RecursionLimitExceeded);
-    parse_with_options(&sql, TestDialect, limit(200))
+    parse_with(&sql, limit(200).dialect(TestDialect))
         .expect("40 nested parens fit comfortably under a limit of 200");
 }
 
 #[test]
 fn the_limit_is_configurable_through_the_engine_builder() {
-    // The underlying parser/engine option (`Parser::with_recursion_limit`) that the
-    // public `ParseOptions` wraps, exercised directly.
+    // The underlying parser/engine option (`Parser::recursion_limit`) that the
+    // public `ParseConfig` wraps, exercised directly.
     let sql = nested_parens(40);
     let tokens = tokenize(&sql).expect("the input lexes cleanly");
-    let mut parser = Parser::new(&sql, &tokens, TestDialect).with_recursion_limit(20);
+    let mut parser = Parser::new(&sql, &tokens, TestDialect).recursion_limit(20);
     let err = parser
         .parse_next_statement()
-        .expect_err("the engine option bounds depth just like ParseOptions");
+        .expect_err("the engine option bounds depth just like ParseConfig");
     assert_eq!(err.kind, ParseErrorKind::RecursionLimitExceeded);
 }
 
@@ -172,7 +176,7 @@ fn every_audited_recursion_site_rejects_past_the_limit() {
         ),
     ];
     for (label, sql) in vectors {
-        let err = parse_with_options(&sql, TestDialect, limit(LOW_LIMIT))
+        let err = parse_with(&sql, limit(LOW_LIMIT).dialect(TestDialect))
             .err()
             .unwrap_or_else(|| panic!("{label}: expected a clean rejection, but the input parsed"));
         assert_eq!(err.kind, ParseErrorKind::RecursionLimitExceeded, "{label}");
@@ -200,13 +204,13 @@ fn nested_trigger_body_past_the_limit_rejects_cleanly() {
     // Uses the SQLite preset because `CREATE TRIGGER` is gated to it.
     use crate::dialect::Sqlite;
     let sql = nested_trigger_body(LOW_LIMIT + 8);
-    let err = parse_with_options(&sql, Sqlite, limit(LOW_LIMIT))
+    let err = parse_with(&sql, limit(LOW_LIMIT).dialect(Sqlite))
         .expect_err("a trigger body nested past the limit must be rejected, not crash");
     assert_eq!(err.kind, ParseErrorKind::RecursionLimitExceeded);
     // A shallow trigger body still parses comfortably under the default limit.
     parse_with(
         "CREATE TRIGGER trg AFTER INSERT ON t BEGIN SELECT 1; END",
-        Sqlite,
+        crate::ParseConfig::new(Sqlite),
     )
     .expect("a shallow trigger body parses under the default limit");
 }
@@ -225,7 +229,7 @@ fn sibling_subtrees_do_not_accumulate_depth() {
         }
         sql.push_str("(1)");
     }
-    parse_with_options(&sql, TestDialect, limit(8))
+    parse_with(&sql, limit(8).dialect(TestDialect))
         .expect("independent sibling groups must not accumulate recursion depth");
 }
 
@@ -247,10 +251,13 @@ fn frame_growth_trips_the_drift_sentinel_before_the_canary() {
         .name("expr-frame-drift-sentinel".into())
         .stack_size(1_600_000)
         .spawn(|| {
-            parse_with(&nested_parens(64), TestDialect)
+            parse_with(&nested_parens(64), crate::ParseConfig::new(TestDialect))
                 .expect("64 nested parens parse within the 1.6 MB sentinel stack");
-            parse_with(&nested_paren_queries(64), TestDialect)
-                .expect("64 nested subqueries parse within the 1.6 MB sentinel stack");
+            parse_with(
+                &nested_paren_queries(64),
+                crate::ParseConfig::new(TestDialect),
+            )
+            .expect("64 nested subqueries parse within the 1.6 MB sentinel stack");
         })
         .expect("the sentinel thread spawns");
     sentinel
@@ -282,7 +289,7 @@ fn nested_compound(n: usize) -> String {
 /// seam), at the given recursion limit.
 fn parse_nested_compound(sql: &str, limit: usize) -> ParseResult<Statement<NoExt>> {
     let tokens = tokenize(sql)?;
-    let mut parser = Parser::new(sql, &tokens, COMPOUND_DIALECT).with_recursion_limit(limit);
+    let mut parser = Parser::new(sql, &tokens, COMPOUND_DIALECT).recursion_limit(limit);
     parser.parse_body_statement()
 }
 

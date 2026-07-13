@@ -23,8 +23,82 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  native:
+    name: native ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: native-darwin-arm64, target: aarch64-apple-darwin, runner: macos-15 }
+          - { label: native-darwin-x64, target: x86_64-apple-darwin, runner: macos-15-intel }
+          - { label: native-linux-arm64-gnu, target: aarch64-unknown-linux-gnu, build-target: aarch64-unknown-linux-gnu.2.28, runner: ubuntu-24.04-arm, zig: true }
+          - { label: native-linux-x64-gnu, target: x86_64-unknown-linux-gnu, build-target: x86_64-unknown-linux-gnu.2.28, runner: ubuntu-24.04, zig: true }
+          - { label: native-linux-arm64-musl, target: aarch64-unknown-linux-musl, runner: ubuntu-24.04-arm, musl: true }
+          - { label: native-linux-x64-musl, target: x86_64-unknown-linux-musl, runner: ubuntu-24.04, musl: true }
+          - { label: native-win32-arm64-msvc, target: aarch64-pc-windows-msvc, runner: windows-11-arm }
+          - { label: native-win32-x64-msvc, target: x86_64-pc-windows-msvc, runner: windows-2025 }
+    defaults:
+      run:
+        working-directory: crates/squonk-wasm
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install Rust target
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install musl linker
+        if: ${{ matrix.musl == true }}
+        run: sudo apt-get update && sudo apt-get install --yes musl-tools
+
+      - name: Install Zig
+        if: ${{ matrix.zig == true }}
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: "0.14.1"
+
+      - name: Install cargo-zigbuild
+        if: ${{ matrix.zig == true }}
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        with:
+          tool: cargo-zigbuild@0.23.0
+
+      - name: Build Node-API addon
+        env:
+          SQUONK_NATIVE_PACKAGE: ${{ matrix.label }}
+          SQUONK_NATIVE_TARGET: ${{ matrix['build-target'] || matrix.target }}
+          SQUONK_CARGO_SUBCOMMAND: ${{ matrix.zig && 'zigbuild' || 'build' }}
+        run: npm run build:native
+
+      - name: Smoke native addon
+        if: ${{ matrix.musl != true }}
+        run: node scripts/smoke-native-addon.mjs native-artifacts/${{ matrix.label }}/squonk.node
+
+      - name: Smoke musl addon in Alpine
+        if: ${{ matrix.musl == true }}
+        shell: bash
+        run: docker run --rm --volume "$PWD:/work" --workdir /work node:24-alpine node scripts/smoke-native-addon.mjs native-artifacts/${{ matrix.label }}/squonk.node
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-${{ matrix.label }}
+          if-no-files-found: error
+          retention-days: 7
+          path: crates/squonk-wasm/native-artifacts
+
   build:
     name: build and smoke npm package
+    needs: native
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -58,11 +132,24 @@ jobs:
           npm install --ignore-scripts --no-package-lock
           npm install --global binaryen@130.0.0
 
-      - name: Build and stage every npm package
-        run: npm run build
+      - name: Build every WebAssembly and TypeScript package
+        run: |
+          npm run build:wasm
+          npm run build:ts
+
+      - name: Download every native addon
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: crates/squonk-wasm/native-artifacts
+
+      - name: Stage every facade and platform package
+        run: npm run stage
 
       - name: Verify declarations and every Node/browser runtime
         run: |
+          npm run check:version
           npm run typecheck
           npm run smoke:variants
 
@@ -98,6 +185,43 @@ jobs:
           retention-days: 7
           path: crates/squonk-wasm/dist/npm
 
+  runtime-compat:
+    name: Bun, Deno, and workerd consumers
+    needs: build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: crates/squonk-wasm
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.3.11"
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: "2.4.3"
+
+      - name: Download verified packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: npm-packages
+          path: crates/squonk-wasm/dist/npm
+
+      - name: Exercise packed packages in every portable runtime
+        run: |
+          npm run smoke:runtimes
+          npm run smoke:workerd
+
   node-compat:
     name: Node ${{ matrix.node }} package consumers
     needs: build
@@ -132,7 +256,7 @@ jobs:
 
   publish:
     name: publish to npm
-    needs: [build, node-compat]
+    needs: [build, node-compat, runtime-compat]
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true' }}
     runs-on: ubuntu-latest
     environment: npm
@@ -160,19 +284,19 @@ jobs:
 
       - name: Enable publishing in the verified artifacts
         run: |
-          for label in ansi postgres mysql sqlite duckdb lenient all; do
-            npm pkg set private=false --json --prefix "$label"
+          for dir in */; do
+            npm pkg set private=false --json --prefix "$dir"
           done
 
       - name: Review every exact publish manifest again
         run: |
-          for label in ansi postgres mysql sqlite duckdb lenient all; do
+          for label in native-darwin-arm64 native-darwin-x64 native-linux-arm64-gnu native-linux-x64-gnu native-linux-arm64-musl native-linux-x64-musl native-win32-arm64-msvc native-win32-x64-msvc ansi postgres mysql sqlite duckdb lenient all; do
             npm publish "./$label" --dry-run --provenance --access public
           done
 
       - name: Publish with OIDC provenance
         run: |
-          for label in ansi postgres mysql sqlite duckdb lenient all; do
+          for label in native-darwin-arm64 native-darwin-x64 native-linux-arm64-gnu native-linux-x64-gnu native-linux-arm64-musl native-linux-x64-musl native-win32-arm64-msvc native-win32-x64-msvc ansi postgres mysql sqlite duckdb lenient all; do
             NAME=$(node -p "require('./$label/package.json').name")
             VERSION=$(node -p "require('./$label/package.json').version")
             EXPECTED=$(npm pack "./$label" --dry-run --json | node --input-type=module -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => process.stdout.write(JSON.parse(s)[0].integrity))')

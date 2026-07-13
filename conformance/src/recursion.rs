@@ -4,7 +4,7 @@
 //! Public-API DoS-safety: deeply nested untrusted SQL is rejected cleanly rather
 //! than overflowing the stack (ADR-0012).
 //!
-//! Black-box over the published entry points (`parse_with` / `parse_with_options`)
+//! Black-box over the published entry points (`parse_with` / `parse_with`)
 //! and the `Ansi` dialect — the surface a downstream consumer fronting untrusted
 //! SQL actually uses. The from-scratch stress spike crashed an *unguarded* build at
 //! ~721 nested parentheses / ~406 nested subqueries; here each vector is nested far
@@ -23,7 +23,7 @@
 
 use squonk::dialect::Ansi;
 use squonk::error::ParseErrorKind;
-use squonk::{ParseOptions, parse_with, parse_with_options};
+use squonk::{ParseConfig, parse_with};
 
 /// Far past both the empirical crash depth and the default limit.
 const ADVERSARIAL_DEPTH: usize = 1500;
@@ -66,7 +66,7 @@ fn on_stack(stack_bytes: usize, body: impl FnOnce() + Send + 'static) {
 }
 
 fn assert_clean_recursion_rejection(sql: String) {
-    let err = parse_with(&sql, Ansi)
+    let err = parse_with(&sql, squonk::ParseConfig::new(Ansi))
         .expect_err("deeply nested input must be rejected, never accepted or crashed");
     assert_eq!(err.kind, ParseErrorKind::RecursionLimitExceeded);
 }
@@ -117,12 +117,8 @@ fn a_raised_limit_still_bounds_recursion() {
     // build), since the point is that the *limit* is enforced, not how deep it sits.
     on_stack(8 * 1024 * 1024, || {
         let sql = nested_parens(ADVERSARIAL_DEPTH);
-        let err = parse_with_options(
-            &sql,
-            Ansi,
-            ParseOptions::default().with_recursion_limit(256),
-        )
-        .expect_err("1500 levels exceed a raised limit of 256");
+        let err = parse_with(&sql, ParseConfig::new(Ansi).recursion_limit(256))
+            .expect_err("1500 levels exceed a raised limit of 256");
         assert_eq!(err.kind, ParseErrorKind::RecursionLimitExceeded);
     });
 }
@@ -131,8 +127,11 @@ fn a_raised_limit_still_bounds_recursion() {
 fn ordinary_depth_still_parses() {
     // The guard must not clip legitimate queries: a handful of nesting levels parses
     // normally under the default limit.
-    parse_with(&nested_parens(8), Ansi).expect("ordinary nesting parses");
-    parse_with(&nested_subqueries(8), Ansi).expect("ordinary subquery nesting parses");
-    parse_with(&nested_scalar_subqueries(8), Ansi).expect("ordinary scalar subqueries parse");
-    parse_with(&nested_derived_tables(8), Ansi).expect("ordinary derived tables parse");
+    parse_with(&nested_parens(8), squonk::ParseConfig::new(Ansi)).expect("ordinary nesting parses");
+    parse_with(&nested_subqueries(8), squonk::ParseConfig::new(Ansi))
+        .expect("ordinary subquery nesting parses");
+    parse_with(&nested_scalar_subqueries(8), squonk::ParseConfig::new(Ansi))
+        .expect("ordinary scalar subqueries parse");
+    parse_with(&nested_derived_tables(8), squonk::ParseConfig::new(Ansi))
+        .expect("ordinary derived tables parse");
 }

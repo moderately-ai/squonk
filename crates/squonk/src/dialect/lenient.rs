@@ -14,7 +14,7 @@ use crate::render::RenderDialect;
 
 /// The permissive "parse anything" tooling dialect ([`FeatureSet::LENIENT`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, Lenient)`, or by
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Lenient))`, or by
 /// runtime name through [`BuiltinDialect`](super::BuiltinDialect). It is the honest,
 /// fully-documented permissive union (every enabled feature and every conflict-resolution
 /// rule is spelled out on [`FeatureSet::LENIENT`]) — **not** a "generic" vibe-union;
@@ -69,7 +69,7 @@ mod tests {
     /// failure or a non-column projection — so it doubles as the conflict-rule-1 lens
     /// (a `"x"` lexed as a string would not be `Expr::Column`).
     fn lenient_identifier_projection_count(sql: &str) -> Option<usize> {
-        let parsed = parse_with(sql, Lenient).ok()?;
+        let parsed = parse_with(sql, crate::ParseConfig::new(Lenient)).ok()?;
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             return None;
         };
@@ -115,14 +115,15 @@ mod tests {
         // Rule 3: `$1` is a positional *parameter*, not a money literal. It parses (the
         // parameter form is enabled) where a stray `$` would be a lex error.
         assert!(
-            parse_with("SELECT $1", Lenient).is_ok(),
+            parse_with("SELECT $1", crate::ParseConfig::new(Lenient)).is_ok(),
             "`$1` lexes as a positional parameter under Lenient",
         );
 
         // Rule 2: `[1]` is a bracket *identifier*, not array-subscript punctuation, so
         // `SELECT a[1]` is not a subscript expression — `[1]` lexes as a quoted identifier
         // and is consumed as `a`'s AS-less column alias (`a AS "1"`).
-        let parsed = parse_with("SELECT a[1] FROM t", Lenient).expect("parses under Lenient");
+        let parsed = parse_with("SELECT a[1] FROM t", crate::ParseConfig::new(Lenient))
+            .expect("parses under Lenient");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };
@@ -155,9 +156,12 @@ mod tests {
             "SELECT a # c\nFROM t",         // `#` line comment
             "SELECT $tag$body$tag$ FROM t", // dollar-quoted string literal
         ] {
-            assert!(parse_with(sql, Lenient).is_ok(), "Lenient accepts {sql:?}");
             assert!(
-                parse_with(sql, Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
+                "Lenient accepts {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
                 "strict ANSI still rejects {sql:?} (no regression)",
             );
         }
@@ -168,7 +172,10 @@ mod tests {
         // Regression guard: the permissive union is opt-in. ANSI keeps rejecting the
         // backtick and bracket identifier styles it always did.
         for sql in [r#"SELECT `x` FROM t"#, "SELECT [x] FROM t"] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
         }
     }
 }

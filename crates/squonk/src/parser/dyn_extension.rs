@@ -174,7 +174,7 @@ fn projection_expr(parsed: &Parsed<Arc<str>, DynExt>) -> &Expr<DynExt> {
 
 /// Canonically render a parsed `SELECT` and return its SQL text.
 fn canonical(src: &str) -> String {
-    parse_with(src, DynDialect)
+    parse_with(src, crate::ParseConfig::new(DynDialect))
         .expect("DynDialect parses the test expression")
         .to_string()
 }
@@ -208,7 +208,7 @@ fn dynamic_custom_operator_trees_round_trip() {
 
 #[test]
 fn parenthesized_mode_wraps_erased_operators_like_built_ins() {
-    let parsed = parse_with("SELECT ~ a ^ b", DynDialect).expect("parses");
+    let parsed = parse_with("SELECT ~ a ^ b", crate::ParseConfig::new(DynDialect)).expect("parses");
     let config = RenderConfig {
         mode: RenderMode::Parenthesized,
         ..RenderConfig::default()
@@ -246,7 +246,7 @@ fn visitor_downcasts_heterogeneous_erased_nodes() {
         }
     }
 
-    let parsed = parse_with("SELECT ~ a ^ b", DynDialect).expect("parses");
+    let parsed = parse_with("SELECT ~ a ^ b", crate::ParseConfig::new(DynDialect)).expect("parses");
     let mut count = Count::default();
     count.visit_expr(projection_expr(&parsed));
 

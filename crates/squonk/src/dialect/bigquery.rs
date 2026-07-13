@@ -13,7 +13,7 @@ use crate::parser::Dialect;
 
 /// The BigQuery / ZetaSQL dialect ([`FeatureSet::BIGQUERY`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, BigQuery)`. BigQuery is
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(BigQuery))`. BigQuery is
 /// exposed as a deliberately conservative ANSI-derived preset (no BigQuery oracle exists to fit
 /// a wider surface): it adds the first-class `UNNEST(<expr>)` table factor with its
 /// `WITH OFFSET [AS <alias>]` tail, the `STRUCT(...)` value constructor (`STRUCT(1, 2)`,
@@ -66,25 +66,28 @@ mod tests {
             "SELECT * FROM UNNEST(arr) WITH OFFSET AS pos",
             "SELECT * FROM t CROSS JOIN UNNEST(t.items) WITH OFFSET AS ord",
         ] {
-            assert!(parse_with(sql, BigQuery).is_ok(), "BigQuery parses {sql:?}");
             assert!(
-                parse_with(sql, Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(BigQuery)).is_ok(),
+                "BigQuery parses {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
                 "ANSI has no UNNEST factor, so it rejects {sql:?}",
             );
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL parses UNNEST but rejects the WITH OFFSET tail in {sql:?}",
             );
             assert!(
-                parse_with(sql, MySql).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
                 "MySQL has no UNNEST factor, so it rejects {sql:?}",
             );
             assert!(
-                parse_with(sql, Sqlite).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
                 "SQLite has no UNNEST factor, so it rejects {sql:?}",
             );
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
                 "DuckDB parses UNNEST but rejects the WITH OFFSET tail in {sql:?}",
             );
         }
@@ -97,7 +100,10 @@ mod tests {
         // factor; the three ANSI-string presets reject it — the boundary that matters here is
         // simply that BigQuery accepts the base form.
         for sql in ["SELECT * FROM UNNEST(arr)", "SELECT * FROM UNNEST(a, b)"] {
-            assert!(parse_with(sql, BigQuery).is_ok(), "BigQuery parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(BigQuery)).is_ok(),
+                "BigQuery parses {sql:?}"
+            );
         }
     }
 
@@ -108,28 +114,28 @@ mod tests {
         // holds only for ANSI/PostgreSQL/DuckDB; the shared half is asserted explicitly.
         let backtick = "SELECT `a b` FROM t";
         assert!(
-            parse_with(backtick, BigQuery).is_ok(),
+            parse_with(backtick, crate::ParseConfig::new(BigQuery)).is_ok(),
             "BigQuery reads `` `a b` `` as an identifier",
         );
         assert!(
-            parse_with(backtick, Ansi).is_err(),
+            parse_with(backtick, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI has no backtick identifier quote",
         );
         assert!(
-            parse_with(backtick, Postgres).is_err(),
+            parse_with(backtick, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL has no backtick identifier quote",
         );
         assert!(
-            parse_with(backtick, DuckDb).is_err(),
+            parse_with(backtick, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB has no backtick identifier quote",
         );
         // The shared half: MySQL and SQLite accept backtick identifiers too.
         assert!(
-            parse_with(backtick, MySql).is_ok(),
+            parse_with(backtick, crate::ParseConfig::new(MySql)).is_ok(),
             "MySQL shares the backtick identifier quote",
         );
         assert!(
-            parse_with(backtick, Sqlite).is_ok(),
+            parse_with(backtick, crate::ParseConfig::new(Sqlite)).is_ok(),
             "SQLite shares the backtick identifier quote (MySQL compat)",
         );
     }
@@ -140,7 +146,8 @@ mod tests {
         // quoted identifier. This is a meaning divergence rather than a parse boundary: the same
         // source parses under ANSI too, but there `"hi"` is a quoted *identifier* (a column
         // reference). Introspecting the projected node proves the string reading.
-        let parsed = parse_with("SELECT \"hi\"", BigQuery).expect("BigQuery parses `\"hi\"`");
+        let parsed = parse_with("SELECT \"hi\"", crate::ParseConfig::new(BigQuery))
+            .expect("BigQuery parses `\"hi\"`");
         let SelectItem::Expr { expr, .. } = &select_projection(&parsed)[0] else {
             panic!("expected a bare projection expression");
         };
@@ -151,7 +158,8 @@ mod tests {
 
         // Under ANSI the identical source reads `"hi"` as a quoted identifier — a column
         // reference, never a literal — which is the divergence this preset flips.
-        let ansi_parsed = parse_with("SELECT \"hi\"", Ansi).expect("ANSI parses `\"hi\"`");
+        let ansi_parsed = parse_with("SELECT \"hi\"", crate::ParseConfig::new(Ansi))
+            .expect("ANSI parses `\"hi\"`");
         let SelectItem::Expr { expr, .. } = &select_projection(&ansi_parsed)[0] else {
             panic!("expected a bare projection expression");
         };

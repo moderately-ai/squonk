@@ -82,7 +82,7 @@ impl<X: Extension> ParsedExpr<X> {
 /// float (`3.14`, `1e9`, `.5`) from an integer (`42`).
 ///
 /// When `parse_float_as_decimal` is set (the parser's off-by-default
-/// [`ParseOptions::parse_float_as_decimal`](crate::parser::ParseOptions::parse_float_as_decimal)
+/// [`ParseConfig::parse_float_as_decimal`](crate::parser::ParseConfig::parse_float_as_decimal)
 /// consumer request), the float case is tagged [`LiteralKind::Decimal`] instead — the
 /// only thing the flag changes. Integers, radix integers, and money are unaffected, and
 /// the spelling round-trips from the span either way, so the flag is pure classification

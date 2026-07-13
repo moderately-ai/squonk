@@ -14,8 +14,13 @@ struct Config {
 }
 
 pub fn run(root: &Path) -> Result<i32, String> {
-    let config = load_config(root)?;
     let major = workspace_major(root)?;
+    let expected_baseline = if major == 0 {
+        "v1.0.0".to_owned()
+    } else {
+        format!("v{major}.0.0")
+    };
+    let config = load_config(root, &expected_baseline)?;
     if major == 0 {
         println!(
             "semver: pre-stable workspace; baseline {} is configured for activation at 1.0.0",
@@ -52,7 +57,7 @@ pub fn run(root: &Path) -> Result<i32, String> {
     Ok(0)
 }
 
-fn load_config(root: &Path) -> Result<Config, String> {
+fn load_config(root: &Path, expected_baseline: &str) -> Result<Config, String> {
     let path = root.join(CONFIG_PATH);
     let text = fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
     let schema = scalar(&text, "schema")?;
@@ -62,9 +67,9 @@ fn load_config(root: &Path) -> Result<Config, String> {
         ));
     }
     let baseline_tag = quoted_scalar(&text, "baseline_tag")?;
-    if baseline_tag != "v1.0.0" {
+    if baseline_tag != expected_baseline {
         return Err(format!(
-            "{CONFIG_PATH}: first stable API baseline must be `v1.0.0`, found `{baseline_tag}`"
+            "{CONFIG_PATH}: workspace major requires API baseline `{expected_baseline}`, found `{baseline_tag}`"
         ));
     }
     let package_roots = quoted_array(&text, "packages")?
@@ -340,8 +345,10 @@ mod tests {
         let temp = TempTree::new();
         temp.config("latest");
 
-        let error = load_config(&temp.0).err().expect("wrong baseline fails");
-        assert!(error.contains("must be `v1.0.0`"), "{error}");
+        let error = load_config(&temp.0, "v1.0.0")
+            .err()
+            .expect("wrong baseline fails");
+        assert!(error.contains("requires API baseline `v1.0.0`"), "{error}");
     }
 
     #[test]
@@ -354,7 +361,7 @@ mod tests {
         )
         .expect("rewrite package");
 
-        let error = load_config(&temp.0)
+        let error = load_config(&temp.0, "v1.0.0")
             .err()
             .expect("unpublished package fails");
         assert!(error.contains("not a published package"), "{error}");
@@ -376,7 +383,7 @@ mod tests {
         )
         .expect("rewrite workspace");
 
-        let error = load_config(&temp.0)
+        let error = load_config(&temp.0, "v1.0.0")
             .err()
             .expect("omitted published package fails");
         assert!(error.contains("must exactly cover"), "{error}");

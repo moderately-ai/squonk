@@ -13,7 +13,7 @@ use crate::parser::Dialect;
 
 /// The SQLite dialect ([`FeatureSet::SQLITE`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, Sqlite)`. It
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Sqlite))`. It
 /// diverges from [`Ansi`](super::Ansi) across the pure-data families the phase-0
 /// sweep proved needed — backtick / `[bracket]` identifier quotes, hex integers, the
 /// `?`/`:name`/`@name`/`$name` placeholders, the `LIMIT <offset>, <count>` comma
@@ -51,7 +51,8 @@ mod tests {
     fn sqlite_render(sql: &str) -> String {
         use squonk_ast::render::{RenderConfig, RenderCtx, RenderExt, RenderMode};
 
-        let parsed = parse_with(sql, Sqlite).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Sqlite))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let config = RenderConfig {
             mode: RenderMode::Canonical,
             target: FeatureSet::SQLITE,
@@ -106,7 +107,10 @@ mod tests {
             "SELECT 1 IS NULL",            // the plain null test still parses
             "SELECT 1 IS NOT NULL",        // ... and its negation
         ] {
-            assert!(parse_with(sql, Sqlite).is_ok(), "SQLite parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
+                "SQLite parses {sql:?}"
+            );
         }
     }
 
@@ -116,9 +120,12 @@ mod tests {
         // engine-measured via rusqlite 3.53.2. The standard requires a non-empty list, so
         // ANSI rejects both. Gated by `PredicateSyntax::empty_in_list`.
         for sql in ["SELECT 1 WHERE 1 IN ()", "SELECT 1 WHERE 1 NOT IN ()"] {
-            assert!(parse_with(sql, Sqlite).is_ok(), "SQLite parses {sql:?}");
             assert!(
-                parse_with(sql, crate::dialect::Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
+                "SQLite parses {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(crate::dialect::Ansi)).is_err(),
                 "ANSI rejects the empty `IN ()` list {sql:?}",
             );
         }
@@ -140,9 +147,12 @@ mod tests {
         // rejects it. (The bare, `AS`-less form `SELECT 1 'x'` is a separate parser surface
         // SQLite also accepts, left to its own follow-up.)
         let sql = "SELECT 1 AS 'x'";
-        assert!(parse_with(sql, Sqlite).is_ok(), "SQLite parses {sql:?}");
         assert!(
-            parse_with(sql, crate::dialect::Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
+            "SQLite parses {sql:?}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Ansi)).is_err(),
             "ANSI rejects the string-literal alias {sql:?}",
         );
         assert_eq!(sqlite_render(sql), sql);
@@ -160,9 +170,12 @@ mod tests {
             "SELECT * FROM t NOT INDEXED",
         ];
         for sql in cases {
-            assert!(parse_with(sql, Sqlite).is_ok(), "SQLite parses {sql:?}");
             assert!(
-                parse_with(sql, crate::dialect::Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
+                "SQLite parses {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(crate::dialect::Ansi)).is_err(),
                 "ANSI rejects the `INDEXED BY` directive {sql:?}",
             );
             assert_eq!(sqlite_render(sql), sql, "{sql:?} round-trips exactly");
@@ -181,7 +194,11 @@ mod tests {
 
         // The typed field carries the directive, so a planner reads it without string
         // inspection: `INDEXED BY ix` is `Named`, `NOT INDEXED` is `NotIndexed`.
-        let parsed = parse_with("SELECT * FROM t INDEXED BY ix", Sqlite).unwrap();
+        let parsed = parse_with(
+            "SELECT * FROM t INDEXED BY ix",
+            crate::ParseConfig::new(Sqlite),
+        )
+        .unwrap();
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query");
         };
@@ -203,12 +220,16 @@ mod tests {
         // `FROM t indexed` with no trailing `BY` is an engine reject (SQLite commits to the
         // directive on the keyword) — the alias-decline plus the mandatory `BY` reproduce it.
         assert!(
-            parse_with("SELECT * FROM t indexed", Sqlite).is_err(),
+            parse_with("SELECT * FROM t indexed", crate::ParseConfig::new(Sqlite)).is_err(),
             "bare `FROM t indexed` (no `BY`) is a parse error, matching SQLite",
         );
         // `NOT INDEXED AS e` is a reject — the directive must trail the alias, not lead it.
         assert!(
-            parse_with("SELECT * FROM t NOT INDEXED AS e", Sqlite).is_err(),
+            parse_with(
+                "SELECT * FROM t NOT INDEXED AS e",
+                crate::ParseConfig::new(Sqlite)
+            )
+            .is_err(),
             "`NOT INDEXED` before the alias is rejected",
         );
         // Everywhere else `indexed` stays a plain identifier (it is in no reserved set):
@@ -219,7 +240,7 @@ mod tests {
             "CREATE TABLE t (indexed INT)",
         ] {
             assert!(
-                parse_with(sql, Sqlite).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
                 "`indexed` is a plain identifier in {sql:?}",
             );
         }
@@ -293,7 +314,7 @@ mod tests {
             assert_eq!(got_words.len(), word_count, "{sql:?} word count");
             assert_eq!(got_args.as_slice(), args, "{sql:?} args");
             assert!(
-                parse_with(sql, crate::dialect::Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(crate::dialect::Ansi)).is_err(),
                 "ANSI rejects the liberal type name {sql:?}",
             );
         }
@@ -313,14 +334,26 @@ mod tests {
         // a three-argument paren list on a multi-word liberal name is a reject (SQLite's
         // `typetoken` caps the modifier list at two). (`FOO(1,2,3)` on a lone word rides the
         // pre-existing user-defined-type modifier list, a separate, wider surface.)
-        assert!(parse_with("CREATE TABLE t (c MY PRIMARY)", Sqlite).is_err());
-        assert!(parse_with("CREATE TABLE t (c FLOATING POINT(1,2,3))", Sqlite).is_err());
+        assert!(
+            parse_with(
+                "CREATE TABLE t (c MY PRIMARY)",
+                crate::ParseConfig::new(Sqlite)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "CREATE TABLE t (c FLOATING POINT(1,2,3))",
+                crate::ParseConfig::new(Sqlite)
+            )
+            .is_err()
+        );
         // A `GENERATED ALWAYS AS` generated column is unaffected — `GENERATED` terminates the
         // type run rather than being absorbed as a liberal word.
         assert!(
             parse_with(
                 "CREATE TABLE t (a INT, c INT GENERATED ALWAYS AS (a) STORED)",
-                Sqlite
+                crate::ParseConfig::new(Sqlite)
             )
             .is_ok(),
         );
@@ -350,7 +383,8 @@ mod tests {
                 TransactionModeKind::Exclusive,
             ),
         ] {
-            let parsed = parse_with(sql, Sqlite).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Sqlite))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let [Statement::Transaction { transaction, .. }] = parsed.statements() else {
                 panic!("{sql:?} did not parse to one transaction statement");
             };
@@ -372,7 +406,7 @@ mod tests {
 
         // Only one modifier word is admitted.
         assert!(
-            parse_with("BEGIN DEFERRED IMMEDIATE", Sqlite).is_err(),
+            parse_with("BEGIN DEFERRED IMMEDIATE", crate::ParseConfig::new(Sqlite)).is_err(),
             "doubling the transaction-mode modifier must reject",
         );
 
@@ -380,11 +414,11 @@ mod tests {
         // existing trailing-token error under ANSI and PostgreSQL.
         for sql in ["BEGIN DEFERRED", "BEGIN IMMEDIATE", "BEGIN EXCLUSIVE"] {
             assert!(
-                parse_with(sql, crate::dialect::Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(crate::dialect::Ansi)).is_err(),
                 "ANSI rejects the SQLite transaction-mode modifier {sql:?}",
             );
             assert!(
-                parse_with(sql, crate::dialect::Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres)).is_err(),
                 "PostgreSQL rejects the SQLite transaction-mode modifier {sql:?}",
             );
         }
@@ -468,7 +502,8 @@ mod tests {
     fn sqlite_double_equals_folds_onto_canonical_equality_with_its_spelling() {
         // A consumer matching `BinaryOperator::Eq(_)` sees both spellings — the fold
         // is what keeps rewriters/analyzers from silently missing `==` comparisons.
-        let parsed = parse_with("SELECT 1 == 1", Sqlite).expect("`==` parses");
+        let parsed =
+            parse_with("SELECT 1 == 1", crate::ParseConfig::new(Sqlite)).expect("`==` parses");
         assert!(matches!(
             project_expr(&parsed),
             Expr::BinaryOp {
@@ -476,7 +511,8 @@ mod tests {
                 ..
             }
         ));
-        let single = parse_with("SELECT 1 = 1", Sqlite).expect("`=` parses");
+        let single =
+            parse_with("SELECT 1 = 1", crate::ParseConfig::new(Sqlite)).expect("`=` parses");
         assert!(matches!(
             project_expr(&single),
             Expr::BinaryOp {
@@ -491,7 +527,7 @@ mod tests {
         // `1 IS 1` is null-safe equality — `IS NOT DISTINCT FROM` — and `1 IS NOT 2`
         // is `IS DISTINCT FROM`. Both fold onto the existing operators (no new node),
         // tagged with the SQLite bare-`IS` spelling so they render back as `IS`/`IS NOT`.
-        let is = parse_with("SELECT 1 IS 1", Sqlite).expect("`IS` parses");
+        let is = parse_with("SELECT 1 IS 1", crate::ParseConfig::new(Sqlite)).expect("`IS` parses");
         assert!(matches!(
             project_expr(&is),
             Expr::BinaryOp {
@@ -499,7 +535,8 @@ mod tests {
                 ..
             }
         ));
-        let is_not = parse_with("SELECT 1 IS NOT 2", Sqlite).expect("`IS NOT` parses");
+        let is_not = parse_with("SELECT 1 IS NOT 2", crate::ParseConfig::new(Sqlite))
+            .expect("`IS NOT` parses");
         assert!(matches!(
             project_expr(&is_not),
             Expr::BinaryOp {
@@ -508,7 +545,8 @@ mod tests {
             }
         ));
         // The plain null test keeps its dedicated shape, unaffected by general equality.
-        let is_null = parse_with("SELECT 1 IS NULL", Sqlite).expect("`IS NULL` parses");
+        let is_null = parse_with("SELECT 1 IS NULL", crate::ParseConfig::new(Sqlite))
+            .expect("`IS NULL` parses");
         assert!(matches!(project_expr(&is_null), Expr::IsNull { .. }));
     }
 
@@ -534,7 +572,11 @@ mod tests {
     #[test]
     fn sqlite_not_glob_folds_to_the_negation_of_glob() {
         // `a NOT GLOB b` has no negated surface of its own, so it is `NOT (a GLOB b)`.
-        let parsed = parse_with("SELECT 'abc' NOT GLOB 'a*'", Sqlite).expect("`NOT GLOB` parses");
+        let parsed = parse_with(
+            "SELECT 'abc' NOT GLOB 'a*'",
+            crate::ParseConfig::new(Sqlite),
+        )
+        .expect("`NOT GLOB` parses");
         let Expr::UnaryOp {
             op: UnaryOperator::Not,
             expr,
@@ -554,7 +596,8 @@ mod tests {
 
     #[test]
     fn sqlite_dollar_name_parameter_carries_the_dollar_sigil() {
-        let parsed = parse_with("SELECT $value", Sqlite).expect("`$name` parses");
+        let parsed =
+            parse_with("SELECT $value", crate::ParseConfig::new(Sqlite)).expect("`$name` parses");
         assert!(matches!(
             project_expr(&parsed),
             Expr::Parameter {
@@ -608,11 +651,11 @@ mod tests {
             "CREATE TABLE t (c SMALLINT(5))",
         ] {
             assert!(
-                parse_with(sql, Sqlite).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
                 "SQLite absorbs the display width {sql:?}",
             );
             assert!(
-                parse_with(sql, Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
                 "ANSI rejects the display width on a built-in integer {sql:?}",
             );
         }
@@ -621,7 +664,11 @@ mod tests {
         // trailing `UNSIGNED` after the parens is rejected — matching rusqlite, whose
         // type grammar forbids a keyword once the `(M)` closes.
         assert!(
-            parse_with("CREATE TABLE t (c INT(11) UNSIGNED)", Sqlite).is_err(),
+            parse_with(
+                "CREATE TABLE t (c INT(11) UNSIGNED)",
+                crate::ParseConfig::new(Sqlite)
+            )
+            .is_err(),
             "SQLite rejects a keyword modifier after the display-width parens",
         );
     }
@@ -634,7 +681,10 @@ mod tests {
             "CREATE TABLE z (end INT)",
             "SELECT desc FROM (SELECT 1 AS desc) AS s",
         ] {
-            assert!(parse_with(sql, Sqlite).is_ok(), "SQLite accepts {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
+                "SQLite accepts {sql:?}"
+            );
         }
     }
 
@@ -686,11 +736,11 @@ mod tests {
             "SELECT 1 FROM a JOIN b JOIN c ON b.id = c.id ON a.id = b.id", // stacked join qualifiers
         ] {
             assert!(
-                parse_with(sql, Sqlite).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
                 "SQLite must reject the multi-dialect form {sql:?}",
             );
             assert!(
-                parse_with(sql, Ansi).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_ok(),
                 "the override dialect (Ansi) still accepts {sql:?}",
             );
         }
@@ -704,7 +754,7 @@ mod tests {
             "ALTER TABLE t ADD COLUMN IF NOT EXISTS k INT",
         ] {
             assert!(
-                parse_with(sql, Sqlite).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
                 "SQLite must reject the ALTER existence guard {sql:?}",
             );
         }
@@ -727,7 +777,10 @@ mod tests {
             "CREATE TABLE t (x INT, y INT AS (x + 1) STORED)",
             "SELECT 1 LIMIT 2 OFFSET 3",
         ] {
-            assert!(parse_with(sql, Sqlite).is_ok(), "SQLite keeps {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
+                "SQLite keeps {sql:?}"
+            );
         }
     }
 }

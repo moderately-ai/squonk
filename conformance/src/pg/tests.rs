@@ -17,7 +17,7 @@ use squonk_ast::{JoinConstraint, JoinOperator, SetExpr, Statement, TableFactor};
 /// The neutral shape of `sql`'s first statement as our parser maps it — the
 /// single-statement projection the structural-oracle tests compare.
 fn first_ours_shape(sql: &str) -> StatementShape {
-    squonk_shape(&parse_with(sql, Postgres).expect("squonk parses"))
+    squonk_shape(&parse_with(sql, squonk::ParseConfig::new(Postgres)).expect("squonk parses"))
         .into_iter()
         .next()
         .expect("one mapped statement")
@@ -1164,11 +1164,11 @@ fn postgres_order_by_using_operator_matches_pg() {
     // error (`order_by_using` gate off).
     let using_sql = "SELECT a FROM t ORDER BY a USING <";
     assert!(
-        parse_with(using_sql, Ansi).is_err(),
+        parse_with(using_sql, squonk::ParseConfig::new(Ansi)).is_err(),
         "ANSI has no ORDER BY USING sort operator",
     );
     assert!(
-        parse_with(using_sql, MySql).is_err(),
+        parse_with(using_sql, squonk::ParseConfig::new(MySql)).is_err(),
         "MySQL has no ORDER BY USING sort operator",
     );
 }
@@ -1339,7 +1339,7 @@ fn postgres_stacked_joins_right_nest_like_pg() {
     // directly, independent of the `pg_query` cross-check above — a
     // `NestedJoin` factor wrapping `b JOIN c`, not a flat 2-join list on `a`.
     let sql = "SELECT 1 FROM a JOIN b JOIN c ON b.id = c.id ON a.id = b.id";
-    let parsed = parse_with(sql, Postgres).expect("stacked join parses");
+    let parsed = parse_with(sql, squonk::ParseConfig::new(Postgres)).expect("stacked join parses");
     let Statement::Query { query, .. } = &parsed.statements()[0] else {
         panic!("expected a query statement");
     };
@@ -2654,8 +2654,12 @@ fn pg_structural_parity_for_some_quantifier() {
     let any = "SELECT * FROM t WHERE a = ANY (SELECT b FROM u)";
     assert_structural_parity(some);
     assert_eq!(
-        squonk_shape(&parse_with(some, Postgres).expect("squonk parses SOME")),
-        squonk_shape(&parse_with(any, Postgres).expect("squonk parses ANY")),
+        squonk_shape(
+            &parse_with(some, squonk::ParseConfig::new(Postgres)).expect("squonk parses SOME")
+        ),
+        squonk_shape(
+            &parse_with(any, squonk::ParseConfig::new(Postgres)).expect("squonk parses ANY")
+        ),
         "SOME and ANY must collapse to one canonical shape",
     );
 }
@@ -2965,30 +2969,59 @@ fn pg_regress_guide_cases_remain_ticketed_gaps() {
 
 #[test]
 fn structural_shape_detects_clause_differences() {
-    let without_where =
-        squonk_shape(&parse_with("SELECT a FROM t", Postgres).expect("query parses"));
-    let with_where =
-        squonk_shape(&parse_with("SELECT a FROM t WHERE a > 1", Postgres).expect("query parses"));
+    let without_where = squonk_shape(
+        &parse_with("SELECT a FROM t", squonk::ParseConfig::new(Postgres)).expect("query parses"),
+    );
+    let with_where = squonk_shape(
+        &parse_with(
+            "SELECT a FROM t WHERE a > 1",
+            squonk::ParseConfig::new(Postgres),
+        )
+        .expect("query parses"),
+    );
 
     assert_ne!(without_where, with_where);
 }
 
 #[test]
 fn structural_shape_detects_select_core_content_differences() {
-    let column_a = squonk_shape(&parse_with("SELECT a FROM t", Postgres).expect("query parses"));
-    let column_b = squonk_shape(&parse_with("SELECT b FROM t", Postgres).expect("query parses"));
+    let column_a = squonk_shape(
+        &parse_with("SELECT a FROM t", squonk::ParseConfig::new(Postgres)).expect("query parses"),
+    );
+    let column_b = squonk_shape(
+        &parse_with("SELECT b FROM t", squonk::ParseConfig::new(Postgres)).expect("query parses"),
+    );
     assert_ne!(column_a, column_b, "projection names are structural");
 
-    let greater =
-        squonk_shape(&parse_with("SELECT a FROM t WHERE a > 1", Postgres).expect("query parses"));
-    let less =
-        squonk_shape(&parse_with("SELECT a FROM t WHERE a < 1", Postgres).expect("query parses"));
+    let greater = squonk_shape(
+        &parse_with(
+            "SELECT a FROM t WHERE a > 1",
+            squonk::ParseConfig::new(Postgres),
+        )
+        .expect("query parses"),
+    );
+    let less = squonk_shape(
+        &parse_with(
+            "SELECT a FROM t WHERE a < 1",
+            squonk::ParseConfig::new(Postgres),
+        )
+        .expect("query parses"),
+    );
     assert_ne!(greater, less, "predicate operators are structural");
 
-    let order_default =
-        squonk_shape(&parse_with("SELECT a FROM t ORDER BY a", Postgres).expect("query parses"));
+    let order_default = squonk_shape(
+        &parse_with(
+            "SELECT a FROM t ORDER BY a",
+            squonk::ParseConfig::new(Postgres),
+        )
+        .expect("query parses"),
+    );
     let order_desc = squonk_shape(
-        &parse_with("SELECT a FROM t ORDER BY a DESC", Postgres).expect("query parses"),
+        &parse_with(
+            "SELECT a FROM t ORDER BY a DESC",
+            squonk::ParseConfig::new(Postgres),
+        )
+        .expect("query parses"),
     );
     assert_ne!(
         order_default, order_desc,
@@ -2998,7 +3031,9 @@ fn structural_shape_detects_select_core_content_differences() {
 
 #[test]
 fn structural_shape_detects_expression_content_differences() {
-    let ours = |sql: &str| squonk_shape(&parse_with(sql, Postgres).expect("query parses"));
+    let ours = |sql: &str| {
+        squonk_shape(&parse_with(sql, squonk::ParseConfig::new(Postgres)).expect("query parses"))
+    };
 
     // NULL-test negation, function name, and function arity/args are structural.
     assert_ne!(ours("SELECT a IS NULL"), ours("SELECT a IS NOT NULL"));

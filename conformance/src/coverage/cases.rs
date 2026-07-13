@@ -1942,7 +1942,8 @@ pub(crate) const COVERAGE_CASES: &[CoverageCase] = &[
 /// `target_spelling` field drives. Used by the `target_spelling` coverage probes to
 /// assert which canonical type spelling a render target emits.
 pub(crate) fn render_to_target(sql: &str, target: &FeatureSet) -> String {
-    let parsed = parse_with(sql, Ansi).expect("type cast parses under ANSI");
+    let parsed =
+        parse_with(sql, squonk::ParseConfig::new(Ansi)).expect("type cast parses under ANSI");
     let config = RenderConfig {
         target: target.clone(),
         spelling: RenderSpelling::TargetDialect,
@@ -2428,8 +2429,10 @@ mod tests {
             "CREATE TABLE t (id INT) ENGINE=InnoDB",
             "CREATE TABLE t (id INT AUTO_INCREMENT)",
         ] {
-            parse_with(reject, Ansi).expect_err("ANSI rejects MySQL table-option syntax");
-            parse_with(reject, Postgres).expect_err("PostgreSQL rejects MySQL table-option syntax");
+            parse_with(reject, squonk::ParseConfig::new(Ansi))
+                .expect_err("ANSI rejects MySQL table-option syntax");
+            parse_with(reject, squonk::ParseConfig::new(Postgres))
+                .expect_err("PostgreSQL rejects MySQL table-option syntax");
         }
     }
 
@@ -2441,9 +2444,9 @@ mod tests {
         // `Postgres`/`Ansi`/`MySql` dialects, beside the `UtilitySyntax` coverage cases
         // that assert the same at the `FeatureSet` level.
         let sql = "COPY t TO STDOUT";
-        parse_with(sql, Postgres).expect("PostgreSQL accepts COPY");
-        parse_with(sql, Ansi).expect_err("ANSI gates COPY off");
-        parse_with(sql, MySql).expect_err("MySQL gates COPY off");
+        parse_with(sql, squonk::ParseConfig::new(Postgres)).expect("PostgreSQL accepts COPY");
+        parse_with(sql, squonk::ParseConfig::new(Ansi)).expect_err("ANSI gates COPY off");
+        parse_with(sql, squonk::ParseConfig::new(MySql)).expect_err("MySQL gates COPY off");
     }
 
     #[test]
@@ -2452,9 +2455,9 @@ mod tests {
         // PostgreSQL dispatches it while ANSI and MySQL gate it off, so the leading
         // `COMMENT` keyword is an unknown statement there.
         let sql = "COMMENT ON TABLE t IS 'note'";
-        parse_with(sql, Postgres).expect("PostgreSQL accepts COMMENT ON");
-        parse_with(sql, Ansi).expect_err("ANSI gates COMMENT ON off");
-        parse_with(sql, MySql).expect_err("MySQL gates COMMENT ON off");
+        parse_with(sql, squonk::ParseConfig::new(Postgres)).expect("PostgreSQL accepts COMMENT ON");
+        parse_with(sql, squonk::ParseConfig::new(Ansi)).expect_err("ANSI gates COMMENT ON off");
+        parse_with(sql, squonk::ParseConfig::new(MySql)).expect_err("MySQL gates COMMENT ON off");
     }
 
     #[test]
@@ -2472,11 +2475,13 @@ mod tests {
             "SELECT a AS `` FROM t",
             "SELECT * FROM ``",
         ] {
-            parse_with(sql, MySql).expect_err("MySQL rejects an empty backtick identifier");
+            parse_with(sql, squonk::ParseConfig::new(MySql))
+                .expect_err("MySQL rejects an empty backtick identifier");
         }
 
         // Non-regression: a non-empty backtick identifier still parses under MySQL.
-        parse_with("SELECT `x` FROM t", MySql).expect("a non-empty backtick identifier is valid");
+        parse_with("SELECT `x` FROM t", squonk::ParseConfig::new(MySql))
+            .expect("a non-empty backtick identifier is valid");
     }
 
     #[test]

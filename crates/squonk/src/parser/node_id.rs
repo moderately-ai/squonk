@@ -110,7 +110,7 @@ const REPRESENTATIVE_CORPUS: &[&str] = &[
 fn representative_parsed_trees_have_unique_nonzero_node_ids() {
     let mut total = 0usize;
     for &sql in REPRESENTATIVE_CORPUS {
-        let parsed = parse_with(sql, TestDialect)
+        let parsed = parse_with(sql, crate::ParseConfig::new(TestDialect))
             .unwrap_or_else(|err| panic!("representative SQL must parse: {sql:?}: {err:?}"));
         let ids: Vec<NodeId> = collect(parsed.statements())
             .iter()
@@ -151,7 +151,7 @@ fn representative_parsed_trees_have_non_synthetic_spans() {
     // would surface here as a synthetic span on a parsed node.
     let mut total = 0usize;
     for &sql in REPRESENTATIVE_CORPUS {
-        let parsed = parse_with(sql, TestDialect)
+        let parsed = parse_with(sql, crate::ParseConfig::new(TestDialect))
             .unwrap_or_else(|err| panic!("representative SQL must parse: {sql:?}: {err:?}"));
         let spans: Vec<Span> = collect(parsed.statements())
             .iter()

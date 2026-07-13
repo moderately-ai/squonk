@@ -636,7 +636,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             self.advance()?;
             let span = sign_span.union(number.span);
             let value = Literal {
-                kind: number_literal_kind(self.span_text(span), self.parse_float_as_decimal()),
+                kind: number_literal_kind(self.span_text(span), self.float_as_decimal_enabled()),
                 meta: self.make_meta(span),
             };
             let meta = self.make_meta(start.union(self.preceding_span()));
@@ -648,7 +648,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 let value = Literal {
                     kind: number_literal_kind(
                         self.span_text(token.span),
-                        self.parse_float_as_decimal(),
+                        self.float_as_decimal_enabled(),
                     ),
                     meta: self.make_meta(token.span),
                 };
@@ -4116,7 +4116,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 Ok(Literal {
                     kind: number_literal_kind(
                         self.span_text(token.span),
-                        self.parse_float_as_decimal(),
+                        self.float_as_decimal_enabled(),
                     ),
                     meta: self.make_meta(token.span),
                 })
@@ -5087,7 +5087,8 @@ mod tests {
     };
 
     fn parse_one(sql: &str) -> Parsed {
-        parse_with(sql, COPY_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
+        parse_with(sql, crate::ParseConfig::new(COPY_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
     }
 
     fn copy_of(parsed: &Parsed) -> &crate::ast::CopyStatement {
@@ -5313,7 +5314,13 @@ mod tests {
         let plain = parse_one("COPY t TO 'f' BINARY");
         assert!(!copy_of(&plain).binary);
         // The prefix cannot introduce the query source (PG has no `COPY BINARY (...)`).
-        assert!(parse_with("COPY BINARY (SELECT 1) TO STDOUT", COPY_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "COPY BINARY (SELECT 1) TO STDOUT",
+                crate::ParseConfig::new(COPY_DIALECT)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -5343,8 +5350,20 @@ mod tests {
         assert!(copy_of(&parse_one("COPY t FROM STDIN")).filter.is_none());
         // COPY TO rejects the filter (PG: "WHERE clause not allowed with COPY TO"),
         // and the query source (always TO) has no WHERE either.
-        assert!(parse_with("COPY t TO STDOUT WHERE a > 1", COPY_DIALECT).is_err());
-        assert!(parse_with("COPY (SELECT 1) TO STDOUT WHERE a > 1", COPY_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "COPY t TO STDOUT WHERE a > 1",
+                crate::ParseConfig::new(COPY_DIALECT)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "COPY (SELECT 1) TO STDOUT WHERE a > 1",
+                crate::ParseConfig::new(COPY_DIALECT)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -5428,7 +5447,7 @@ mod tests {
             // Under `COPY_DIALECT` (COPY gate on), these reject on the grammar, not the
             // gate — the intent of this test.
             assert!(
-                parse_with(sql, COPY_DIALECT).is_err(),
+                parse_with(sql, crate::ParseConfig::new(COPY_DIALECT)).is_err(),
                 "{sql:?} should be rejected",
             );
         }
@@ -5442,11 +5461,11 @@ mod tests {
         // divergence. `EXPLAIN` is ungated, so it still parses under the same baseline;
         // and the identical `COPY` parses once the gate is on (`COPY_DIALECT`).
         assert!(
-            parse_with("COPY t TO STDOUT", TestDialect).is_err(),
+            parse_with("COPY t TO STDOUT", crate::ParseConfig::new(TestDialect)).is_err(),
             "ANSI gates COPY off, so a leading COPY is an unknown statement",
         );
-        assert!(parse_with("EXPLAIN SELECT 1", TestDialect).is_ok());
-        assert!(parse_with("COPY t TO STDOUT", COPY_DIALECT).is_ok());
+        assert!(parse_with("EXPLAIN SELECT 1", crate::ParseConfig::new(TestDialect)).is_ok());
+        assert!(parse_with("COPY t TO STDOUT", crate::ParseConfig::new(COPY_DIALECT)).is_ok());
     }
 
     // --- COPY INTO (Snowflake) ----------------------------------------------
@@ -5466,7 +5485,8 @@ mod tests {
     };
 
     fn parse_copy_into(sql: &str) -> Parsed {
-        parse_with(sql, COPY_INTO_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
+        parse_with(sql, crate::ParseConfig::new(COPY_INTO_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"))
     }
 
     fn copy_into_of(parsed: &Parsed) -> &crate::ast::CopyIntoStatement {
@@ -5591,7 +5611,7 @@ mod tests {
         assert!(
             parse_with(
                 "COPY INTO t FROM (CREATE TABLE x (a INT))",
-                COPY_INTO_DIALECT
+                crate::ParseConfig::new(COPY_INTO_DIALECT)
             )
             .is_err(),
             "the transformation source admits only a query",
@@ -5608,7 +5628,7 @@ mod tests {
             "COPY INTO t FROM 's3://b/' FILE_FORMAT = (TYPE CSV)", // nested pairs require `=`
         ] {
             assert!(
-                parse_with(sql, COPY_INTO_DIALECT).is_err(),
+                parse_with(sql, crate::ParseConfig::new(COPY_INTO_DIALECT)).is_err(),
                 "{sql:?} should be rejected",
             );
         }
@@ -5621,10 +5641,28 @@ mod tests {
         // the PostgreSQL-style `copy` gate alone, `COPY INTO ...` parses as PG `COPY`
         // with `INTO` as the table name and rejects on the malformed remainder —
         // either way a reject, so the labelled coverage flip holds.
-        assert!(parse_with("COPY INTO t FROM 's3://b/'", TestDialect).is_err());
-        assert!(parse_with("COPY INTO t FROM 's3://b/'", COPY_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "COPY INTO t FROM 's3://b/'",
+                crate::ParseConfig::new(TestDialect)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "COPY INTO t FROM 's3://b/'",
+                crate::ParseConfig::new(COPY_DIALECT)
+            )
+            .is_err()
+        );
         // `copy` off, `copy_into` on: the PostgreSQL transfer shape is not admitted.
-        assert!(parse_with("COPY t TO STDOUT", COPY_INTO_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "COPY t TO STDOUT",
+                crate::ParseConfig::new(COPY_INTO_DIALECT)
+            )
+            .is_err()
+        );
         // Both surfaces coexist when both gates are on (the Lenient union).
         const BOTH: FeatureDialect = {
             const FEATURES: FeatureSet =
@@ -5637,8 +5675,8 @@ mod tests {
                 features: &FEATURES,
             }
         };
-        assert!(parse_with("COPY t TO STDOUT", BOTH).is_ok());
-        assert!(parse_with("COPY INTO t FROM 's3://b/'", BOTH).is_ok());
+        assert!(parse_with("COPY t TO STDOUT", crate::ParseConfig::new(BOTH)).is_ok());
+        assert!(parse_with("COPY INTO t FROM 's3://b/'", crate::ParseConfig::new(BOTH)).is_ok());
     }
 
     // --- PRAGMA / ATTACH / DETACH -------------------------------------------
@@ -5683,7 +5721,11 @@ mod tests {
         // The three surface forms land on the single canonical shape: the bare read
         // has no value, and `= v` / `(v)` share the value slot under the
         // `parenthesized` tag (ADR-0011).
-        let bare = parse_with("PRAGMA user_version", PRAGMA_DIALECT).unwrap();
+        let bare = parse_with(
+            "PRAGMA user_version",
+            crate::ParseConfig::new(PRAGMA_DIALECT),
+        )
+        .unwrap();
         let pragma = pragma_of(&bare);
         assert_eq!(
             bare.resolver().resolve(pragma.name.0[0].sym),
@@ -5691,7 +5733,11 @@ mod tests {
         );
         assert!(pragma.value.is_none());
 
-        let assign = parse_with("PRAGMA foreign_keys = ON", PRAGMA_DIALECT).unwrap();
+        let assign = parse_with(
+            "PRAGMA foreign_keys = ON",
+            crate::ParseConfig::new(PRAGMA_DIALECT),
+        )
+        .unwrap();
         let pragma = pragma_of(&assign);
         assert!(!pragma.parenthesized);
         let Some(SetParameterValue::Name { name, .. }) = &pragma.value else {
@@ -5699,19 +5745,31 @@ mod tests {
         };
         assert_eq!(assign.resolver().resolve(name.sym), "ON");
 
-        let call = parse_with("PRAGMA table_info(sqlite_master)", PRAGMA_DIALECT).unwrap();
+        let call = parse_with(
+            "PRAGMA table_info(sqlite_master)",
+            crate::ParseConfig::new(PRAGMA_DIALECT),
+        )
+        .unwrap();
         let pragma = pragma_of(&call);
         assert!(pragma.parenthesized);
         assert!(matches!(pragma.value, Some(SetParameterValue::Name { .. })));
 
         // A signed number folds the sign into the literal (PG `NumericOnly` /
         // SQLite `signed-number`), and a string value is a plain literal.
-        let signed = parse_with("PRAGMA cache_size = -2000", PRAGMA_DIALECT).unwrap();
+        let signed = parse_with(
+            "PRAGMA cache_size = -2000",
+            crate::ParseConfig::new(PRAGMA_DIALECT),
+        )
+        .unwrap();
         let Some(SetParameterValue::Literal { literal, .. }) = &pragma_of(&signed).value else {
             panic!("`-2000` should be one literal value");
         };
         assert_eq!(literal.kind, LiteralKind::Integer);
-        let string = parse_with("PRAGMA QUICK_CHECK('sqlite_master')", PRAGMA_DIALECT).unwrap();
+        let string = parse_with(
+            "PRAGMA QUICK_CHECK('sqlite_master')",
+            crate::ParseConfig::new(PRAGMA_DIALECT),
+        )
+        .unwrap();
         let pragma = pragma_of(&string);
         assert!(pragma.parenthesized);
         assert!(matches!(
@@ -5721,7 +5779,11 @@ mod tests {
         ));
 
         // The name is a qualified-name position: `PRAGMA main.user_version`.
-        let qualified = parse_with("PRAGMA main.user_version", PRAGMA_DIALECT).unwrap();
+        let qualified = parse_with(
+            "PRAGMA main.user_version",
+            crate::ParseConfig::new(PRAGMA_DIALECT),
+        )
+        .unwrap();
         assert_eq!(pragma_of(&qualified).name.0.len(), 2);
     }
 
@@ -5738,7 +5800,7 @@ mod tests {
             "PRAGMA user_version = ",
         ] {
             assert!(
-                parse_with(sql, PRAGMA_DIALECT).is_err(),
+                parse_with(sql, crate::ParseConfig::new(PRAGMA_DIALECT)).is_err(),
                 "{sql:?} should be rejected",
             );
         }
@@ -5748,41 +5810,58 @@ mod tests {
     fn attach_and_detach_parse_with_the_database_keyword_tag() {
         // The optional `DATABASE` noise keyword is round-trip-significant, so both
         // spellings parse onto one shape with the surface tag recording it.
-        let with_kw = parse_with("ATTACH DATABASE ':memory:' AS aux", ATTACH_DIALECT).unwrap();
+        let with_kw = parse_with(
+            "ATTACH DATABASE ':memory:' AS aux",
+            crate::ParseConfig::new(ATTACH_DIALECT),
+        )
+        .unwrap();
         let [Statement::Attach { attach, .. }] = with_kw.statements() else {
             panic!("expected an ATTACH statement");
         };
         assert!(attach.database_keyword);
         assert_eq!(with_kw.resolver().resolve(attach.schema.sym), "aux");
 
-        let bare = parse_with("ATTACH ':memory:' AS aux2", ATTACH_DIALECT).unwrap();
+        let bare = parse_with(
+            "ATTACH ':memory:' AS aux2",
+            crate::ParseConfig::new(ATTACH_DIALECT),
+        )
+        .unwrap();
         let [Statement::Attach { attach, .. }] = bare.statements() else {
             panic!("expected an ATTACH statement");
         };
         assert!(!attach.database_keyword);
 
         // The database source is a full expression, not just a string literal.
-        let expr = parse_with("ATTACH 'a' || '.db' AS x", ATTACH_DIALECT).unwrap();
+        let expr = parse_with(
+            "ATTACH 'a' || '.db' AS x",
+            crate::ParseConfig::new(ATTACH_DIALECT),
+        )
+        .unwrap();
         let [Statement::Attach { attach, .. }] = expr.statements() else {
             panic!("expected an ATTACH statement");
         };
         assert!(matches!(attach.target, Expr::BinaryOp { .. }));
 
-        let detach = parse_with("DETACH DATABASE aux", ATTACH_DIALECT).unwrap();
+        let detach = parse_with(
+            "DETACH DATABASE aux",
+            crate::ParseConfig::new(ATTACH_DIALECT),
+        )
+        .unwrap();
         let [Statement::Detach { detach, .. }] = detach.statements() else {
             panic!("expected a DETACH statement");
         };
         assert!(detach.database_keyword);
 
-        let detach_bare = parse_with("DETACH aux", ATTACH_DIALECT).unwrap();
+        let detach_bare =
+            parse_with("DETACH aux", crate::ParseConfig::new(ATTACH_DIALECT)).unwrap();
         let [Statement::Detach { detach, .. }] = detach_bare.statements() else {
             panic!("expected a DETACH statement");
         };
         assert!(!detach.database_keyword);
 
         // The `AS <schema>` tail is required, matching SQLite.
-        assert!(parse_with("ATTACH ':memory:'", ATTACH_DIALECT).is_err());
-        assert!(parse_with("DETACH", ATTACH_DIALECT).is_err());
+        assert!(parse_with("ATTACH ':memory:'", crate::ParseConfig::new(ATTACH_DIALECT)).is_err());
+        assert!(parse_with("DETACH", crate::ParseConfig::new(ATTACH_DIALECT)).is_err());
     }
 
     #[test]
@@ -5790,13 +5869,37 @@ mod tests {
         // Each knob moves only its own family: `pragma` never admits
         // `ATTACH`/`DETACH`, `attach` never admits `PRAGMA`, and the ANSI baseline
         // (both off) rejects all three as unknown statements.
-        assert!(parse_with("PRAGMA user_version", PRAGMA_DIALECT).is_ok());
-        assert!(parse_with("ATTACH ':memory:' AS aux", PRAGMA_DIALECT).is_err());
-        assert!(parse_with("DETACH aux", PRAGMA_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "PRAGMA user_version",
+                crate::ParseConfig::new(PRAGMA_DIALECT)
+            )
+            .is_ok()
+        );
+        assert!(
+            parse_with(
+                "ATTACH ':memory:' AS aux",
+                crate::ParseConfig::new(PRAGMA_DIALECT)
+            )
+            .is_err()
+        );
+        assert!(parse_with("DETACH aux", crate::ParseConfig::new(PRAGMA_DIALECT)).is_err());
 
-        assert!(parse_with("ATTACH ':memory:' AS aux", ATTACH_DIALECT).is_ok());
-        assert!(parse_with("DETACH aux", ATTACH_DIALECT).is_ok());
-        assert!(parse_with("PRAGMA user_version", ATTACH_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "ATTACH ':memory:' AS aux",
+                crate::ParseConfig::new(ATTACH_DIALECT)
+            )
+            .is_ok()
+        );
+        assert!(parse_with("DETACH aux", crate::ParseConfig::new(ATTACH_DIALECT)).is_ok());
+        assert!(
+            parse_with(
+                "PRAGMA user_version",
+                crate::ParseConfig::new(ATTACH_DIALECT)
+            )
+            .is_err()
+        );
 
         for sql in [
             "PRAGMA user_version",
@@ -5804,7 +5907,7 @@ mod tests {
             "DETACH aux",
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "ANSI gates {sql:?} off as an unknown statement",
             );
         }
@@ -5828,7 +5931,11 @@ mod tests {
     #[test]
     fn export_database_bare_and_named_forms_round_trip() {
         // Bare form: no catalogue name, path only.
-        let bare = parse_with("EXPORT DATABASE 'dir'", EXPORT_DIALECT).unwrap();
+        let bare = parse_with(
+            "EXPORT DATABASE 'dir'",
+            crate::ParseConfig::new(EXPORT_DIALECT),
+        )
+        .unwrap();
         let [Statement::Export { export, .. }] = bare.statements() else {
             panic!("expected an EXPORT statement, got {:?}", bare.statements());
         };
@@ -5836,7 +5943,11 @@ mod tests {
         assert!(export.options.is_empty());
 
         // Named form threads the catalogue through a required `TO` before the path.
-        let named = parse_with("EXPORT DATABASE mydb TO 'dir'", EXPORT_DIALECT).unwrap();
+        let named = parse_with(
+            "EXPORT DATABASE mydb TO 'dir'",
+            crate::ParseConfig::new(EXPORT_DIALECT),
+        )
+        .unwrap();
         let [Statement::Export { export, .. }] = named.statements() else {
             panic!("expected an EXPORT statement");
         };
@@ -5847,10 +5958,16 @@ mod tests {
         assert_eq!(named.resolver().resolve(database.sym), "mydb");
 
         // The named form's `TO` is required: `EXPORT DATABASE db 'dir'` without it rejects.
-        assert!(parse_with("EXPORT DATABASE mydb 'dir'", EXPORT_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "EXPORT DATABASE mydb 'dir'",
+                crate::ParseConfig::new(EXPORT_DIALECT)
+            )
+            .is_err()
+        );
 
         for sql in ["EXPORT DATABASE 'dir'", "EXPORT DATABASE mydb TO 'dir'"] {
-            let parsed = parse_with(sql, EXPORT_DIALECT).unwrap();
+            let parsed = parse_with(sql, crate::ParseConfig::new(EXPORT_DIALECT)).unwrap();
             let rendered = Renderer::new(EXPORT_DIALECT)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("renders: {err:?}"));
@@ -5864,7 +5981,7 @@ mod tests {
         // `CopyOption`/`CopyOptionValue` verbatim, with the parenthesized surface tag.
         let parsed = parse_with(
             "EXPORT DATABASE 'dir' (FORMAT parquet, COMPRESSION 'zstd', ROW_GROUP_SIZE 100000)",
-            EXPORT_DIALECT,
+            crate::ParseConfig::new(EXPORT_DIALECT),
         )
         .unwrap();
         let [Statement::Export { export, .. }] = parsed.statements() else {
@@ -5896,14 +6013,18 @@ mod tests {
         assert!(
             parse_with(
                 "EXPORT DATABASE 'dir' WITH (FORMAT parquet)",
-                EXPORT_DIALECT
+                crate::ParseConfig::new(EXPORT_DIALECT)
             )
             .is_err()
         );
 
         // The legacy un-parenthesized `copy_opt_list` branch is reachable too (DuckDB
         // accepts `HEADER`), tagged non-parenthesized.
-        let legacy = parse_with("EXPORT DATABASE 'dir' HEADER", EXPORT_DIALECT).unwrap();
+        let legacy = parse_with(
+            "EXPORT DATABASE 'dir' HEADER",
+            crate::ParseConfig::new(EXPORT_DIALECT),
+        )
+        .unwrap();
         let [Statement::Export { export, .. }] = legacy.statements() else {
             panic!("expected an EXPORT statement");
         };
@@ -5913,7 +6034,11 @@ mod tests {
 
     #[test]
     fn import_database_parses_a_bare_path_and_round_trips() {
-        let parsed = parse_with("IMPORT DATABASE 'dir'", EXPORT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "IMPORT DATABASE 'dir'",
+            crate::ParseConfig::new(EXPORT_DIALECT),
+        )
+        .unwrap();
         let [Statement::Import { .. }] = parsed.statements() else {
             panic!(
                 "expected an IMPORT statement, got {:?}",
@@ -5926,8 +6051,14 @@ mod tests {
         assert_eq!(rendered, "IMPORT DATABASE 'dir'");
 
         // IMPORT takes no options and no path is a parse error.
-        assert!(parse_with("IMPORT DATABASE 'dir' (FORMAT parquet)", EXPORT_DIALECT).is_err());
-        assert!(parse_with("IMPORT DATABASE", EXPORT_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "IMPORT DATABASE 'dir' (FORMAT parquet)",
+                crate::ParseConfig::new(EXPORT_DIALECT)
+            )
+            .is_err()
+        );
+        assert!(parse_with("IMPORT DATABASE", crate::ParseConfig::new(EXPORT_DIALECT)).is_err());
     }
 
     #[test]
@@ -5936,11 +6067,11 @@ mod tests {
         // keywords as unknown statements.
         for sql in ["EXPORT DATABASE 'dir'", "IMPORT DATABASE 'dir'"] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "ANSI gates {sql:?} off as an unknown statement",
             );
             assert!(
-                parse_with(sql, EXPORT_DIALECT).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(EXPORT_DIALECT)).is_ok(),
                 "{sql:?} parses with the gate on",
             );
         }
@@ -6015,7 +6146,7 @@ mod tests {
             "ANALYZE sqlite_master",
             "ANALYZE main.t",
         ] {
-            let parsed = parse_with(sql, MAINTENANCE_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(MAINTENANCE_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MAINTENANCE_DIALECT)
                 .render_parsed(&parsed)
@@ -6027,11 +6158,12 @@ mod tests {
     #[test]
     fn vacuum_captures_schema_and_into_independently() {
         assert!(
-            vacuum_of(&parse_with("VACUUM", MAINTENANCE_DIALECT).unwrap())
+            vacuum_of(&parse_with("VACUUM", crate::ParseConfig::new(MAINTENANCE_DIALECT)).unwrap())
                 .schema
                 .is_none()
         );
-        let with_schema = parse_with("VACUUM main", MAINTENANCE_DIALECT).unwrap();
+        let with_schema =
+            parse_with("VACUUM main", crate::ParseConfig::new(MAINTENANCE_DIALECT)).unwrap();
         let vacuum = vacuum_of(&with_schema);
         assert_eq!(
             with_schema
@@ -6042,11 +6174,19 @@ mod tests {
         assert!(vacuum.into.is_none());
 
         // `INTO` is a full expression target, and it is independent of the schema.
-        let into_only = parse_with("VACUUM INTO 'f'", MAINTENANCE_DIALECT).unwrap();
+        let into_only = parse_with(
+            "VACUUM INTO 'f'",
+            crate::ParseConfig::new(MAINTENANCE_DIALECT),
+        )
+        .unwrap();
         let vacuum = vacuum_of(&into_only);
         assert!(vacuum.schema.is_none());
         assert!(matches!(vacuum.into, Some(Expr::Literal { .. })));
-        let both = parse_with("VACUUM main INTO 'a' || '.db'", MAINTENANCE_DIALECT).unwrap();
+        let both = parse_with(
+            "VACUUM main INTO 'a' || '.db'",
+            crate::ParseConfig::new(MAINTENANCE_DIALECT),
+        )
+        .unwrap();
         let vacuum = vacuum_of(&both);
         assert!(vacuum.schema.is_some());
         assert!(matches!(vacuum.into, Some(Expr::BinaryOp { .. })));
@@ -6054,19 +6194,27 @@ mod tests {
 
     #[test]
     fn reindex_and_analyze_capture_optional_target() {
-        let bare = parse_with("REINDEX", MAINTENANCE_DIALECT).unwrap();
+        let bare = parse_with("REINDEX", crate::ParseConfig::new(MAINTENANCE_DIALECT)).unwrap();
         let [Statement::Reindex { reindex, .. }] = bare.statements() else {
             panic!("expected a REINDEX statement");
         };
         assert!(reindex.target.is_none(), "bare REINDEX has no target");
 
-        let qualified = parse_with("REINDEX main.t", MAINTENANCE_DIALECT).unwrap();
+        let qualified = parse_with(
+            "REINDEX main.t",
+            crate::ParseConfig::new(MAINTENANCE_DIALECT),
+        )
+        .unwrap();
         let [Statement::Reindex { reindex, .. }] = qualified.statements() else {
             panic!("expected a REINDEX statement");
         };
         assert_eq!(reindex.target.as_ref().unwrap().0.len(), 2, "schema.object");
 
-        let analyze = parse_with("ANALYZE sqlite_master", MAINTENANCE_DIALECT).unwrap();
+        let analyze = parse_with(
+            "ANALYZE sqlite_master",
+            crate::ParseConfig::new(MAINTENANCE_DIALECT),
+        )
+        .unwrap();
         let [Statement::Analyze { analyze, .. }] = analyze.statements() else {
             panic!("expected an ANALYZE statement");
         };
@@ -6086,7 +6234,8 @@ mod tests {
             "REINDEX 1",
             "ANALYZE 1",
         ] {
-            parse_with(sql, MAINTENANCE_DIALECT).expect_err(&format!("{sql:?} should be rejected"));
+            parse_with(sql, crate::ParseConfig::new(MAINTENANCE_DIALECT))
+                .expect_err(&format!("{sql:?} should be rejected"));
         }
     }
 
@@ -6112,8 +6261,8 @@ mod tests {
             "ANALYZE main.t",
             "ANALYZE t (a, b)",
         ] {
-            let parsed =
-                parse_with(sql, DUCKDB_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(DUCKDB_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -6124,7 +6273,7 @@ mod tests {
     #[test]
     fn duckdb_vacuum_analyze_capture_shapes() {
         // `VACUUM ANALYZE` sets the analyze flag (keyword spelling) with no operand.
-        let va = parse_with("VACUUM ANALYZE", DUCKDB_RENDER).unwrap();
+        let va = parse_with("VACUUM ANALYZE", crate::ParseConfig::new(DUCKDB_RENDER)).unwrap();
         let vacuum = vacuum_of(&va);
         assert_eq!(vacuum.analyze, Some(VacuumAnalyze::Keyword));
         assert!(vacuum.table.is_none() && vacuum.columns.is_none());
@@ -6133,36 +6282,48 @@ mod tests {
 
         // The parenthesized option list is the distinct `Parenthesized` spelling; a
         // repeated-ANALYZE list canonicalizes to the same single flag.
-        let paren = parse_with("VACUUM (ANALYZE)", DUCKDB_RENDER).unwrap();
+        let paren = parse_with("VACUUM (ANALYZE)", crate::ParseConfig::new(DUCKDB_RENDER)).unwrap();
         assert_eq!(
             vacuum_of(&paren).analyze,
             Some(VacuumAnalyze::Parenthesized)
         );
-        let repeated = parse_with("VACUUM (ANALYZE, ANALYZE)", DUCKDB_RENDER).unwrap();
+        let repeated = parse_with(
+            "VACUUM (ANALYZE, ANALYZE)",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .unwrap();
         assert_eq!(
             vacuum_of(&repeated).analyze,
             Some(VacuumAnalyze::Parenthesized)
         );
         // The paren form also carries the table + column operands.
-        let paren_full = parse_with("VACUUM (ANALYZE) db1.integers (a, b)", DUCKDB_RENDER).unwrap();
+        let paren_full = parse_with(
+            "VACUUM (ANALYZE) db1.integers (a, b)",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .unwrap();
         let vacuum = vacuum_of(&paren_full);
         assert_eq!(vacuum.analyze, Some(VacuumAnalyze::Parenthesized));
         assert_eq!(vacuum.table.as_ref().unwrap().0.len(), 2, "schema.table");
         assert_eq!(vacuum.columns.as_ref().unwrap().len(), 2);
 
         // A qualified table plus a column list (keyword spelling).
-        let full = parse_with("VACUUM ANALYZE db1.integers (a, b)", DUCKDB_RENDER).unwrap();
+        let full = parse_with(
+            "VACUUM ANALYZE db1.integers (a, b)",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .unwrap();
         let vacuum = vacuum_of(&full);
         assert_eq!(vacuum.analyze, Some(VacuumAnalyze::Keyword));
         assert_eq!(vacuum.table.as_ref().unwrap().0.len(), 2, "schema.table");
         assert_eq!(vacuum.columns.as_ref().unwrap().len(), 2);
 
         // Bare `VACUUM` (no analyze) — distinct from either analyze spelling.
-        let bare = parse_with("VACUUM", DUCKDB_RENDER).unwrap();
+        let bare = parse_with("VACUUM", crate::ParseConfig::new(DUCKDB_RENDER)).unwrap();
         assert_eq!(vacuum_of(&bare).analyze, None);
 
         // DuckDB `ANALYZE <table> (<cols>)` — the column list rides `analyze_columns`.
-        let ana = parse_with("ANALYZE t (a, b)", DUCKDB_RENDER).unwrap();
+        let ana = parse_with("ANALYZE t (a, b)", crate::ParseConfig::new(DUCKDB_RENDER)).unwrap();
         let [Statement::Analyze { analyze, .. }] = ana.statements() else {
             panic!("expected an ANALYZE statement");
         };
@@ -6205,7 +6366,8 @@ mod tests {
             "VACUUM (ANALYZE) INTO 'f'",
             "VACUUM (ANALYZE) t (a) INTO 'f'",
         ] {
-            parse_with(sql, DUCKDB_RENDER).expect_err(&format!("{sql:?} should be rejected"));
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+                .expect_err(&format!("{sql:?} should be rejected"));
         }
     }
 
@@ -6213,18 +6375,18 @@ mod tests {
     fn maintenance_gates_flip_independently() {
         // Each of the three flags admits only its own leading keyword — the proof they
         // are separate flags (the `copy`/`comment_on` precedent), not one shared gate.
-        assert!(parse_with("VACUUM", VACUUM_ONLY).is_ok());
-        assert!(parse_with("REINDEX", VACUUM_ONLY).is_err());
-        assert!(parse_with("ANALYZE", VACUUM_ONLY).is_err());
-        assert!(parse_with("REINDEX", REINDEX_ONLY).is_ok());
-        assert!(parse_with("VACUUM", REINDEX_ONLY).is_err());
-        assert!(parse_with("ANALYZE", ANALYZE_ONLY).is_ok());
-        assert!(parse_with("VACUUM", ANALYZE_ONLY).is_err());
+        assert!(parse_with("VACUUM", crate::ParseConfig::new(VACUUM_ONLY)).is_ok());
+        assert!(parse_with("REINDEX", crate::ParseConfig::new(VACUUM_ONLY)).is_err());
+        assert!(parse_with("ANALYZE", crate::ParseConfig::new(VACUUM_ONLY)).is_err());
+        assert!(parse_with("REINDEX", crate::ParseConfig::new(REINDEX_ONLY)).is_ok());
+        assert!(parse_with("VACUUM", crate::ParseConfig::new(REINDEX_ONLY)).is_err());
+        assert!(parse_with("ANALYZE", crate::ParseConfig::new(ANALYZE_ONLY)).is_ok());
+        assert!(parse_with("VACUUM", crate::ParseConfig::new(ANALYZE_ONLY)).is_err());
 
         // The ANSI baseline (all three off) rejects all three as unknown statements.
         for sql in ["VACUUM", "REINDEX", "ANALYZE"] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "ANSI gates {sql:?} off as an unknown statement",
             );
         }
@@ -6253,7 +6415,8 @@ mod tests {
             "VACUUM (ANALYZE) t (a, b)",
             "VACUUM t (a)",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -6272,7 +6435,8 @@ mod tests {
             "VACUUM (ANALYZE) t (a) INTO 'f'",
             "VACUUM db.t INTO 'f'",
         ] {
-            parse_with(sql, Lenient).expect_err(&format!("{sql:?} should be rejected"));
+            parse_with(sql, crate::ParseConfig::new(Lenient))
+                .expect_err(&format!("{sql:?} should be rejected"));
         }
 
         // `VACUUM ANALYZE INTO 'f'` is different: SQLite's grammar accepts it (`nm` =
@@ -6281,16 +6445,20 @@ mod tests {
         // is reserved in Lenient's ANSI reserved model (conflict-resolution rule 5), so
         // it cannot be read as the schema name here — a lex-class exclusion, recovered
         // by quoting, not a grammar hybrid.
-        parse_with("VACUUM ANALYZE INTO 'f'", Lenient)
+        parse_with("VACUUM ANALYZE INTO 'f'", crate::ParseConfig::new(Lenient))
             .expect_err("ANALYZE is reserved under Lenient");
-        let quoted = parse_with("VACUUM \"ANALYZE\" INTO 'f'", Lenient).unwrap();
+        let quoted = parse_with(
+            "VACUUM \"ANALYZE\" INTO 'f'",
+            crate::ParseConfig::new(Lenient),
+        )
+        .unwrap();
         let vacuum = vacuum_of(&quoted);
         assert!(vacuum.schema.is_some() && vacuum.into.is_some() && vacuum.analyze.is_none());
 
         // A taken `INTO` selects the SQLite grammar: its single-part name populates the
         // SQLite `schema` slot, never the DuckDB `table` slot, so at most one dialect's
         // fields are populated (the `VacuumStatement` node invariant) under the union too.
-        let parsed = parse_with("VACUUM main INTO 'f'", Lenient).unwrap();
+        let parsed = parse_with("VACUUM main INTO 'f'", crate::ParseConfig::new(Lenient)).unwrap();
         let vacuum = vacuum_of(&parsed);
         assert_eq!(
             parsed
@@ -6302,7 +6470,7 @@ mod tests {
         assert!(vacuum.into.is_some());
         // Without `INTO` the name stays the DuckDB table operand (the more general,
         // qualified reading).
-        let bare_name = parse_with("VACUUM main", Lenient).unwrap();
+        let bare_name = parse_with("VACUUM main", crate::ParseConfig::new(Lenient)).unwrap();
         let vacuum = vacuum_of(&bare_name);
         assert!(vacuum.schema.is_none());
         assert_eq!(vacuum.table.as_ref().unwrap().0.len(), 1);
@@ -6327,7 +6495,11 @@ mod tests {
             }
         };
 
-        let parsed = parse_with("VACUUM ANALYZE INTO 'f'", BOTH_SQLITE_LEX).unwrap();
+        let parsed = parse_with(
+            "VACUUM ANALYZE INTO 'f'",
+            crate::ParseConfig::new(BOTH_SQLITE_LEX),
+        )
+        .unwrap();
         let vacuum = vacuum_of(&parsed);
         assert_eq!(
             parsed
@@ -6337,7 +6509,8 @@ mod tests {
         );
         assert!(vacuum.into.is_some() && vacuum.analyze.is_none() && vacuum.table.is_none());
         // Without a following `INTO`, the same word is the DuckDB option.
-        let option = parse_with("VACUUM ANALYZE", BOTH_SQLITE_LEX).unwrap();
+        let option =
+            parse_with("VACUUM ANALYZE", crate::ParseConfig::new(BOTH_SQLITE_LEX)).unwrap();
         let vacuum = vacuum_of(&option);
         assert!(
             vacuum.analyze == Some(VacuumAnalyze::Keyword)
@@ -6409,7 +6582,7 @@ mod tests {
             "REPAIR TABLE t1",
             "REPAIR NO_WRITE_TO_BINLOG TABLE t1 QUICK EXTENDED USE_FRM",
         ] {
-            let parsed = parse_with(sql, MYSQL_MAINT_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_MAINT_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_MAINT_DIALECT)
                 .render_parsed(&parsed)
@@ -6421,7 +6594,11 @@ mod tests {
     #[test]
     fn table_maintenance_captures_verb_payloads() {
         // The `NO_WRITE_TO_BINLOG`/`LOCAL` prefix spelling round-trips distinctly.
-        let parsed = parse_with("ANALYZE LOCAL TABLE t1", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "ANALYZE LOCAL TABLE t1",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         let stmt = table_maintenance_of(&parsed);
         assert!(matches!(
             stmt.kind,
@@ -6435,13 +6612,21 @@ mod tests {
         assert_eq!(stmt.table_keyword, TableKeyword::Table);
 
         // The `TABLES` synonym is captured, and a multi-table list is preserved.
-        let parsed = parse_with("OPTIMIZE TABLES a, b, c", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "OPTIMIZE TABLES a, b, c",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         let stmt = table_maintenance_of(&parsed);
         assert_eq!(stmt.table_keyword, TableKeyword::Tables);
         assert_eq!(stmt.tables.len(), 3);
 
         // The CHECK option list preserves order and repeats.
-        let parsed = parse_with("CHECK TABLE t QUICK QUICK FAST", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "CHECK TABLE t QUICK QUICK FAST",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         let stmt = table_maintenance_of(&parsed);
         let TableMaintenanceKind::Check { options, .. } = &stmt.kind else {
             panic!("expected CHECK");
@@ -6456,7 +6641,11 @@ mod tests {
         );
 
         // The CHECKSUM mode is a single optional token.
-        let parsed = parse_with("CHECKSUM TABLE t EXTENDED", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "CHECKSUM TABLE t EXTENDED",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         let stmt = table_maintenance_of(&parsed);
         assert!(matches!(
             stmt.kind,
@@ -6467,8 +6656,11 @@ mod tests {
         ));
 
         // The REPAIR option list combines all three flags in order.
-        let parsed =
-            parse_with("REPAIR TABLE t QUICK EXTENDED USE_FRM", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "REPAIR TABLE t QUICK EXTENDED USE_FRM",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         let stmt = table_maintenance_of(&parsed);
         let TableMaintenanceKind::Repair { options, .. } = &stmt.kind else {
             panic!("expected REPAIR");
@@ -6485,7 +6677,7 @@ mod tests {
         // The ANALYZE histogram bucket count is captured.
         let parsed = parse_with(
             "ANALYZE TABLE t UPDATE HISTOGRAM ON c WITH 32 BUCKETS",
-            MYSQL_MAINT_DIALECT,
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
         )
         .unwrap();
         let stmt = table_maintenance_of(&parsed);
@@ -6509,15 +6701,21 @@ mod tests {
         // the maintenance dispatch claims only those forms. A bare `ANALYZE` under the MySQL
         // preset (which has no SQLite/DuckDB `analyze` gate) is *not* claimed — it rejects as
         // an unknown statement, keeping the keyword free for the bare-ANALYZE sibling.
-        assert!(parse_with("ANALYZE TABLE t", MYSQL_MAINT_DIALECT).is_ok());
         assert!(
-            parse_with("ANALYZE t", MYSQL_MAINT_DIALECT).is_err(),
+            parse_with(
+                "ANALYZE TABLE t",
+                crate::ParseConfig::new(MYSQL_MAINT_DIALECT)
+            )
+            .is_ok()
+        );
+        assert!(
+            parse_with("ANALYZE t", crate::ParseConfig::new(MYSQL_MAINT_DIALECT)).is_err(),
             "a bare `ANALYZE <name>` is not the MySQL maintenance form",
         );
 
         // The SQLite/DuckDB bare-`analyze` gate keeps admitting a bare `ANALYZE` on its own,
         // untouched by the MySQL maintenance lookahead (which insists on `{TABLE | TABLES}`).
-        assert!(parse_with("ANALYZE", ANALYZE_ONLY).is_ok());
+        assert!(parse_with("ANALYZE", crate::ParseConfig::new(ANALYZE_ONLY)).is_ok());
     }
 
     #[test]
@@ -6530,7 +6728,7 @@ mod tests {
             "RENAME USER u@localhost TO v@localhost",
             "RENAME USER u@localhost TO v@localhost, a TO b",
         ] {
-            let parsed = parse_with(sql, MYSQL_MAINT_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_MAINT_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_MAINT_DIALECT)
                 .render_parsed(&parsed)
@@ -6541,7 +6739,11 @@ mod tests {
 
     #[test]
     fn rename_captures_table_and_user_forms() {
-        let parsed = parse_with("RENAME TABLE a TO b, c TO d", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "RENAME TABLE a TO b, c TO d",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         let RenameStatement::Table { renames, .. } = rename_of(&parsed) else {
             panic!("expected RENAME TABLE");
         };
@@ -6549,7 +6751,7 @@ mod tests {
 
         let parsed = parse_with(
             "RENAME USER u@localhost TO v@localhost",
-            MYSQL_MAINT_DIALECT,
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
         )
         .unwrap();
         let RenameStatement::User { renames, .. } = rename_of(&parsed) else {
@@ -6574,7 +6776,8 @@ mod tests {
             "RENAME USER u v",                    // missing TO
             "RENAME a TO b",                      // missing TABLE/USER
         ] {
-            parse_with(sql, MYSQL_MAINT_DIALECT).expect_err(&format!("{sql:?} should be rejected"));
+            parse_with(sql, crate::ParseConfig::new(MYSQL_MAINT_DIALECT))
+                .expect_err(&format!("{sql:?} should be rejected"));
         }
     }
 
@@ -6590,7 +6793,7 @@ mod tests {
             "RENAME USER u TO v",
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "ANSI gates {sql:?} off as an unknown statement",
             );
         }
@@ -6654,7 +6857,7 @@ mod tests {
             "PURGE BINARY LOGS BEFORE '2000-01-01 00:00:00'",
             "PURGE BINARY LOGS BEFORE NOW()",
         ] {
-            let parsed = parse_with(sql, MYSQL_MAINT_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_MAINT_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_MAINT_DIALECT)
                 .render_parsed(&parsed)
@@ -6666,7 +6869,11 @@ mod tests {
     #[test]
     fn flush_captures_prefix_target_and_lock() {
         // The `LOCAL` prefix spelling is captured, and the keyword-target list is preserved.
-        let parsed = parse_with("FLUSH LOCAL PRIVILEGES, STATUS", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "FLUSH LOCAL PRIVILEGES, STATUS",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         let flush = flush_of(&parsed);
         assert_eq!(flush.no_write_to_binlog, Some(NoWriteToBinlog::Local));
         let FlushTarget::Options { options, .. } = &flush.target else {
@@ -6678,7 +6885,11 @@ mod tests {
         ));
 
         // The `RELAY LOGS FOR CHANNEL` qualifier is captured.
-        let parsed = parse_with("FLUSH RELAY LOGS FOR CHANNEL 'c1'", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "FLUSH RELAY LOGS FOR CHANNEL 'c1'",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         let FlushTarget::Options { options, .. } = &flush_of(&parsed).target else {
             panic!("expected the keyword-target list form");
         };
@@ -6691,7 +6902,11 @@ mod tests {
         ));
 
         // The `TABLES` synonym, a multi-table list, and the `WITH READ LOCK` lock are all held.
-        let parsed = parse_with("FLUSH TABLES t1, t2 WITH READ LOCK", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "FLUSH TABLES t1, t2 WITH READ LOCK",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         let FlushTarget::Tables {
             table_keyword,
             tables,
@@ -6708,10 +6923,18 @@ mod tests {
 
     #[test]
     fn purge_captures_target_forms() {
-        let parsed = parse_with("PURGE BINARY LOGS TO 'log.1'", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "PURGE BINARY LOGS TO 'log.1'",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(purge_of(&parsed).target, PurgeTarget::To { .. }));
 
-        let parsed = parse_with("PURGE BINARY LOGS BEFORE NOW()", MYSQL_MAINT_DIALECT).unwrap();
+        let parsed = parse_with(
+            "PURGE BINARY LOGS BEFORE NOW()",
+            crate::ParseConfig::new(MYSQL_MAINT_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             purge_of(&parsed).target,
             PurgeTarget::Before { .. }
@@ -6732,7 +6955,8 @@ mod tests {
             "PURGE BINARY LOGS",        // a TO/BEFORE target is required
             "PURGE LOGS BEFORE NOW()",  // the BINARY keyword is mandatory
         ] {
-            parse_with(sql, MYSQL_MAINT_DIALECT).expect_err(&format!("{sql:?} should be rejected"));
+            parse_with(sql, crate::ParseConfig::new(MYSQL_MAINT_DIALECT))
+                .expect_err(&format!("{sql:?} should be rejected"));
         }
     }
 
@@ -6744,7 +6968,7 @@ mod tests {
             "PURGE BINARY LOGS TO 'x'",
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "ANSI gates {sql:?} off as an unknown statement",
             );
         }
@@ -6805,25 +7029,29 @@ mod tests {
         // Engine-verified against live mysql:8: bare `KILL <id>` writes no scope keyword
         // (MySQL defaults it to CONNECTION), and `CONNECTION`/`QUERY` ride the target tag.
         assert_eq!(
-            kill_of(&parse_with("KILL 5", KILL_DIALECT).unwrap()).target,
+            kill_of(&parse_with("KILL 5", crate::ParseConfig::new(KILL_DIALECT)).unwrap()).target,
             KillTarget::Unspecified,
         );
         assert_eq!(
-            kill_of(&parse_with("KILL CONNECTION 5", KILL_DIALECT).unwrap()).target,
+            kill_of(
+                &parse_with("KILL CONNECTION 5", crate::ParseConfig::new(KILL_DIALECT)).unwrap()
+            )
+            .target,
             KillTarget::Connection,
         );
         assert_eq!(
-            kill_of(&parse_with("KILL QUERY 5", KILL_DIALECT).unwrap()).target,
+            kill_of(&parse_with("KILL QUERY 5", crate::ParseConfig::new(KILL_DIALECT)).unwrap())
+                .target,
             KillTarget::Query,
         );
         // The id is a full expression: a string, and an arithmetic expression, both prepare
         // on mysql:8 (`KILL '123'` / `KILL 1 + 1`).
         assert!(matches!(
-            kill_of(&parse_with("KILL '123'", KILL_DIALECT).unwrap()).id,
+            kill_of(&parse_with("KILL '123'", crate::ParseConfig::new(KILL_DIALECT)).unwrap()).id,
             Expr::Literal { .. },
         ));
         assert!(matches!(
-            kill_of(&parse_with("KILL 1 + 1", KILL_DIALECT).unwrap()).id,
+            kill_of(&parse_with("KILL 1 + 1", crate::ParseConfig::new(KILL_DIALECT)).unwrap()).id,
             Expr::BinaryOp { .. },
         ));
     }
@@ -6831,8 +7059,8 @@ mod tests {
     #[test]
     fn kill_round_trips_each_spelling() {
         for sql in ["KILL 5", "KILL CONNECTION 5", "KILL QUERY 5", "KILL '123'"] {
-            let parsed =
-                parse_with(sql, KILL_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(KILL_DIALECT))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(KILL_DIALECT)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -6851,7 +7079,10 @@ mod tests {
             "KILL QUERY '123'",
             "KILL @id",
         ] {
-            assert!(parse_with(sql, MySql).is_ok(), "MySql should parse {sql:?}",);
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
+                "MySql should parse {sql:?}",
+            );
         }
     }
 
@@ -6867,7 +7098,7 @@ mod tests {
             "KILL CONNECTION QUERY 5",
         ] {
             assert!(
-                parse_with(sql, KILL_DIALECT).is_err(),
+                parse_with(sql, crate::ParseConfig::new(KILL_DIALECT)).is_err(),
                 "{sql:?} should be rejected",
             );
         }
@@ -6877,26 +7108,46 @@ mod tests {
     fn describe_and_desc_are_explain_synonyms_with_a_spelling_tag() {
         // MySQL accepts `DESCRIBE`/`DESC` as EXPLAIN synonyms for a query (engine-verified);
         // the spelling tag records which keyword so it round-trips.
-        let describe = parse_with("DESCRIBE SELECT 1", DESCRIBE_DIALECT).unwrap();
+        let describe = parse_with(
+            "DESCRIBE SELECT 1",
+            crate::ParseConfig::new(DESCRIBE_DIALECT),
+        )
+        .unwrap();
         assert_eq!(explain_of(&describe).spelling, ExplainKeyword::Describe);
         assert!(matches!(
             *explain_of(&describe).statement,
             Statement::Query { .. },
         ));
         assert_eq!(
-            explain_of(&parse_with("DESC SELECT 1", DESCRIBE_DIALECT).unwrap()).spelling,
+            explain_of(
+                &parse_with("DESC SELECT 1", crate::ParseConfig::new(DESCRIBE_DIALECT)).unwrap()
+            )
+            .spelling,
             ExplainKeyword::Desc,
         );
         // Plain `EXPLAIN` keeps the `Explain` spelling.
         assert_eq!(
-            explain_of(&parse_with("EXPLAIN SELECT 1", DESCRIBE_DIALECT).unwrap()).spelling,
+            explain_of(
+                &parse_with(
+                    "EXPLAIN SELECT 1",
+                    crate::ParseConfig::new(DESCRIBE_DIALECT)
+                )
+                .unwrap()
+            )
+            .spelling,
             ExplainKeyword::Explain,
         );
         // The legacy `ANALYZE` option is still an option, not a table (`DESCRIBE ANALYZE
         // SELECT 1` is the query form, engine-verified).
         assert_eq!(
-            explain_of(&parse_with("DESCRIBE ANALYZE SELECT 1", DESCRIBE_DIALECT).unwrap())
-                .spelling,
+            explain_of(
+                &parse_with(
+                    "DESCRIBE ANALYZE SELECT 1",
+                    crate::ParseConfig::new(DESCRIBE_DIALECT)
+                )
+                .unwrap()
+            )
+            .spelling,
             ExplainKeyword::Describe,
         );
     }
@@ -6905,34 +7156,48 @@ mod tests {
     fn describe_table_form_captures_table_and_optional_column() {
         // A table name (not an explainable statement) after the keyword is the
         // table-metadata form; all three keyword spellings reach it (engine-verified).
-        let bare = parse_with("DESCRIBE t", DESCRIBE_DIALECT).unwrap();
+        let bare = parse_with("DESCRIBE t", crate::ParseConfig::new(DESCRIBE_DIALECT)).unwrap();
         let describe = describe_table_of(&bare);
         assert_eq!(describe.keyword, ExplainKeyword::Describe);
         assert_eq!(bare.resolver().resolve(describe.table.0[0].sym), "t");
         assert!(describe.column.is_none());
         assert_eq!(
-            describe_table_of(&parse_with("EXPLAIN t", DESCRIBE_DIALECT).unwrap()).keyword,
+            describe_table_of(
+                &parse_with("EXPLAIN t", crate::ParseConfig::new(DESCRIBE_DIALECT)).unwrap()
+            )
+            .keyword,
             ExplainKeyword::Explain,
         );
         assert_eq!(
-            describe_table_of(&parse_with("DESC t", DESCRIBE_DIALECT).unwrap()).keyword,
+            describe_table_of(
+                &parse_with("DESC t", crate::ParseConfig::new(DESCRIBE_DIALECT)).unwrap()
+            )
+            .keyword,
             ExplainKeyword::Desc,
         );
         // The optional trailing argument is a single column name or a wildcard pattern.
         assert!(matches!(
-            describe_table_of(&parse_with("DESCRIBE t col", DESCRIBE_DIALECT).unwrap()).column,
+            describe_table_of(
+                &parse_with("DESCRIBE t col", crate::ParseConfig::new(DESCRIBE_DIALECT)).unwrap()
+            )
+            .column,
             Some(DescribeColumn::Name { .. }),
         ));
         assert!(matches!(
-            describe_table_of(&parse_with("DESCRIBE t 'a%'", DESCRIBE_DIALECT).unwrap()).column,
+            describe_table_of(
+                &parse_with("DESCRIBE t 'a%'", crate::ParseConfig::new(DESCRIBE_DIALECT)).unwrap()
+            )
+            .column,
             Some(DescribeColumn::Wild { .. }),
         ));
         // The table is a possibly-qualified name (`DESCRIBE db.t`).
         assert_eq!(
-            describe_table_of(&parse_with("DESCRIBE db.t", DESCRIBE_DIALECT).unwrap())
-                .table
-                .0
-                .len(),
+            describe_table_of(
+                &parse_with("DESCRIBE db.t", crate::ParseConfig::new(DESCRIBE_DIALECT)).unwrap()
+            )
+            .table
+            .0
+            .len(),
             2,
         );
     }
@@ -6950,8 +7215,8 @@ mod tests {
             "DESCRIBE t 'a%'",
             "DESCRIBE db.t",
         ] {
-            let parsed =
-                parse_with(sql, DESCRIBE_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DESCRIBE_DIALECT))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(DESCRIBE_DIALECT)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -6965,7 +7230,7 @@ mod tests {
         // argument (the trailing tokens are left for the statement loop to reject).
         for sql in ["DESCRIBE t a.b", "DESCRIBE t *", "DESCRIBE t a b"] {
             assert!(
-                parse_with(sql, DESCRIBE_DIALECT).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DESCRIBE_DIALECT)).is_err(),
                 "{sql:?} should be rejected",
             );
         }
@@ -6976,8 +7241,20 @@ mod tests {
         // The ticket's load-bearing check: a leading `DESC` dispatched as a statement must
         // not perturb the `ORDER BY … DESC` sort direction (a non-leading `DESC` consumed by
         // the order-by grammar). Green with the `describe` gate on.
-        assert!(parse_with("SELECT 1 ORDER BY 1 DESC", DESCRIBE_DIALECT).is_ok());
-        assert!(parse_with("SELECT a FROM t ORDER BY a DESC, b ASC", DESCRIBE_DIALECT).is_ok());
+        assert!(
+            parse_with(
+                "SELECT 1 ORDER BY 1 DESC",
+                crate::ParseConfig::new(DESCRIBE_DIALECT)
+            )
+            .is_ok()
+        );
+        assert!(
+            parse_with(
+                "SELECT a FROM t ORDER BY a DESC, b ASC",
+                crate::ParseConfig::new(DESCRIBE_DIALECT)
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -6986,10 +7263,10 @@ mod tests {
         // of them as unknown statements; `EXPLAIN` stays ungated (its query-plan form
         // parses everywhere), but a table after `EXPLAIN` needs the `describe` gate — with
         // it off, `EXPLAIN t` rejects, as PostgreSQL does.
-        assert!(parse_with("KILL 5", KILL_ONLY).is_ok());
-        assert!(parse_with("DESCRIBE t", KILL_ONLY).is_err());
-        assert!(parse_with("DESCRIBE t", DESCRIBE_ONLY).is_ok());
-        assert!(parse_with("KILL 5", DESCRIBE_ONLY).is_err());
+        assert!(parse_with("KILL 5", crate::ParseConfig::new(KILL_ONLY)).is_ok());
+        assert!(parse_with("DESCRIBE t", crate::ParseConfig::new(KILL_ONLY)).is_err());
+        assert!(parse_with("DESCRIBE t", crate::ParseConfig::new(DESCRIBE_ONLY)).is_ok());
+        assert!(parse_with("KILL 5", crate::ParseConfig::new(DESCRIBE_ONLY)).is_err());
 
         for sql in [
             "KILL 5",
@@ -6999,11 +7276,11 @@ mod tests {
             "EXPLAIN t",
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "ANSI gates {sql:?} off",
             );
         }
-        assert!(parse_with("EXPLAIN SELECT 1", TestDialect).is_ok());
+        assert!(parse_with("EXPLAIN SELECT 1", crate::ParseConfig::new(TestDialect)).is_ok());
     }
 
     // --- SHOW TABLES (MySQL / DuckDB) ---------------------------------------
@@ -7030,24 +7307,48 @@ mod tests {
     fn show_tables_parses_modifiers_from_and_filter() {
         // Bare form (DuckDB + MySQL): no modifiers, no qualifier, no filter.
         assert_eq!(
-            show_tables_of(&parse_with("SHOW TABLES", SHOW_TABLES_DIALECT).unwrap()),
+            show_tables_of(
+                &parse_with("SHOW TABLES", crate::ParseConfig::new(SHOW_TABLES_DIALECT)).unwrap()
+            ),
             (false, false, false),
         );
         // DuckDB `SHOW ALL TABLES` (engine-verified); MySQL `EXTENDED`/`FULL` (doc-cited).
         assert_eq!(
-            show_tables_of(&parse_with("SHOW ALL TABLES", SHOW_TABLES_DIALECT).unwrap()),
+            show_tables_of(
+                &parse_with(
+                    "SHOW ALL TABLES",
+                    crate::ParseConfig::new(SHOW_TABLES_DIALECT)
+                )
+                .unwrap()
+            ),
             (false, false, true),
         );
         assert_eq!(
-            show_tables_of(&parse_with("SHOW FULL TABLES", SHOW_TABLES_DIALECT).unwrap()),
+            show_tables_of(
+                &parse_with(
+                    "SHOW FULL TABLES",
+                    crate::ParseConfig::new(SHOW_TABLES_DIALECT)
+                )
+                .unwrap()
+            ),
             (false, true, false),
         );
         assert_eq!(
-            show_tables_of(&parse_with("SHOW EXTENDED FULL TABLES", SHOW_TABLES_DIALECT).unwrap()),
+            show_tables_of(
+                &parse_with(
+                    "SHOW EXTENDED FULL TABLES",
+                    crate::ParseConfig::new(SHOW_TABLES_DIALECT)
+                )
+                .unwrap()
+            ),
             (true, true, false),
         );
         // `{FROM | IN} <db>` qualifier (DuckDB accepts only `FROM`; MySQL both).
-        let parsed = parse_with("SHOW TABLES FROM main", SHOW_TABLES_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW TABLES FROM main",
+            crate::ParseConfig::new(SHOW_TABLES_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7059,7 +7360,11 @@ mod tests {
         assert_eq!(parsed.resolver().resolve(from.name.0[0].sym), "main");
         assert!(filter.is_none());
         // `IN` synonym.
-        let parsed = parse_with("SHOW TABLES IN db", SHOW_TABLES_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW TABLES IN db",
+            crate::ParseConfig::new(SHOW_TABLES_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7068,7 +7373,11 @@ mod tests {
         };
         assert_eq!(from.as_ref().unwrap().keyword, ShowFromKeyword::In);
         // `LIKE '<pat>'` / `WHERE <expr>` filters (MySQL; mutually exclusive).
-        let parsed = parse_with("SHOW TABLES LIKE 'a%'", SHOW_TABLES_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW TABLES LIKE 'a%'",
+            crate::ParseConfig::new(SHOW_TABLES_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7076,7 +7385,11 @@ mod tests {
             unreachable!()
         };
         assert!(matches!(filter, Some(ShowFilter::Like { .. })));
-        let parsed = parse_with("SHOW TABLES WHERE x = 1", SHOW_TABLES_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW TABLES WHERE x = 1",
+            crate::ParseConfig::new(SHOW_TABLES_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7098,7 +7411,7 @@ mod tests {
             "SHOW TABLES LIKE 'a%'",
             "SHOW TABLES WHERE x = 1",
         ] {
-            let parsed = parse_with(sql, SHOW_TABLES_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(SHOW_TABLES_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(SHOW_TABLES_DIALECT)
                 .render_parsed(&parsed)
@@ -7115,7 +7428,9 @@ mod tests {
         for sql in ["SHOW search_path", "SHOW ALL", "SHOW tables_something"] {
             assert!(
                 matches!(
-                    parse_with(sql, SHOW_TABLES_DIALECT).unwrap().statements(),
+                    parse_with(sql, crate::ParseConfig::new(SHOW_TABLES_DIALECT))
+                        .unwrap()
+                        .statements(),
                     [Statement::Session { .. }],
                 ),
                 "{sql:?} must stay a generic session SHOW",
@@ -7124,7 +7439,9 @@ mod tests {
         // With `show_tables` off (plain ANSI, session_statements still on), `SHOW TABLES`
         // falls back to the generic session `SHOW` — the parse PostgreSQL already accepts.
         assert!(matches!(
-            parse_with("SHOW TABLES", TestDialect).unwrap().statements(),
+            parse_with("SHOW TABLES", crate::ParseConfig::new(TestDialect))
+                .unwrap()
+                .statements(),
             [Statement::Session { .. }],
         ));
     }
@@ -7136,7 +7453,9 @@ mod tests {
         for sql in ["SHOW TABLES", "SHOW ALL TABLES", "SHOW TABLES FROM main"] {
             assert!(
                 matches!(
-                    parse_with(sql, DuckDb).unwrap().statements(),
+                    parse_with(sql, crate::ParseConfig::new(DuckDb))
+                        .unwrap()
+                        .statements(),
                     [Statement::Show { .. }],
                 ),
                 "DuckDb should parse {sql:?} as a typed SHOW",
@@ -7152,14 +7471,16 @@ mod tests {
         ] {
             assert!(
                 matches!(
-                    parse_with(sql, MySql).unwrap().statements(),
+                    parse_with(sql, crate::ParseConfig::new(MySql))
+                        .unwrap()
+                        .statements(),
                     [Statement::Show { .. }],
                 ),
                 "MySql should parse {sql:?} as a typed SHOW",
             );
         }
         // SQLite has neither session statements nor typed SHOW: `SHOW TABLES` is rejected.
-        assert!(parse_with("SHOW TABLES", Sqlite).is_err());
+        assert!(parse_with("SHOW TABLES", crate::ParseConfig::new(Sqlite)).is_err());
     }
 
     // --- SHOW COLUMNS (MySQL) -----------------------------------------------
@@ -7169,7 +7490,11 @@ mod tests {
     #[test]
     fn show_columns_parses_modifiers_spelling_from_from_and_filter() {
         // Bare form: `COLUMNS` spelling, mandatory table qualifier, no modifiers/db/filter.
-        let parsed = parse_with("SHOW COLUMNS FROM t", SHOW_COLUMNS_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW COLUMNS FROM t",
+            crate::ParseConfig::new(SHOW_COLUMNS_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             panic!("expected one SHOW statement, got {:?}", parsed.statements());
         };
@@ -7193,7 +7518,11 @@ mod tests {
         assert!(filter.is_none());
 
         // `FIELDS` synonym is captured on the spelling tag.
-        let parsed = parse_with("SHOW FIELDS FROM t", SHOW_COLUMNS_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW FIELDS FROM t",
+            crate::ParseConfig::new(SHOW_COLUMNS_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7206,7 +7535,7 @@ mod tests {
         // `IN` synonym on the table qualifier.
         let parsed = parse_with(
             "SHOW EXTENDED FULL COLUMNS IN t IN db",
-            SHOW_COLUMNS_DIALECT,
+            crate::ParseConfig::new(SHOW_COLUMNS_DIALECT),
         )
         .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
@@ -7230,7 +7559,11 @@ mod tests {
         assert_eq!(parsed.resolver().resolve(database.name.0[0].sym), "db");
 
         // `LIKE '<pat>'` / `WHERE <expr>` filters (mutually exclusive).
-        let parsed = parse_with("SHOW COLUMNS FROM t LIKE 'a%'", SHOW_COLUMNS_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW COLUMNS FROM t LIKE 'a%'",
+            crate::ParseConfig::new(SHOW_COLUMNS_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7238,7 +7571,11 @@ mod tests {
             unreachable!()
         };
         assert!(matches!(filter, Some(ShowFilter::Like { .. })));
-        let parsed = parse_with("SHOW COLUMNS FROM t WHERE x = 1", SHOW_COLUMNS_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW COLUMNS FROM t WHERE x = 1",
+            crate::ParseConfig::new(SHOW_COLUMNS_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7261,7 +7598,7 @@ mod tests {
             "SHOW COLUMNS FROM t LIKE 'a%'",
             "SHOW FIELDS FROM t WHERE x = 1",
         ] {
-            let parsed = parse_with(sql, SHOW_COLUMNS_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(SHOW_COLUMNS_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(SHOW_COLUMNS_DIALECT)
                 .render_parsed(&parsed)
@@ -7277,7 +7614,9 @@ mod tests {
         for sql in ["SHOW search_path", "SHOW ALL", "SHOW columns_something"] {
             assert!(
                 matches!(
-                    parse_with(sql, SHOW_COLUMNS_DIALECT).unwrap().statements(),
+                    parse_with(sql, crate::ParseConfig::new(SHOW_COLUMNS_DIALECT))
+                        .unwrap()
+                        .statements(),
                     [Statement::Session { .. }],
                 ),
                 "{sql:?} must stay a generic session SHOW",
@@ -7286,7 +7625,7 @@ mod tests {
         // With `show_columns` off (plain ANSI, session_statements on), the mandatory table
         // qualifier means `SHOW COLUMNS FROM t` cannot parse as a generic session `SHOW` —
         // the trailing `FROM t` is leftover — so it is a genuine parse error (accept flip).
-        assert!(parse_with("SHOW COLUMNS FROM t", TestDialect).is_err());
+        assert!(parse_with("SHOW COLUMNS FROM t", crate::ParseConfig::new(TestDialect)).is_err());
     }
 
     #[test]
@@ -7303,7 +7642,9 @@ mod tests {
         ] {
             assert!(
                 matches!(
-                    parse_with(sql, MySql).unwrap().statements(),
+                    parse_with(sql, crate::ParseConfig::new(MySql))
+                        .unwrap()
+                        .statements(),
                     [Statement::Show { .. }],
                 ),
                 "MySql should parse {sql:?} as a typed SHOW",
@@ -7315,11 +7656,13 @@ mod tests {
         // which would otherwise read a trailing `FROM t` as a separate standalone query — an
         // orthogonal leniency, not the typed SHOW COLUMNS.)
         assert!(matches!(
-            parse_with("SHOW COLUMNS", DuckDb).unwrap().statements(),
+            parse_with("SHOW COLUMNS", crate::ParseConfig::new(DuckDb))
+                .unwrap()
+                .statements(),
             [Statement::Session { .. }],
         ));
         // SQLite has neither session statements nor typed SHOW: `SHOW COLUMNS …` is rejected.
-        assert!(parse_with("SHOW COLUMNS FROM t", Sqlite).is_err());
+        assert!(parse_with("SHOW COLUMNS FROM t", crate::ParseConfig::new(Sqlite)).is_err());
     }
 
     // --- SHOW CREATE TABLE (MySQL) ------------------------------------------
@@ -7334,7 +7677,11 @@ mod tests {
     #[test]
     fn show_create_table_parses_name() {
         // Bare table name.
-        let parsed = parse_with("SHOW CREATE TABLE t", SHOW_CREATE_TABLE_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW CREATE TABLE t",
+            crate::ParseConfig::new(SHOW_CREATE_TABLE_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             panic!("expected one SHOW statement, got {:?}", parsed.statements());
         };
@@ -7349,7 +7696,11 @@ mod tests {
         assert_eq!(parsed.resolver().resolve(name.0[0].sym), "t");
 
         // Schema-qualified table name round-trips through both idents.
-        let parsed = parse_with("SHOW CREATE TABLE db.t", SHOW_CREATE_TABLE_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW CREATE TABLE db.t",
+            crate::ParseConfig::new(SHOW_CREATE_TABLE_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7368,7 +7719,7 @@ mod tests {
     #[test]
     fn show_create_table_round_trips() {
         for sql in ["SHOW CREATE TABLE t", "SHOW CREATE TABLE db.t"] {
-            let parsed = parse_with(sql, SHOW_CREATE_TABLE_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(SHOW_CREATE_TABLE_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(SHOW_CREATE_TABLE_DIALECT)
                 .render_parsed(&parsed)
@@ -7383,7 +7734,7 @@ mod tests {
         for sql in ["SHOW search_path", "SHOW ALL"] {
             assert!(
                 matches!(
-                    parse_with(sql, SHOW_CREATE_TABLE_DIALECT)
+                    parse_with(sql, crate::ParseConfig::new(SHOW_CREATE_TABLE_DIALECT))
                         .unwrap()
                         .statements(),
                     [Statement::Session { .. }],
@@ -7398,12 +7749,18 @@ mod tests {
         // the flag on and with it off (matching PostgreSQL, where `SHOW create` likewise
         // cannot read the reserved word as a session variable). The flag does not disturb
         // that behaviour: the seam only steals the full `CREATE TABLE` two-keyword prefix.
-        assert!(parse_with("SHOW CREATE", SHOW_CREATE_TABLE_DIALECT).is_err());
-        assert!(parse_with("SHOW CREATE", TestDialect).is_err());
+        assert!(
+            parse_with(
+                "SHOW CREATE",
+                crate::ParseConfig::new(SHOW_CREATE_TABLE_DIALECT)
+            )
+            .is_err()
+        );
+        assert!(parse_with("SHOW CREATE", crate::ParseConfig::new(TestDialect)).is_err());
         // With `show_create_table` off (plain ANSI, session_statements on), the fixed
         // `CREATE TABLE` keywords likewise cannot parse as a generic session `SHOW`, so
         // `SHOW CREATE TABLE t` is a genuine parse error (accept flip against the flag).
-        assert!(parse_with("SHOW CREATE TABLE t", TestDialect).is_err());
+        assert!(parse_with("SHOW CREATE TABLE t", crate::ParseConfig::new(TestDialect)).is_err());
     }
 
     #[test]
@@ -7413,7 +7770,9 @@ mod tests {
         for sql in ["SHOW CREATE TABLE t", "SHOW CREATE TABLE db.t"] {
             assert!(
                 matches!(
-                    parse_with(sql, MySql).unwrap().statements(),
+                    parse_with(sql, crate::ParseConfig::new(MySql))
+                        .unwrap()
+                        .statements(),
                     [Statement::Show { .. }],
                 ),
                 "MySql should parse {sql:?} as a typed SHOW",
@@ -7423,10 +7782,10 @@ mod tests {
         // dispatch never fires, and the generic session `SHOW` cannot read the reserved
         // `CREATE` keyword as a variable, so `SHOW CREATE TABLE t` is rejected — never the
         // typed node.
-        assert!(parse_with("SHOW CREATE TABLE t", DuckDb).is_err());
+        assert!(parse_with("SHOW CREATE TABLE t", crate::ParseConfig::new(DuckDb)).is_err());
         // SQLite has neither session statements nor typed SHOW: `SHOW CREATE TABLE t` is
         // rejected.
-        assert!(parse_with("SHOW CREATE TABLE t", Sqlite).is_err());
+        assert!(parse_with("SHOW CREATE TABLE t", crate::ParseConfig::new(Sqlite)).is_err());
     }
 
     // --- SHOW FUNCTIONS (Spark / Databricks) --------------------------------
@@ -7441,7 +7800,11 @@ mod tests {
     #[test]
     fn show_functions_parses_forms() {
         // Bare listing: no scope, no schema, no filter.
-        let parsed = parse_with("SHOW FUNCTIONS", SHOW_FUNCTIONS_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW FUNCTIONS",
+            crate::ParseConfig::new(SHOW_FUNCTIONS_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             panic!("expected one SHOW statement, got {:?}", parsed.statements());
         };
@@ -7459,7 +7822,7 @@ mod tests {
             ("SHOW SYSTEM FUNCTIONS", ShowFunctionsScope::System),
             ("SHOW ALL FUNCTIONS", ShowFunctionsScope::All),
         ] {
-            let parsed = parse_with(sql, SHOW_FUNCTIONS_DIALECT).unwrap();
+            let parsed = parse_with(sql, crate::ParseConfig::new(SHOW_FUNCTIONS_DIALECT)).unwrap();
             let [Statement::Show { show, .. }] = parsed.statements() else {
                 unreachable!()
             };
@@ -7470,7 +7833,11 @@ mod tests {
         }
 
         // The `{FROM | IN} <schema>` qualifier.
-        let parsed = parse_with("SHOW FUNCTIONS IN db", SHOW_FUNCTIONS_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW FUNCTIONS IN db",
+            crate::ParseConfig::new(SHOW_FUNCTIONS_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7482,7 +7849,11 @@ mod tests {
         assert_eq!(parsed.resolver().resolve(from.name.0[0].sym), "db");
 
         // `LIKE '<regex>'` — a quoted regex pattern.
-        let parsed = parse_with("SHOW FUNCTIONS LIKE 't*'", SHOW_FUNCTIONS_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW FUNCTIONS LIKE 't*'",
+            crate::ParseConfig::new(SHOW_FUNCTIONS_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7495,7 +7866,11 @@ mod tests {
         ));
 
         // A bare (optionally qualified) function name without `LIKE`.
-        let parsed = parse_with("SHOW FUNCTIONS myfunc", SHOW_FUNCTIONS_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW FUNCTIONS myfunc",
+            crate::ParseConfig::new(SHOW_FUNCTIONS_DIALECT),
+        )
+        .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
             unreachable!()
         };
@@ -7511,7 +7886,7 @@ mod tests {
         // The fully-decorated form: scope + schema + `LIKE` name.
         let parsed = parse_with(
             "SHOW SYSTEM FUNCTIONS FROM db LIKE myfunc",
-            SHOW_FUNCTIONS_DIALECT,
+            crate::ParseConfig::new(SHOW_FUNCTIONS_DIALECT),
         )
         .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
@@ -7545,7 +7920,7 @@ mod tests {
             "SHOW FUNCTIONS LIKE myfunc",
             "SHOW SYSTEM FUNCTIONS FROM db LIKE 'max'",
         ] {
-            let parsed = parse_with(sql, SHOW_FUNCTIONS_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(SHOW_FUNCTIONS_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(SHOW_FUNCTIONS_DIALECT)
                 .render_parsed(&parsed)
@@ -7562,7 +7937,7 @@ mod tests {
         for sql in ["SHOW search_path", "SHOW ALL"] {
             assert!(
                 matches!(
-                    parse_with(sql, SHOW_FUNCTIONS_DIALECT)
+                    parse_with(sql, crate::ParseConfig::new(SHOW_FUNCTIONS_DIALECT))
                         .unwrap()
                         .statements(),
                     [Statement::Session { .. }],
@@ -7573,7 +7948,13 @@ mod tests {
         // With `show_functions` off (plain ANSI, session_statements on), `SHOW FUNCTIONS`
         // reads `FUNCTIONS` as the session variable name, so the trailing `LIKE 't*'` is
         // leftover and the statement is a genuine parse error (accept flip against the flag).
-        assert!(parse_with("SHOW FUNCTIONS LIKE 't*'", TestDialect).is_err());
+        assert!(
+            parse_with(
+                "SHOW FUNCTIONS LIKE 't*'",
+                crate::ParseConfig::new(TestDialect)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -7587,7 +7968,9 @@ mod tests {
         ] {
             assert!(
                 matches!(
-                    parse_with(sql, Databricks).unwrap().statements(),
+                    parse_with(sql, crate::ParseConfig::new(Databricks))
+                        .unwrap()
+                        .statements(),
                     [Statement::Show { .. }],
                 ),
                 "Databricks should parse {sql:?} as a typed SHOW",
@@ -7596,10 +7979,10 @@ mod tests {
         // MySQL has no bare `SHOW FUNCTIONS` listing — its `SHOW FUNCTION STATUS` is a
         // *different* routine-catalogue statement — so `show_functions` is off: the decorated
         // form cannot parse as a generic session `SHOW` (the trailing `LIKE 'x'` is leftover).
-        assert!(parse_with("SHOW FUNCTIONS LIKE 'x'", MySql).is_err());
+        assert!(parse_with("SHOW FUNCTIONS LIKE 'x'", crate::ParseConfig::new(MySql)).is_err());
         // DuckDB has no `SHOW FUNCTIONS` grammar either (`SHOW <name>` is a DESCRIBE alias):
         // the decorated form is rejected, never the typed node.
-        assert!(parse_with("SHOW FUNCTIONS LIKE 'x'", DuckDb).is_err());
+        assert!(parse_with("SHOW FUNCTIONS LIKE 'x'", crate::ParseConfig::new(DuckDb)).is_err());
     }
 
     // --- SHOW {FUNCTION | PROCEDURE} STATUS (MySQL) -------------------------
@@ -7618,7 +8001,8 @@ mod tests {
             ("SHOW FUNCTION STATUS", ShowRoutineKind::Function),
             ("SHOW PROCEDURE STATUS", ShowRoutineKind::Procedure),
         ] {
-            let parsed = parse_with(sql, SHOW_ROUTINE_STATUS_DIALECT).unwrap();
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(SHOW_ROUTINE_STATUS_DIALECT)).unwrap();
             let [Statement::Show { show, .. }] = parsed.statements() else {
                 panic!("expected one SHOW statement, got {:?}", parsed.statements());
             };
@@ -7635,7 +8019,7 @@ mod tests {
         // The shared `LIKE '<pat>'` filter (reused from `SHOW TABLES`/`SHOW COLUMNS`).
         let parsed = parse_with(
             "SHOW FUNCTION STATUS LIKE 'a%'",
-            SHOW_ROUTINE_STATUS_DIALECT,
+            crate::ParseConfig::new(SHOW_ROUTINE_STATUS_DIALECT),
         )
         .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
@@ -7649,7 +8033,7 @@ mod tests {
         // The shared `WHERE <expr>` predicate filter.
         let parsed = parse_with(
             "SHOW PROCEDURE STATUS WHERE Db = 'x'",
-            SHOW_ROUTINE_STATUS_DIALECT,
+            crate::ParseConfig::new(SHOW_ROUTINE_STATUS_DIALECT),
         )
         .unwrap();
         let [Statement::Show { show, .. }] = parsed.statements() else {
@@ -7667,7 +8051,13 @@ mod tests {
         // Engine-probed on mysql:8: `SHOW FUNCTION STATUS FROM db` is `ER_PARSE_ERROR` — the
         // subform has no `{FROM | IN}` qualifier, unlike `SHOW TABLES`/`SHOW COLUMNS`. The
         // trailing `FROM db` is left unconsumed, so the statement is a parse error.
-        assert!(parse_with("SHOW FUNCTION STATUS FROM db", SHOW_ROUTINE_STATUS_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "SHOW FUNCTION STATUS FROM db",
+                crate::ParseConfig::new(SHOW_ROUTINE_STATUS_DIALECT)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -7680,7 +8070,7 @@ mod tests {
             "SHOW FUNCTION STATUS WHERE Db = 'x'",
             "SHOW PROCEDURE STATUS WHERE Db = 'x'",
         ] {
-            let parsed = parse_with(sql, SHOW_ROUTINE_STATUS_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(SHOW_ROUTINE_STATUS_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(SHOW_ROUTINE_STATUS_DIALECT)
                 .render_parsed(&parsed)
@@ -7698,7 +8088,7 @@ mod tests {
         for sql in ["SHOW search_path", "SHOW status", "SHOW ALL"] {
             assert!(
                 matches!(
-                    parse_with(sql, SHOW_ROUTINE_STATUS_DIALECT)
+                    parse_with(sql, crate::ParseConfig::new(SHOW_ROUTINE_STATUS_DIALECT))
                         .unwrap()
                         .statements(),
                     [Statement::Session { .. }],
@@ -7710,7 +8100,7 @@ mod tests {
         // reserved keyword, so `SHOW FUNCTION STATUS` cannot parse as a generic session `SHOW
         // <var>` (like `SHOW CREATE`) — a genuine parse error, so the flag is genuinely
         // required (accept flip against the flag).
-        assert!(parse_with("SHOW FUNCTION STATUS", TestDialect).is_err());
+        assert!(parse_with("SHOW FUNCTION STATUS", crate::ParseConfig::new(TestDialect)).is_err());
     }
 
     #[test]
@@ -7725,7 +8115,9 @@ mod tests {
         ] {
             assert!(
                 matches!(
-                    parse_with(sql, MySql).unwrap().statements(),
+                    parse_with(sql, crate::ParseConfig::new(MySql))
+                        .unwrap()
+                        .statements(),
                     [Statement::Show { .. }],
                 ),
                 "MySql should parse {sql:?} as a typed SHOW",
@@ -7735,7 +8127,7 @@ mod tests {
         // (engine-probed: MySQL rejects `SHOW FUNCTIONS`, and the singular `FUNCTION STATUS`
         // is MySQL-only), so `SHOW FUNCTION STATUS` cannot reach the typed node there — the
         // reserved `FUNCTION` keyword cannot be read as a session variable, so it is rejected.
-        assert!(parse_with("SHOW FUNCTION STATUS", Databricks).is_err());
+        assert!(parse_with("SHOW FUNCTION STATUS", crate::ParseConfig::new(Databricks)).is_err());
     }
 
     // --- SHOW server-administration / catalogue family (MySQL) --------------
@@ -7752,7 +8144,11 @@ mod tests {
     #[test]
     fn show_admin_parses_each_target_shape() {
         // Listing family: the DATA sub-command axis + shared FROM / [LIKE|WHERE] tail.
-        let parsed = parse_with("SHOW DATABASES", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW DATABASES",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Listing {
@@ -7762,7 +8158,11 @@ mod tests {
                 ..
             },
         ));
-        let parsed = parse_with("SHOW SCHEMAS LIKE 'a%'", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW SCHEMAS LIKE 'a%'",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Listing {
@@ -7771,7 +8171,11 @@ mod tests {
                 ..
             },
         ));
-        let parsed = parse_with("SHOW GLOBAL STATUS", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW GLOBAL STATUS",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Listing {
@@ -7781,7 +8185,11 @@ mod tests {
                 ..
             },
         ));
-        let parsed = parse_with("SHOW FULL TRIGGERS FROM db", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW FULL TRIGGERS FROM db",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Listing {
@@ -7792,7 +8200,11 @@ mod tests {
         ));
 
         // Bare family (no operand).
-        let parsed = parse_with("SHOW STORAGE ENGINES", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW STORAGE ENGINES",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Bare {
@@ -7800,7 +8212,11 @@ mod tests {
                 ..
             },
         ));
-        let parsed = parse_with("SHOW FULL PROCESSLIST", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW FULL PROCESSLIST",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Bare {
@@ -7808,7 +8224,11 @@ mod tests {
                 ..
             },
         ));
-        let parsed = parse_with("SHOW BINARY LOG STATUS", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW BINARY LOG STATUS",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Bare {
@@ -7818,7 +8238,11 @@ mod tests {
         ));
 
         // Generalized SHOW CREATE <kind>.
-        let parsed = parse_with("SHOW CREATE VIEW v", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW CREATE VIEW v",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Create {
@@ -7827,8 +8251,11 @@ mod tests {
                 ..
             },
         ));
-        let parsed =
-            parse_with("SHOW CREATE DATABASE IF NOT EXISTS db", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW CREATE DATABASE IF NOT EXISTS db",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Create {
@@ -7839,7 +8266,11 @@ mod tests {
         ));
 
         // Index listing (WHERE-only tail).
-        let parsed = parse_with("SHOW EXTENDED KEYS FROM t FROM db", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW EXTENDED KEYS FROM t FROM db",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Index {
@@ -7851,7 +8282,11 @@ mod tests {
         ));
 
         // Engine dump (None engine == ALL).
-        let parsed = parse_with("SHOW ENGINE ALL MUTEX", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW ENGINE ALL MUTEX",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Engine {
@@ -7862,7 +8297,11 @@ mod tests {
         ));
 
         // Diagnostics: LIMIT offset,count and the COUNT(*) cardinality form.
-        let parsed = parse_with("SHOW WARNINGS LIMIT 1, 5", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW WARNINGS LIMIT 1, 5",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Diagnostics {
@@ -7875,7 +8314,11 @@ mod tests {
                 ..
             },
         ));
-        let parsed = parse_with("SHOW COUNT(*) ERRORS", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW COUNT(*) ERRORS",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::Diagnostics {
@@ -7887,7 +8330,11 @@ mod tests {
         ));
 
         // Replica status and routine code.
-        let parsed = parse_with("SHOW REPLICA STATUS FOR CHANNEL 'c'", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW REPLICA STATUS FOR CHANNEL 'c'",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::ReplicaStatus {
@@ -7895,7 +8342,11 @@ mod tests {
                 ..
             },
         ));
-        let parsed = parse_with("SHOW PROCEDURE CODE p", SHOW_ADMIN_DIALECT).unwrap();
+        let parsed = parse_with(
+            "SHOW PROCEDURE CODE p",
+            crate::ParseConfig::new(SHOW_ADMIN_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             show_admin_target(&parsed),
             ShowTarget::RoutineCode {
@@ -7908,8 +8359,20 @@ mod tests {
     /// The `SHOW INDEX` grammar admits only a `WHERE` narrowing, never `LIKE`.
     #[test]
     fn show_index_rejects_like_filter() {
-        assert!(parse_with("SHOW INDEX FROM t WHERE x = 1", SHOW_ADMIN_DIALECT).is_ok());
-        assert!(parse_with("SHOW INDEX FROM t LIKE 'a%'", SHOW_ADMIN_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "SHOW INDEX FROM t WHERE x = 1",
+                crate::ParseConfig::new(SHOW_ADMIN_DIALECT)
+            )
+            .is_ok()
+        );
+        assert!(
+            parse_with(
+                "SHOW INDEX FROM t LIKE 'a%'",
+                crate::ParseConfig::new(SHOW_ADMIN_DIALECT)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -7991,7 +8454,7 @@ mod tests {
             "SHOW PROCEDURE CODE p",
             "SHOW FUNCTION CODE f",
         ] {
-            let parsed = parse_with(sql, SHOW_ADMIN_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(SHOW_ADMIN_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             assert!(
                 matches!(parsed.statements(), [Statement::Show { .. }]),
@@ -8017,7 +8480,7 @@ mod tests {
             "SHOW CREATE USER 'u'@'localhost'",
             "SHOW GRANTS FOR u@localhost",
         ] {
-            let parsed = parse_with(sql, MYSQL_RENDER)
+            let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_RENDER))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             assert!(
                 matches!(parsed.statements(), [Statement::Show { .. }]),
@@ -8049,13 +8512,15 @@ mod tests {
         ] {
             assert!(
                 matches!(
-                    parse_with(sql, MySql).unwrap().statements(),
+                    parse_with(sql, crate::ParseConfig::new(MySql))
+                        .unwrap()
+                        .statements(),
                     [Statement::Show { .. }],
                 ),
                 "MySql should parse {sql:?} as a typed SHOW",
             );
             assert!(
-                parse_with(sql, Sqlite).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
                 "SQLite should reject {sql:?} (no SHOW dispatch)",
             );
         }
@@ -8089,15 +8554,16 @@ mod tests {
 
     #[test]
     fn use_statement_parses_one_and_two_part_names() {
-        let parsed = parse_with("USE s1", USE_DIALECT).expect("USE <schema> parses");
+        let parsed = parse_with("USE s1", crate::ParseConfig::new(USE_DIALECT))
+            .expect("USE <schema> parses");
         assert_eq!(use_of(&parsed).name.0.len(), 1);
         assert_eq!(
             parsed.resolver().resolve(use_of(&parsed).name.0[0].sym),
             "s1"
         );
 
-        let parsed =
-            parse_with("USE memory.main", USE_DIALECT).expect("USE <catalog>.<schema> parses");
+        let parsed = parse_with("USE memory.main", crate::ParseConfig::new(USE_DIALECT))
+            .expect("USE <catalog>.<schema> parses");
         assert_eq!(use_of(&parsed).name.0.len(), 2);
     }
 
@@ -8105,22 +8571,22 @@ mod tests {
     fn use_statement_rejects_a_three_part_name() {
         // DuckDB parse-rejects `USE a.b.c` (`Expected "USE database" or "USE
         // database.schema"`); the arity bound is enforced rather than over-accepted.
-        assert!(parse_with("USE a.b.c", USE_DIALECT).is_err());
+        assert!(parse_with("USE a.b.c", crate::ParseConfig::new(USE_DIALECT)).is_err());
     }
 
     #[test]
     fn use_statement_is_gated_off_without_the_flag() {
         // `use_statement` off (the ANSI baseline) leaves a leading `USE` an unknown
         // statement — the reject path — while the identical text parses with the gate on.
-        assert!(parse_with("USE s1", TestDialect).is_err());
-        assert!(parse_with("USE s1", USE_DIALECT).is_ok());
+        assert!(parse_with("USE s1", crate::ParseConfig::new(TestDialect)).is_err());
+        assert!(parse_with("USE s1", crate::ParseConfig::new(USE_DIALECT)).is_ok());
     }
 
     #[test]
     fn use_statement_round_trips() {
         for sql in ["USE s1", "USE memory.main"] {
-            let parsed =
-                parse_with(sql, USE_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(USE_DIALECT))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(USE_DIALECT)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?}: {err}"));
@@ -8140,7 +8606,8 @@ mod tests {
 
         // MySQL's `USE ident` switches the default schema by a single unqualified name and
         // round-trips; a dotted name is `ER_PARSE_ERROR`.
-        let parsed = parse_with("USE s1", MySql).expect("MySQL USE <schema> parses");
+        let parsed = parse_with("USE s1", crate::ParseConfig::new(MySql))
+            .expect("MySQL USE <schema> parses");
         assert_eq!(use_of(&parsed).name.0.len(), 1);
         assert_eq!(
             Renderer::new(MYSQL_RENDER)
@@ -8148,10 +8615,11 @@ mod tests {
                 .expect("USE renders"),
             "USE s1",
         );
-        parse_with("USE a.b", MySql).expect_err("MySQL USE rejects a dotted name");
+        parse_with("USE a.b", crate::ParseConfig::new(MySql))
+            .expect_err("MySQL USE rejects a dotted name");
 
         // DuckDB, by contrast, admits the two-part `catalog.schema` name (`use_qualified_name`).
-        assert!(parse_with("USE memory.main", DuckDb).is_ok());
+        assert!(parse_with("USE memory.main", crate::ParseConfig::new(DuckDb)).is_ok());
     }
 
     // --- UPDATE EXTENSIONS (DuckDB) -----------------------------------------
@@ -8174,12 +8642,16 @@ mod tests {
     #[test]
     fn update_extensions_captures_optional_name_list() {
         // Bare form: empty name list (refresh all installed).
-        let parsed = parse_with("UPDATE EXTENSIONS", DUCKDB_RENDER).unwrap();
+        let parsed =
+            parse_with("UPDATE EXTENSIONS", crate::ParseConfig::new(DUCKDB_RENDER)).unwrap();
         assert!(update_extensions_of(&parsed).extensions.is_empty());
 
         // Parenthesized form: the written `ColId` list, in order.
-        let parsed = parse_with("UPDATE EXTENSIONS (httpfs, json)", DUCKDB_RENDER)
-            .unwrap_or_else(|err| panic!("{err:?}"));
+        let parsed = parse_with(
+            "UPDATE EXTENSIONS (httpfs, json)",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .unwrap_or_else(|err| panic!("{err:?}"));
         let names: Vec<_> = update_extensions_of(&parsed)
             .extensions
             .iter()
@@ -8199,7 +8671,7 @@ mod tests {
             "WITH x AS (SELECT 1) UPDATE EXTENSIONS",
         ] {
             assert!(
-                parse_with(sql, DUCKDB_RENDER).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER)).is_err(),
                 "expected reject for {sql:?}",
             );
         }
@@ -8217,8 +8689,8 @@ mod tests {
             "UPDATE EXTENSIONS SET a = 1",
             "UPDATE EXTENSIONS AS e SET a = 1",
         ] {
-            let parsed =
-                parse_with(sql, DUCKDB_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert!(
                 matches!(parsed.statements(), [Statement::Update { .. }]),
                 "{sql:?} must parse as a DML UPDATE",
@@ -8231,15 +8703,15 @@ mod tests {
         // With `update_extensions` off (the ANSI baseline) the `EXTENSIONS` lookahead is
         // never taken: `UPDATE EXTENSIONS` reaches the DML parser as `UPDATE <rel=EXTENSIONS>`
         // and rejects for the missing `SET`, while the gate-on dialect accepts it.
-        assert!(parse_with("UPDATE EXTENSIONS", TestDialect).is_err());
-        assert!(parse_with("UPDATE EXTENSIONS", DUCKDB_RENDER).is_ok());
+        assert!(parse_with("UPDATE EXTENSIONS", crate::ParseConfig::new(TestDialect)).is_err());
+        assert!(parse_with("UPDATE EXTENSIONS", crate::ParseConfig::new(DUCKDB_RENDER)).is_ok());
     }
 
     #[test]
     fn update_extensions_round_trips() {
         for sql in ["UPDATE EXTENSIONS", "UPDATE EXTENSIONS (httpfs, json)"] {
-            let parsed =
-                parse_with(sql, DUCKDB_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(DUCKDB_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?}: {err}"));
@@ -8297,25 +8769,41 @@ mod tests {
     fn prepare_execute_call_capture_shapes() {
         // PREPARE wraps an arbitrary statement body (here a SELECT carrying the `?`
         // placeholder the fitted DuckDb preset now lexes).
-        let parsed = parse_with("PREPARE v1 AS SELECT 'Test' LIMIT ?", DUCKDB_RENDER).unwrap();
+        let parsed = parse_with(
+            "PREPARE v1 AS SELECT 'Test' LIMIT ?",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .unwrap();
         assert!(
             prepare_of(&parsed).statement.as_query().is_some(),
             "body is the SELECT",
         );
         // EXECUTE: a bare invocation leaves `args` empty; a parenthesized list fills it.
-        let bare = parse_with("EXECUTE v1", DUCKDB_RENDER).unwrap();
+        let bare = parse_with("EXECUTE v1", crate::ParseConfig::new(DUCKDB_RENDER)).unwrap();
         assert!(execute_of(&bare).args.is_empty());
-        let two = parse_with("EXECUTE v1(1, 2)", DUCKDB_RENDER).unwrap();
+        let two = parse_with("EXECUTE v1(1, 2)", crate::ParseConfig::new(DUCKDB_RENDER)).unwrap();
         assert_eq!(execute_of(&two).args.len(), 2);
         // CALL: the parentheses are mandatory but may hold an empty list.
-        let empty = parse_with("CALL pragma_version()", DUCKDB_RENDER).unwrap();
+        let empty = parse_with(
+            "CALL pragma_version()",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .unwrap();
         assert!(call_of(&empty).args.is_empty());
-        let one = parse_with("CALL pragma_table_info('t')", DUCKDB_RENDER).unwrap();
+        let one = parse_with(
+            "CALL pragma_table_info('t')",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .unwrap();
         assert_eq!(call_of(&one).args.len(), 1);
         // DEALLOCATE records whether the optional `PREPARE` keyword was written.
-        let dealloc = parse_with("DEALLOCATE v1", DUCKDB_RENDER).unwrap();
+        let dealloc = parse_with("DEALLOCATE v1", crate::ParseConfig::new(DUCKDB_RENDER)).unwrap();
         assert!(!deallocate_of(&dealloc).prepare_keyword);
-        let dealloc_prep = parse_with("DEALLOCATE PREPARE v1", DUCKDB_RENDER).unwrap();
+        let dealloc_prep = parse_with(
+            "DEALLOCATE PREPARE v1",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .unwrap();
         assert!(deallocate_of(&dealloc_prep).prepare_keyword);
     }
 
@@ -8361,7 +8849,10 @@ mod tests {
                 ..FeatureSet::DUCKDB.utility_syntax
             }));
         const BOTH_ON_RENDER: FeatureDialect = FeatureDialect { features: &BOTH_ON };
-        let _ = parse_with("DEALLOCATE PREPARE p", BOTH_ON_RENDER);
+        let _ = parse_with(
+            "DEALLOCATE PREPARE p",
+            crate::ParseConfig::new(BOTH_ON_RENDER),
+        );
     }
 
     /// Debug-build enforcement of the `feature_dependencies` registry at the parse-entry seam:
@@ -8388,7 +8879,7 @@ mod tests {
         const DANGLING_RENDER: FeatureDialect = FeatureDialect {
             features: &DANGLING,
         };
-        let _ = parse_with("CALL p", DANGLING_RENDER);
+        let _ = parse_with("CALL p", crate::ParseConfig::new(DANGLING_RENDER));
     }
 
     #[test]
@@ -8402,8 +8893,8 @@ mod tests {
             "CALL pragma_version()",
             "CALL pragma_table_info('t')",
         ] {
-            let parsed =
-                parse_with(sql, DUCKDB_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(DUCKDB_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -8421,8 +8912,11 @@ mod tests {
         use crate::dialect::{MySql, Postgres};
 
         // Two full type names, round-tripping with the AST carrying both.
-        let parsed = parse_with("PREPARE p(int, text) AS SELECT $1, $2", Postgres)
-            .expect("typed parameter list parses under PostgreSQL");
+        let parsed = parse_with(
+            "PREPARE p(int, text) AS SELECT $1, $2",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("typed parameter list parses under PostgreSQL");
         assert_eq!(prepare_of(&parsed).parameter_types.len(), 2);
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
@@ -8440,7 +8934,8 @@ mod tests {
                 "PREPARE p(INTEGER[]) AS SELECT $1",
             ),
         ] {
-            let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert_eq!(prepare_of(&parsed).parameter_types.len(), 1);
             let rendered = Renderer::new(Postgres)
                 .render_parsed(&parsed)
@@ -8450,20 +8945,24 @@ mod tests {
 
         // PostgreSQL rejects an empty written `()` (pg_query-verified).
         assert!(
-            parse_with("PREPARE p() AS SELECT 1", Postgres).is_err(),
+            parse_with("PREPARE p() AS SELECT 1", crate::ParseConfig::new(Postgres)).is_err(),
             "empty parameter-type list should reject",
         );
 
         // Bare `PREPARE` (no parens) still parses and carries an empty list.
-        let bare =
-            parse_with("PREPARE p AS SELECT 1", Postgres).expect("bare PREPARE still parses");
+        let bare = parse_with("PREPARE p AS SELECT 1", crate::ParseConfig::new(Postgres))
+            .expect("bare PREPARE still parses");
         assert!(prepare_of(&bare).parameter_types.is_empty());
 
         // DuckDB structurally rejects the typed list (`prepare_typed_parameters` off): the
         // `(` after the name is left untouched, so the statement falls through to the `AS`
         // expectation and errors there — today's error shape, unchanged by this widening.
         assert!(
-            parse_with("PREPARE p(int) AS SELECT $1", DUCKDB_RENDER).is_err(),
+            parse_with(
+                "PREPARE p(int) AS SELECT $1",
+                crate::ParseConfig::new(DUCKDB_RENDER)
+            )
+            .is_err(),
             "DuckDB should reject the typed parameter list",
         );
 
@@ -8473,7 +8972,11 @@ mod tests {
         // (`PREPARE p(int) FROM 'x'` is `ER_PARSE_ERROR` — the typed list is
         // PostgreSQL-only).
         assert!(
-            parse_with("PREPARE p(int) FROM 'SELECT 1'", MySql).is_err(),
+            parse_with(
+                "PREPARE p(int) FROM 'SELECT 1'",
+                crate::ParseConfig::new(MySql)
+            )
+            .is_err(),
             "MySQL's PREPARE ... FROM grammar admits no type list",
         );
     }
@@ -8487,13 +8990,14 @@ mod tests {
         // (`duckdb-settings-and-session-statements`); under PostgreSQL the same text is a
         // gated-off unknown statement.
         for sql in ["PRAGMA verify_parallelism", "PRAGMA default_order = 'ASC'"] {
-            let parsed = parse_with(sql, DuckDb).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert!(
                 matches!(parsed.statements(), [Statement::Pragma { .. }]),
                 "{sql:?} should parse to a PRAGMA under DuckDb",
             );
             assert!(
-                parse_with(sql, crate::dialect::Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres)).is_err(),
                 "{sql:?} is gated off under PostgreSQL",
             );
         }
@@ -8513,7 +9017,7 @@ mod tests {
             "DEALLOCATE",
         ] {
             assert!(
-                parse_with(sql, DUCKDB_RENDER).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER)).is_err(),
                 "DuckDb should reject {sql:?}",
             );
         }
@@ -8532,30 +9036,33 @@ mod tests {
             "DEALLOCATE v1",
             "CALL f(1)",
         ] {
-            assert!(parse_with(sql, Ansi).is_err(), "Ansi should reject {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "Ansi should reject {sql:?}"
+            );
         }
         // PostgreSQL has its own `PREPARE`/`EXECUTE`/`DEALLOCATE` prepared-statement
         // lifecycle (`planner-parity-prepare-typed-parameters`), so only `CALL` stays
         // rejected there — its own flag, off under PostgreSQL until a routine-call
         // grammar ticket fits it.
         assert!(
-            parse_with("PREPARE v1 AS SELECT 1", Postgres).is_ok(),
+            parse_with("PREPARE v1 AS SELECT 1", crate::ParseConfig::new(Postgres)).is_ok(),
             "Postgres should accept the bare PREPARE form",
         );
         assert!(
-            parse_with("EXECUTE v1(1)", Postgres).is_ok(),
+            parse_with("EXECUTE v1(1)", crate::ParseConfig::new(Postgres)).is_ok(),
             "Postgres should accept EXECUTE",
         );
         assert!(
-            parse_with("DEALLOCATE v1", Postgres).is_ok(),
+            parse_with("DEALLOCATE v1", crate::ParseConfig::new(Postgres)).is_ok(),
             "Postgres should accept DEALLOCATE",
         );
         assert!(
-            parse_with("CALL f(1)", Postgres).is_err(),
+            parse_with("CALL f(1)", crate::ParseConfig::new(Postgres)).is_err(),
             "Postgres should reject CALL (its own, still-off flag)",
         );
         assert!(
-            parse_with("SELECT ?", Postgres).is_err(),
+            parse_with("SELECT ?", crate::ParseConfig::new(Postgres)).is_err(),
             "`?` stays a stray byte under PostgreSQL",
         );
     }
@@ -8574,7 +9081,8 @@ mod tests {
         };
 
         // The bare form: no argument list at all, so `parenthesized` is false and `args` empty.
-        let bare = parse_with("CALL p", MySql).expect("MySQL accepts the bare CALL form");
+        let bare = parse_with("CALL p", crate::ParseConfig::new(MySql))
+            .expect("MySQL accepts the bare CALL form");
         assert!(
             !call_of(&bare).parenthesized,
             "bare CALL has no argument list"
@@ -8582,20 +9090,24 @@ mod tests {
         assert!(call_of(&bare).args.is_empty());
 
         // The empty-parens form: `parenthesized` true, `args` empty — a distinct written shape.
-        let empty = parse_with("CALL p()", MySql).expect("MySQL accepts empty parens");
+        let empty = parse_with("CALL p()", crate::ParseConfig::new(MySql))
+            .expect("MySQL accepts empty parens");
         assert!(call_of(&empty).parenthesized);
         assert!(call_of(&empty).args.is_empty());
 
         // A filled and a qualified `db.proc` form.
-        let two = parse_with("CALL p(1, 2)", MySql).expect("MySQL accepts a filled list");
+        let two = parse_with("CALL p(1, 2)", crate::ParseConfig::new(MySql))
+            .expect("MySQL accepts a filled list");
         assert!(call_of(&two).parenthesized);
         assert_eq!(call_of(&two).args.len(), 2);
-        let qualified = parse_with("CALL db.p(1)", MySql).expect("MySQL accepts a db.proc name");
+        let qualified = parse_with("CALL db.p(1)", crate::ParseConfig::new(MySql))
+            .expect("MySQL accepts a db.proc name");
         assert_eq!(call_of(&qualified).name.0.len(), 2);
 
         // Every grammar-valid form round-trips byte-identically (the bare form renders no `()`).
         for sql in ["CALL p", "CALL p()", "CALL p(1, 2)", "CALL db.p(1)"] {
-            let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -8604,13 +9116,17 @@ mod tests {
 
         // A three-part name is a syntax error (MySQL's `sp_name` is at most `db.proc`).
         assert!(
-            parse_with("CALL a.b.c(1)", MySql).is_err(),
+            parse_with("CALL a.b.c(1)", crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects a three-part routine name",
         );
         // A bare name with no parens is a syntax error where `call_bare_name` is off: DuckDB's
         // parentheses are mandatory, so `CALL pragma_version` still rejects there.
         assert!(
-            parse_with("CALL pragma_version", DUCKDB_RENDER).is_err(),
+            parse_with(
+                "CALL pragma_version",
+                crate::ParseConfig::new(DUCKDB_RENDER)
+            )
+            .is_err(),
             "DuckDB requires the parenthesized argument list",
         );
     }
@@ -8645,38 +9161,39 @@ mod tests {
         // The string source is the opaque `Text` arm; the `@var` source is `Variable`, its
         // name held sigil-less with the quote style preserved (each `ident_or_text`
         // spelling: folded `@name`, and the standalone-`@` quoted forms).
-        let text = parse_with("PREPARE s FROM 'SELECT 1'", MySql).unwrap();
+        let text = parse_with("PREPARE s FROM 'SELECT 1'", crate::ParseConfig::new(MySql)).unwrap();
         assert!(matches!(
             prepare_from_of(&text).source,
             PrepareSource::Text { .. },
         ));
-        let bare_var = parse_with("PREPARE s FROM @code", MySql).unwrap();
+        let bare_var = parse_with("PREPARE s FROM @code", crate::ParseConfig::new(MySql)).unwrap();
         let PrepareSource::Variable { name, .. } = &prepare_from_of(&bare_var).source else {
             panic!("expected a Variable source");
         };
         assert_eq!(name.quote, QuoteStyle::None);
-        let quoted_var = parse_with("PREPARE s FROM @'code'", MySql).unwrap();
+        let quoted_var =
+            parse_with("PREPARE s FROM @'code'", crate::ParseConfig::new(MySql)).unwrap();
         let PrepareSource::Variable { name, .. } = &prepare_from_of(&quoted_var).source else {
             panic!("expected a Variable source");
         };
         assert_eq!(name.quote, QuoteStyle::Single);
 
         // A bare EXECUTE leaves the USING list empty; the list members are sigil-less names.
-        let bare = parse_with("EXECUTE s", MySql).unwrap();
+        let bare = parse_with("EXECUTE s", crate::ParseConfig::new(MySql)).unwrap();
         assert!(execute_using_of(&bare).using.is_empty());
-        let two = parse_with("EXECUTE s USING @a, @'b'", MySql).unwrap();
+        let two = parse_with("EXECUTE s USING @a, @'b'", crate::ParseConfig::new(MySql)).unwrap();
         assert_eq!(execute_using_of(&two).using.len(), 2);
         assert_eq!(execute_using_of(&two).using[1].quote, QuoteStyle::Single);
 
         // The release verb records its `deallocate_or_drop` spelling; the mandatory
         // `PREPARE` keyword is always recorded written.
-        let dealloc = parse_with("DEALLOCATE PREPARE s", MySql).unwrap();
+        let dealloc = parse_with("DEALLOCATE PREPARE s", crate::ParseConfig::new(MySql)).unwrap();
         assert_eq!(
             deallocate_of(&dealloc).keyword,
             DeallocateKeyword::Deallocate,
         );
         assert!(deallocate_of(&dealloc).prepare_keyword);
-        let drop = parse_with("DROP PREPARE s", MySql).unwrap();
+        let drop = parse_with("DROP PREPARE s", crate::ParseConfig::new(MySql)).unwrap();
         assert_eq!(deallocate_of(&drop).keyword, DeallocateKeyword::Drop);
         assert!(deallocate_of(&drop).prepare_keyword);
     }
@@ -8706,7 +9223,8 @@ mod tests {
             "DEALLOCATE PREPARE `s`",
             "DROP PREPARE s",
         ] {
-            let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -8737,7 +9255,7 @@ mod tests {
             "DROP PREPARE IF EXISTS s",
         ] {
             assert!(
-                parse_with(sql, MySql).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
                 "MySql should reject {sql:?}",
             );
         }
@@ -8756,9 +9274,15 @@ mod tests {
             "DROP PREPARE s",
         ] {
             for (dialect_name, result) in [
-                ("Ansi", parse_with(sql, Ansi)),
-                ("Postgres", parse_with(sql, Postgres)),
-                ("DuckDb", parse_with(sql, DUCKDB_RENDER)),
+                ("Ansi", parse_with(sql, crate::ParseConfig::new(Ansi))),
+                (
+                    "Postgres",
+                    parse_with(sql, crate::ParseConfig::new(Postgres)),
+                ),
+                (
+                    "DuckDb",
+                    parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER)),
+                ),
             ] {
                 assert!(result.is_err(), "{dialect_name} should reject {sql:?}");
             }
@@ -8777,16 +9301,24 @@ mod tests {
         use crate::dialect::Postgres;
 
         // Body only — one `Body` arg.
-        let body = parse_with("DO $$BEGIN NULL; END$$", Postgres).unwrap();
+        let body = parse_with("DO $$BEGIN NULL; END$$", crate::ParseConfig::new(Postgres)).unwrap();
         assert!(matches!(do_of(&body).args.as_slice(), [DoArg::Body { .. }]));
 
         // Both `LANGUAGE`/body orders round-trip as distinct arg sequences.
-        let lang_first = parse_with("DO LANGUAGE plpgsql $$x$$", Postgres).unwrap();
+        let lang_first = parse_with(
+            "DO LANGUAGE plpgsql $$x$$",
+            crate::ParseConfig::new(Postgres),
+        )
+        .unwrap();
         assert!(matches!(
             do_of(&lang_first).args.as_slice(),
             [DoArg::Language { .. }, DoArg::Body { .. }],
         ));
-        let body_first = parse_with("DO $$x$$ LANGUAGE plpgsql", Postgres).unwrap();
+        let body_first = parse_with(
+            "DO $$x$$ LANGUAGE plpgsql",
+            crate::ParseConfig::new(Postgres),
+        )
+        .unwrap();
         assert!(matches!(
             do_of(&body_first).args.as_slice(),
             [DoArg::Body { .. }, DoArg::Language { .. }],
@@ -8795,14 +9327,19 @@ mod tests {
         // The raw-parse forms libpg_query accepts but only rejects at execution: a
         // language-only block, a repeated body, and a repeated language all parse here, since
         // the "exactly one body, at most one language" check is deferred (like `PREPARE`).
-        let lang_only = parse_with("DO LANGUAGE plpgsql", Postgres).unwrap();
+        let lang_only =
+            parse_with("DO LANGUAGE plpgsql", crate::ParseConfig::new(Postgres)).unwrap();
         assert!(matches!(
             do_of(&lang_only).args.as_slice(),
             [DoArg::Language { .. }]
         ));
-        let two_bodies = parse_with("DO $$a$$ $$b$$", Postgres).unwrap();
+        let two_bodies = parse_with("DO $$a$$ $$b$$", crate::ParseConfig::new(Postgres)).unwrap();
         assert_eq!(do_of(&two_bodies).args.len(), 2);
-        let two_langs = parse_with("DO 'x' LANGUAGE a LANGUAGE b", Postgres).unwrap();
+        let two_langs = parse_with(
+            "DO 'x' LANGUAGE a LANGUAGE b",
+            crate::ParseConfig::new(Postgres),
+        )
+        .unwrap();
         assert!(matches!(
             do_of(&two_langs).args.as_slice(),
             [
@@ -8827,7 +9364,8 @@ mod tests {
             "DO 'x' LANGUAGE 'plpgsql'",
             "DO LANGUAGE 'plpgsql' $$x$$",
         ] {
-            let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(Postgres)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -8859,7 +9397,7 @@ mod tests {
             "DO 'x' LANGUAGE x'ab'",
         ] {
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "Postgres should reject {sql:?}",
             );
         }
@@ -8870,7 +9408,8 @@ mod tests {
         use crate::dialect::Postgres;
         // `NonReservedWord_or_Sconst`: the operand is a bare word or an `Sconst` string, in
         // either `LANGUAGE`/body order. libpg_query accepts each of these.
-        let word = parse_with("DO 'x' LANGUAGE plpgsql", Postgres).unwrap();
+        let word =
+            parse_with("DO 'x' LANGUAGE plpgsql", crate::ParseConfig::new(Postgres)).unwrap();
         assert!(matches!(
             do_of(&word).args.as_slice(),
             [
@@ -8881,7 +9420,11 @@ mod tests {
                 }
             ],
         ));
-        let string = parse_with("DO 'x' LANGUAGE 'plpgsql'", Postgres).unwrap();
+        let string = parse_with(
+            "DO 'x' LANGUAGE 'plpgsql'",
+            crate::ParseConfig::new(Postgres),
+        )
+        .unwrap();
         assert!(matches!(
             do_of(&string).args.as_slice(),
             [
@@ -8892,7 +9435,11 @@ mod tests {
                 }
             ],
         ));
-        let string_first = parse_with("DO LANGUAGE 'plpgsql' $$x$$", Postgres).unwrap();
+        let string_first = parse_with(
+            "DO LANGUAGE 'plpgsql' $$x$$",
+            crate::ParseConfig::new(Postgres),
+        )
+        .unwrap();
         assert!(matches!(
             do_of(&string_first).args.as_slice(),
             [
@@ -8904,7 +9451,11 @@ mod tests {
             ],
         ));
         // An `E'…'` escape string and a dollar-quoted string are `Sconst`s too.
-        let escape = parse_with("DO 'x' LANGUAGE E'plpgsql'", Postgres).unwrap();
+        let escape = parse_with(
+            "DO 'x' LANGUAGE E'plpgsql'",
+            crate::ParseConfig::new(Postgres),
+        )
+        .unwrap();
         assert!(matches!(
             do_of(&escape).args.as_slice(),
             [
@@ -8925,9 +9476,9 @@ mod tests {
         // excluded: it dispatches the *different* `do_expression_list` behaviour on `DO`, so
         // `DO 'x'` parses there as the expression form — see `mysql_do_expressions_*`.)
         for dialect_rejects in [
-            parse_with("DO 'x'", Ansi).is_err(),
-            parse_with("DO 'x'", DuckDb).is_err(),
-            parse_with("DO 'x'", Sqlite).is_err(),
+            parse_with("DO 'x'", crate::ParseConfig::new(Ansi)).is_err(),
+            parse_with("DO 'x'", crate::ParseConfig::new(DuckDb)).is_err(),
+            parse_with("DO 'x'", crate::ParseConfig::new(Sqlite)).is_err(),
         ] {
             assert!(
                 dialect_rejects,
@@ -8953,10 +9504,12 @@ mod tests {
         // MySQL's `DO <expr-list>` evaluates a select-item list for side effects — a distinct
         // behaviour on the `DO` keyword from PostgreSQL's code block. The list round-trips and
         // an alias is grammar-legal (`DO select_item_list`), so it parses like a projection.
-        let parsed = parse_with("DO 1 + 1, SLEEP(0)", MySql).expect("MySQL DO parses");
+        let parsed = parse_with("DO 1 + 1, SLEEP(0)", crate::ParseConfig::new(MySql))
+            .expect("MySQL DO parses");
         assert_eq!(do_expressions_of(&parsed).items.len(), 2);
         for sql in ["DO 1 + 1", "DO 1, 2, 3", "DO SLEEP(0)", "DO 1 AS x"] {
-            let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -8964,7 +9517,8 @@ mod tests {
         }
 
         // A bare `DO` has no expression list — `ER_PARSE_ERROR` on mysql:8.
-        parse_with("DO", MySql).expect_err("MySQL DO requires an expression list");
+        parse_with("DO", crate::ParseConfig::new(MySql))
+            .expect_err("MySQL DO requires an expression list");
     }
 
     // --- LOCK / UNLOCK TABLES and LOCK / UNLOCK INSTANCE (MySQL) --------------
@@ -8989,7 +9543,7 @@ mod tests {
         // engine-verified grammar-positive on 8.4.10 — 1046/1295, never 1064).
         let parsed = parse_with(
             "LOCK TABLES t1 AS a READ LOCAL, db.t2 WRITE, t3 b READ",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("MySQL LOCK TABLES parses");
         let lock = lock_tables_of(&parsed);
@@ -9010,7 +9564,8 @@ mod tests {
             "LOCK TABLES t1 WRITE",
             "LOCK TABLES t1 a READ, db.t2 WRITE",
         ] {
-            let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -9019,7 +9574,8 @@ mod tests {
 
         // The `AS` alias spelling is not recorded (MySQL's `opt_as` noise keyword), so it
         // renders in the canonical bare form.
-        let parsed = parse_with("LOCK TABLES t1 AS a READ", MySql).expect("AS alias parses");
+        let parsed = parse_with("LOCK TABLES t1 AS a READ", crate::ParseConfig::new(MySql))
+            .expect("AS alias parses");
         assert_eq!(
             Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
@@ -9042,7 +9598,7 @@ mod tests {
             "LOCK",
             "LOCK TABLES t1 LOW_PRIORITY WRITE",
         ] {
-            parse_with(sql, MySql).expect_err(sql);
+            parse_with(sql, crate::ParseConfig::new(MySql)).expect_err(sql);
         }
     }
 
@@ -9061,7 +9617,8 @@ mod tests {
         use crate::dialect::MySql;
 
         for (sql, plural) in [("UNLOCK TABLES", true), ("UNLOCK TABLE", false)] {
-            let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert_eq!(unlock_tables_of(&parsed).plural, plural);
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
@@ -9069,7 +9626,8 @@ mod tests {
             assert_eq!(rendered, sql, "round-trip for {sql:?}");
         }
         // A bare `UNLOCK` is `ER_PARSE_ERROR` on mysql:8.4.10.
-        parse_with("UNLOCK", MySql).expect_err("UNLOCK needs TABLES/TABLE or INSTANCE");
+        parse_with("UNLOCK", crate::ParseConfig::new(MySql))
+            .expect_err("UNLOCK needs TABLES/TABLE or INSTANCE");
     }
 
     fn instance_lock_of(parsed: &Parsed) -> &crate::ast::InstanceLockStatement {
@@ -9090,7 +9648,8 @@ mod tests {
             ("LOCK INSTANCE FOR BACKUP", true),
             ("UNLOCK INSTANCE", false),
         ] {
-            let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert_eq!(instance_lock_of(&parsed).acquire, acquire);
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
@@ -9098,7 +9657,8 @@ mod tests {
             assert_eq!(rendered, sql, "round-trip for {sql:?}");
         }
         // The `FOR BACKUP` tail is mandatory on the acquire side.
-        parse_with("LOCK INSTANCE", MySql).expect_err("LOCK INSTANCE requires FOR BACKUP");
+        parse_with("LOCK INSTANCE", crate::ParseConfig::new(MySql))
+            .expect_err("LOCK INSTANCE requires FOR BACKUP");
     }
 
     #[test]
@@ -9116,10 +9676,10 @@ mod tests {
             "UNLOCK INSTANCE",
         ] {
             for rejects in [
-                parse_with(sql, Ansi).is_err(),
-                parse_with(sql, Postgres).is_err(),
-                parse_with(sql, Sqlite).is_err(),
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             ] {
                 assert!(rejects, "{sql:?} is gated off outside MySQL/Lenient");
             }
@@ -9151,7 +9711,8 @@ mod tests {
                    FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '\"' ESCAPED BY '\\\\' \
                    LINES STARTING BY '>' TERMINATED BY '\\n' \
                    IGNORE 1 LINES (a, @v) SET b = @v";
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let load = load_data_of(&parsed);
         assert_eq!(load.format, LoadDataFormat::Data);
         assert_eq!(load.concurrency, Some(LoadDataConcurrency::LowPriority));
@@ -9195,7 +9756,8 @@ mod tests {
         // clause restrictions are semantic, not syntactic), so `ROWS IDENTIFIED BY` parses here.
         let sql = "LOAD XML LOCAL INFILE 'f.xml' INTO TABLE t CHARACTER SET utf8mb4 \
                    ROWS IDENTIFIED BY '<row>' IGNORE 2 ROWS (a, @v) SET b = @v";
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let load = load_data_of(&parsed);
         assert_eq!(load.format, LoadDataFormat::Xml);
         assert!(load.rows_identified_by.is_some());
@@ -9222,21 +9784,25 @@ mod tests {
             "LOAD DATA INFILE 'f' INTO TABLE t IGNORE 3 LINES",
             "LOAD DATA INFILE 'f' INTO TABLE t (a, b, @c) SET d = @c, e = DEFAULT",
         ] {
-            let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
             assert_eq!(rendered, sql, "round-trip for {sql:?}");
         }
-        let concurrent =
-            parse_with("LOAD DATA CONCURRENT INFILE 'f' INTO TABLE db.t", MySql).unwrap();
+        let concurrent = parse_with(
+            "LOAD DATA CONCURRENT INFILE 'f' INTO TABLE db.t",
+            crate::ParseConfig::new(MySql),
+        )
+        .unwrap();
         assert_eq!(
             load_data_of(&concurrent).concurrency,
             Some(LoadDataConcurrency::Concurrent),
         );
         let columns = parse_with(
             "LOAD DATA INFILE 'f' INTO TABLE t COLUMNS TERMINATED BY '\\t' ENCLOSED BY '\"'",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .unwrap();
         assert_eq!(
@@ -9244,7 +9810,11 @@ mod tests {
             LoadFieldsSpelling::Columns,
         );
         // A written empty `()` column list folds to absent (both are MySQL's nullptr).
-        let empty = parse_with("LOAD DATA INFILE 'f' INTO TABLE t ()", MySql).unwrap();
+        let empty = parse_with(
+            "LOAD DATA INFILE 'f' INTO TABLE t ()",
+            crate::ParseConfig::new(MySql),
+        )
+        .unwrap();
         assert!(load_data_of(&empty).columns.is_empty());
     }
 
@@ -9256,19 +9826,27 @@ mod tests {
         // two-word `LOAD DATA`/`LOAD XML` lookahead routes the bulk-import reading here while a
         // bare `LOAD '<lib>'` stays the extension load.
         assert!(matches!(
-            parse_with("LOAD DATA INFILE 'f' INTO TABLE t", Lenient)
-                .unwrap()
-                .statements(),
+            parse_with(
+                "LOAD DATA INFILE 'f' INTO TABLE t",
+                crate::ParseConfig::new(Lenient)
+            )
+            .unwrap()
+            .statements(),
             [Statement::LoadData { .. }],
         ));
         assert!(matches!(
-            parse_with("LOAD XML INFILE 'f' INTO TABLE t", Lenient)
-                .unwrap()
-                .statements(),
+            parse_with(
+                "LOAD XML INFILE 'f' INTO TABLE t",
+                crate::ParseConfig::new(Lenient)
+            )
+            .unwrap()
+            .statements(),
             [Statement::LoadData { .. }],
         ));
         assert!(matches!(
-            parse_with("LOAD 'plpgsql'", Lenient).unwrap().statements(),
+            parse_with("LOAD 'plpgsql'", crate::ParseConfig::new(Lenient))
+                .unwrap()
+                .statements(),
             [Statement::Load { .. }],
         ));
     }
@@ -9294,7 +9872,8 @@ mod tests {
             // `INTO TABLE` is mandatory.
             "LOAD DATA INFILE 'f'",
         ] {
-            parse_with(sql, MySql).expect_err(&format!("{sql:?} must reject"));
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err(&format!("{sql:?} must reject"));
         }
     }
 
@@ -9308,10 +9887,10 @@ mod tests {
         // statement still rejects.
         let sql = "LOAD DATA INFILE 'f' INTO TABLE t";
         for rejects in [
-            parse_with(sql, Ansi).is_err(),
-            parse_with(sql, Postgres).is_err(),
-            parse_with(sql, Sqlite).is_err(),
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
         ] {
             assert!(rejects, "{sql:?} is gated off outside MySQL/Lenient");
         }
@@ -9329,7 +9908,7 @@ mod tests {
         // Structural spot-checks: the CLONE INSTANCE donor account, port, and SSL axis.
         let instance = parse_with(
             "CLONE INSTANCE FROM u@h:3306 IDENTIFIED BY 'p' REQUIRE NO SSL",
-            MYSQL_RENDER,
+            crate::ParseConfig::new(MYSQL_RENDER),
         )
         .unwrap();
         let Statement::Clone { clone, .. } = &instance.statements()[0] else {
@@ -9344,7 +9923,7 @@ mod tests {
         ));
 
         // HELP accepts a bare identifier and a quoted string alike (`ident_or_text`).
-        let help_bare = parse_with("HELP contents", MYSQL_RENDER).unwrap();
+        let help_bare = parse_with("HELP contents", crate::ParseConfig::new(MYSQL_RENDER)).unwrap();
         let Statement::Help { help, .. } = &help_bare.statements()[0] else {
             panic!("expected a HELP statement");
         };
@@ -9371,8 +9950,8 @@ mod tests {
             "HELP contents",
             "BINLOG 'YWJj'",
         ] {
-            let parsed =
-                parse_with(sql, MYSQL_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_RENDER))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -9402,7 +9981,7 @@ mod tests {
             "BINLOG",
         ] {
             assert!(
-                parse_with(sql, MYSQL_RENDER).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MYSQL_RENDER)).is_err(),
                 "{sql:?} must reject",
             );
         }
@@ -9424,16 +10003,19 @@ mod tests {
             "HELP 'x'",
             "BINLOG 'YWJj'",
         ] {
-            assert!(parse_with(sql, MySql).is_ok(), "{sql:?} parses under MySQL");
             assert!(
-                parse_with(sql, Lenient).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
+                "{sql:?} parses under MySQL"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Lenient)).is_ok(),
                 "{sql:?} parses under Lenient",
             );
             for rejects in [
-                parse_with(sql, Ansi).is_err(),
-                parse_with(sql, Postgres).is_err(),
-                parse_with(sql, Sqlite).is_err(),
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             ] {
                 assert!(rejects, "{sql:?} is gated off outside MySQL/Lenient");
             }
@@ -9521,7 +10103,7 @@ mod tests {
         ];
 
         for sql in FORMS {
-            let parsed = parse_with(sql, REPLICATION_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(REPLICATION_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert!(
                 matches!(parsed.statements(), [Statement::Replication { .. }]),
@@ -9563,7 +10145,7 @@ mod tests {
 
         for sql in REJECTS {
             assert!(
-                parse_with(sql, MySql).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
                 "{sql:?} should be rejected by the MySql preset",
             );
         }
@@ -9585,15 +10167,15 @@ mod tests {
             "STOP GROUP_REPLICATION",
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "{sql:?} must be gated off under ANSI",
             );
             assert!(
-                parse_with(sql, Sqlite).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
                 "{sql:?} must be gated off under SQLite",
             );
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
                 "{sql:?} must be gated off under DuckDB",
             );
         }

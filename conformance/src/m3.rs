@@ -995,13 +995,13 @@ mod tests {
             .chain(SCHEMA_DEPENDENT_ACCEPT)
         {
             assert!(
-                parse_with(sql, MySql).is_ok(),
+                parse_with(sql, squonk::ParseConfig::new(MySql)).is_ok(),
                 "MySql should parse the accept-corpus entry {sql:?}",
             );
         }
         for sql in SCHEMA_INDEPENDENT_REJECT {
             assert!(
-                parse_with(sql, MySql).is_err(),
+                parse_with(sql, squonk::ParseConfig::new(MySql)).is_err(),
                 "MySql should reject the reject-corpus entry {sql:?}",
             );
         }
@@ -1016,8 +1016,11 @@ mod tests {
         // call — MySQL resolves it as a stored-function reference. The empty grouping
         // set `()` is not a valid expression there, so it is rejected. (MySQL's own
         // grouping surface is the distinct trailing `WITH ROLLUP`, not modelled here.)
-        let parsed = parse_with("SELECT a FROM t GROUP BY ROLLUP (a, b)", MySql)
-            .expect("MySQL parses rollup as a function call");
+        let parsed = parse_with(
+            "SELECT a FROM t GROUP BY ROLLUP (a, b)",
+            squonk::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses rollup as a function call");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query");
         };
@@ -1032,7 +1035,11 @@ mod tests {
             },
         ));
         assert!(
-            parse_with("SELECT a FROM t GROUP BY ()", MySql).is_err(),
+            parse_with(
+                "SELECT a FROM t GROUP BY ()",
+                squonk::ParseConfig::new(MySql)
+            )
+            .is_err(),
             "MySQL rejects the empty grouping set (no grouping-set surface)",
         );
     }

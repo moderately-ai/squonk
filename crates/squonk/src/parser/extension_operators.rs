@@ -184,7 +184,8 @@ impl Dialect for OpDialect {
 
 /// Parse one `SELECT <expr>` under `OpDialect`.
 fn parse(src: &str) -> Parsed<Arc<str>, OpExt> {
-    parse_with(src, OpDialect).expect("OpDialect parses the test expression")
+    parse_with(src, crate::ParseConfig::new(OpDialect))
+        .expect("OpDialect parses the test expression")
 }
 
 /// The single projection expression of a parsed `SELECT <expr>`.
@@ -203,14 +204,15 @@ fn projection_expr(parsed: &Parsed<Arc<str>, OpExt>) -> &Expr<OpExt> {
 
 /// Canonically render a parsed `SELECT` and return its SQL text.
 fn canonical(src: &str) -> String {
-    parse_with(src, OpDialect)
+    parse_with(src, crate::ParseConfig::new(OpDialect))
         .expect("OpDialect parses the test expression")
         .to_string()
 }
 
 /// Fully-parenthesized render (the precedence oracle).
 fn parenthesized(src: &str) -> String {
-    let parsed = parse_with(src, OpDialect).expect("OpDialect parses the test expression");
+    let parsed = parse_with(src, crate::ParseConfig::new(OpDialect))
+        .expect("OpDialect parses the test expression");
     let config = RenderConfig {
         mode: RenderMode::Parenthesized,
         ..RenderConfig::default()
@@ -367,14 +369,15 @@ fn nonassoc_infix_hook_rejects_chains() {
     // operator, exactly like `a < b < c` for the built-in comparisons — never a
     // silently associated parse (ADR-0008). The chain check reads the left operand's
     // precedence back through `Dialect::extension_operand_binding_power`.
-    let err = parse_with("SELECT a & b & c", OpDialect)
+    let err = parse_with("SELECT a & b & c", crate::ParseConfig::new(OpDialect))
         .expect_err("the non-associative `&` does not chain");
     assert_eq!(err.expected.as_str(), "the end of the operator chain");
     // `SELECT a & b & c`: the second `&` sits at bytes 13..14.
     assert_eq!(err.span, Span::new(13, 14));
 
     // A single `&` is fine, and binds a plain `Cmp` node.
-    let parsed = parse_with("SELECT a & b", OpDialect).expect("a single `&` parses");
+    let parsed = parse_with("SELECT a & b", crate::ParseConfig::new(OpDialect))
+        .expect("a single `&` parses");
     assert!(matches!(
         projection_expr(&parsed),
         Expr::Other {
@@ -405,7 +408,8 @@ fn parenthesized_nonassoc_extension_resets_chain_detection() {
 
     // The left grouping is genuinely `(a & b) & c`: a `Cmp` whose left operand is a
     // nested `Cmp`.
-    let parsed = parse_with("SELECT (a & b) & c", OpDialect).expect("left grouping parses");
+    let parsed = parse_with("SELECT (a & b) & c", crate::ParseConfig::new(OpDialect))
+        .expect("left grouping parses");
     let Expr::Other {
         ext: OpExt::Cmp { left, .. },
         ..
@@ -433,7 +437,7 @@ fn nonassoc_extension_and_builtin_comparison_do_not_chain_across_the_boundary() 
     // both consult paths — the built-in loop reading an `Expr::Other` left operand, and
     // the extension branch reading a built-in `Expr::BinaryOp` left operand.
     for src in ["SELECT a & b < c", "SELECT a < b & c"] {
-        parse_with(src, OpDialect)
+        parse_with(src, crate::ParseConfig::new(OpDialect))
             .expect_err("a non-associative extension operator does not chain with a comparison");
     }
 

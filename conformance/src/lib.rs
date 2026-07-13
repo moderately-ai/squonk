@@ -366,7 +366,7 @@ fn assert_roundtrips_in(sql: &str, mode: RenderMode) {
 /// A parse failure inside an oracle is itself a test failure (the corpus is meant
 /// to be parseable), so this turns the `Result` into a descriptive panic.
 fn parse_generic(sql: &str) -> Parsed {
-    parse_with(sql, Ansi)
+    parse_with(sql, squonk::ParseConfig::new(Ansi))
         .unwrap_or_else(|err| panic!("expected {sql:?} to parse under Ansi, but: {err:?}"))
 }
 
@@ -632,7 +632,8 @@ mod tests {
     #[test]
     fn postgres_string_literals_materialize_values_without_changing_rendering() {
         let sql = "SELECT E'line\\nquote\\'', $$a\\n'b$$, e'\\141\\x62\\u0063\\U00000064'";
-        let parsed = parse_with(sql, Postgres).expect("PostgreSQL string literals parse");
+        let parsed = parse_with(sql, squonk::ParseConfig::new(Postgres))
+            .expect("PostgreSQL string literals parse");
 
         assert_eq!(
             projection_literal(&parsed, 0)

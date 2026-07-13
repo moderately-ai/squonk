@@ -8,6 +8,7 @@ members = [
     "crates/squonk",
     "crates/squonk-sourcegen",
     "crates/squonk-python",
+    "crates/squonk-node",
     "crates/squonk-wasm",
     "bench",
     "conformance",
@@ -29,7 +30,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "1.0.0"
+version = "2.0.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
@@ -38,8 +39,8 @@ authors = ["Moderately AI"]
 
 [workspace.dependencies]
 # Internal crates — path + version so the libraries stay publishable as-is.
-squonk-ast = { path = "crates/squonk-ast", version = "1.0.0" }
-squonk = { path = "crates/squonk", version = "1.0.0" }
+squonk-ast = { path = "crates/squonk-ast", version = "2.0.0" }
+squonk = { path = "crates/squonk", version = "2.0.0" }
 
 # External, shared across the workspace.
 # `thin-vec`: one-word (8 B) child-sequence container vs `Vec`'s three words

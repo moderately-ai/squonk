@@ -107,7 +107,7 @@ use crate::ast::NoExt;
 use crate::ast::SourceStore;
 use crate::dialect::BuiltinDialect;
 use crate::error::ParseError;
-use crate::parser::{ParseOptions, Parsed};
+use crate::parser::{ParseConfig, Parsed};
 
 /// The v1 style surface. Deliberately small (ticket point 4): indent width, max line
 /// length, keyword case — explicitly **not** sql-formatter's full option catalog.
@@ -154,7 +154,7 @@ impl FormatOptions {
 /// Format an already-parsed tree, applying `dialect` for the keyword-casing token
 /// pass and for re-tokenizing fragments during subquery re-layout — pass the dialect
 /// the tree was parsed under. Comments are formatted only when the parse captured
-/// trivia ([`parse_with_trivia`](crate::parse_with_trivia) / `capture_trivia`).
+/// trivia ([`ParseConfig::capture_trivia`](crate::ParseConfig::capture_trivia)).
 ///
 /// The tree must be the standard (`NoExt`) AST; the layouter reuses the canonical
 /// renderer for expression fragments, so any spelling the canonical path preserves is
@@ -180,11 +180,7 @@ pub fn format_sql(
     dialect: BuiltinDialect,
     options: &FormatOptions,
 ) -> Result<String, ParseError> {
-    let parsed = crate::parse_with_builtin_options(
-        sql,
-        dialect,
-        ParseOptions::default().with_trivia_capture(true),
-    )?;
+    let parsed = crate::parse_builtin_with(sql, ParseConfig::new(dialect).capture_trivia(true))?;
     Ok(format_parsed(&parsed, dialect, options))
 }
 

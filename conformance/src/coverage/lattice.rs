@@ -377,11 +377,12 @@ fn gate_by_name(name: &str) -> Option<&'static Gate> {
 /// to this feature set); only a tree that renders and reparses to something structurally
 /// different is a finding.
 fn stability_finding(sql: &str, candidate: &FeatureSet) -> Option<String> {
-    let Ok(parsed) = parse_with(sql, AdHocDialect(candidate)) else {
+    let Ok(parsed) = parse_with(sql, squonk::ParseConfig::new(AdHocDialect(candidate))) else {
         return None;
     };
     let rendered = crate::render_statements(&parsed, RenderMode::Parenthesized);
-    let Ok(reparsed) = parse_with(&rendered, AdHocDialect(candidate)) else {
+    let Ok(reparsed) = parse_with(&rendered, squonk::ParseConfig::new(AdHocDialect(candidate)))
+    else {
         return Some(format!(
             "probe {sql:?} parsed but its render {rendered:?} did not reparse under the pair"
         ));
@@ -447,7 +448,7 @@ fn probe_candidate(
     }
     let mut corpus_parses = 0usize;
     for sql in corpus {
-        if parse_with(sql, AdHocDialect(candidate)).is_ok() {
+        if parse_with(sql, squonk::ParseConfig::new(AdHocDialect(candidate))).is_ok() {
             corpus_parses += 1;
         }
         if let Some(finding) = stability_finding(sql, candidate) {
@@ -631,7 +632,7 @@ mod tests {
 
                 valid += 1;
                 for sql in PROBE_CORPUS {
-                    if parse_with(sql, AdHocDialect(&candidate)).is_ok() {
+                    if parse_with(sql, squonk::ParseConfig::new(AdHocDialect(&candidate))).is_ok() {
                         corpus_parses += 1;
                     }
                     if let Some(finding) = stability_finding(sql, &candidate) {

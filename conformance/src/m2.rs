@@ -224,7 +224,7 @@ pub fn m2_divergence_allowlisted(engine: &str, sql: &str) -> bool {
 ///
 /// Raw: no allowlist applied (callers compose [`m2_divergence_allowlisted`]).
 pub fn sqlite_raw_bytes_divergence(conn: &SqliteConnection, sql: &str) -> Option<String> {
-    let ours = parse_with(sql, squonk::dialect::Sqlite)
+    let ours = parse_with(sql, squonk::ParseConfig::new(squonk::dialect::Sqlite))
         .ok()
         .map(|p| p.statements().len());
     let (accepts, count, reliable) = match crate::sqlite_ffi::segment(conn, sql) {
@@ -252,7 +252,7 @@ pub fn sqlite_raw_bytes_divergence(conn: &SqliteConnection, sql: &str) -> Option
 ///
 /// Raw: no allowlist applied (callers compose [`m2_divergence_allowlisted`]).
 pub fn duckdb_raw_bytes_divergence(conn: &DuckDbConnection, sql: &str) -> Option<String> {
-    let ours = parse_with(sql, squonk::dialect::DuckDb)
+    let ours = parse_with(sql, squonk::ParseConfig::new(squonk::dialect::DuckDb))
         .ok()
         .map(|p| p.statements().len());
     let (accepts, count) = match conn.extract_statement_count(sql) {
@@ -307,7 +307,7 @@ pub fn duckdb_nonascii_swallow(conn: &DuckDbConnection, sql: &str) -> bool {
     // Swallow direction only: DuckDB accepts, our parser rejects. A both-accept case
     // (non-ASCII inside a string/identifier/comment) has `ours = Some` and is left
     // fully visible; a DuckDB reject (the `U&` escapes) is `Err` below and left visible.
-    if parse_with(sql, squonk::dialect::DuckDb).is_ok() {
+    if parse_with(sql, squonk::ParseConfig::new(squonk::dialect::DuckDb)).is_ok() {
         return false;
     }
     let Ok(engine_count) = conn.extract_statement_count(sql) else {
@@ -322,7 +322,7 @@ pub fn duckdb_nonascii_swallow(conn: &DuckDbConnection, sql: &str) -> bool {
     let Ok(stripped_count) = conn.extract_statement_count(&stripped) else {
         return false;
     };
-    let stripped_ours = parse_with(&stripped, squonk::dialect::DuckDb)
+    let stripped_ours = parse_with(&stripped, squonk::ParseConfig::new(squonk::dialect::DuckDb))
         .ok()
         .map(|p| p.statements().len());
     // The swallow proof: DuckDB's count is unchanged by removing the non-ASCII (it
@@ -915,7 +915,7 @@ mod tests {
         ];
         for sql in forms {
             assert!(
-                parse_with(sql, DuckDb).is_ok(),
+                parse_with(sql, squonk::ParseConfig::new(DuckDb)).is_ok(),
                 "DuckDb preset must parse-accept {sql:?}",
             );
         }
@@ -928,7 +928,7 @@ mod tests {
             "ALTER DATABASE d SET FOO TO e",
         ] {
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, squonk::ParseConfig::new(DuckDb)).is_err(),
                 "DuckDb preset must reject {sql:?}",
             );
         }
@@ -1174,7 +1174,7 @@ mod tests {
                 "sqlite should accept the grammar-gap case {sql:?}",
             );
             assert!(
-                parse_with(sql, Sqlite).is_err(),
+                parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_err(),
                 "{sql:?} now parses under the fitted Sqlite preset; triage it in corpus_sqlite_verdicts",
             );
         }
@@ -1195,7 +1195,7 @@ mod tests {
                 "duckdb should accept the grammar-gap case {sql:?}",
             );
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, squonk::ParseConfig::new(DuckDb)).is_err(),
                 "{sql:?} now parses under the fitted DuckDb preset; move it into SCHEMA_INDEPENDENT_ACCEPT",
             );
         }

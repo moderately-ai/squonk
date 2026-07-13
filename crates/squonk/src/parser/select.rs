@@ -524,7 +524,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             return Err(self.unexpected("a numeric sample size"));
         }
         self.advance()?;
-        let kind = number_literal_kind(self.span_text(token.span), self.parse_float_as_decimal());
+        let kind = number_literal_kind(self.span_text(token.span), self.float_as_decimal_enabled());
         Ok(Literal {
             kind,
             meta: self.make_meta(token.span),
@@ -1654,8 +1654,11 @@ mod tests {
     /// spelling tag). Gated by the flag: off under plain ANSI, a `:` head rejects.
     #[test]
     fn prefix_colon_alias_projection_folds_onto_alias_field() {
-        let parsed =
-            parse_with("SELECT j : 42", COLON_ALIAS_DIALECT).expect("prefix colon alias parses");
+        let parsed = parse_with(
+            "SELECT j : 42",
+            crate::ParseConfig::new(COLON_ALIAS_DIALECT),
+        )
+        .expect("prefix colon alias parses");
         let [SelectItem::Expr { alias, .. }] = projection(&parsed) else {
             panic!("expected one aliased expression item");
         };
@@ -1671,15 +1674,18 @@ mod tests {
         assert_eq!(rendered, "SELECT 42 AS j");
 
         // The gate, honoured as data: the same text rejects with the flag off.
-        assert!(parse_with("SELECT j : 42", TestDialect).is_err());
+        assert!(parse_with("SELECT j : 42", crate::ParseConfig::new(TestDialect)).is_err());
     }
 
     /// The three alias spellings coexist in one projection list: prefix `j1 : 42`, trailing
     /// `42 AS j2`, and bare `42 j3` (a corpus line). Each item captures its own alias.
     #[test]
     fn prefix_colon_alias_coexists_with_as_and_bare_aliases() {
-        let parsed = parse_with("SELECT j1 : 42, 42 AS j2, 42 j3", COLON_ALIAS_DIALECT)
-            .expect("mixed alias spellings parse");
+        let parsed = parse_with(
+            "SELECT j1 : 42, 42 AS j2, 42 j3",
+            crate::ParseConfig::new(COLON_ALIAS_DIALECT),
+        )
+        .expect("mixed alias spellings parse");
         let names: Vec<&str> = projection(&parsed)
             .iter()
             .map(|item| {
@@ -1702,12 +1708,42 @@ mod tests {
     /// identifier is admitted.
     #[test]
     fn prefix_colon_alias_rejects_trailing_alias_and_non_identifier_lhs() {
-        assert!(parse_with("SELECT a : 42 AS b", COLON_ALIAS_DIALECT).is_err());
-        assert!(parse_with("SELECT a.b : 42", COLON_ALIAS_DIALECT).is_err());
-        assert!(parse_with("SELECT foo() : 42", COLON_ALIAS_DIALECT).is_err());
-        assert!(parse_with("SELECT p : q : 42", COLON_ALIAS_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "SELECT a : 42 AS b",
+                crate::ParseConfig::new(COLON_ALIAS_DIALECT)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT a.b : 42",
+                crate::ParseConfig::new(COLON_ALIAS_DIALECT)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT foo() : 42",
+                crate::ParseConfig::new(COLON_ALIAS_DIALECT)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT p : q : 42",
+                crate::ParseConfig::new(COLON_ALIAS_DIALECT)
+            )
+            .is_err()
+        );
         // A quoted identifier LHS is admitted (`"my col" : 42`).
-        assert!(parse_with("SELECT \"my col\" : 42", COLON_ALIAS_DIALECT).is_ok());
+        assert!(
+            parse_with(
+                "SELECT \"my col\" : 42",
+                crate::ParseConfig::new(COLON_ALIAS_DIALECT)
+            )
+            .is_ok()
+        );
     }
 
     fn projection(parsed: &Parsed) -> &[SelectItem<NoExt>] {
@@ -1726,7 +1762,8 @@ mod tests {
 
     #[test]
     fn explicit_as_alias_is_captured() {
-        let parsed = parse_with("SELECT a AS x", TestDialect).expect("aliased projection parses");
+        let parsed = parse_with("SELECT a AS x", crate::ParseConfig::new(TestDialect))
+            .expect("aliased projection parses");
         let SelectItem::Expr {
             alias: Some(alias), ..
         } = &projection(&parsed)[0]
@@ -1739,7 +1776,8 @@ mod tests {
     #[test]
     fn implicit_alias_without_as_is_captured() {
         // `a b` aliases the column `a` as `b` with the `AS` keyword elided.
-        let parsed = parse_with("SELECT a b", TestDialect).expect("implicit alias parses");
+        let parsed = parse_with("SELECT a b", crate::ParseConfig::new(TestDialect))
+            .expect("implicit alias parses");
         let SelectItem::Expr {
             alias: Some(alias), ..
         } = &projection(&parsed)[0]
@@ -1754,8 +1792,11 @@ mod tests {
         // `Range` is an unreserved keyword usable as a bare column (`ColId`); an
         // `AS` alias is a ColLabel that admits any keyword (`Desc`, reserved); and a
         // bare alias is a BareColLabel that admits non-`AS_LABEL` keywords (`Nulls`).
-        let parsed = parse_with("SELECT Range, a AS Desc, b Nulls", TestDialect)
-            .expect("contextual keywords can be identifiers");
+        let parsed = parse_with(
+            "SELECT Range, a AS Desc, b Nulls",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("contextual keywords can be identifiers");
         let items = projection(&parsed);
 
         let SelectItem::Expr {
@@ -1790,7 +1831,7 @@ mod tests {
         // D1 (`prod-keyword-position-reserved-sets`): an `AS` alias is a ColLabel,
         // which admits *every* keyword — including reserved ones like `FROM` — so
         // `SELECT a AS from` parses, matching PostgreSQL.
-        let parsed = parse_with("SELECT a AS from", TestDialect)
+        let parsed = parse_with("SELECT a AS from", crate::ParseConfig::new(TestDialect))
             .expect("a reserved keyword is a valid AS alias");
         let SelectItem::Expr {
             alias: Some(alias), ..
@@ -1803,7 +1844,7 @@ mod tests {
 
     #[test]
     fn reserved_keyword_cannot_start_a_projection_expression() {
-        let err = parse_with("SELECT FROM", TestDialect)
+        let err = parse_with("SELECT FROM", crate::ParseConfig::new(TestDialect))
             .expect_err("reserved keyword is not a column expression");
         assert_eq!(err.span, Span::new(7, 11));
     }
@@ -1811,7 +1852,8 @@ mod tests {
     #[test]
     fn a_clause_keyword_is_not_taken_as_an_implicit_alias() {
         // `FROM` must not be read as the alias of the projection column `a`.
-        let parsed = parse_with("SELECT a FROM t", TestDialect).expect("FROM ends the projection");
+        let parsed = parse_with("SELECT a FROM t", crate::ParseConfig::new(TestDialect))
+            .expect("FROM ends the projection");
         assert!(matches!(
             projection(&parsed)[0],
             SelectItem::Expr { alias: None, .. },
@@ -1826,9 +1868,9 @@ mod tests {
         // 8.0 but free under ANSI/PostgreSQL. The word now lives in the shared
         // inventory, yet the dialect reject sets gate it differently — the same
         // mechanism the position sets already use, no new identifier logic.
-        parse_with("SELECT rlike FROM t", MySql)
+        parse_with("SELECT rlike FROM t", crate::ParseConfig::new(MySql))
             .expect_err("MySQL reserves RLIKE as a column name");
-        let ansi = parse_with("SELECT rlike FROM t", Ansi)
+        let ansi = parse_with("SELECT rlike FROM t", crate::ParseConfig::new(Ansi))
             .expect("ANSI leaves RLIKE free as an identifier");
         assert_eq!(
             ansi.resolver().resolve(match &projection(&ansi)[0] {
@@ -1840,22 +1882,23 @@ mod tests {
             }),
             "rlike",
         );
-        parse_with("SELECT rlike FROM t", Postgres)
+        parse_with("SELECT rlike FROM t", crate::ParseConfig::new(Postgres))
             .expect("PostgreSQL leaves RLIKE free as an identifier");
 
         // A MySQL bare alias is also gated: `STRAIGHT_JOIN` cannot alias under MySQL
         // but can under ANSI (it is non-reserved there).
-        parse_with("SELECT a straight_join", MySql)
+        parse_with("SELECT a straight_join", crate::ParseConfig::new(MySql))
             .expect_err("MySQL reserves STRAIGHT_JOIN, so it is not a bare alias");
-        parse_with("SELECT a straight_join", Ansi)
+        parse_with("SELECT a straight_join", crate::ParseConfig::new(Ansi))
             .expect("ANSI admits STRAIGHT_JOIN as a bare alias");
 
         // Reverse divergence: PostgreSQL reserves `OFFSET`, MySQL does not, so the
         // gate swings the other way — MySQL admits it as a bare column, PostgreSQL
         // rejects it.
-        parse_with("SELECT offset FROM t", MySql)
+        parse_with("SELECT offset FROM t", crate::ParseConfig::new(MySql))
             .expect("MySQL leaves OFFSET free as a column name");
-        parse_with("SELECT offset FROM t", Postgres).expect_err("PostgreSQL reserves OFFSET");
+        parse_with("SELECT offset FROM t", crate::ParseConfig::new(Postgres))
+            .expect_err("PostgreSQL reserves OFFSET");
     }
 
     #[test]
@@ -1864,8 +1907,11 @@ mod tests {
 
         // The MySQL `SELECT STRAIGHT_JOIN ...` modifier sets the `straight_join` flag
         // and is consumed before the projection, so `a` is the sole projection column.
-        let parsed = parse_with("SELECT STRAIGHT_JOIN a FROM t", MySql)
-            .expect("MySQL parses the STRAIGHT_JOIN modifier");
+        let parsed = parse_with(
+            "SELECT STRAIGHT_JOIN a FROM t",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL parses the STRAIGHT_JOIN modifier");
         let select = select_of(&parsed);
         assert!(select.straight_join, "the modifier flag is set");
         assert_eq!(
@@ -1876,8 +1922,11 @@ mod tests {
 
         // Gated: under ANSI the flag is off, so `STRAIGHT_JOIN` is read as a column
         // reference aliased `a` (a non-reserved word there), not the modifier.
-        let ansi = parse_with("SELECT STRAIGHT_JOIN a FROM t", Ansi)
-            .expect("ANSI reads STRAIGHT_JOIN as an ordinary identifier");
+        let ansi = parse_with(
+            "SELECT STRAIGHT_JOIN a FROM t",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect("ANSI reads STRAIGHT_JOIN as an ordinary identifier");
         let ansi_select = select_of(&ansi);
         assert!(
             !ansi_select.straight_join,
@@ -1891,7 +1940,8 @@ mod tests {
 
     #[test]
     fn qualified_wildcard_keeps_its_object_name() {
-        let parsed = parse_with("SELECT t.*", TestDialect).expect("qualified wildcard parses");
+        let parsed = parse_with("SELECT t.*", crate::ParseConfig::new(TestDialect))
+            .expect("qualified wildcard parses");
         let SelectItem::QualifiedWildcard { name, .. } = &projection(&parsed)[0] else {
             panic!("expected a qualified wildcard");
         };
@@ -1901,7 +1951,8 @@ mod tests {
 
     #[test]
     fn multi_part_qualified_wildcard_keeps_the_whole_prefix() {
-        let parsed = parse_with("SELECT a.b.*", TestDialect).expect("dotted wildcard parses");
+        let parsed = parse_with("SELECT a.b.*", crate::ParseConfig::new(TestDialect))
+            .expect("dotted wildcard parses");
         let SelectItem::QualifiedWildcard { name, .. } = &projection(&parsed)[0] else {
             panic!("expected a qualified wildcard");
         };
@@ -1910,7 +1961,8 @@ mod tests {
 
     #[test]
     fn bare_wildcard_is_unchanged() {
-        let parsed = parse_with("SELECT *", TestDialect).expect("bare wildcard parses");
+        let parsed = parse_with("SELECT *", crate::ParseConfig::new(TestDialect))
+            .expect("bare wildcard parses");
         assert!(matches!(
             projection(&parsed)[0],
             SelectItem::Wildcard { .. }
@@ -1925,7 +1977,8 @@ mod tests {
         // PostgreSQL reads `t.*` as an ordinary columnref, so it takes the standard
         // `[AS] label` projection alias (engine-probed against libpg_query). The alias folds
         // onto the qualified-wildcard item's slot, carrying its bare-vs-`AS` spelling.
-        let bare = parse_with("SELECT t.* a FROM t", Postgres).expect("`t.* a` parses under PG");
+        let bare = parse_with("SELECT t.* a FROM t", crate::ParseConfig::new(Postgres))
+            .expect("`t.* a` parses under PG");
         let SelectItem::QualifiedWildcard {
             name,
             alias: Some(alias),
@@ -1939,8 +1992,8 @@ mod tests {
         assert_eq!(bare.resolver().resolve(alias.sym), "a");
         assert_eq!(*alias_spelling, AliasSpelling::Bare);
 
-        let as_form =
-            parse_with("SELECT t.* AS a FROM t", Postgres).expect("`t.* AS a` parses under PG");
+        let as_form = parse_with("SELECT t.* AS a FROM t", crate::ParseConfig::new(Postgres))
+            .expect("`t.* AS a` parses under PG");
         let SelectItem::QualifiedWildcard {
             alias: Some(alias),
             alias_spelling,
@@ -1953,38 +2006,41 @@ mod tests {
         assert_eq!(*alias_spelling, AliasSpelling::As);
 
         // A multi-part prefix aliases the same way (`s.t.* a`).
-        parse_with("SELECT s.t.* a FROM s.t", Postgres).expect("`s.t.* a` parses under PG");
+        parse_with("SELECT s.t.* a FROM s.t", crate::ParseConfig::new(Postgres))
+            .expect("`s.t.* a` parses under PG");
 
         // The minimized fuzz reproducer (parse-qualified-wildcard-bare-alias): `hEE.*` then
         // the bare label `LC`, which PG accepts and we used to reject.
-        parse_with("SELECT hEE.*LC;", Postgres).expect("the fuzz reproducer parses under PG");
+        parse_with("SELECT hEE.*LC;", crate::ParseConfig::new(Postgres))
+            .expect("the fuzz reproducer parses under PG");
 
         // Asymmetry: a *bare* `*` is the non-aliasable `target_el: '*'` production, so a
         // trailing word rejects even under PG (matches libpg_query).
         assert!(
-            parse_with("SELECT * a FROM t", Postgres).is_err(),
+            parse_with("SELECT * a FROM t", crate::ParseConfig::new(Postgres)).is_err(),
             "PG rejects a bare-star alias",
         );
 
         // Gated: dialects whose `t.*` is a non-aliasable production keep the flag off, so the
         // trailing alias rejects (engine-measured Reject on ANSI/rusqlite/mysql:8).
         assert!(
-            parse_with("SELECT t.* a FROM t", Ansi).is_err(),
+            parse_with("SELECT t.* a FROM t", crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI rejects the qualified-wildcard alias (gate off)",
         );
         assert!(
-            parse_with("SELECT t.* a FROM t", MySql).is_err(),
+            parse_with("SELECT t.* a FROM t", crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects the qualified-wildcard alias (gate off)",
         );
         assert!(
-            parse_with("SELECT t.* a FROM t", Sqlite).is_err(),
+            parse_with("SELECT t.* a FROM t", crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects the qualified-wildcard alias (gate off)",
         );
     }
 
     #[test]
     fn no_quantifier_leaves_distinct_unset() {
-        let parsed = parse_with("SELECT a", TestDialect).expect("bare projection parses");
+        let parsed = parse_with("SELECT a", crate::ParseConfig::new(TestDialect))
+            .expect("bare projection parses");
         assert!(select_of(&parsed).distinct.is_none());
     }
 
@@ -1992,7 +2048,8 @@ mod tests {
     fn explicit_all_quantifier_is_captured() {
         // `SELECT ALL` is the explicit spelling of the default; it is preserved as a
         // distinct AST state so it round-trips (mirroring `ORDER BY … ASC`).
-        let parsed = parse_with("SELECT ALL a", TestDialect).expect("SELECT ALL parses");
+        let parsed = parse_with("SELECT ALL a", crate::ParseConfig::new(TestDialect))
+            .expect("SELECT ALL parses");
         assert!(matches!(
             select_of(&parsed).distinct,
             Some(SelectDistinct::Quantifier {
@@ -2004,7 +2061,8 @@ mod tests {
 
     #[test]
     fn distinct_quantifier_is_captured() {
-        let parsed = parse_with("SELECT DISTINCT a", TestDialect).expect("SELECT DISTINCT parses");
+        let parsed = parse_with("SELECT DISTINCT a", crate::ParseConfig::new(TestDialect))
+            .expect("SELECT DISTINCT parses");
         assert!(matches!(
             select_of(&parsed).distinct,
             Some(SelectDistinct::Quantifier {
@@ -2016,8 +2074,11 @@ mod tests {
 
     #[test]
     fn distinct_on_keeps_its_key_expressions() {
-        let parsed = parse_with("SELECT DISTINCT ON (a, b) c FROM t", PG_SELECT_DIALECT)
-            .expect("DISTINCT ON parses under PostgreSQL");
+        let parsed = parse_with(
+            "SELECT DISTINCT ON (a, b) c FROM t",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("DISTINCT ON parses under PostgreSQL");
         let Some(SelectDistinct::On { exprs, .. }) = &select_of(&parsed).distinct else {
             panic!("expected a DISTINCT ON quantifier");
         };
@@ -2029,8 +2090,11 @@ mod tests {
     fn distinct_on_is_rejected_without_the_dialect_gate() {
         // ANSI does not gate `DISTINCT ON`, so `ON` is read as a projection token and
         // rejected (it is a reserved keyword, not a column expression).
-        let err = parse_with("SELECT DISTINCT ON (a) c", TestDialect)
-            .expect_err("ANSI rejects DISTINCT ON");
+        let err = parse_with(
+            "SELECT DISTINCT ON (a) c",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI rejects DISTINCT ON");
         // `ON` sits at bytes 16..18, right after `SELECT DISTINCT `.
         assert_eq!(err.span, Span::new(16, 18));
     }
@@ -2040,8 +2104,11 @@ mod tests {
         // PostgreSQL's `SELECT … INTO <table>` create-table form: the target sits
         // between the projection and `FROM`. `INTO` is reserved as a bare alias, so it
         // is not swallowed as the alias of the projection column.
-        let parsed =
-            parse_with("SELECT a INTO t FROM s", PG_SELECT_DIALECT).expect("SELECT INTO parses");
+        let parsed = parse_with(
+            "SELECT a INTO t FROM s",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("SELECT INTO parses");
         let select = select_of(&parsed);
         let into = select.into.as_ref().expect("the INTO target is captured");
         assert!(into.temporary.is_none(), "no TEMP marker was written");
@@ -2058,8 +2125,11 @@ mod tests {
 
     #[test]
     fn select_into_temp_marks_a_temporary_target() {
-        let parsed = parse_with("SELECT a INTO TEMP t FROM s", PG_SELECT_DIALECT)
-            .expect("SELECT INTO TEMP parses");
+        let parsed = parse_with(
+            "SELECT a INTO TEMP t FROM s",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("SELECT INTO TEMP parses");
         let into = select_of(&parsed)
             .into
             .as_ref()
@@ -2072,8 +2142,11 @@ mod tests {
         // The `TEMPORARY` long form is a distinct surface spelling from `TEMP`; it is
         // preserved (not folded to `TEMP`) so the target round-trips exactly, reusing
         // the same `TemporaryTableKind` shape `CREATE TABLE` uses.
-        let parsed = parse_with("SELECT a INTO TEMPORARY t FROM s", PG_SELECT_DIALECT)
-            .expect("SELECT INTO TEMPORARY parses");
+        let parsed = parse_with(
+            "SELECT a INTO TEMPORARY t FROM s",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("SELECT INTO TEMPORARY parses");
         let into = select_of(&parsed)
             .into
             .as_ref()
@@ -2086,16 +2159,22 @@ mod tests {
         // PostgreSQL's `OptTempTableName` admits an optional `TABLE` after the (optional)
         // temporary marker; it is pure noise, so it is consumed and dropped — the target and
         // its temporary axis are captured identically to the bare spelling.
-        let plain = parse_with("SELECT a INTO TABLE t FROM s", PG_SELECT_DIALECT)
-            .expect("SELECT INTO TABLE parses");
+        let plain = parse_with(
+            "SELECT a INTO TABLE t FROM s",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("SELECT INTO TABLE parses");
         let into = select_of(&plain)
             .into
             .as_ref()
             .expect("INTO target captured");
         assert_eq!(into.temporary, None);
 
-        let temp = parse_with("SELECT a INTO TEMP TABLE t FROM s", PG_SELECT_DIALECT)
-            .expect("SELECT INTO TEMP TABLE parses");
+        let temp = parse_with(
+            "SELECT a INTO TEMP TABLE t FROM s",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("SELECT INTO TEMP TABLE parses");
         let temp_into = select_of(&temp)
             .into
             .as_ref()
@@ -2111,11 +2190,11 @@ mod tests {
         // form, so the gate is off: `INTO` is left unconsumed and the trailing
         // `INTO t FROM s` is a parse error. MySQL has no such form and also rejects it.
         assert!(
-            parse_with("SELECT a INTO t FROM s", Ansi).is_err(),
+            parse_with("SELECT a INTO t FROM s", crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI does not accept the SELECT INTO create-table form",
         );
         assert!(
-            parse_with("SELECT a INTO t FROM s", MySql).is_err(),
+            parse_with("SELECT a INTO t FROM s", crate::ParseConfig::new(MySql)).is_err(),
             "MySQL has no SELECT INTO create-table form",
         );
     }
@@ -2128,8 +2207,11 @@ mod tests {
     fn group_by_rollup_parses_as_a_grouping_construct() {
         // `ROLLUP (a, b)` is the grouping construct, not a call to a function named
         // `rollup` — PostgreSQL lowers the unquoted keyword in this position.
-        let parsed = parse_with("SELECT a FROM t GROUP BY ROLLUP (a, b)", PG_SELECT_DIALECT)
-            .expect("ROLLUP grouping set parses");
+        let parsed = parse_with(
+            "SELECT a FROM t GROUP BY ROLLUP (a, b)",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("ROLLUP grouping set parses");
         let group_by = group_by_of(&parsed);
         assert_eq!(group_by.len(), 1, "one GROUP BY item");
         let GroupByItem::Rollup { exprs, .. } = &group_by[0] else {
@@ -2141,8 +2223,11 @@ mod tests {
 
     #[test]
     fn group_by_cube_parses_as_a_grouping_construct() {
-        let parsed = parse_with("SELECT a FROM t GROUP BY CUBE (a, b)", PG_SELECT_DIALECT)
-            .expect("CUBE grouping set parses");
+        let parsed = parse_with(
+            "SELECT a FROM t GROUP BY CUBE (a, b)",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("CUBE grouping set parses");
         assert!(matches!(
             &group_by_of(&parsed)[0],
             GroupByItem::Cube { exprs, .. } if exprs.len() == 2,
@@ -2155,7 +2240,7 @@ mod tests {
         // items may appear inside (the recursive `group_by_item`).
         let parsed = parse_with(
             "SELECT a FROM t GROUP BY GROUPING SETS (ROLLUP (a, b), (c), ())",
-            PG_SELECT_DIALECT,
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
         )
         .expect("GROUPING SETS parses");
         let GroupByItem::GroupingSets { sets, .. } = &group_by_of(&parsed)[0] else {
@@ -2171,15 +2256,21 @@ mod tests {
     fn group_by_empty_grouping_set_parses() {
         // A bare `()` is the empty grouping set (grand total), admitted as a top-level
         // GROUP BY item per PG's `empty_grouping_set`.
-        let parsed = parse_with("SELECT a FROM t GROUP BY ()", PG_SELECT_DIALECT)
-            .expect("empty grouping set parses");
+        let parsed = parse_with(
+            "SELECT a FROM t GROUP BY ()",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("empty grouping set parses");
         assert!(matches!(group_by_of(&parsed)[0], GroupByItem::Empty { .. }));
     }
 
     #[test]
     fn group_by_plain_expressions_stay_plain_items() {
-        let parsed = parse_with("SELECT a FROM t GROUP BY a, b + c", PG_SELECT_DIALECT)
-            .expect("plain GROUP BY keys parse");
+        let parsed = parse_with(
+            "SELECT a FROM t GROUP BY a, b + c",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("plain GROUP BY keys parse");
         let group_by = group_by_of(&parsed);
         assert_eq!(group_by.len(), 2);
         assert!(
@@ -2195,7 +2286,7 @@ mod tests {
         // is a function call — matching PostgreSQL, which lowers only the bare keyword.
         let parsed = parse_with(
             "SELECT a FROM t GROUP BY \"rollup\" (a, b)",
-            PG_SELECT_DIALECT,
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
         )
         .expect("quoted rollup parses as a function call");
         let GroupByItem::Expr {
@@ -2213,8 +2304,11 @@ mod tests {
         // `rollup` without a following `(` is an ordinary (unreserved in PG) column
         // reference, not the construct — the `(` is what admits ROLLUP as a grouping
         // set.
-        let parsed = parse_with("SELECT a FROM t GROUP BY rollup", PG_SELECT_DIALECT)
-            .expect("bare rollup is a column");
+        let parsed = parse_with(
+            "SELECT a FROM t GROUP BY rollup",
+            crate::ParseConfig::new(PG_SELECT_DIALECT),
+        )
+        .expect("bare rollup is a column");
         let GroupByItem::Expr {
             expr: Expr::Column { name, .. },
             ..
@@ -2233,8 +2327,11 @@ mod tests {
         // expression grammar as an ordinary function call — MySQL resolves it as a
         // stored-function reference (`rollup` is non-reserved there). MySQL's own
         // grouping surface is the distinct trailing `WITH ROLLUP`, not modelled here.
-        let parsed = parse_with("SELECT a FROM t GROUP BY ROLLUP (a, b)", MySql)
-            .expect("MySQL reads rollup as a function call");
+        let parsed = parse_with(
+            "SELECT a FROM t GROUP BY ROLLUP (a, b)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL reads rollup as a function call");
         assert!(matches!(
             &group_by_of(&parsed)[0],
             GroupByItem::Expr {
@@ -2252,8 +2349,11 @@ mod tests {
         // canonicalizes into one `GroupByItem::Rollup` (spelling `WithRollup`) wrapping
         // every key — the same node `ROLLUP (…)` produces (ADR-0011), tagged so render
         // reproduces the surface.
-        let parsed = parse_with("SELECT a FROM t GROUP BY a, b WITH ROLLUP", MySql)
-            .expect("MySQL `WITH ROLLUP` parses");
+        let parsed = parse_with(
+            "SELECT a FROM t GROUP BY a, b WITH ROLLUP",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL `WITH ROLLUP` parses");
         let group_by = group_by_of(&parsed);
         assert_eq!(
             group_by.len(),
@@ -2281,7 +2381,8 @@ mod tests {
         // permissive superset that also accepts `WITH ROLLUP` — proving the tag, not the
         // target dialect, drives the trailing form.
         let mysql = "SELECT a FROM t GROUP BY a, b WITH ROLLUP";
-        let parsed = parse_with(mysql, MySql).expect("MySQL `WITH ROLLUP` parses");
+        let parsed =
+            parse_with(mysql, crate::ParseConfig::new(MySql)).expect("MySQL `WITH ROLLUP` parses");
         assert_eq!(
             Renderer::new(Lenient)
                 .render_parsed(&parsed)
@@ -2291,7 +2392,8 @@ mod tests {
 
         // The SQL:1999 item form is unchanged by the added tag (the `Function` default).
         let ansi = "SELECT a FROM t GROUP BY ROLLUP (a, b)";
-        let parsed = parse_with(ansi, Postgres).expect("`ROLLUP (…)` parses");
+        let parsed =
+            parse_with(ansi, crate::ParseConfig::new(Postgres)).expect("`ROLLUP (…)` parses");
         assert_eq!(
             Renderer::new(Postgres)
                 .render_parsed(&parsed)
@@ -2309,11 +2411,19 @@ mod tests {
         // clean parse error, not an over-acceptance. (MySQL-only surface: differential
         // pg parity is N/A, self-attested until the MySQL oracle lands.)
         assert!(
-            parse_with("SELECT a FROM t GROUP BY a, b WITH ROLLUP", Postgres).is_err(),
+            parse_with(
+                "SELECT a FROM t GROUP BY a, b WITH ROLLUP",
+                crate::ParseConfig::new(Postgres)
+            )
+            .is_err(),
             "PostgreSQL rejects the MySQL `WITH ROLLUP` modifier",
         );
         assert!(
-            parse_with("SELECT a FROM t GROUP BY a, b WITH ROLLUP", Ansi).is_err(),
+            parse_with(
+                "SELECT a FROM t GROUP BY a, b WITH ROLLUP",
+                crate::ParseConfig::new(Ansi)
+            )
+            .is_err(),
             "ANSI rejects the MySQL `WITH ROLLUP` modifier",
         );
     }
@@ -2322,8 +2432,11 @@ mod tests {
     fn group_by_all_parses_as_the_clause_mode() {
         use crate::dialect::DuckDb;
 
-        let parsed = parse_with("SELECT i, sum(j) FROM t GROUP BY ALL", DuckDb)
-            .expect("GROUP BY ALL parses under DuckDb");
+        let parsed = parse_with(
+            "SELECT i, sum(j) FROM t GROUP BY ALL",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("GROUP BY ALL parses under DuckDb");
         let select = select_of(&parsed);
         assert_eq!(
             select.group_by_all,
@@ -2343,8 +2456,11 @@ mod tests {
         // DuckDB's `GROUP BY *` shorthand opens the same mode as `GROUP BY ALL`
         // (probed on 1.5.4: identical result to `GROUP BY ALL`), tagged with its
         // `*` spelling so it round-trips.
-        let parsed = parse_with("SELECT i, sum(j) FROM t GROUP BY *", DuckDb)
-            .expect("GROUP BY * parses under DuckDb");
+        let parsed = parse_with(
+            "SELECT i, sum(j) FROM t GROUP BY *",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("GROUP BY * parses under DuckDb");
         let select = select_of(&parsed);
         assert_eq!(
             select.group_by_all,
@@ -2366,10 +2482,34 @@ mod tests {
         // parse-level contract rejects the same shapes — the mode consumes only its
         // wildcard, so a leftover comma/item/paren fails as trailing input. No
         // over-acceptance beyond the bare form.
-        assert!(parse_with("SELECT i FROM t GROUP BY *, i", DuckDb).is_err());
-        assert!(parse_with("SELECT i FROM t GROUP BY i, *", DuckDb).is_err());
-        assert!(parse_with("SELECT i FROM t GROUP BY ROLLUP (i), *", DuckDb).is_err());
-        assert!(parse_with("SELECT i FROM t GROUP BY *(i)", DuckDb).is_err());
+        assert!(
+            parse_with(
+                "SELECT i FROM t GROUP BY *, i",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT i FROM t GROUP BY i, *",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT i FROM t GROUP BY ROLLUP (i), *",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT i FROM t GROUP BY *(i)",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -2379,14 +2519,20 @@ mod tests {
         // The `*` shorthand rides the same `group_by_all` gate as the keyword; with it
         // off, a bare `*` cannot open a grouping clause — the over-acceptance guard.
         let sql = "SELECT a, count(*) FROM t GROUP BY *";
-        assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects GROUP BY *");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+            "ANSI rejects GROUP BY *"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects GROUP BY *"
         );
-        assert!(parse_with(sql, MySql).is_err(), "MySQL rejects GROUP BY *");
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+            "MySQL rejects GROUP BY *"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects GROUP BY *"
         );
     }
@@ -2398,7 +2544,7 @@ mod tests {
         // Probed on DuckDB 1.5.4: `HAVING` follows the mode as it follows a key list.
         let parsed = parse_with(
             "SELECT i, sum(j) FROM t GROUP BY ALL HAVING sum(j) > 1",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("HAVING follows the mode");
         let select = select_of(&parsed);
@@ -2417,8 +2563,11 @@ mod tests {
         // `all` must be quoted — and the quoted spelling tokenizes as an identifier,
         // an ordinary grouping key, exactly as the engine reads it (a bare `all`
         // there is the mode; probed on 1.5.4).
-        let parsed = parse_with("SELECT \"all\" FROM t GROUP BY \"all\"", DuckDb)
-            .expect("a quoted all is an ordinary key");
+        let parsed = parse_with(
+            "SELECT \"all\" FROM t GROUP BY \"all\"",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("a quoted all is an ordinary key");
         let select = select_of(&parsed);
         assert!(select.group_by_all.is_none());
         assert_eq!(select.group_by.len(), 1);
@@ -2431,10 +2580,34 @@ mod tests {
         // Probed on DuckDB 1.5.4: `ALL` admits no sibling item in either order — the
         // mode consumes only its keyword, so the leftovers fail as trailing input,
         // the same verdict as the engine's syntax errors.
-        assert!(parse_with("SELECT i FROM t GROUP BY ALL, i", DuckDb).is_err());
-        assert!(parse_with("SELECT i FROM t GROUP BY i, ALL", DuckDb).is_err());
-        assert!(parse_with("SELECT i FROM t GROUP BY ROLLUP (i), ALL", DuckDb).is_err());
-        assert!(parse_with("SELECT i FROM t GROUP BY ALL (i)", DuckDb).is_err());
+        assert!(
+            parse_with(
+                "SELECT i FROM t GROUP BY ALL, i",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT i FROM t GROUP BY i, ALL",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT i FROM t GROUP BY ROLLUP (i), ALL",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT i FROM t GROUP BY ALL (i)",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -2444,17 +2617,20 @@ mod tests {
         // Every shipped dialect reserves `ALL`, so with the gate off the keyword
         // cannot open a grouping expression — the over-acceptance guard on all four.
         let sql = "SELECT a, count(*) FROM t GROUP BY ALL";
-        assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects GROUP BY ALL");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+            "ANSI rejects GROUP BY ALL"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects GROUP BY ALL"
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects GROUP BY ALL"
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects GROUP BY ALL"
         );
     }
@@ -2468,7 +2644,8 @@ mod tests {
             "SELECT i, sum(j) FROM t GROUP BY ALL HAVING sum(j) > 1",
             "SELECT i, j FROM t GROUP BY ALL ORDER BY ALL",
         ] {
-            let parsed = parse_with(sql, BY_ALL_DIALECT).expect("GROUP BY ALL parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(BY_ALL_DIALECT))
+                .expect("GROUP BY ALL parses");
             assert_eq!(
                 Renderer::new(BY_ALL_DIALECT)
                     .render_parsed(&parsed)
@@ -2496,7 +2673,8 @@ mod tests {
                 "SELECT i, sum(j) FROM t GROUP BY ALL HAVING sum(j) > 1",
             ),
         ] {
-            let parsed = parse_with(source, BY_ALL_DIALECT).expect("GROUP BY * parses");
+            let parsed = parse_with(source, crate::ParseConfig::new(BY_ALL_DIALECT))
+                .expect("GROUP BY * parses");
             assert_eq!(
                 Renderer::new(BY_ALL_DIALECT)
                     .render_parsed(&parsed)
@@ -2513,8 +2691,11 @@ mod tests {
         // PostgreSQL's SQL:2016 grouping-set quantifier: `DISTINCT` prefixes a non-empty
         // grouping list, recorded on `group_by_quantifier` while the items parse normally
         // (probed on pg_query PG-17: `GROUP BY DISTINCT a, b` accepts).
-        let parsed = parse_with("SELECT a FROM t GROUP BY DISTINCT a, b", Postgres)
-            .expect("GROUP BY DISTINCT parses under PostgreSQL");
+        let parsed = parse_with(
+            "SELECT a FROM t GROUP BY DISTINCT a, b",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("GROUP BY DISTINCT parses under PostgreSQL");
         let select = select_of(&parsed);
         assert_eq!(select.group_by_quantifier, Some(SetQuantifier::Distinct));
         assert!(
@@ -2530,15 +2711,18 @@ mod tests {
 
         // The quantifier admits the grouping-set constructs after it (probed on pg_query
         // PG-17: `GROUP BY {ALL | DISTINCT} rollup(…) / grouping sets (…) / ()`).
-        let all = parse_with("SELECT a FROM t GROUP BY ALL ROLLUP (a, b)", Postgres)
-            .expect("GROUP BY ALL over ROLLUP parses");
+        let all = parse_with(
+            "SELECT a FROM t GROUP BY ALL ROLLUP (a, b)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("GROUP BY ALL over ROLLUP parses");
         let select = select_of(&all);
         assert_eq!(select.group_by_quantifier, Some(SetQuantifier::All));
         assert!(matches!(select.group_by[0], GroupByItem::Rollup { .. }));
 
         let distinct = parse_with(
             "SELECT a FROM t GROUP BY DISTINCT GROUPING SETS ((a), (b)), ()",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("GROUP BY DISTINCT over GROUPING SETS parses");
         let select = select_of(&distinct);
@@ -2565,7 +2749,7 @@ mod tests {
             "SELECT a FROM t GROUP BY DISTINCT ALL a",
         ] {
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects `{sql}` (the quantifier needs a following list)",
             );
         }
@@ -2581,19 +2765,19 @@ mod tests {
         // separately; `GROUP BY DISTINCT a` has no DuckDB reading.)
         let sql = "SELECT a FROM t GROUP BY DISTINCT a";
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI rejects the quantifier"
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects the quantifier"
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite rejects the quantifier"
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB has no GROUP BY DISTINCT quantifier"
         );
     }
@@ -2607,8 +2791,11 @@ mod tests {
         // `GROUP BY ALL` is the mode (empty item list), while `GROUP BY ALL <items>` is
         // the quantifier prefixing the list. No genuine ambiguity, so the quantifier
         // ships on for Lenient (the honest superset) rather than being disabled.
-        let mode = parse_with("SELECT i, sum(j) FROM t GROUP BY ALL", Lenient)
-            .expect("bare GROUP BY ALL is the DuckDB mode under Lenient");
+        let mode = parse_with(
+            "SELECT i, sum(j) FROM t GROUP BY ALL",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("bare GROUP BY ALL is the DuckDB mode under Lenient");
         let select = select_of(&mode);
         assert_eq!(
             select.group_by_all,
@@ -2618,8 +2805,11 @@ mod tests {
         assert_eq!(select.group_by_quantifier, None);
         assert!(select.group_by.is_empty());
 
-        let quantifier = parse_with("SELECT a FROM t GROUP BY ALL a, b", Lenient)
-            .expect("GROUP BY ALL over a list is the PostgreSQL quantifier under Lenient");
+        let quantifier = parse_with(
+            "SELECT a FROM t GROUP BY ALL a, b",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("GROUP BY ALL over a list is the PostgreSQL quantifier under Lenient");
         let select = select_of(&quantifier);
         assert!(
             select.group_by_all.is_none(),
@@ -2628,8 +2818,11 @@ mod tests {
         assert_eq!(select.group_by_quantifier, Some(SetQuantifier::All));
         assert_eq!(select.group_by.len(), 2);
 
-        let distinct = parse_with("SELECT a FROM t GROUP BY DISTINCT a", Lenient)
-            .expect("GROUP BY DISTINCT is the quantifier under Lenient");
+        let distinct = parse_with(
+            "SELECT a FROM t GROUP BY DISTINCT a",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("GROUP BY DISTINCT is the quantifier under Lenient");
         assert_eq!(
             select_of(&distinct).group_by_quantifier,
             Some(SetQuantifier::Distinct)
@@ -2649,7 +2842,8 @@ mod tests {
             "SELECT a FROM t GROUP BY DISTINCT ROLLUP (a, b)",
             "SELECT a FROM t GROUP BY a",
         ] {
-            let parsed = parse_with(sql, Postgres).expect("quantified GROUP BY parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect("quantified GROUP BY parses");
             assert_eq!(
                 Renderer::new(Postgres)
                     .render_parsed(&parsed)
@@ -2668,7 +2862,7 @@ mod tests {
         // rather than a nonsensical rollup-of-a-rollup.
         let err = parse_with(
             "SELECT a FROM t GROUP BY ROLLUP (a, b) WITH ROLLUP",
-            Lenient,
+            crate::ParseConfig::new(Lenient),
         )
         .expect_err("a grouping-set key before `WITH ROLLUP` is rejected");
         assert!(
@@ -2696,7 +2890,8 @@ mod tests {
         // `TABLE t` is `SELECT * FROM t`, so it canonicalizes to a wildcard projection
         // over the one relation, tagged `TableCommand`. It is ungated (standard SQL
         // `<explicit table>`), so a bare `TABLE t` parses even under the ANSI test dialect.
-        let parsed = parse_with("TABLE t", TestDialect).expect("TABLE command parses");
+        let parsed = parse_with("TABLE t", crate::ParseConfig::new(TestDialect))
+            .expect("TABLE command parses");
         let TableFactor::Table {
             name,
             inheritance: RelationInheritance::Plain,
@@ -2713,7 +2908,8 @@ mod tests {
 
     #[test]
     fn table_command_keeps_qualified_names() {
-        let parsed = parse_with("TABLE s.t", TestDialect).expect("qualified TABLE parses");
+        let parsed = parse_with("TABLE s.t", crate::ParseConfig::new(TestDialect))
+            .expect("qualified TABLE parses");
         let TableFactor::Table { name, .. } = table_command_relation(&parsed) else {
             panic!("expected a named relation");
         };
@@ -2728,7 +2924,8 @@ mod tests {
 
         // The `ONLY`/`*` `relation_expr` markers ride the PostgreSQL inheritance gate,
         // so they parse under the full Postgres preset (not the ANSI-based test dialect).
-        let only = parse_with("TABLE ONLY t", Postgres).expect("TABLE ONLY parses");
+        let only = parse_with("TABLE ONLY t", crate::ParseConfig::new(Postgres))
+            .expect("TABLE ONLY parses");
         assert!(matches!(
             table_command_relation(&only),
             TableFactor::Table {
@@ -2737,7 +2934,8 @@ mod tests {
             },
         ));
 
-        let only_paren = parse_with("TABLE ONLY (t)", Postgres).expect("TABLE ONLY (t) parses");
+        let only_paren = parse_with("TABLE ONLY (t)", crate::ParseConfig::new(Postgres))
+            .expect("TABLE ONLY (t) parses");
         assert!(matches!(
             table_command_relation(&only_paren),
             TableFactor::Table {
@@ -2746,7 +2944,8 @@ mod tests {
             },
         ));
 
-        let star = parse_with("TABLE t *", Postgres).expect("TABLE t * parses");
+        let star =
+            parse_with("TABLE t *", crate::ParseConfig::new(Postgres)).expect("TABLE t * parses");
         assert!(matches!(
             table_command_relation(&star),
             TableFactor::Table {
@@ -2769,7 +2968,7 @@ mod tests {
             "TABLE",
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "{sql:?} must be rejected",
             );
         }
@@ -2779,9 +2978,9 @@ mod tests {
     fn table_command_inheritance_markers_need_the_gate() {
         // Under a dialect without PostgreSQL inheritance (the ANSI test dialect), the
         // `ONLY`/`*` markers are rejected while the plain `TABLE t` still parses.
-        assert!(parse_with("TABLE ONLY t", TestDialect).is_err());
-        assert!(parse_with("TABLE t *", TestDialect).is_err());
-        assert!(parse_with("TABLE t", TestDialect).is_ok());
+        assert!(parse_with("TABLE ONLY t", crate::ParseConfig::new(TestDialect)).is_err());
+        assert!(parse_with("TABLE t *", crate::ParseConfig::new(TestDialect)).is_err());
+        assert!(parse_with("TABLE t", crate::ParseConfig::new(TestDialect)).is_ok());
     }
 
     #[test]
@@ -2796,7 +2995,7 @@ mod tests {
             "TABLE ONLY (t)",
             "TABLE t *",
         ] {
-            let parsed = parse_with(sql, Postgres).expect("TABLE parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres)).expect("TABLE parses");
             assert_eq!(
                 Renderer::new(Postgres)
                     .render_parsed(&parsed)
@@ -2819,7 +3018,7 @@ mod tests {
             "SELECT ORDER BY 1",
             "SELECT ALL FROM t",
         ] {
-            let parsed = parse_with(sql, PG_SELECT_DIALECT)
+            let parsed = parse_with(sql, crate::ParseConfig::new(PG_SELECT_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             assert!(
                 select_of(&parsed).projection.is_empty(),
@@ -2832,8 +3031,8 @@ mod tests {
     fn empty_target_list_is_rejected_without_the_gate() {
         // ANSI/MySQL require ≥1 select item, so `FROM` — a reserved keyword, not an
         // expression — is a parse error where the projection is required.
-        assert!(parse_with("SELECT FROM t", TestDialect).is_err());
-        assert!(parse_with("SELECT", TestDialect).is_err());
+        assert!(parse_with("SELECT FROM t", crate::ParseConfig::new(TestDialect)).is_err());
+        assert!(parse_with("SELECT", crate::ParseConfig::new(TestDialect)).is_err());
     }
 
     #[test]
@@ -2841,10 +3040,22 @@ mod tests {
         // PostgreSQL splits `SELECT opt_all_clause opt_target_list` (empty allowed) from
         // `SELECT distinct_clause target_list` (required), so a `DISTINCT` head with no
         // items is a syntax error even under the empty-target-list gate.
-        assert!(parse_with("SELECT DISTINCT", PG_SELECT_DIALECT).is_err());
-        assert!(parse_with("SELECT DISTINCT FROM t", PG_SELECT_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "SELECT DISTINCT",
+                crate::ParseConfig::new(PG_SELECT_DIALECT)
+            )
+            .is_err()
+        );
+        assert!(
+            parse_with(
+                "SELECT DISTINCT FROM t",
+                crate::ParseConfig::new(PG_SELECT_DIALECT)
+            )
+            .is_err()
+        );
         // A plain or explicit-`ALL` head still admits the empty list.
-        assert!(parse_with("SELECT ALL", PG_SELECT_DIALECT).is_ok());
+        assert!(parse_with("SELECT ALL", crate::ParseConfig::new(PG_SELECT_DIALECT)).is_ok());
     }
 
     #[test]
@@ -2853,7 +3064,8 @@ mod tests {
         use crate::render::Renderer;
 
         for sql in ["SELECT", "SELECT FROM t", "SELECT WHERE a = 1"] {
-            let parsed = parse_with(sql, Postgres).expect("empty SELECT parses");
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(Postgres)).expect("empty SELECT parses");
             assert_eq!(
                 Renderer::new(Postgres)
                     .render_parsed(&parsed)
@@ -2869,7 +3081,7 @@ mod tests {
         // the clause even without DuckDB's keyword reservation.
         let parsed = parse_with(
             "SELECT a FROM t GROUP BY a QUALIFY row_number() OVER () = 1",
-            QUALIFY_DIALECT,
+            crate::ParseConfig::new(QUALIFY_DIALECT),
         )
         .expect("QUALIFY parses under the gate");
         let select = select_of(&parsed);
@@ -2891,7 +3103,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT a FROM t GROUP BY a QUALIFY row_number() OVER () = 1",
-                TestDialect,
+                crate::ParseConfig::new(TestDialect),
             )
             .is_err(),
             "ANSI rejects the QUALIFY clause",
@@ -2955,8 +3167,8 @@ mod tests {
             "SELECT a FROM t JOIN u ON t.id = u.id LATERAL VIEW explode(col) v AS c WHERE v.c = 1",
             "SELECT a FROM t, u LATERAL VIEW explode(col) v GROUP BY a",
         ] {
-            let parsed =
-                parse_with(sql, LATERAL_VIEW_DIALECT).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(LATERAL_VIEW_DIALECT))
+                .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
             assert!(
                 !select_of(&parsed).lateral_views.is_empty(),
                 "{sql:?} populates lateral_views",
@@ -2974,7 +3186,7 @@ mod tests {
         // aliases land as typed fields.
         let parsed = parse_with(
             "SELECT a FROM t LATERAL VIEW OUTER explode(m) kv AS k, v",
-            LATERAL_VIEW_DIALECT,
+            crate::ParseConfig::new(LATERAL_VIEW_DIALECT),
         )
         .expect("parses");
         let views = &select_of(&parsed).lateral_views;
@@ -2995,7 +3207,7 @@ mod tests {
         // the documented conservative-direction over-acceptance.
         let bare = parse_with(
             "SELECT a FROM t LATERAL VIEW explode(m) kv k, v",
-            LATERAL_VIEW_DIALECT,
+            crate::ParseConfig::new(LATERAL_VIEW_DIALECT),
         )
         .expect("the AS-less Spark spelling parses");
         assert_eq!(select_of(&bare).lateral_views[0].columns.len(), 2);
@@ -3014,7 +3226,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT a FROM t LATERAL VIEW explode v",
-                LATERAL_VIEW_DIALECT
+                crate::ParseConfig::new(LATERAL_VIEW_DIALECT)
             )
             .is_err(),
             "a bare generator name without `(…)` rejects",
@@ -3023,7 +3235,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT a FROM t LATERAL VIEW rank() OVER () v",
-                LATERAL_VIEW_DIALECT,
+                crate::ParseConfig::new(LATERAL_VIEW_DIALECT),
             )
             .is_err(),
             "a windowed generator rejects",
@@ -3033,7 +3245,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT a FROM t LATERAL VIEW explode(col) WHERE a = 1",
-                LATERAL_VIEW_DIALECT,
+                crate::ParseConfig::new(LATERAL_VIEW_DIALECT),
             )
             .is_err(),
             "a missing table alias rejects",
@@ -3045,13 +3257,21 @@ mod tests {
         // With the flag off (ANSI) the post-FROM `LATERAL` is left unconsumed and the
         // trailing clause is a clean parse error — the over-acceptance guard.
         assert!(
-            parse_with("SELECT a FROM t LATERAL VIEW explode(col) v", TestDialect).is_err(),
+            parse_with(
+                "SELECT a FROM t LATERAL VIEW explode(col) v",
+                crate::ParseConfig::new(TestDialect)
+            )
+            .is_err(),
             "ANSI rejects the LATERAL VIEW clause",
         );
         // Hive/Spark attach lateral views inside the FROM clause, so a FROM-less body
         // never reads them even with the gate on.
         assert!(
-            parse_with("SELECT 1 LATERAL VIEW explode(col) v", LATERAL_VIEW_DIALECT).is_err(),
+            parse_with(
+                "SELECT 1 LATERAL VIEW explode(col) v",
+                crate::ParseConfig::new(LATERAL_VIEW_DIALECT)
+            )
+            .is_err(),
             "a FROM-less body rejects the clause",
         );
     }
@@ -3062,8 +3282,11 @@ mod tests {
 
         // Under the Lenient combination both `LATERAL` gates are on. At a table-factor
         // head, `LATERAL` (no `VIEW` follow) is the derived-table/function factor…
-        let factor = parse_with("SELECT a FROM t, LATERAL f(t.x) v", LATERAL_BOTH_DIALECT)
-            .expect("the lateral function factor parses");
+        let factor = parse_with(
+            "SELECT a FROM t, LATERAL f(t.x) v",
+            crate::ParseConfig::new(LATERAL_BOTH_DIALECT),
+        )
+        .expect("the lateral function factor parses");
         let factor_select = select_of(&factor);
         assert_eq!(factor_select.from.len(), 2);
         assert!(
@@ -3078,7 +3301,7 @@ mod tests {
         // …after the complete FROM list, `LATERAL VIEW` is the view clause…
         let clause = parse_with(
             "SELECT a FROM t LATERAL VIEW explode(col) v AS c",
-            LATERAL_BOTH_DIALECT,
+            crate::ParseConfig::new(LATERAL_BOTH_DIALECT),
         )
         .expect("the view clause parses with both gates on");
         assert_eq!(select_of(&clause).lateral_views.len(), 1);
@@ -3086,7 +3309,7 @@ mod tests {
         // …and both compose on one query, each claiming its own `LATERAL`.
         let both = parse_with(
             "SELECT a FROM t, LATERAL f(t.x) v LATERAL VIEW explode(v.col) w AS c",
-            LATERAL_BOTH_DIALECT,
+            crate::ParseConfig::new(LATERAL_BOTH_DIALECT),
         )
         .expect("factor + clause compose");
         let both_select = select_of(&both);
@@ -3110,7 +3333,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT a FROM t, LATERAL VIEW explode(col) v",
-                LATERAL_BOTH_DIALECT,
+                crate::ParseConfig::new(LATERAL_BOTH_DIALECT),
             )
             .is_err(),
             "a comma-position LATERAL VIEW rejects",
@@ -3154,8 +3377,8 @@ mod tests {
             "SELECT a FROM t WHERE a > 0 CONNECT BY PRIOR id = pid",
             "SELECT dept, COUNT(*) FROM t CONNECT BY PRIOR id = pid GROUP BY dept",
         ] {
-            let parsed =
-                parse_with(sql, CONNECT_BY_DIALECT).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(CONNECT_BY_DIALECT))
+                .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
             assert!(
                 select_of(&parsed).connect_by.is_some(),
                 "{sql:?} populates connect_by",
@@ -3173,7 +3396,7 @@ mod tests {
         // land as typed fields.
         let parsed = parse_with(
             "SELECT a FROM t START WITH pid IS NULL CONNECT BY NOCYCLE PRIOR id = pid",
-            CONNECT_BY_DIALECT,
+            crate::ParseConfig::new(CONNECT_BY_DIALECT),
         )
         .expect("parses");
         let clause = select_of(&parsed)
@@ -3198,7 +3421,7 @@ mod tests {
         // written order (the spelling-fidelity round-trip).
         let leads = parse_with(
             "SELECT a FROM t START WITH id = 1 CONNECT BY PRIOR id = pid",
-            CONNECT_BY_DIALECT,
+            crate::ParseConfig::new(CONNECT_BY_DIALECT),
         )
         .expect("START WITH first parses");
         assert!(
@@ -3211,7 +3434,7 @@ mod tests {
 
         let trails = parse_with(
             "SELECT a FROM t CONNECT BY PRIOR id = pid START WITH id = 1",
-            CONNECT_BY_DIALECT,
+            crate::ParseConfig::new(CONNECT_BY_DIALECT),
         )
         .expect("CONNECT BY first parses");
         assert!(
@@ -3248,7 +3471,7 @@ mod tests {
         use crate::render::{RenderConfig, RenderMode, Renderer};
         let parsed = parse_with(
             "SELECT a FROM t CONNECT BY PRIOR id = pid",
-            CONNECT_BY_DIALECT,
+            crate::ParseConfig::new(CONNECT_BY_DIALECT),
         )
         .expect("parses");
         let renderer = Renderer::with_config(
@@ -3272,7 +3495,7 @@ mod tests {
         // name — in the projection, in START WITH, and inside a subquery of the condition.
         let projection = parse_with(
             "SELECT prior FROM t CONNECT BY PRIOR id = pid",
-            CONNECT_BY_DIALECT,
+            crate::ParseConfig::new(CONNECT_BY_DIALECT),
         )
         .expect("bare `prior` in the projection is a column");
         assert!(select_of(&projection).connect_by.is_some());
@@ -3280,7 +3503,7 @@ mod tests {
         // START WITH does not recognize PRIOR — a bare `prior` there is a column.
         parse_with(
             "SELECT a FROM t START WITH prior = 1 CONNECT BY id = pid",
-            CONNECT_BY_DIALECT,
+            crate::ParseConfig::new(CONNECT_BY_DIALECT),
         )
         .expect("bare `prior` in START WITH is a column");
 
@@ -3288,7 +3511,7 @@ mod tests {
         // `prior` is a column, not the operator.
         parse_with(
             "SELECT a FROM t CONNECT BY id = (SELECT prior FROM u)",
-            CONNECT_BY_DIALECT,
+            crate::ParseConfig::new(CONNECT_BY_DIALECT),
         )
         .expect("bare `prior` in a subquery of the condition is a column");
     }
@@ -3299,13 +3522,17 @@ mod tests {
         // left unconsumed and the trailing clause is a clean parse error — the
         // over-acceptance guard.
         assert!(
-            parse_with("SELECT a FROM t CONNECT BY PRIOR id = pid", TestDialect).is_err(),
+            parse_with(
+                "SELECT a FROM t CONNECT BY PRIOR id = pid",
+                crate::ParseConfig::new(TestDialect)
+            )
+            .is_err(),
             "ANSI rejects the CONNECT BY clause",
         );
         assert!(
             parse_with(
                 "SELECT a FROM t START WITH id = 1 CONNECT BY id = pid",
-                TestDialect
+                crate::ParseConfig::new(TestDialect)
             )
             .is_err(),
             "ANSI rejects the START WITH clause",
@@ -3318,8 +3545,11 @@ mod tests {
     fn from_first_tags_the_spelling_and_keeps_the_canonical_body() {
         // `FROM t SELECT a` is the ordinary Select body written FROM-first: the projection
         // and FROM populate exactly as for `SELECT a FROM t`; only the surface tag differs.
-        let from_first =
-            parse_with("FROM t SELECT a", FROM_FIRST_DIALECT).expect("FROM-first parses");
+        let from_first = parse_with(
+            "FROM t SELECT a",
+            crate::ParseConfig::new(FROM_FIRST_DIALECT),
+        )
+        .expect("FROM-first parses");
         let ff = select_of(&from_first);
         assert_eq!(ff.spelling, SelectSpelling::FromFirst);
         assert_eq!(ff.projection.len(), 1);
@@ -3327,8 +3557,11 @@ mod tests {
         assert_eq!(ff.from.len(), 1);
         assert!(ff.into.is_none() && !ff.straight_join);
 
-        let select_first =
-            parse_with("SELECT a FROM t", FROM_FIRST_DIALECT).expect("SELECT-first parses");
+        let select_first = parse_with(
+            "SELECT a FROM t",
+            crate::ParseConfig::new(FROM_FIRST_DIALECT),
+        )
+        .expect("SELECT-first parses");
         let sf = select_of(&select_first);
         assert_eq!(sf.spelling, SelectSpelling::Select);
         assert_eq!(ff.projection.len(), sf.projection.len());
@@ -3338,7 +3571,8 @@ mod tests {
     #[test]
     fn bare_from_is_an_implicit_wildcard() {
         // Bare `FROM t` (no SELECT) canonicalizes to `SELECT * FROM t` plus the tag.
-        let parsed = parse_with("FROM t", FROM_FIRST_DIALECT).expect("bare FROM parses");
+        let parsed = parse_with("FROM t", crate::ParseConfig::new(FROM_FIRST_DIALECT))
+            .expect("bare FROM parses");
         let select = select_of(&parsed);
         assert_eq!(select.spelling, SelectSpelling::FromFirst);
         assert!(matches!(
@@ -3355,7 +3589,7 @@ mod tests {
         // ordinary order after it.
         let parsed = parse_with(
             "FROM t SELECT a, sum(b) WHERE a > 1 GROUP BY a HAVING sum(b) > 2",
-            FROM_FIRST_DIALECT,
+            crate::ParseConfig::new(FROM_FIRST_DIALECT),
         )
         .expect("FROM-first with a full tail parses");
         let select = select_of(&parsed);
@@ -3365,8 +3599,11 @@ mod tests {
         assert!(select.having.is_some(), "HAVING parsed");
 
         // GROUP BY ALL co-occurs with FROM-first heavily in the corpus.
-        let by_all = parse_with("FROM t GROUP BY ALL", FROM_FIRST_DIALECT)
-            .expect("FROM t GROUP BY ALL parses");
+        let by_all = parse_with(
+            "FROM t GROUP BY ALL",
+            crate::ParseConfig::new(FROM_FIRST_DIALECT),
+        )
+        .expect("FROM t GROUP BY ALL parses");
         let by_all = select_of(&by_all);
         assert!(by_all.group_by_all.is_some() && by_all.group_by.is_empty());
     }
@@ -3377,13 +3614,22 @@ mod tests {
         // A statement-position FROM must stay a clean parse error everywhere the gate is
         // off — the over-acceptance guard the differential oracle relies on.
         for sql in ["FROM t SELECT a", "FROM t", "FROM t WHERE a > 1"] {
-            assert!(parse_with(sql, Ansi).is_err(), "Ansi rejects {sql:?}");
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "Ansi rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "Postgres rejects {sql:?}"
             );
-            assert!(parse_with(sql, MySql).is_err(), "MySQL rejects {sql:?}");
-            assert!(parse_with(sql, Sqlite).is_err(), "SQLite rejects {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+                "MySQL rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
+                "SQLite rejects {sql:?}"
+            );
         }
     }
 
@@ -3398,7 +3644,7 @@ mod tests {
         // DuckDB's single-statement rejection.
         for sql in ["FROM t WHERE a > 1 SELECT a", "FROM t GROUP BY a SELECT a"] {
             assert!(
-                parse_with(sql, FROM_FIRST_DIALECT).is_err(),
+                parse_with(sql, crate::ParseConfig::new(FROM_FIRST_DIALECT)).is_err(),
                 "separator-less juxtaposed statements reject in {sql:?}",
             );
         }
@@ -3410,8 +3656,8 @@ mod tests {
             "FROM t WHERE a > 1; SELECT a",
             "FROM t GROUP BY a; SELECT a",
         ] {
-            let parsed =
-                parse_with(sql, FROM_FIRST_DIALECT).expect("`;`-separated statements parse");
+            let parsed = parse_with(sql, crate::ParseConfig::new(FROM_FIRST_DIALECT))
+                .expect("`;`-separated statements parse");
             let first = select_of(&parsed);
             assert_eq!(first.spelling, SelectSpelling::FromFirst);
             assert!(
@@ -3439,7 +3685,8 @@ mod tests {
             "FROM t ORDER BY a",
             "FROM a SELECT x UNION FROM b SELECT y",
         ] {
-            let parsed = parse_with(sql, FROM_FIRST_DIALECT).expect("FROM-first parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(FROM_FIRST_DIALECT))
+                .expect("FROM-first parses");
             assert_eq!(
                 Renderer::new(FROM_FIRST_DIALECT)
                     .render_parsed(&parsed)
@@ -3455,8 +3702,11 @@ mod tests {
         // Explicit `FROM t SELECT *` carries the same shape as bare `FROM t` (a single
         // wildcard, no DISTINCT); the one canonical render is the bare form, so the
         // `SELECT *` normalizes away (ADR-0011, the single-tag-state decision).
-        let parsed =
-            parse_with("FROM t SELECT *", FROM_FIRST_DIALECT).expect("FROM t SELECT * parses");
+        let parsed = parse_with(
+            "FROM t SELECT *",
+            crate::ParseConfig::new(FROM_FIRST_DIALECT),
+        )
+        .expect("FROM t SELECT * parses");
         assert_eq!(
             Renderer::new(FROM_FIRST_DIALECT)
                 .render_parsed(&parsed)
@@ -3478,7 +3728,7 @@ mod tests {
             "WITH c AS (FROM t) FROM c",
         ] {
             assert!(
-                parse_with(sql, FROM_FIRST_DIALECT).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(FROM_FIRST_DIALECT)).is_ok(),
                 "{sql:?} parses"
             );
         }
@@ -3505,7 +3755,7 @@ mod tests {
         // qualified wildcard, and a plain `*` stays modifier-free (`options: None`).
         let parsed = parse_with(
             "SELECT * EXCLUDE (a) REPLACE (b + 1 AS b) RENAME (c AS d), t.* EXCLUDE (e), * FROM t",
-            STAR_MODIFIERS_DIALECT,
+            crate::ParseConfig::new(STAR_MODIFIERS_DIALECT),
         )
         .expect("the gated modifiers parse");
         let items = projection(&parsed);
@@ -3537,7 +3787,13 @@ mod tests {
         ));
 
         // The same text under plain ANSI leaves `EXCLUDE` unconsumed — a clean error.
-        assert!(parse_with("SELECT * EXCLUDE (a) FROM t", TestDialect).is_err());
+        assert!(
+            parse_with(
+                "SELECT * EXCLUDE (a) FROM t",
+                crate::ParseConfig::new(TestDialect)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -3546,7 +3802,8 @@ mod tests {
         // side-table key for diagnostics/slicing), and the options node anchors at the
         // star.
         let sql = "SELECT * EXCLUDE (a) FROM t";
-        let parsed = parse_with(sql, STAR_MODIFIERS_DIALECT).expect("parses");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(STAR_MODIFIERS_DIALECT)).expect("parses");
         let SelectItem::Wildcard {
             options: Some(options),
             meta,

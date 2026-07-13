@@ -13,7 +13,7 @@ use crate::parser::Dialect;
 
 /// The Databricks dialect ([`FeatureSet::DATABRICKS`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, Databricks)`.
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Databricks))`.
 /// Databricks is exposed as a deliberately conservative ANSI-derived preset (no Databricks
 /// oracle exists to fit a wider surface): it adds the sided `{LEFT|RIGHT} {SEMI|ANTI} JOIN`
 /// family, semi-structured colon path access (`base:key[0].field` over `VARIANT`/JSON
@@ -56,23 +56,23 @@ mod tests {
     /// against each so a future preset edit cannot silently move one).
     fn rejects_under_every_oracle_preset(sql: &str) {
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI must reject the Databricks-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL must reject the Databricks-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL must reject the Databricks-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite must reject the Databricks-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB must reject the Databricks-only form {sql:?}",
         );
     }
@@ -82,14 +82,20 @@ mod tests {
     /// with DuckDB* (which enables all three flags), so the boundary here excludes DuckDB —
     /// the reject is asserted only against the presets that genuinely lack the clause.
     fn rejects_under_the_non_duckdb_oracle_presets(sql: &str) {
-        assert!(parse_with(sql, Ansi).is_err(), "ANSI must reject {sql:?}");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+            "ANSI must reject {sql:?}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL must reject {sql:?}",
         );
-        assert!(parse_with(sql, MySql).is_err(), "MySQL must reject {sql:?}");
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+            "MySQL must reject {sql:?}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite must reject {sql:?}"
         );
     }
@@ -107,7 +113,7 @@ mod tests {
             "SELECT * FROM a RIGHT ANTI JOIN b USING (x)",
         ] {
             assert!(
-                parse_with(sql, Databricks).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Databricks)).is_ok(),
                 "Databricks parses {sql:?}"
             );
             rejects_under_every_oracle_preset(sql);
@@ -127,12 +133,12 @@ mod tests {
         // COLUMN_REF `customer` aliased `src`.
         for sql in ["SELECT src:customer", "SELECT src:customer[0].name"] {
             assert!(
-                parse_with(sql, Databricks).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Databricks)).is_ok(),
                 "Databricks parses {sql:?} as a semi-structured path"
             );
             rejects_under_the_non_duckdb_oracle_presets(sql);
             assert!(
-                parse_with(sql, DuckDb).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
                 "DuckDB reinterprets {sql:?} as a prefix colon alias, not a path",
             );
         }
@@ -142,7 +148,7 @@ mod tests {
         // still reads the `src:customer` operand as a path.
         let mid = "SELECT a + src:customer FROM t";
         assert!(
-            parse_with(mid, Databricks).is_ok(),
+            parse_with(mid, crate::ParseConfig::new(Databricks)).is_ok(),
             "Databricks parses {mid:?}"
         );
         rejects_under_every_oracle_preset(mid);
@@ -160,13 +166,13 @@ mod tests {
             "SELECT a FROM t ORDER BY ALL",
         ] {
             assert!(
-                parse_with(sql, Databricks).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Databricks)).is_ok(),
                 "Databricks parses {sql:?}"
             );
             rejects_under_the_non_duckdb_oracle_presets(sql);
             // The shared-surface half: DuckDB accepts these too (all three flags on there).
             assert!(
-                parse_with(sql, DuckDb).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
                 "DuckDB shares {sql:?} (its own QUALIFY / GROUP BY ALL / ORDER BY ALL)",
             );
         }
@@ -180,7 +186,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT a FROM t QUALIFY row_number() OVER () = 1",
-                Databricks
+                crate::ParseConfig::new(Databricks)
             )
             .is_ok(),
             "the bare `FROM t QUALIFY …` form parses the clause, not an alias",
@@ -188,11 +194,11 @@ mod tests {
         // The reservation side: `qualify` is not usable as a bare column name under
         // Databricks, while ANSI (which does not reserve it) reads it as an ordinary column.
         assert!(
-            parse_with("SELECT qualify FROM t", Databricks).is_err(),
+            parse_with("SELECT qualify FROM t", crate::ParseConfig::new(Databricks)).is_err(),
             "Databricks rejects `qualify` as a column name (reserved)",
         );
         assert!(
-            parse_with("SELECT qualify FROM t", Ansi).is_ok(),
+            parse_with("SELECT qualify FROM t", crate::ParseConfig::new(Ansi)).is_ok(),
             "ANSI reads `qualify` as an ordinary column name (unreserved)",
         );
     }
@@ -203,16 +209,16 @@ mod tests {
         // `"…"`. The backtick form is the signature Spark/Databricks spelling; ANSI (which
         // has no backtick quote) rejects it.
         assert!(
-            parse_with("SELECT `a b` FROM t", Databricks).is_ok(),
+            parse_with("SELECT `a b` FROM t", crate::ParseConfig::new(Databricks)).is_ok(),
             "Databricks reads a backtick-quoted identifier",
         );
         assert!(
-            parse_with("SELECT `a b` FROM t", Ansi).is_err(),
+            parse_with("SELECT `a b` FROM t", crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI has no backtick identifier quote",
         );
         // `"…"` stays an identifier quote (not a string), so `double_quoted_strings` is off.
         assert!(
-            parse_with("SELECT \"col\" FROM t", Databricks).is_ok(),
+            parse_with("SELECT \"col\" FROM t", crate::ParseConfig::new(Databricks)).is_ok(),
             "Databricks reads a double-quoted identifier",
         );
     }

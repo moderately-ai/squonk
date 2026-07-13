@@ -130,7 +130,8 @@ impl StructuralOracle for UnavailableOracle {
 /// Our own neutral shapes for `sql` under the DuckDB parse dialect — used to build a
 /// mock engine tree without a live engine.
 fn our_shape(sql: &str) -> Vec<StatementShape> {
-    let parsed = parse_with(sql, duckdb_parse_dialect()).expect("our parser accepts the SQL");
+    let parsed = parse_with(sql, squonk::ParseConfig::new(duckdb_parse_dialect()))
+        .expect("our parser accepts the SQL");
     squonk_shape_result(&parsed).expect("our neutral shape maps")
 }
 

@@ -13,7 +13,7 @@ use crate::parser::Dialect;
 
 /// The Hive / HiveQL dialect ([`FeatureSet::HIVE`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, Hive)`. Hive is exposed
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Hive))`. Hive is exposed
 /// as a deliberately conservative ANSI-derived preset (no Hive oracle exists to fit a wider
 /// surface): it adds the sided `{LEFT|RIGHT} {SEMI|ANTI} JOIN` family (Hive originated
 /// `LEFT SEMI JOIN`), backtick-quoted identifiers (`` `name` ``), and `"…"` double-quoted
@@ -56,23 +56,23 @@ mod tests {
     /// preset edit cannot silently move one).
     fn rejects_under_every_oracle_preset(sql: &str) {
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI must reject the Hive-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL must reject the Hive-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL must reject the Hive-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite must reject the Hive-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB must reject the Hive-only form {sql:?}",
         );
     }
@@ -92,7 +92,10 @@ mod tests {
             "SELECT * FROM a RIGHT SEMI JOIN b ON a.x = b.x",
             "SELECT * FROM a RIGHT ANTI JOIN b USING (x)",
         ] {
-            assert!(parse_with(sql, Hive).is_ok(), "Hive parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Hive)).is_ok(),
+                "Hive parses {sql:?}"
+            );
             rejects_under_every_oracle_preset(sql);
         }
     }
@@ -104,28 +107,28 @@ mod tests {
         // only for ANSI/PostgreSQL/DuckDB; the shared half is asserted explicitly.
         let backtick = "SELECT `a b` FROM t";
         assert!(
-            parse_with(backtick, Hive).is_ok(),
+            parse_with(backtick, crate::ParseConfig::new(Hive)).is_ok(),
             "Hive reads `` `a b` `` as an identifier",
         );
         assert!(
-            parse_with(backtick, Ansi).is_err(),
+            parse_with(backtick, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI has no backtick identifier quote",
         );
         assert!(
-            parse_with(backtick, Postgres).is_err(),
+            parse_with(backtick, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL has no backtick identifier quote",
         );
         assert!(
-            parse_with(backtick, DuckDb).is_err(),
+            parse_with(backtick, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB has no backtick identifier quote",
         );
         // The shared half: MySQL and SQLite accept backtick identifiers too.
         assert!(
-            parse_with(backtick, MySql).is_ok(),
+            parse_with(backtick, crate::ParseConfig::new(MySql)).is_ok(),
             "MySQL shares the backtick identifier quote",
         );
         assert!(
-            parse_with(backtick, Sqlite).is_ok(),
+            parse_with(backtick, crate::ParseConfig::new(Sqlite)).is_ok(),
             "SQLite shares the backtick identifier quote (MySQL compat)",
         );
     }
@@ -136,7 +139,8 @@ mod tests {
         // quoted identifier. This is a meaning divergence rather than a parse boundary: the same
         // source parses under ANSI too, but there `"hi"` is a quoted *identifier* (a column
         // reference). Introspecting the projected node proves the string reading.
-        let parsed = parse_with("SELECT \"hi\"", Hive).expect("Hive parses `\"hi\"`");
+        let parsed = parse_with("SELECT \"hi\"", crate::ParseConfig::new(Hive))
+            .expect("Hive parses `\"hi\"`");
         let SelectItem::Expr { expr, .. } = &select_projection(&parsed)[0] else {
             panic!("expected a bare projection expression");
         };
@@ -147,7 +151,8 @@ mod tests {
 
         // Under ANSI the identical source reads `"hi"` as a quoted identifier — a column
         // reference, never a literal — which is the divergence this preset flips.
-        let ansi_parsed = parse_with("SELECT \"hi\"", Ansi).expect("ANSI parses `\"hi\"`");
+        let ansi_parsed = parse_with("SELECT \"hi\"", crate::ParseConfig::new(Ansi))
+            .expect("ANSI parses `\"hi\"`");
         let SelectItem::Expr { expr, .. } = &select_projection(&ansi_parsed)[0] else {
             panic!("expected a bare projection expression");
         };

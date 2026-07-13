@@ -858,7 +858,7 @@ mod tests {
         let (mut accept, mut reject) = (0usize, 0usize);
         let (mut test_suite, mut docs_ex) = (0usize, 0usize);
         for entry in entries() {
-            let ok = parse_with(entry.sql, CORPUS_DIALECT).is_ok();
+            let ok = parse_with(entry.sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok();
             if ok {
                 accept += 1;
             } else {
@@ -953,7 +953,7 @@ mod tests {
         // per corpus so a regression is legible without the oracle.
         let (mut acc_a, mut acc_r) = (0usize, 0usize);
         for sql in &flat_q {
-            if parse_with(sql, CORPUS_DIALECT).is_ok() {
+            if parse_with(sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok() {
                 acc_a += 1;
             } else {
                 acc_r += 1;
@@ -961,7 +961,7 @@ mod tests {
         }
         let (mut rej_a, mut rej_r) = (0usize, 0usize);
         for sql in &flat_r {
-            if parse_with(sql, CORPUS_DIALECT).is_ok() {
+            if parse_with(sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok() {
                 rej_a += 1;
             } else {
                 rej_r += 1;
@@ -1048,7 +1048,7 @@ mod tests {
         // per corpus so a regression is legible without the oracle.
         let (mut acc_a, mut acc_r) = (0usize, 0usize);
         for sql in &flat_q {
-            if parse_with(sql, CORPUS_DIALECT).is_ok() {
+            if parse_with(sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok() {
                 acc_a += 1;
             } else {
                 acc_r += 1;
@@ -1056,7 +1056,7 @@ mod tests {
         }
         let (mut rej_a, mut rej_r) = (0usize, 0usize);
         for sql in &flat_r {
-            if parse_with(sql, CORPUS_DIALECT).is_ok() {
+            if parse_with(sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok() {
                 rej_a += 1;
             } else {
                 rej_r += 1;
@@ -1354,7 +1354,7 @@ mod oracle_sweep {
             };
 
             for &sql in &group.queries {
-                let ours = parse_with(sql, CORPUS_DIALECT).is_ok();
+                let ours = parse_with(sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok();
                 let bare_accepts = bare.verdict(sql).map(|v| v.accepts()).unwrap_or(false);
                 let schema_accepts = match &schema {
                     Some(oracle) => oracle.verdict(sql).map(|v| v.accepts()).unwrap_or(false),
@@ -1524,7 +1524,7 @@ mod oracle_sweep {
 
         // --- Ledger staleness: every allowlisted over-acceptance still diverges ---
         assert_entries_still_diverge(DUCKDB_DIVERGENCE_ALLOWLIST, |entry| {
-            let ours = parse_with(entry.sql, CORPUS_DIALECT).is_ok();
+            let ours = parse_with(entry.sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok();
             let duck = bare
                 .verdict(entry.sql)
                 .map(|v| v.accepts())
@@ -1616,7 +1616,7 @@ mod oracle_sweep {
                 }
             };
             let verdict_of = |sql: &str| -> Verdict {
-                let ours = parse_with(sql, CORPUS_DIALECT).is_ok();
+                let ours = parse_with(sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok();
                 let bare_accepts = bare.verdict(sql).map(|v| v.accepts()).unwrap_or(false);
                 let schema_accepts = match &schema {
                     Some(oracle) => oracle.verdict(sql).map(|v| v.accepts()).unwrap_or(false),
@@ -1842,7 +1842,7 @@ mod oracle_sweep {
                 }
             };
             let verdict_of = |sql: &str| -> Verdict {
-                let ours = parse_with(sql, CORPUS_DIALECT).is_ok();
+                let ours = parse_with(sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok();
                 let bare_accepts = bare.verdict(sql).map(|v| v.accepts()).unwrap_or(false);
                 let schema_accepts = match &schema {
                     Some(oracle) => oracle.verdict(sql).map(|v| v.accepts()).unwrap_or(false),
@@ -2127,7 +2127,7 @@ mod oracle_sweep {
                     match duckdb_stmt_production(sql) {
                         Some(production) => {
                             r.engine.insert(production);
-                            if parse_with(sql, CORPUS_DIALECT).is_ok() {
+                            if parse_with(sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok() {
                                 r.squonk.insert(production);
                             }
                         }
@@ -2364,7 +2364,7 @@ mod oracle_sweep {
                 Ok(o) => o.verdict(query).map(|v| v.accepts()).unwrap_or(false),
                 Err(OracleUnavailable(_)) => false, // provisioning failed -> not bind-reached
             };
-            let ours = parse_with(query, CORPUS_DIALECT).is_ok();
+            let ours = parse_with(query, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok();
             let parses = match json_tree(&json_probe, query) {
                 Ok(Some(_)) => true,
                 Ok(None) => {
@@ -2481,7 +2481,7 @@ mod oracle_sweep {
                 .verdict(entry.sql)
                 .map(|v| v.accepts())
                 .unwrap_or(false)
-                && parse_with(entry.sql, CORPUS_DIALECT).is_ok();
+                && parse_with(entry.sql, squonk::ParseConfig::new(CORPUS_DIALECT)).is_ok();
             if !(is_select && both_accept) {
                 continue;
             }
@@ -2711,7 +2711,7 @@ mod oracle_sweep {
     const DUCKDB_FEATURE_SCHEMA: &str = "CREATE TABLE t (a INTEGER PRIMARY KEY, b TEXT, c INTEGER)";
 
     fn duckdb_generative_divergence(sql: &str, oracle: &DuckDbOracle) -> Option<String> {
-        let ours = squonk::parse_with(sql, DuckDb).is_ok();
+        let ours = squonk::parse_with(sql, squonk::ParseConfig::new(DuckDb)).is_ok();
         let theirs = match oracle.verdict(sql) {
             Ok(OracleVerdict::Accept) => true,
             Ok(OracleVerdict::Reject) => false,

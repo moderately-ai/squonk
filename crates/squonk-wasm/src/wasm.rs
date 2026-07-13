@@ -9,7 +9,120 @@
 use serde::Serialize;
 use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 
+use squonk::bindings::{ParseDocument, RecoveredDocument};
+use squonk::{BuiltinDialect, Parsed, Recovered};
+
 use crate::core;
+
+#[wasm_bindgen]
+pub struct NativeDocument {
+    parsed: Parsed,
+    dialect: BuiltinDialect,
+}
+
+#[wasm_bindgen]
+impl NativeDocument {
+    #[wasm_bindgen(getter)]
+    pub fn source(&self) -> String {
+        self.parsed.source().to_owned()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn dialect(&self) -> String {
+        self.dialect.name().to_owned()
+    }
+
+    pub fn to_value(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&ParseDocument::new(&self.parsed, self.dialect)).map_err(to_js_error)
+    }
+
+    pub fn render(&self, dialect: &str, mode: &str) -> Result<String, JsValue> {
+        core::render_document(&self.parsed, dialect, mode).map_err(to_js_error)
+    }
+
+    pub fn render_fragment(
+        &self,
+        node_id: u32,
+        dialect: &str,
+        mode: &str,
+    ) -> Result<String, JsValue> {
+        core::render_fragment(&self.parsed, node_id, dialect, mode).map_err(to_js_error)
+    }
+}
+
+#[wasm_bindgen]
+pub struct NativeRecoveredDocument {
+    recovered: Recovered,
+    dialect: BuiltinDialect,
+}
+
+#[wasm_bindgen]
+impl NativeRecoveredDocument {
+    #[wasm_bindgen(getter)]
+    pub fn source(&self) -> String {
+        self.recovered.parsed().source().to_owned()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn dialect(&self) -> String {
+        self.dialect.name().to_owned()
+    }
+
+    pub fn to_value(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&RecoveredDocument::new(&self.recovered, self.dialect)).map_err(to_js_error)
+    }
+
+    pub fn render(&self, dialect: &str, mode: &str) -> Result<String, JsValue> {
+        core::render_document(self.recovered.parsed(), dialect, mode).map_err(to_js_error)
+    }
+
+    pub fn render_fragment(
+        &self,
+        node_id: u32,
+        dialect: &str,
+        mode: &str,
+    ) -> Result<String, JsValue> {
+        core::render_fragment(self.recovered.parsed(), node_id, dialect, mode).map_err(to_js_error)
+    }
+}
+
+#[wasm_bindgen]
+pub fn parse_document_with(
+    sql: &str,
+    dialect: &str,
+    recursion_limit: Option<u32>,
+    capture_trivia: bool,
+    parse_float_as_decimal: bool,
+) -> Result<NativeDocument, JsValue> {
+    let (parsed, dialect) = core::parse_owned_with(
+        sql,
+        dialect,
+        recursion_limit.map(|limit| limit as usize),
+        capture_trivia,
+        parse_float_as_decimal,
+    )
+    .map_err(to_js_error)?;
+    Ok(NativeDocument { parsed, dialect })
+}
+
+#[wasm_bindgen]
+pub fn parse_recovering_document_with(
+    sql: &str,
+    dialect: &str,
+    recursion_limit: Option<u32>,
+    capture_trivia: bool,
+    parse_float_as_decimal: bool,
+) -> Result<NativeRecoveredDocument, JsValue> {
+    let (recovered, dialect) = core::parse_recovering_owned_with(
+        sql,
+        dialect,
+        recursion_limit.map(|limit| limit as usize),
+        capture_trivia,
+        parse_float_as_decimal,
+    )
+    .map_err(to_js_error)?;
+    Ok(NativeRecoveredDocument { recovered, dialect })
+}
 
 /// Parse `sql` under the named `dialect`, returning the parsed tree as a native JS
 /// object. On failure the JS call throws the same diagnostic object shape.
@@ -35,14 +148,14 @@ pub fn parse_with_limit(sql: &str, dialect: &str, limit: u32) -> Result<JsValue,
 
 /// Parse with explicit recursion-depth, trivia-capture, and float-as-decimal options.
 #[wasm_bindgen]
-pub fn parse_with_options(
+pub fn parse_with(
     sql: &str,
     dialect: &str,
     recursion_limit: Option<u32>,
     capture_trivia: bool,
     parse_float_as_decimal: bool,
 ) -> Result<JsValue, JsValue> {
-    core::parse_with_options(
+    core::parse_with(
         sql,
         dialect,
         recursion_limit.map(|limit| limit as usize),
@@ -65,14 +178,14 @@ pub fn parse_recovering(sql: &str, dialect: &str) -> Result<JsValue, JsValue> {
 /// Recovering parse with explicit recursion-depth, trivia-capture, and
 /// float-as-decimal options.
 #[wasm_bindgen]
-pub fn parse_recovering_with_options(
+pub fn parse_recovering_with(
     sql: &str,
     dialect: &str,
     recursion_limit: Option<u32>,
     capture_trivia: bool,
     parse_float_as_decimal: bool,
 ) -> Result<JsValue, JsValue> {
-    core::parse_recovering_with_options(
+    core::parse_recovering_with(
         sql,
         dialect,
         recursion_limit.map(|limit| limit as usize),

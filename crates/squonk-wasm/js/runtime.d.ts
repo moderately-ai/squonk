@@ -74,7 +74,7 @@ export interface SourceLocation {
     utf16Column: number;
 }
 /** Options for fail-fast and recovering parse calls. */
-export interface ParseOptions<TSupported extends CanonicalDialectName = CanonicalDialectName, TDialect extends DialectName<TSupported> = DialectName<TSupported>> {
+export interface ParseConfig<TSupported extends CanonicalDialectName = CanonicalDialectName, TDialect extends DialectName<TSupported> = DialectName<TSupported>> {
     /** Dialect name or alias. Defaults to the active package's dialect. */
     dialect?: TDialect;
     /** Optional parser recursion-depth limit for untrusted input. */
@@ -213,10 +213,20 @@ export interface TokenizeResult<TDialect extends CanonicalDialectName = Canonica
     tokens: Token[];
     trivia?: Trivia[];
 }
-/** wasm-bindgen exports consumed by the typed facade. */
+/** Native Node-API or wasm-bindgen document handle consumed by the typed facade. */
+export interface NativeDocumentHandle {
+    readonly source: string;
+    readonly dialect: string;
+    to_value(): unknown;
+    render(dialect: string, mode: string): string;
+    render_fragment(nodeId: number, dialect: string, mode: string): string;
+}
+/** Backend-neutral low-level binding contract consumed by the typed facade. */
 export interface WasmBindings {
-    parse_with_options(sql: string, dialect: string, recursionLimit: number | null | undefined, captureTrivia: boolean, parseFloatAsDecimal: boolean): unknown;
-    parse_recovering_with_options(sql: string, dialect: string, recursionLimit: number | null | undefined, captureTrivia: boolean, parseFloatAsDecimal: boolean): unknown;
+    parse_document_with(sql: string, dialect: string, recursionLimit: number | null | undefined, captureTrivia: boolean, parseFloatAsDecimal: boolean): NativeDocumentHandle;
+    parse_recovering_document_with(sql: string, dialect: string, recursionLimit: number | null | undefined, captureTrivia: boolean, parseFloatAsDecimal: boolean): NativeDocumentHandle;
+    parse_with(sql: string, dialect: string, recursionLimit: number | null | undefined, captureTrivia: boolean, parseFloatAsDecimal: boolean): unknown;
+    parse_recovering_with(sql: string, dialect: string, recursionLimit: number | null | undefined, captureTrivia: boolean, parseFloatAsDecimal: boolean): unknown;
     render_sql(sql: string, dialect: string, mode: string): string;
     render_document?(document: unknown, dialect: string, mode: string): string;
     render_fragment?(document: unknown, nodeId: number, dialect: string, mode: string): string;
@@ -252,8 +262,9 @@ export declare class SqlParseError extends Error {
 /** Parsed SQL document with convenience methods for traversal and rendering. */
 export declare class Document<TParse extends ParseResult = ParseResult, TDialect extends CanonicalDialectName = TParse["dialect"], TSupported extends CanonicalDialectName = CanonicalDialectName> {
     #private;
-    readonly raw: TParse;
-    constructor(token: typeof WRAPPER_TOKEN, raw: TParse);
+    constructor(token: typeof WRAPPER_TOKEN, raw: TParse | null, native?: NativeDocumentHandle | null, source?: string, dialect?: TDialect);
+    /** Raw JSON parse payload, materialized on first access. */
+    get raw(): TParse;
     /** Original SQL source. */
     get source(): string;
     /** Canonical dialect used to parse this document. */
@@ -381,15 +392,15 @@ export interface SquonkApi<TSupported extends CanonicalDialectName, TDefault ext
     /** Return the canonical dialect for a dynamic string, or null if unsupported. */
     canonicalDialectName(value: string): TSupported | null;
     /** Fail-fast parse into a wrapped document. */
-    parse<const TDialect extends DialectName<TSupported> = DefaultDialect<TSupported, TDefault>>(sql: string, options?: ParseOptions<TSupported, TDialect>): Document<ParseResult<CanonicalDialect<TDialect>>, CanonicalDialect<TDialect>, TSupported>;
+    parse<const TDialect extends DialectName<TSupported> = DefaultDialect<TSupported, TDefault>>(sql: string, options?: ParseConfig<TSupported, TDialect>): Document<ParseResult<CanonicalDialect<TDialect>>, CanonicalDialect<TDialect>, TSupported>;
     /** Fail-fast parse into the raw JSON payload. */
-    parseJson<const TDialect extends DialectName<TSupported> = DefaultDialect<TSupported, TDefault>>(sql: string, options?: ParseOptions<TSupported, TDialect>): ParseResult<CanonicalDialect<TDialect>>;
+    parseJson<const TDialect extends DialectName<TSupported> = DefaultDialect<TSupported, TDefault>>(sql: string, options?: ParseConfig<TSupported, TDialect>): ParseResult<CanonicalDialect<TDialect>>;
     /** Parse with an explicit recursion-depth limit. */
     parseWithLimit<const TDialect extends DialectName<TSupported>>(sql: string, dialect: TDialect, limit: number): Document<ParseResult<CanonicalDialect<TDialect>>, CanonicalDialect<TDialect>, TSupported>;
     /** Recovering parse into a wrapped document with diagnostics. */
-    parseRecovering<const TDialect extends DialectName<TSupported> = DefaultDialect<TSupported, TDefault>>(sql: string, options?: ParseOptions<TSupported, TDialect>): RecoveredDocument<RecoveringParseResult<CanonicalDialect<TDialect>>, CanonicalDialect<TDialect>, TSupported>;
+    parseRecovering<const TDialect extends DialectName<TSupported> = DefaultDialect<TSupported, TDefault>>(sql: string, options?: ParseConfig<TSupported, TDialect>): RecoveredDocument<RecoveringParseResult<CanonicalDialect<TDialect>>, CanonicalDialect<TDialect>, TSupported>;
     /** Recovering parse into the raw JSON payload with diagnostics. */
-    parseRecoveringJson<const TDialect extends DialectName<TSupported> = DefaultDialect<TSupported, TDefault>>(sql: string, options?: ParseOptions<TSupported, TDialect>): RecoveringParseResult<CanonicalDialect<TDialect>>;
+    parseRecoveringJson<const TDialect extends DialectName<TSupported> = DefaultDialect<TSupported, TDefault>>(sql: string, options?: ParseConfig<TSupported, TDialect>): RecoveringParseResult<CanonicalDialect<TDialect>>;
     /** Dialects compiled into the active wasm artifact. */
     supportedDialects(): DialectInfo<TSupported>[];
     /** Tokenize SQL under a supported dialect. */
@@ -409,11 +420,21 @@ export interface SquonkApi<TSupported extends CanonicalDialectName, TDefault ext
     version(): string;
     /** Serialized AST wire-schema version. */
     schemaVersion(): number;
+    /** Describe the engine selected for this package instance. */
+    runtimeInfo(): RuntimeInfo;
 }
-/** Construct a typed facade over one wasm-bindgen artifact. */
+/** Runtime engine selected for a Squonk package instance. */
+export interface RuntimeInfo {
+    /** Execution backend. Native is Node-API; wasm is WebAssembly. */
+    readonly backend: "native" | "wasm";
+    /** Host family used to load the backend. */
+    readonly host: "node" | "bun" | "deno" | "browser" | "workerd" | "edge-light" | "unknown";
+}
+/** Construct a typed facade over a native Node-API or wasm-bindgen backend. */
 export declare function createSquonkApi<const TSupportedDialects extends readonly CanonicalDialectName[], const TDefaultDialect extends TSupportedDialects[number]>(wasm: WasmBindings, options: {
     readonly defaultDialect: TDefaultDialect;
     readonly supportedDialects: TSupportedDialects;
+    readonly runtime?: RuntimeInfo;
 }): SquonkApi<TSupportedDialects[number], TDefaultDialect>;
 /** Build the one-shot asynchronous loader exposed by each browser entrypoint. */
 export declare function createBrowserSquonk<const TSupportedDialects extends readonly CanonicalDialectName[], const TDefaultDialect extends TSupportedDialects[number], TInitOutput>(initWasm: WasmInit<TInitOutput>, wasm: WasmBindings, defaultWasmUrl: URL, options: {

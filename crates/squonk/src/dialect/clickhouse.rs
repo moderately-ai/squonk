@@ -13,7 +13,7 @@ use crate::parser::Dialect;
 
 /// The ClickHouse dialect ([`FeatureSet::CLICKHOUSE`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, ClickHouse)`.
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(ClickHouse))`.
 /// ClickHouse is exposed as a deliberately conservative ANSI-derived preset (no
 /// ClickHouse oracle exists to fit a wider surface): it adds the three ClickHouse query
 /// tails — `LIMIT n [OFFSET m] BY …`, `SETTINGS name = value, …`, and `FORMAT <name>` —
@@ -55,23 +55,23 @@ mod tests {
     /// against each so a future preset edit cannot silently move one).
     fn rejects_under_every_oracle_preset(sql: &str) {
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI must reject the ClickHouse-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL must reject the ClickHouse-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL must reject the ClickHouse-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "SQLite must reject the ClickHouse-only form {sql:?}",
         );
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB must reject the ClickHouse-only form {sql:?}",
         );
     }
@@ -88,7 +88,7 @@ mod tests {
             "SELECT a FROM t FORMAT JSON",              // FORMAT tail
         ] {
             assert!(
-                parse_with(sql, ClickHouse).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(ClickHouse)).is_ok(),
                 "ClickHouse parses {sql:?}"
             );
             rejects_under_every_oracle_preset(sql);
@@ -108,7 +108,7 @@ mod tests {
             "CREATE TABLE t (c Nested(a INT, b INT))",
         ] {
             assert!(
-                parse_with(sql, ClickHouse).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(ClickHouse)).is_ok(),
                 "ClickHouse parses {sql:?}"
             );
             rejects_under_every_oracle_preset(sql);
@@ -176,11 +176,15 @@ mod tests {
         // `"`-only quoter) rejects the backtick form. `"a"` reads as an identifier, never
         // a string (`double_quoted_strings` stays off).
         assert!(
-            parse_with(r#"SELECT "a", `b` FROM t"#, ClickHouse).is_ok(),
+            parse_with(
+                r#"SELECT "a", `b` FROM t"#,
+                crate::ParseConfig::new(ClickHouse)
+            )
+            .is_ok(),
             "ClickHouse accepts both `\"a\"` and `` `b` `` identifiers",
         );
         assert!(
-            parse_with("SELECT `b` FROM t", Ansi).is_err(),
+            parse_with("SELECT `b` FROM t", crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI rejects the backtick identifier ClickHouse accepts",
         );
     }

@@ -58,7 +58,8 @@ fn portable_publication_corpus_is_balanced_and_qualified() {
 
     for case in &corpus.statements {
         assert_eq!(case.bytes, case.sql.len());
-        parse_with(&case.sql, Ansi).unwrap_or_else(|error| panic!("{}: {error}", case.id));
+        parse_with(&case.sql, squonk::ParseConfig::new(Ansi))
+            .unwrap_or_else(|error| panic!("{}: {error}", case.id));
         Parser::parse_sql(&AnsiDialect {}, &case.sql)
             .unwrap_or_else(|error| panic!("{}: {error}", case.id));
     }

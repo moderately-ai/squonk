@@ -52,7 +52,8 @@ fn assert_allocations(name: &str, expected: ExpectedAllocations, f: impl FnOnce(
 fn to_sql_renders_the_analytic_select_in_one_allocation() {
     // Parsed OUTSIDE the profiler scope: this pin isolates `to_sql`'s own
     // allocations from the parse that builds the tree it renders.
-    let parsed = parse_with(ANALYTIC_SELECT, Ansi).expect("fixture parses");
+    let parsed =
+        parse_with(ANALYTIC_SELECT, squonk::ParseConfig::new(Ansi)).expect("fixture parses");
 
     // `ANALYTIC_SELECT` is already canonical (its round-trip is byte-identical), so
     // `with_capacity(source().len())` fits the render exactly: one allocation for

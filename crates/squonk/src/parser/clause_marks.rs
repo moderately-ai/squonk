@@ -22,8 +22,8 @@
 //! ## Opt-in, zero-overhead-when-off
 //!
 //! Capture is gated behind the *same* opt-in as trivia
-//! ([`ParseOptions::capture_trivia`](crate::parser::ParseOptions) / the
-//! [`parse_with_trivia`](crate::parse_with_trivia) path): the default parse records
+//! ([`ParseConfig::capture_trivia`](crate::parser::ParseConfig) / the
+//! [`ParseConfig::capture_trivia`](crate::ParseConfig::capture_trivia) path): the default parse records
 //! nothing, pays a single cold `bool` branch per clause keyword, and ships an empty
 //! index that owns an empty `Vec` (no allocation). The pushes and the finalizing
 //! owner-patch live in called-and-returned helper methods on the parser, off the

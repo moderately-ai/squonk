@@ -35,7 +35,7 @@ use squonk::bindings::{
     ParseDocument, RecoveredDocument, ResolverMetadata, SourceSpan, TokenizeDocument,
     WIRE_SCHEMA_VERSION,
 };
-use squonk::{BuiltinDialect, Parsed, parse, parse_recovering_with_builtin};
+use squonk::{BuiltinDialect, Parsed, parse, parse_recovering_builtin};
 
 /// The checked-in shape snapshot for the current [`WIRE_SCHEMA_VERSION`].
 fn snapshot_path() -> PathBuf {
@@ -88,7 +88,7 @@ fn canonical_snapshot() -> String {
     // use minimal instances so the envelope shape is not buried under a full parse.
     let ast = ast_sample();
     let wrapped = parse("SELECT 1 FROM t").expect("wrapper sample parses");
-    let recovered = parse_recovering_with_builtin("SELECT 1; SELECT FROM t", BuiltinDialect::Ansi)
+    let recovered = parse_recovering_builtin("SELECT 1; SELECT FROM t", BuiltinDialect::Ansi)
         .expect("recovering parse produces a partial tree");
 
     let parse_document = ParseDocument {

@@ -14,7 +14,7 @@ use crate::parser::Dialect;
 /// The MySQL dialect ([`FeatureSet::MYSQL`]) — the third shipped dialect, added to
 /// validate that dialect-as-data scales to a maximally-different dialect.
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, MySql)`. It
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(MySql))`. It
 /// diverges from [`Ansi`](super::Ansi) across many *data* dimensions (backtick
 /// identifier quotes, `#` comments, `&&`-as-`AND`, `||`-as-`OR`, `"..."` strings with
 /// backslash escapes, `0x`/`0b` numbers, `?` placeholders) plus one new gated grammar
@@ -52,7 +52,8 @@ mod tests {
     fn mysql_render(sql: &str) -> String {
         use squonk_ast::render::{RenderConfig, RenderCtx, RenderExt, RenderMode};
 
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let config = RenderConfig {
             mode: RenderMode::Canonical,
             target: FeatureSet::MYSQL,
@@ -80,7 +81,10 @@ mod tests {
             "SELECT a FROM t LIMIT 5, 10",       // `LIMIT <offset>, <count>`
             "SELECT a FROM t LIMIT 10",          // the plain form still parses
         ] {
-            assert!(parse_with(sql, MySql).is_ok(), "MySQL parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
+                "MySQL parses {sql:?}"
+            );
         }
     }
 
@@ -111,7 +115,7 @@ mod tests {
             "CREATE TABLE a (b INT) ON COMMIT PRESERVE ROWS", // ON COMMIT is not MySQL (non-temp)
         ] {
             assert!(
-                parse_with(sql, MySql).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
                 "MySQL should reject the tightened over-acceptance {sql:?}",
             );
         }
@@ -146,7 +150,7 @@ mod tests {
             "CREATE VIEW v AS SELECT a FROM t",         // a plain (non-temporary) view
         ] {
             assert!(
-                parse_with(sql, MySql).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
                 "MySQL should still accept the valid form {sql:?}",
             );
         }
@@ -193,7 +197,7 @@ mod tests {
             "SELECT CAST(a AS JSON)",
         ] {
             assert!(
-                parse_with(sql, MySql).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
                 "MySQL should accept the cast target {sql:?}",
             );
         }
@@ -226,7 +230,7 @@ mod tests {
             "SELECT CAST(a AS mytype)",
         ] {
             assert!(
-                parse_with(sql, MySql).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
                 "MySQL should reject the non-cast-target {sql:?}",
             );
         }
@@ -270,7 +274,7 @@ mod tests {
             "UPDATE t SET a = 1 FROM u",
         ] {
             assert!(
-                parse_with(sql, MySql).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
                 "MySQL should reject the round-5 over-acceptance {sql:?}",
             );
         }
@@ -295,7 +299,7 @@ mod tests {
             "UPDATE t SET a = 1",         // UPDATE without a FROM clause
         ] {
             assert!(
-                parse_with(sql, MySql).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
                 "MySQL should still accept the valid form {sql:?}",
             );
         }
@@ -334,7 +338,7 @@ mod tests {
             "SELECT * FROM current_timestamp",
         ] {
             assert!(
-                parse_with(sql, MySql).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
                 "MySQL should reject the round-6 over-acceptance {sql:?}",
             );
         }
@@ -360,7 +364,7 @@ mod tests {
             "SELECT CURRENT_DATE",
         ] {
             assert!(
-                parse_with(sql, MySql).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
                 "MySQL should still accept the valid form {sql:?}",
             );
         }
@@ -380,10 +384,20 @@ mod tests {
             query.limit.clone().expect("a row-limiting clause")
         };
 
-        let comma =
-            limit_of(&parse_with("SELECT a FROM t LIMIT 5, 10", MySql).expect("comma form"));
-        let explicit =
-            limit_of(&parse_with("SELECT a FROM t LIMIT 10 OFFSET 5", MySql).expect("offset form"));
+        let comma = limit_of(
+            &parse_with(
+                "SELECT a FROM t LIMIT 5, 10",
+                crate::ParseConfig::new(MySql),
+            )
+            .expect("comma form"),
+        );
+        let explicit = limit_of(
+            &parse_with(
+                "SELECT a FROM t LIMIT 10 OFFSET 5",
+                crate::ParseConfig::new(MySql),
+            )
+            .expect("offset form"),
+        );
 
         assert_eq!(comma.syntax, LimitSyntax::CommaOffset);
         assert_eq!(explicit.syntax, LimitSyntax::LimitOffset);
@@ -558,7 +572,10 @@ mod tests {
             "SELECT CAST(NULL AS CHAR CHARACTER SET 'utf8mb4')",
             "SELECT CAST(NULL AS CHAR CHARACTER SET `utf8mb4`)",
         ] {
-            assert!(parse_with(sql, MySql).is_ok(), "MySQL parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
+                "MySQL parses {sql:?}"
+            );
         }
     }
 
@@ -602,7 +619,7 @@ mod tests {
             "SELECT CAST(NULL AS VARCHAR(5) CHARACTER SET utf8mb4)",
         ] {
             assert!(
-                parse_with(sql, MySql).is_err(),
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
                 "MySQL should reject {sql:?}",
             );
         }
@@ -611,7 +628,11 @@ mod tests {
         // rejects the annotation (pg_query-verified syntax error), so the same column
         // definition fails there.
         assert!(
-            parse_with("CREATE TABLE t (c CHAR(5) CHARACTER SET utf8mb4)", Postgres).is_err(),
+            parse_with(
+                "CREATE TABLE t (c CHAR(5) CHARACTER SET utf8mb4)",
+                crate::ParseConfig::new(Postgres)
+            )
+            .is_err(),
             "PostgreSQL rejects the MySQL charset annotation",
         );
     }
@@ -763,7 +784,8 @@ mod tests {
             rendered, chain,
             "the left-nested chain renders without parens"
         );
-        let reparsed = parse_with(&rendered, MySql).expect("the bare render reparses");
+        let reparsed = parse_with(&rendered, crate::ParseConfig::new(MySql))
+            .expect("the bare render reparses");
         let Expr::BinaryOp {
             op: BinaryOperator::Lt,
             left,
@@ -789,7 +811,8 @@ mod tests {
             rendered, explicit,
             "the right-nested shape keeps its parens"
         );
-        let reparsed = parse_with(&rendered, MySql).expect("the parenthesized render reparses");
+        let reparsed = parse_with(&rendered, crate::ParseConfig::new(MySql))
+            .expect("the parenthesized render reparses");
         let Expr::BinaryOp {
             op: BinaryOperator::Lt,
             right,
@@ -834,7 +857,8 @@ mod tests {
         // Family 1 — `<=>` folds onto the canonical null-safe operator with the
         // `NullSafeEq` spelling and renders back to `<=>`, never the keyword form (which
         // MySQL rejects), so the spelling tag is load-bearing for a valid re-parse.
-        let parsed = parse_with("SELECT 1 <=> NULL", MySql).expect("`<=>` parses");
+        let parsed =
+            parse_with("SELECT 1 <=> NULL", crate::ParseConfig::new(MySql)).expect("`<=>` parses");
         assert!(matches!(
             expr(item(&parsed)),
             Expr::BinaryOp {
@@ -846,7 +870,8 @@ mod tests {
 
         // Family 2 — same-line adjacent string literals concatenate to one value, and the
         // source spelling round-trips verbatim (the span renders unchanged, ADR-0006).
-        let parsed = parse_with("SELECT 'a' 'b'", MySql).expect("adjacent strings parse");
+        let parsed = parse_with("SELECT 'a' 'b'", crate::ParseConfig::new(MySql))
+            .expect("adjacent strings parse");
         let Expr::Literal { literal, .. } = expr(item(&parsed)) else {
             panic!("expected a string literal");
         };
@@ -855,7 +880,8 @@ mod tests {
 
         // Family 3 — a string-literal alias interns its value and records the source quote,
         // round-tripping to the same quoting (both the single- and double-quoted forms).
-        let parsed = parse_with("SELECT 1 AS 'x'", MySql).expect("single-quoted string alias");
+        let parsed = parse_with("SELECT 1 AS 'x'", crate::ParseConfig::new(MySql))
+            .expect("single-quoted string alias");
         let SelectItem::Expr {
             alias: Some(alias), ..
         } = item(&parsed)
@@ -868,7 +894,8 @@ mod tests {
 
         // Family 4 — the UTC_* niladic date/time functions parse to the dedicated special
         // value function, and the precision form round-trips.
-        let parsed = parse_with("SELECT UTC_DATE", MySql).expect("`UTC_DATE` parses");
+        let parsed = parse_with("SELECT UTC_DATE", crate::ParseConfig::new(MySql))
+            .expect("`UTC_DATE` parses");
         assert!(matches!(
             expr(item(&parsed)),
             Expr::SpecialFunction {

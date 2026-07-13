@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { packages } from "./package-matrix.mjs";
 
 const crateDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const expectedVersion = JSON.parse(await readFile(join(crateDir, "package.json"), "utf8")).version;
 const child = process.argv[2];
 if (child) {
   const variant = packages.find((item) => item.label === child);
@@ -54,6 +55,10 @@ async function smoke(variant, mode) {
     }
   }
 
+  if (api.runtimeInfo().backend !== "wasm" && mode === "browser") {
+    throw new Error(`${variant.packageName}: browser selected a non-wasm backend`);
+  }
+
   const dialects = api.supportedDialects().map(({ name }) => name).sort();
   assertEqual(dialects, [...variant.supportedDialects].sort(), `${variant.packageName} dialects`);
   const document = api.parse("select 1");
@@ -82,6 +87,16 @@ async function smoke(variant, mode) {
   }
   if (api.tokenize("select 1").tokens.length === 0 || api.version().length === 0 || api.schemaVersion() < 1) {
     throw new Error(`${variant.packageName}: tokenizer/version smoke failed`);
+  }
+  assertEqual(api.version(), expectedVersion, `${variant.packageName} version`);
+  const unsupported = packages.find((item) => !variant.supportedDialects.includes(item.defaultDialect));
+  if (unsupported) {
+    try {
+      api.parse("select 1", { dialect: unsupported.defaultDialect });
+      throw new Error(`${variant.packageName}: accepted gated dialect ${unsupported.defaultDialect}`);
+    } catch (error) {
+      if (String(error).includes("accepted gated dialect")) throw error;
+    }
   }
   console.log(`ok ${variant.packageName} ${mode}`);
 }

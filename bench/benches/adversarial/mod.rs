@@ -37,7 +37,7 @@ use squonk_bench::adversarial::{ScaleSample, WIDTH_FAMILIES, WIDTH_LADDER, Width
 
 /// `true` iff our parser accepts `sql` under the Postgres preset.
 pub fn ours_parses(sql: &str) -> bool {
-    parse_with(sql, Postgres).is_ok()
+    parse_with(sql, squonk::ParseConfig::new(Postgres)).is_ok()
 }
 
 /// `true` iff upstream accepts `sql` under `PostgreSqlDialect`. Upstream ships its
@@ -51,7 +51,7 @@ pub fn theirs_parses(sql: &str) -> bool {
 /// Parse to our owned AST root, kept for the retained-heap read. Only called on a
 /// width already proven to parse, so the `expect` cannot fire on the measured set.
 pub fn parse_ours_owned(sql: &str) -> StockParsed {
-    parse_with(sql, Postgres).expect("measured width parses (ours)")
+    parse_with(sql, squonk::ParseConfig::new(Postgres)).expect("measured width parses (ours)")
 }
 
 /// Parse to upstream's owned AST (`Vec<Statement>`), kept for the retained-heap read.

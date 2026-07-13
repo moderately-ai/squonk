@@ -3,7 +3,7 @@
 
 import { expectTypeOf } from "expect-type";
 
-import { parse as parseAnsi } from "../js/ansi.js";
+import { parse as parseAnsi, runtimeInfo } from "../js/ansi.js";
 import { createSquonk } from "../js/postgres-browser.js";
 import * as postgresBrowser from "../js/postgres-browser.js";
 import {
@@ -18,6 +18,10 @@ import {
 import { canonicalDialectName, parse as parseAll } from "../js/index.js";
 
 expectTypeOf(parseAnsi("select 1").dialect).toEqualTypeOf<"ansi">();
+expectTypeOf(runtimeInfo().backend).toEqualTypeOf<"native" | "wasm">();
+expectTypeOf(runtimeInfo().host).toEqualTypeOf<
+  "node" | "bun" | "deno" | "browser" | "workerd" | "edge-light" | "unknown"
+>();
 // @ts-expect-error ANSI package does not compile PostgreSQL.
 parseAnsi("select $1", { dialect: "postgres" });
 

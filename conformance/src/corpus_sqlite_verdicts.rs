@@ -421,7 +421,7 @@ fn corpus_verdicts(
         (
             sql,
             Verdict {
-                ours: parse_with(sql, Sqlite).is_ok(),
+                ours: parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok(),
                 bare_accepts,
                 schema_accepts,
                 bare_reason: if bare_accepts {
@@ -667,7 +667,7 @@ fn sqlite_divergence_allowlist_entries_name_tickets_and_still_diverge() {
     assert_entries_are_ticketed(SQLITE_DIVERGENCE_ALLOWLIST);
     // Still diverges: we accept, SQLite syntax-rejects.
     assert_entries_still_diverge(SQLITE_DIVERGENCE_ALLOWLIST, |entry| {
-        let ours = parse_with(entry.sql, Sqlite).is_ok();
+        let ours = parse_with(entry.sql, squonk::ParseConfig::new(Sqlite)).is_ok();
         let sqlite = bare_probe.prepare(entry.sql).is_ok();
         let reason = bare_reject_reason(&bare_probe, entry.sql);
         ours && !sqlite && reason == RejectReason::Syntax
@@ -690,7 +690,7 @@ fn sqlite_ragged_values_arity_matches_the_engine_both_directions() {
 
     // Ragged rows: both the fitted preset and real SQLite reject at parse.
     assert!(
-        parse_with(RAGGED, Sqlite).is_err(),
+        parse_with(RAGGED, squonk::ParseConfig::new(Sqlite)).is_err(),
         "fitted Sqlite preset must parse-reject the ragged VALUES: {RAGGED:?}",
     );
     assert!(
@@ -700,7 +700,7 @@ fn sqlite_ragged_values_arity_matches_the_engine_both_directions() {
 
     // Equal-arity rows: both accept.
     assert!(
-        parse_with(EQUAL, Sqlite).is_ok(),
+        parse_with(EQUAL, squonk::ParseConfig::new(Sqlite)).is_ok(),
         "fitted Sqlite preset must accept the equal-arity VALUES: {EQUAL:?}",
     );
     assert!(
@@ -804,7 +804,7 @@ fn sqlite_position_aware_reserved_matches_the_engine() {
         for (label, tmpl) in positions {
             let sql = tmpl(kw);
             let oracle = sqlite_admits_syntactically(&conn, &sql);
-            let ours = parse_with(&sql, Sqlite).is_ok();
+            let ours = parse_with(&sql, squonk::ParseConfig::new(Sqlite)).is_ok();
             if oracle != ours && !is_ledgered(kw, label) {
                 untriaged.push(format!(
                     "[{label}] {sql:?}: sqlite_admits={oracle} ours_accepts={ours}"
@@ -822,7 +822,8 @@ fn sqlite_position_aware_reserved_matches_the_engine() {
     // The ledgered residuals must STILL diverge — a fixed one is swept, never re-pinned.
     for sql in ["SELECT * FROM t9 isnull", "SELECT * FROM t9 notnull"] {
         assert!(
-            !sqlite_admits_syntactically(&conn, sql) && parse_with(sql, Sqlite).is_ok(),
+            !sqlite_admits_syntactically(&conn, sql)
+                && parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok(),
             "ledgered residual {sql:?} no longer diverges (SQLite still syntax-rejects it, we \
              still accept it as a bare table alias) — if the ISNULL/NOTNULL postfix operator \
              landed, sweep this ledger entry",
@@ -840,7 +841,8 @@ fn sqlite_position_aware_reserved_matches_the_engine() {
         "SELECT * FROM t9 natural JOIN t8",
     ] {
         assert!(
-            parse_with(join, Sqlite).is_ok() && sqlite_admits_syntactically(&conn, join),
+            parse_with(join, squonk::ParseConfig::new(Sqlite)).is_ok()
+                && sqlite_admits_syntactically(&conn, join),
             "a JOIN keyword must still parse as the join (both us and SQLite): {join:?}",
         );
     }
@@ -869,7 +871,8 @@ fn sqlite_rejects_search_and_cycle_clauses_like_the_engine() {
         "WITH t(n) AS (SELECT 1) SELECT * FROM t",
     ] {
         assert!(
-            sqlite_admits_syntactically(&conn, base) && parse_with(base, Sqlite).is_ok(),
+            sqlite_admits_syntactically(&conn, base)
+                && parse_with(base, squonk::ParseConfig::new(Sqlite)).is_ok(),
             "the clause-free recursive CTE must parse for both us and SQLite: {base:?}",
         );
     }
@@ -891,7 +894,7 @@ fn sqlite_rejects_search_and_cycle_clauses_like_the_engine() {
              the engine disagrees): {sql:?}",
         );
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_err(),
             "our fitted Sqlite preset must reject the SEARCH/CYCLE clause (gate off): {sql:?}",
         );
     }
@@ -916,7 +919,7 @@ fn setup_driven_sqlite_probes_match_recorded_class() {
                 .map(|v| v.accepts())
                 .unwrap_or(false)
         },
-        |sql| parse_with(sql, Sqlite).is_ok(),
+        |sql| parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok(),
     );
     eprintln!("  setup-driven coverage gaps: {gaps}");
     assert_eq!(
@@ -1272,7 +1275,7 @@ fn sqlite_testsuite_is_pinned_and_parses_without_panicking() {
     // per surface so a regression is legible without the oracle.
     let (mut acc_a, mut acc_r) = (0usize, 0usize);
     for &sql in &flat_q {
-        if parse_with(sql, Sqlite).is_ok() {
+        if parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok() {
             acc_a += 1;
         } else {
             acc_r += 1;
@@ -1280,7 +1283,7 @@ fn sqlite_testsuite_is_pinned_and_parses_without_panicking() {
     }
     let (mut rej_a, mut rej_r) = (0usize, 0usize);
     for &sql in &flat_r {
-        if parse_with(sql, Sqlite).is_ok() {
+        if parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok() {
             rej_a += 1;
         } else {
             rej_r += 1;
@@ -1356,7 +1359,7 @@ fn sqlite_testsuite_spec_audit_inventory() {
             }
         };
         let verdict_of = |sql: &str| -> Verdict {
-            let ours = parse_with(sql, Sqlite).is_ok();
+            let ours = parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok();
             let bare_accepts = bare.verdict(sql).map(|v| v.accepts()).unwrap_or(false);
             let schema_accepts = match &schema {
                 Some(oracle) => oracle.verdict(sql).map(|v| v.accepts()).unwrap_or(false),
@@ -1815,7 +1818,7 @@ fn sqlite_unexercised_command_productions_have_permanent_oracle_probes() {
             "probe reached the wrong top-level command: {sql:?}",
         );
         assert_eq!(
-            parse_with(sql, Sqlite).is_ok(),
+            parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok(),
             expected_squonk_support,
             "squonk support changed for {expected_command}; review the coverage boundary",
         );
@@ -1865,7 +1868,11 @@ fn sqlite_create_virtual_table_is_corpus_covered_and_parser_supported() {
     );
     // squonk acceptance (the distinct axis): the fitted preset parses it.
     assert!(
-        parse_with(SQLITE_CREATE_VIRTUAL_TABLE_PROBE, Sqlite).is_ok(),
+        parse_with(
+            SQLITE_CREATE_VIRTUAL_TABLE_PROBE,
+            squonk::ParseConfig::new(Sqlite)
+        )
+        .is_ok(),
         "fitted Sqlite preset must parse CREATE VIRTUAL TABLE",
     );
     // And the vendored TCL accept corpus really carries it (not just the authored probe).
@@ -1973,7 +1980,7 @@ fn generative_verdict(
     bare_probe: &SqliteConnection,
     provisioned: &SqliteOracle,
 ) -> Verdict {
-    let ours = parse_with(sql, Sqlite).is_ok();
+    let ours = parse_with(sql, squonk::ParseConfig::new(Sqlite)).is_ok();
     let bare_accepts = bare.verdict(sql).map(|v| v.accepts()).unwrap_or(false);
     let schema_accepts = provisioned
         .verdict(sql)
@@ -2107,7 +2114,7 @@ fn sqlite_generative_divergence_allowlist_entries_name_tickets_and_still_diverge
     let bare_probe = SqliteConnection::open_in_memory().expect("bare probe connection");
     assert_entries_are_ticketed(SQLITE_GENERATIVE_DIVERGENCE_ALLOWLIST);
     assert_entries_still_diverge(SQLITE_GENERATIVE_DIVERGENCE_ALLOWLIST, |entry| {
-        let ours = parse_with(entry.sql, Sqlite).is_ok();
+        let ours = parse_with(entry.sql, squonk::ParseConfig::new(Sqlite)).is_ok();
         let sqlite = bare_probe.prepare(entry.sql).is_ok();
         let reason = bare_reject_reason(&bare_probe, entry.sql);
         ours && !sqlite && reason == RejectReason::Syntax

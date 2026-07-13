@@ -740,7 +740,7 @@ mod tests {
         // Year` keeps an empty value list (bind-time auto-detection).
         let parsed = parse_with(
             "PIVOT Cities ON Year IN (2000, 2010), Country USING sum(Population) GROUP BY Name",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the statement form parses");
         let pivot = pivot_of(&parsed);
@@ -758,7 +758,7 @@ mod tests {
     fn statement_pivot_carries_with_order_by_and_limit() {
         let parsed = parse_with(
             "WITH c AS (SELECT 1 AS x, 2 AS y) PIVOT c ON x USING sum(y) ORDER BY x LIMIT 3",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the WITH-prefixed statement parses");
         let pivot = pivot_of(&parsed);
@@ -774,7 +774,7 @@ mod tests {
     fn statement_unpivot_captures_the_into_clause() {
         let parsed = parse_with(
             "UNPIVOT monthly_sales ON jan, feb, mar INTO NAME month VALUE sales",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the UNPIVOT statement parses");
         let Statement::Unpivot { unpivot, .. } = &parsed.statements()[0] else {
@@ -803,7 +803,7 @@ mod tests {
         let parsed = parse_with(
             "SELECT * FROM Cities PIVOT (sum(Population) AS total, count(*) FOR Year \
              IN (2000 AS y2000, 2010) GROUP BY Country) AS p",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the table-factor form parses");
         let TableFactor::Pivot { pivot, alias, .. } = relation_of(&parsed) else {
@@ -831,7 +831,7 @@ mod tests {
         let parsed = parse_with(
             "SELECT * FROM t UNPIVOT INCLUDE NULLS \
              ((v1, v2) FOR n IN ((a, b) AS 'g1', (c, d)))",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the multi-column UNPIVOT parses");
         let TableFactor::Unpivot { unpivot, .. } = relation_of(&parsed) else {
@@ -855,15 +855,18 @@ mod tests {
         // eliding to the bare default; an omitted marker stays `None`.
         let written = parse_with(
             "SELECT * FROM t UNPIVOT EXCLUDE NULLS (v FOR n IN (a, b))",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("explicit EXCLUDE NULLS parses");
         assert_eq!(
             factor_unpivot(&written).null_inclusion,
             Some(NullInclusion::ExcludeNulls),
         );
-        let bare = parse_with("SELECT * FROM t UNPIVOT (v FOR n IN (a, b))", DuckDb)
-            .expect("the bare default parses");
+        let bare = parse_with(
+            "SELECT * FROM t UNPIVOT (v FOR n IN (a, b))",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("the bare default parses");
         assert_eq!(factor_unpivot(&bare).null_inclusion, None);
         // Lenient is the render target and shares the surface; the explicit marker is
         // reproduced rather than elided to the bare default.
@@ -888,7 +891,7 @@ mod tests {
     fn bigquery_unpivot_reachable_with_shared_fields() {
         let parsed = parse_with(
             "SELECT * FROM sales AS s UNPIVOT INCLUDE NULLS (amount FOR quarter IN (q1 AS 'Q1', q2))",
-            BigQuery,
+            crate::ParseConfig::new(BigQuery),
         )
         .expect("BigQuery reaches the standard UNPIVOT after an explicit alias");
         let unpivot = factor_unpivot(&parsed);
@@ -907,7 +910,7 @@ mod tests {
     fn snowflake_unpivot_reachable() {
         let parsed = parse_with(
             "SELECT * FROM sales AS s UNPIVOT (amount FOR quarter IN (q1, q2, q3, q4))",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("Snowflake reaches the standard UNPIVOT after an explicit alias");
         let unpivot = factor_unpivot(&parsed);
@@ -924,7 +927,8 @@ mod tests {
             "SELECT * FROM sales AS s UNPIVOT INCLUDE NULLS (amount FOR quarter IN (q1, q2))",
             "SELECT * FROM sales AS s UNPIVOT EXCLUDE NULLS (amount FOR quarter IN (q1 AS a, q2))",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = crate::render::Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -940,7 +944,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT * FROM sales AS s UNPIVOT (amount FOR quarter IN (q1, q2))",
-                Postgres,
+                crate::ParseConfig::new(Postgres),
             )
             .is_err(),
             "PostgreSQL rejects the standard UNPIVOT table factor",
@@ -954,7 +958,7 @@ mod tests {
         // engine-verified composition (DuckDB 1.5.4).
         let parsed = parse_with(
             "SELECT * FROM test PIVOT (sum(x) FOR y IN ('z')) UNPIVOT (x FOR y IN (z)) JOIN u ON true",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the chained suffixes parse");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
@@ -981,7 +985,7 @@ mod tests {
         // inner-WITH form recovered by the ADR-0005 backtrack.
         let parsed = parse_with(
             "SELECT * FROM (PIVOT Cities ON Year USING sum(Population)) AS p",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the parenthesized statement parses");
         let TableFactor::Pivot { pivot, alias, .. } = relation_of(&parsed) else {
@@ -992,7 +996,7 @@ mod tests {
 
         let parsed = parse_with(
             "SELECT * FROM (WITH c AS (SELECT 1 AS a, 2 AS b) PIVOT c ON a USING sum(b))",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the inner-WITH parenthesized statement parses");
         let TableFactor::Pivot { pivot, .. } = relation_of(&parsed) else {
@@ -1008,14 +1012,27 @@ mod tests {
         // column list; after an explicit alias the word cannot alias, so the suffix
         // fires — the ASOF split, applied to PIVOT.
         assert!(
-            parse_with("SELECT * FROM t PIVOT (sum(x) FOR y IN (1))", Lenient,).is_err(),
+            parse_with(
+                "SELECT * FROM t PIVOT (sum(x) FOR y IN (1))",
+                crate::ParseConfig::new(Lenient),
+            )
+            .is_err(),
             "the alias reading swallows the bare-factor PIVOT under Lenient",
         );
-        let parsed = parse_with("SELECT * FROM t a PIVOT (sum(x) FOR y IN (1))", Lenient)
-            .expect("Lenient parses the suffix after an explicit alias");
+        let parsed = parse_with(
+            "SELECT * FROM t a PIVOT (sum(x) FOR y IN (1))",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses the suffix after an explicit alias");
         assert!(matches!(relation_of(&parsed), TableFactor::Pivot { .. }));
         // The statement form has no alias ambiguity, so it parses directly.
-        assert!(parse_with("PIVOT t ON y USING sum(x)", Lenient).is_ok());
+        assert!(
+            parse_with(
+                "PIVOT t ON y USING sum(x)",
+                crate::ParseConfig::new(Lenient)
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -1026,7 +1043,7 @@ mod tests {
         // any other expression position.
         let parsed = parse_with(
             "UNPIVOT monthly_sales ON COLUMNS('month_.*') INTO NAME month VALUE sales",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the COLUMNS spelling parses as the columns expression");
         let Statement::Unpivot { unpivot, .. } = &parsed.statements()[0] else {
@@ -1049,7 +1066,7 @@ mod tests {
         let parsed = parse_with(
             "WITH pivoted AS (PIVOT monthly_sales ON MONTH USING SUM(AMOUNT) GROUP BY empid) \
              SELECT * FROM pivoted ORDER BY empid DESC",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("PIVOT as a CTE body parses");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
@@ -1069,7 +1086,7 @@ mod tests {
         let materialized = parse_with(
             "WITH p AS MATERIALIZED (PIVOT monthly_sales ON MONTH USING SUM(AMOUNT) GROUP BY empid) \
              SELECT * FROM p",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("MATERIALIZED PIVOT CTE parses");
         let Statement::Query { query, .. } = &materialized.statements()[0] else {
@@ -1085,7 +1102,7 @@ mod tests {
     fn unpivot_as_a_cte_body_is_a_setexpr_unpivot() {
         let parsed = parse_with(
             "WITH u AS (UNPIVOT monthly_sales ON jan, feb INTO NAME month VALUE sales) SELECT * FROM u",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("UNPIVOT as a CTE body parses");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
@@ -1108,7 +1125,7 @@ mod tests {
         let parsed = parse_with(
             "CREATE VIEW v1 AS PIVOT monthly_sales ON MONTH IN ('1-JAN', '2-FEB') \
              USING SUM(AMOUNT) GROUP BY empid ORDER BY ALL",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("CREATE VIEW AS PIVOT parses");
         let Statement::CreateView { view, .. } = &parsed.statements()[0] else {
@@ -1121,7 +1138,7 @@ mod tests {
     fn pivot_as_a_create_table_as_body_is_a_setexpr_pivot() {
         let parsed = parse_with(
             "CREATE TABLE ct AS PIVOT monthly_sales ON MONTH USING SUM(AMOUNT) GROUP BY empid",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("CREATE TABLE AS PIVOT parses");
         let Statement::CreateTable { create, .. } = &parsed.statements()[0] else {
@@ -1142,7 +1159,8 @@ mod tests {
             "WITH p AS (PIVOT monthly_sales ON MONTH USING SUM(AMOUNT) GROUP BY empid) SELECT * FROM p",
             "CREATE VIEW v AS PIVOT t ON id IN ('a') USING SUM(feb)",
         ] {
-            let parsed = parse_with(sql, DuckDb).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = crate::render::Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -1158,7 +1176,7 @@ mod tests {
         assert!(
             parse_with(
                 "WITH p AS (PIVOT t ON x USING sum(y)) SELECT * FROM p",
-                Postgres
+                crate::ParseConfig::new(Postgres)
             )
             .is_err(),
             "PostgreSQL rejects PIVOT in a CTE body",
@@ -1166,7 +1184,7 @@ mod tests {
         assert!(
             parse_with(
                 "CREATE VIEW v AS PIVOT t ON x IN (1) USING sum(y)",
-                Postgres
+                crate::ParseConfig::new(Postgres)
             )
             .is_err(),
             "PostgreSQL rejects PIVOT as a view body",
@@ -1175,7 +1193,7 @@ mod tests {
         assert!(
             parse_with(
                 "WITH p AS (PIVOT t ON x USING sum(y)) SELECT * FROM p",
-                Lenient
+                crate::ParseConfig::new(Lenient)
             )
             .is_ok(),
             "Lenient accepts PIVOT in a CTE body",
@@ -1199,7 +1217,7 @@ mod tests {
         // aggregate aliases — the fields the standard shares with DuckDB.
         let parsed = parse_with(
             "SELECT * FROM sales AS s PIVOT (sum(amount) AS total FOR quarter IN ('Q1' AS q1, 'Q2'))",
-            BigQuery,
+            crate::ParseConfig::new(BigQuery),
         )
         .expect("BigQuery parses the standard PIVOT after an explicit alias");
         let pivot = factor_pivot(&parsed);
@@ -1221,7 +1239,7 @@ mod tests {
     fn snowflake_pivot_captures_any_order_by_value_source() {
         let parsed = parse_with(
             "SELECT * FROM sales AS s PIVOT (sum(amount) FOR quarter IN (ANY ORDER BY quarter))",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("Snowflake parses `IN (ANY ORDER BY …)`");
         let pivot = factor_pivot(&parsed);
@@ -1241,7 +1259,7 @@ mod tests {
         let parsed = parse_with(
             "SELECT * FROM sales AS s PIVOT (sum(amount) FOR quarter \
              IN (SELECT DISTINCT quarter FROM q) DEFAULT ON NULL (0))",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("Snowflake parses the subquery source and `DEFAULT ON NULL`");
         let pivot = factor_pivot(&parsed);
@@ -1271,7 +1289,7 @@ mod tests {
         // The documented BigQuery form has no alias between the table and `PIVOT`.
         let parsed = parse_with(
             "SELECT * FROM sales PIVOT (sum(amount) FOR quarter IN ('Q1', 'Q2'))",
-            BigQuery,
+            crate::ParseConfig::new(BigQuery),
         )
         .expect("BigQuery reaches the bare-factor PIVOT via the ColId reservation");
         let pivot = factor_pivot(&parsed);
@@ -1284,7 +1302,7 @@ mod tests {
     fn bigquery_unpivot_reachable_on_a_bare_factor() {
         let parsed = parse_with(
             "SELECT * FROM sales UNPIVOT (amount FOR quarter IN (q1, q2))",
-            BigQuery,
+            crate::ParseConfig::new(BigQuery),
         )
         .expect("BigQuery reaches the bare-factor UNPIVOT via the ColId reservation");
         assert!(matches!(
@@ -1297,7 +1315,7 @@ mod tests {
     fn snowflake_pivot_and_unpivot_reachable_on_a_bare_factor() {
         let pivot = parse_with(
             "SELECT * FROM sales PIVOT (sum(amount) FOR quarter IN (ANY))",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("Snowflake reaches the bare-factor PIVOT via the ColId reservation");
         assert!(matches!(
@@ -1306,7 +1324,7 @@ mod tests {
         ));
         let unpivot = parse_with(
             "SELECT * FROM sales UNPIVOT (amount FOR quarter IN (q1, q2, q3, q4))",
-            Snowflake,
+            crate::ParseConfig::new(Snowflake),
         )
         .expect("Snowflake reaches the bare-factor UNPIVOT via the ColId reservation");
         assert!(matches!(
@@ -1328,9 +1346,9 @@ mod tests {
                 "projection bare label" => "SELECT 1 pivot FROM t",
                 _ => "SELECT CAST(1 AS pivot) FROM t",
             };
-            parse_with(sql, BigQuery)
+            parse_with(sql, crate::ParseConfig::new(BigQuery))
                 .unwrap_or_else(|e| panic!("BigQuery keeps `pivot` a {label}: {e:?}"));
-            parse_with(sql, Snowflake)
+            parse_with(sql, crate::ParseConfig::new(Snowflake))
                 .unwrap_or_else(|e| panic!("Snowflake keeps `pivot` a {label}: {e:?}"));
         }
     }
@@ -1349,19 +1367,25 @@ mod tests {
             "SELECT pivot FROM t",      // bare column reference
         ] {
             assert!(
-                parse_with(sql, BigQuery).is_err(),
+                parse_with(sql, crate::ParseConfig::new(BigQuery)).is_err(),
                 "BigQuery rejects the unquoted `pivot` ColId: {sql:?}",
             );
             assert!(
-                parse_with(sql, Snowflake).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Snowflake)).is_err(),
                 "Snowflake rejects the unquoted `pivot` ColId: {sql:?}",
             );
         }
         // The escape hatch: a quoted alias sidesteps the keyword classification.
-        parse_with("SELECT * FROM t AS `pivot`", BigQuery)
-            .expect("BigQuery admits a backtick-quoted alias named pivot");
-        parse_with("SELECT * FROM t AS \"pivot\"", Snowflake)
-            .expect("Snowflake admits a double-quoted alias named pivot");
+        parse_with(
+            "SELECT * FROM t AS `pivot`",
+            crate::ParseConfig::new(BigQuery),
+        )
+        .expect("BigQuery admits a backtick-quoted alias named pivot");
+        parse_with(
+            "SELECT * FROM t AS \"pivot\"",
+            crate::ParseConfig::new(Snowflake),
+        )
+        .expect("Snowflake admits a double-quoted alias named pivot");
     }
 
     #[test]
@@ -1375,7 +1399,8 @@ mod tests {
             "SELECT * FROM sales AS s PIVOT (sum(amount) FOR quarter IN (SELECT quarter FROM q))",
             "SELECT * FROM sales AS s PIVOT (sum(amount) FOR quarter IN ('Q1') DEFAULT ON NULL (0))",
         ] {
-            let parsed = parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = crate::render::Renderer::new(Lenient)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -1393,7 +1418,7 @@ mod tests {
             "SELECT * FROM sales AS s PIVOT (sum(amount) FOR quarter IN ('Q1') DEFAULT ON NULL (0))",
         ] {
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects the standard PIVOT: {sql:?}",
             );
         }
@@ -1411,14 +1436,14 @@ mod tests {
             "SELECT * FROM t AS a PIVOT (sum(x) FOR y IN (1) DEFAULT ON NULL (0))",
         ] {
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
                 "DuckDB has no standard PIVOT value source: {sql:?}",
             );
         }
         // The DuckDB value-list form still parses, carrying no standard value source.
         let parsed = parse_with(
             "SELECT * FROM t AS a PIVOT (sum(x) FOR y IN (1, 2))",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the DuckDB value list is untouched");
         assert!(factor_pivot(&parsed).pivot_on[0].value_source.is_none());

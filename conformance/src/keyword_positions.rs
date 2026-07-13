@@ -146,7 +146,7 @@ pub const EXPECTED_DIVERGENCES: &[KeywordPositionDivergence] = &[
 /// Whether our PostgreSQL-preset parser accepts the probe SQL for `keyword` in
 /// `position`.
 pub fn squonk_accepts(position: Position, keyword: &str) -> bool {
-    parse_with(&position.sql(keyword), Postgres).is_ok()
+    parse_with(&position.sql(keyword), squonk::ParseConfig::new(Postgres)).is_ok()
 }
 
 /// Whether libpg_query accepts the probe SQL for `keyword` in `position`.

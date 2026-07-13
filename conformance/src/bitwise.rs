@@ -21,8 +21,8 @@ use squonk_ast::render::{RenderConfig, RenderCtx, RenderExt as _, RenderMode};
 /// The first statement of `sql`, rendered fully parenthesized so operator grouping is
 /// explicit. Panics if `sql` does not parse under `dialect`.
 fn parenthesized<D: Dialect<Ext = NoExt>>(sql: &str, dialect: D) -> String {
-    let parsed =
-        parse_with(sql, dialect).unwrap_or_else(|err| panic!("expected {sql:?} to parse: {err:?}"));
+    let parsed = parse_with(sql, squonk::ParseConfig::new(dialect))
+        .unwrap_or_else(|err| panic!("expected {sql:?} to parse: {err:?}"));
     let config = RenderConfig {
         mode: RenderMode::Parenthesized,
         ..RenderConfig::default()
@@ -113,14 +113,14 @@ fn mysql_bitwise_precedence_splits_the_family_across_four_ranks() {
 fn bitwise_xor_spelling_is_dialect_specific() {
     // PostgreSQL spells XOR `#`; MySQL spells it `^`. Each dialect accepts its own spelling
     // as the operator.
-    assert!(parse_with("SELECT 5 # 3", Postgres).is_ok());
-    assert!(parse_with("SELECT 5 ^ 3", MySql).is_ok());
+    assert!(parse_with("SELECT 5 # 3", squonk::ParseConfig::new(Postgres)).is_ok());
+    assert!(parse_with("SELECT 5 ^ 3", squonk::ParseConfig::new(MySql)).is_ok());
     // PostgreSQL's `^` is NOT XOR — it is arithmetic exponentiation
     // (`CaretOperator::Exponent`, `BinaryOperator::Exponent`), a distinct operator
     // at its own precedence tier. So `SELECT 5 ^ 3` parses under PostgreSQL, but as power, not
     // the `#` XOR: `5 # 3` and `5 ^ 3` are different operators there (verified by the
     // parenthesized renders below).
-    assert!(parse_with("SELECT 5 ^ 3", Postgres).is_ok());
+    assert!(parse_with("SELECT 5 ^ 3", squonk::ParseConfig::new(Postgres)).is_ok());
     // MySQL treats `#` as a line comment, *not* XOR, so `SELECT 5 # 3` parses to `SELECT 5`
     // (the `# 3` is stripped) — decisively not the `5 # 3` XOR tree PostgreSQL builds.
     assert_eq!(parenthesized("SELECT 5 # 3", MySql), "SELECT 5");
@@ -130,8 +130,8 @@ fn bitwise_xor_spelling_is_dialect_specific() {
     // DuckDB 1.5.4 (`duckdb-operator-surface-sweep`): `2^3*2 = 16` (tighter than `*`),
     // `2^3^2 = 64` (left-associative), `-2^2 = 4` (unary sign tighter than `^`) — so
     // `caret_operator` is `Exponent` and `5 ^ 3` parses as power.
-    assert!(parse_with("SELECT 5 # 3", DuckDb).is_err());
-    assert!(parse_with("SELECT 5 ^ 3", DuckDb).is_ok());
+    assert!(parse_with("SELECT 5 # 3", squonk::ParseConfig::new(DuckDb)).is_err());
+    assert!(parse_with("SELECT 5 ^ 3", squonk::ParseConfig::new(DuckDb)).is_ok());
     assert_eq!(parenthesized("SELECT 5 ^ 3", DuckDb), "SELECT (5 ^ 3)");
     // The three probed precedence/associativity minimal pairs, as fully-parenthesized renders:
     // `^` tighter than `*`, left-associative, and (via the shared `prefix_sign` rank) tighter
@@ -178,24 +178,24 @@ fn duckdb_operator_surface_sweep_probe_matrix() {
     // one lexical divergence (the `#`/`?` charset drop) against an accidental future flip.
 
     // caret_operator = Exponent: `^` and the whole exponent grammar accept.
-    assert!(parse_with("SELECT 2 ^ 3", DuckDb).is_ok());
+    assert!(parse_with("SELECT 2 ^ 3", squonk::ParseConfig::new(DuckDb)).is_ok());
 
     // `**` is DuckDB's other exponent spelling (probed `2**3 = 8`). Not folded onto the
     // exponent operator here (an unmodelled synonym), but with the general surface on it now
     // parse-accepts as a generic `Op` run — matching DuckDB's parse verdict (`extract` accepts).
-    assert!(parse_with("SELECT 2 ** 3", DuckDb).is_ok());
+    assert!(parse_with("SELECT 2 ** 3", squonk::ParseConfig::new(DuckDb)).is_ok());
 
     // `&&` list/array/GEOMETRY overlap is its own dedicated operator, NOT the generic
     // custom-operator surface: `duckdb-geometry-type-and-overlaps-operator` routes it infix
     // under `double_ampersand: Overlaps` to `BinaryOperator::Overlap`, so `1 && 2` parses
     // (DuckDB's parser accepts it too; the binder then rejects "no function &&(INT, INT)" —
     // a bind reject outside a parse-only validator's scope).
-    assert!(parse_with("SELECT 1 && 2", DuckDb).is_ok());
+    assert!(parse_with("SELECT 1 && 2", squonk::ParseConfig::new(DuckDb)).is_ok());
 
     // custom_operators ON: the general symbolic surface now parse-accepts, matching DuckDB —
     // infix regex `~` / `!~` (probed accept as `regexp_matches`) fold onto the named operator.
-    assert!(parse_with("SELECT 'a' ~ 'b'", DuckDb).is_ok());
-    assert!(parse_with("SELECT 'a' !~ 'b'", DuckDb).is_ok());
+    assert!(parse_with("SELECT 'a' ~ 'b'", squonk::ParseConfig::new(DuckDb)).is_ok());
+    assert!(parse_with("SELECT 'a' !~ 'b'", squonk::ParseConfig::new(DuckDb)).is_ok());
 
     // The one lexical divergence from PostgreSQL: DuckDB drops `#` and `?` from the `Op`
     // charset (its `#1` positional-column and `?` parameter sigils), so a run stops at either.
@@ -204,13 +204,13 @@ fn duckdb_operator_surface_sweep_probe_matrix() {
     // (`1 @#@ 2` is `@` then a stray `#`). This is why arming the shared `custom_operators`
     // charset would NOT over-accept the `#`/`?` runs: the lexer's `is_operator_char` drops them
     // under `positional_column` / `anonymous_question`.
-    assert!(parse_with("SELECT 1 # 2", DuckDb).is_err());
-    assert!(parse_with("SELECT 1 @#@ 2", DuckDb).is_err());
-    assert!(parse_with("SELECT 1 ? 2", DuckDb).is_err());
+    assert!(parse_with("SELECT 1 # 2", squonk::ParseConfig::new(DuckDb)).is_err());
+    assert!(parse_with("SELECT 1 @#@ 2", squonk::ParseConfig::new(DuckDb)).is_err());
+    assert!(parse_with("SELECT 1 ? 2", squonk::ParseConfig::new(DuckDb)).is_err());
 
     // Prefix `~` bitwise complement rides `bitwise_operators` (a separate flag) and keeps its
     // dedicated unary node — `~ 5` is `UnaryOperator::Not`, not a prefix named operator.
-    assert!(parse_with("SELECT ~ 5", DuckDb).is_ok());
+    assert!(parse_with("SELECT ~ 5", squonk::ParseConfig::new(DuckDb)).is_ok());
 }
 
 #[test]
@@ -251,7 +251,10 @@ fn ansi_rejects_the_whole_bitwise_family() {
         "SELECT 5 # 3",
         "SELECT 5 ^ 3",
     ] {
-        assert!(parse_with(sql, Ansi).is_err(), "ANSI must reject {sql:?}");
+        assert!(
+            parse_with(sql, squonk::ParseConfig::new(Ansi)).is_err(),
+            "ANSI must reject {sql:?}"
+        );
     }
 }
 

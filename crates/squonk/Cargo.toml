@@ -89,7 +89,7 @@ serde-deserialize = ["dep:serde", "squonk-ast/serde-deserialize", "thin-vec/serd
 # default — the serialize-only wasm/parse
 # hot path must not grow — and pure additive: it compiles a new `format` module and
 # touches no canonical render path. Reuses the opt-in trivia + clause-mark capture
-# the parser already ships behind `parse_with_trivia`.
+# the parser already ships behind `ParseConfig::capture_trivia`.
 document-render = []
 
 [dependencies]

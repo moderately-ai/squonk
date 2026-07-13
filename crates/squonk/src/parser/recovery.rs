@@ -20,7 +20,12 @@
 //! [`Recovered::errors`], never a node to the tree. The partial AST and the
 //! diagnostics travel out of band, side by side.
 //!
-//! [`Recovered`] is a differently-shaped result from [`Parsed`] — partial AST plus a diagnostic list, not a single tree — so it keeps its own verb pair rather than folding into [`ParseOptions`] (the crate's entry-point rule: a same-shape knob is a `ParseOptions` field, a new result shape is a new verb). [`parse_recovering_with_options`] still composes every `ParseOptions` field that a `Parsed`-carrying root can honour, [`ParseOptions::capture_trivia`] included: the returned [`Recovered`] embeds a real [`Parsed`], so its [`parsed()`](Recovered::parsed) exposes the same trivia queries [`parse_with_trivia`](super::parse_with_trivia) does.
+//! [`Recovered`] is a differently-shaped result from [`Parsed`] — partial AST plus a
+//! diagnostic list, not a single tree — so it keeps its own verb pair rather than
+//! folding into [`ParseConfig`]. [`parse_recovering_with`] still composes every
+//! configuration field that a `Parsed`-carrying root can honour, including
+//! [`ParseConfig::capture_trivia`]: the returned [`Recovered`] embeds a real
+//! [`Parsed`], so its [`parsed()`](Recovered::parsed) exposes the same trivia queries.
 
 use std::sync::Arc;
 
@@ -28,7 +33,7 @@ use crate::ast::{Extension, NoExt, SourceStore, Statement};
 use crate::error::{ParseError, ParseResult};
 
 use super::engine::Parser;
-use super::{DEFAULT_RECURSION_LIMIT, Dialect, ParseOptions, Parsed};
+use super::{Dialect, ParseConfig, Parsed};
 
 /// The result of a recovering parse: the partial AST plus every collected error.
 ///
@@ -97,30 +102,26 @@ impl<S: SourceStore, X: Extension> Recovered<S, X> {
 /// [`Recovered::errors`].
 ///
 /// [`parse_with`]: super::parse_with
-pub fn parse_recovering<D: Dialect>(
-    src: &str,
-    dialect: D,
-) -> ParseResult<Recovered<Arc<str>, D::Ext>> {
-    collect_recovered::<D>(src, dialect, DEFAULT_RECURSION_LIMIT, false, false)
+pub fn parse_recovering(src: &str) -> ParseResult<Recovered> {
+    parse_recovering_with(src, ParseConfig::default())
 }
 
-/// [`parse_recovering`] honouring `options` — the recursion-depth limit and trivia capture, for a caller recovering over untrusted SQL on a bounded stack, wanting the out-of-band trivia index on the recovered root, or both.
+/// [`parse_recovering`] honouring `config`, including recursion depth and trivia capture.
 ///
 /// # Errors
 ///
 /// As [`parse_recovering`]. A per-statement recursion-limit error is collected into
 /// [`Recovered::errors`] like any other, then recovery resumes at the next `;`.
-pub fn parse_recovering_with_options<D: Dialect>(
+pub fn parse_recovering_with<D: Dialect>(
     src: &str,
-    dialect: D,
-    options: ParseOptions,
+    config: ParseConfig<D>,
 ) -> ParseResult<Recovered<Arc<str>, D::Ext>> {
     collect_recovered::<D>(
         src,
-        dialect,
-        options.recursion_limit,
-        options.capture_trivia,
-        options.parse_float_as_decimal,
+        config.dialect,
+        config.recursion_limit,
+        config.capture_trivia,
+        config.parse_float_as_decimal,
     )
 }
 
@@ -156,8 +157,8 @@ where
         Parser::streaming(src, dialect)?
     };
     let mut parser = parser
-        .with_recursion_limit(recursion_limit)
-        .with_parse_float_as_decimal(parse_float_as_decimal);
+        .recursion_limit(recursion_limit)
+        .parse_float_as_decimal(parse_float_as_decimal);
     let mut statements = Vec::new();
     let mut errors = Vec::new();
 
@@ -237,7 +238,8 @@ mod tests {
         // among three well-formed ones. Recovery resynchronizes at each `;` so all
         // three good statements parse and both errors are reported.
         let src = "SELECT alpha; FROM x; SELECT beta; ); SELECT gamma";
-        let recovered = parse_recovering(src, TestDialect).expect("streaming setup succeeds");
+        let recovered = parse_recovering_with(src, crate::ParseConfig::new(TestDialect))
+            .expect("streaming setup succeeds");
 
         // The three well-formed statements survive, as ordinary, usable AST.
         assert_eq!(recovered.statements().len(), 3);
@@ -272,10 +274,12 @@ mod tests {
         // recovery is opt-in and the lean default is untouched.
         let src = "SELECT alpha; FROM x; SELECT beta; ); SELECT gamma";
 
-        let recovered = parse_recovering(src, TestDialect).expect("setup");
+        let recovered =
+            parse_recovering_with(src, crate::ParseConfig::new(TestDialect)).expect("setup");
         assert_eq!(recovered.errors().len(), 2, "recovery sees both");
 
-        let error = parse_with(src, TestDialect).expect_err("default path is fail-fast");
+        let error = parse_with(src, crate::ParseConfig::new(TestDialect))
+            .expect_err("default path is fail-fast");
         // The single fail-fast error is exactly the first one recovery collected.
         assert_eq!(error.span, recovered.errors()[0].span);
     }
@@ -283,8 +287,11 @@ mod tests {
     #[test]
     fn well_formed_script_recovers_with_no_errors() {
         // Recovery does not change the happy path: every statement parses, no errors.
-        let recovered =
-            parse_recovering("SELECT 1; SELECT 2; SELECT 3", TestDialect).expect("setup");
+        let recovered = parse_recovering_with(
+            "SELECT 1; SELECT 2; SELECT 3",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("setup");
         assert_eq!(recovered.statements().len(), 3);
         assert!(recovered.errors().is_empty());
         assert!(!recovered.has_errors());
@@ -294,7 +301,11 @@ mod tests {
     fn recovers_to_end_of_input_when_the_last_statement_is_broken() {
         // A broken final statement with no trailing `;` resynchronizes to EOF: the
         // earlier good statement survives and the one error is reported.
-        let recovered = parse_recovering("SELECT 1; SELECT FROM", TestDialect).expect("setup");
+        let recovered = parse_recovering_with(
+            "SELECT 1; SELECT FROM",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("setup");
         assert_eq!(recovered.statements().len(), 1);
         assert_eq!(recovered.errors().len(), 1);
         assert!(!recovered.errors()[0].span.is_synthetic());
@@ -308,8 +319,11 @@ mod tests {
         // lexical fault, recorded before recovery stops (the input cannot be tokenized
         // past it). Contrast `SELECT FROM '…`, where the parser itself reaches the
         // string, so the fault is the *parse* error, not a separate resync one.
-        let recovered =
-            parse_recovering("SELECT alpha; ) 'unterminated", TestDialect).expect("setup");
+        let recovered = parse_recovering_with(
+            "SELECT alpha; ) 'unterminated",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("setup");
 
         assert_eq!(recovered.statements().len(), 1);
         assert_eq!(recovered.errors().len(), 2);
@@ -321,8 +335,11 @@ mod tests {
     fn a_repeated_lexical_fault_while_resyncing_is_not_double_reported() {
         // Here the statement fails *on* the unterminated string, and the resync hits
         // the same fault at the same span — it must not be reported twice.
-        let recovered =
-            parse_recovering("SELECT alpha; SELECT 'unterminated", TestDialect).expect("setup");
+        let recovered = parse_recovering_with(
+            "SELECT alpha; SELECT 'unterminated",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("setup");
 
         assert_eq!(recovered.statements().len(), 1);
         assert_eq!(recovered.errors().len(), 1);
@@ -331,7 +348,7 @@ mod tests {
     #[test]
     fn into_parts_yields_the_root_and_errors() {
         let src = "SELECT kept; )";
-        let (parsed, errors) = parse_recovering(src, TestDialect)
+        let (parsed, errors) = parse_recovering_with(src, crate::ParseConfig::new(TestDialect))
             .expect("setup")
             .into_parts();
 
@@ -345,17 +362,17 @@ mod tests {
     fn with_options_defaults_to_no_trivia() {
         // Recovery's zero-cost-off contract mirrors `parse_with`'s (ADR-0005):
         // neither the argument-free `parse_recovering` nor
-        // `parse_recovering_with_options` with default options captures trivia.
+        // `parse_recovering_with` with default options captures trivia.
         let src = "SELECT alpha; /* oops */ FROM x -- trailing";
         assert!(
-            parse_recovering(src, TestDialect)
+            parse_recovering_with(src, crate::ParseConfig::new(TestDialect))
                 .expect("setup")
                 .parsed()
                 .trivia()
                 .is_empty()
         );
-        let recovered = parse_recovering_with_options(src, TestDialect, ParseOptions::default())
-            .expect("setup");
+        let recovered =
+            parse_recovering_with(src, ParseConfig::default().dialect(TestDialect)).expect("setup");
         assert!(recovered.parsed().trivia().is_empty());
     }
 
@@ -367,8 +384,8 @@ mod tests {
         use crate::tokenizer::TriviaKind::{BlockComment, LineComment};
 
         let src = "SELECT alpha; /* oops */ FROM x; -- trailing\nSELECT beta";
-        let options = ParseOptions::default().with_trivia_capture(true);
-        let recovered = parse_recovering_with_options(src, TestDialect, options).expect("setup");
+        let options = ParseConfig::default().capture_trivia(true);
+        let recovered = parse_recovering_with(src, options.dialect(TestDialect)).expect("setup");
 
         assert_eq!(
             recovered.statements().len(),

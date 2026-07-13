@@ -20,7 +20,7 @@ from ._ast import (
     SourceLocation,
     Span,
     Trivia,
-    document_from_json,
+    document_from_native,
 )
 from ._exceptions import (
     DialectError,
@@ -157,13 +157,13 @@ def parse(
     parse_float_as_decimal: bool = False,
 ) -> Document:
     """Parse ``sql`` and return a typed :class:`Document` view."""
-    raw = _call_with_source(
+    native = _call_with_source(
         sql,
-        lambda: _native.parse(
+        lambda: _native.parse_document(
             sql, dialect, recursion_limit, capture_trivia, parse_float_as_decimal
         ),
     )
-    return document_from_json(raw)
+    return document_from_native(native)
 
 
 def parse_with_limit(
@@ -202,10 +202,10 @@ def parse_recovering(
     parse_float_as_decimal: bool = False,
 ) -> RecoveredDocument:
     """Parse ``sql`` while collecting statement-level diagnostics."""
-    document = document_from_json(
+    document = document_from_native(
         _call_with_source(
             sql,
-            lambda: _native.parse_recovering(
+            lambda: _native.parse_recovering_document(
             sql, dialect, recursion_limit, capture_trivia, parse_float_as_decimal
             ),
         ),

@@ -5834,7 +5834,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     ) -> ParseResult<Literal> {
         if let Some(token) = self.peek()? {
             if token.kind == TokenKind::Number
-                && number_literal_kind(self.span_text(token.span), self.parse_float_as_decimal())
+                && number_literal_kind(self.span_text(token.span), self.float_as_decimal_enabled())
                     == LiteralKind::Integer
             {
                 self.advance()?;
@@ -5856,7 +5856,8 @@ impl<'a, D: Dialect> Parser<'a, D> {
         if let Some(token) = self.peek()? {
             let text = self.span_text(token.span);
             if token.kind == TokenKind::Number
-                && number_literal_kind(text, self.parse_float_as_decimal()) == LiteralKind::Integer
+                && number_literal_kind(text, self.float_as_decimal_enabled())
+                    == LiteralKind::Integer
                 && crate::ast::split_radix_prefix(text).0 == 10
             {
                 self.advance()?;
@@ -7680,7 +7681,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 TokenKind::String => Some(LiteralKind::String),
                 TokenKind::Number => Some(number_literal_kind(
                     self.span_text(token.span),
-                    self.parse_float_as_decimal(),
+                    self.float_as_decimal_enabled(),
                 )),
                 _ => None,
             };
@@ -8023,7 +8024,8 @@ mod tests {
     #[test]
     fn create_database_if_not_exists_parses_and_round_trips() {
         let sql = "CREATE DATABASE IF NOT EXISTS d";
-        let parsed = parse_with(sql, MySql).expect("CREATE DATABASE IF NOT EXISTS parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect("CREATE DATABASE IF NOT EXISTS parses");
         assert!(create_database_of(&parsed).if_not_exists);
         assert_eq!(
             Renderer::new(MYSQL_RENDER)
@@ -8033,7 +8035,8 @@ mod tests {
         );
 
         // The bare form leaves the flag off and still parses under MySQL.
-        let bare = parse_with("CREATE DATABASE d", MySql).expect("bare CREATE DATABASE parses");
+        let bare = parse_with("CREATE DATABASE d", crate::ParseConfig::new(MySql))
+            .expect("bare CREATE DATABASE parses");
         assert!(!create_database_of(&bare).if_not_exists);
     }
 
@@ -8067,7 +8070,8 @@ mod tests {
                 false,
             ),
         ] {
-            let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let drop = drop_database_of(&parsed);
             assert_eq!(drop.spelling, spelling, "{sql:?}");
             assert_eq!(drop.if_exists, if_exists, "{sql:?}");
@@ -8092,7 +8096,7 @@ mod tests {
             "DROP DATABASE a RESTRICT",
             "DROP DATABASE db.x",
         ] {
-            parse_with(sql, MySql).expect_err(sql);
+            parse_with(sql, crate::ParseConfig::new(MySql)).expect_err(sql);
         }
     }
 
@@ -8115,7 +8119,8 @@ mod tests {
             "DROP INDEX i ON t ALGORITHM = COPY LOCK = SHARED",
             "DROP INDEX i ON t LOCK NONE ALGORITHM DEFAULT",
         ] {
-            let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert_eq!(
                 Renderer::new(MYSQL_RENDER)
                     .render_parsed(&parsed)
@@ -8128,8 +8133,11 @@ mod tests {
 
     #[test]
     fn drop_index_captures_name_table_and_ordered_options() {
-        let parsed = parse_with("DROP INDEX i ON db.t LOCK = NONE ALGORITHM INPLACE", MySql)
-            .expect("parses");
+        let parsed = parse_with(
+            "DROP INDEX i ON db.t LOCK = NONE ALGORITHM INPLACE",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("parses");
         let drop = drop_index_of(&parsed);
         assert_eq!(parsed.resolver().resolve(drop.name.sym), "i");
         assert_eq!(drop.table.0.len(), 2, "dotted table keeps both parts");
@@ -8164,7 +8172,7 @@ mod tests {
             "DROP INDEX i ON t ALGORITHM = COPY ALGORITHM = INPLACE",
             "DROP INDEX i ON t LOCK = NONE LOCK = SHARED",
         ] {
-            parse_with(sql, MySql).expect_err(sql);
+            parse_with(sql, crate::ParseConfig::new(MySql)).expect_err(sql);
         }
     }
 
@@ -8173,10 +8181,13 @@ mod tests {
         // The MySQL `ON <table>` / single-name-`DATABASE` intercepts are gated off elsewhere:
         // ANSI keeps the shared name-list `DROP INDEX`/`DROP SCHEMA` and never grew a `DROP
         // DATABASE` drop, so the MySQL-only forms reject and the shared forms still parse.
-        parse_with("DROP INDEX i ON t", Ansi).expect_err("ANSI has no DROP INDEX … ON <table>");
-        parse_with("DROP DATABASE d", Ansi).expect_err("ANSI has no DROP DATABASE");
-        parse_with("DROP INDEX i, j", Ansi).expect("ANSI keeps the shared name-list DROP INDEX");
-        parse_with("DROP SCHEMA s CASCADE", Ansi)
+        parse_with("DROP INDEX i ON t", crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no DROP INDEX … ON <table>");
+        parse_with("DROP DATABASE d", crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no DROP DATABASE");
+        parse_with("DROP INDEX i, j", crate::ParseConfig::new(Ansi))
+            .expect("ANSI keeps the shared name-list DROP INDEX");
+        parse_with("DROP SCHEMA s CASCADE", crate::ParseConfig::new(Ansi))
             .expect("ANSI keeps the shared name-list DROP SCHEMA");
     }
 
@@ -8186,8 +8197,10 @@ mod tests {
         // which have no `CREATE DATABASE IF NOT EXISTS` — so `IF` is read as the database
         // name and the trailing `NOT EXISTS d` is leftover input -> reject.
         let sql = "CREATE DATABASE IF NOT EXISTS d";
-        parse_with(sql, Ansi).expect_err("ANSI has no CREATE DATABASE IF NOT EXISTS");
-        parse_with(sql, PG_DIALECT).expect_err("PostgreSQL has no CREATE DATABASE IF NOT EXISTS");
+        parse_with(sql, crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no CREATE DATABASE IF NOT EXISTS");
+        parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+            .expect_err("PostgreSQL has no CREATE DATABASE IF NOT EXISTS");
     }
 
     #[test]
@@ -8197,7 +8210,8 @@ mod tests {
         // `INTEGER` (not `INT`) matches the MySQL target's canonical type spelling, so
         // the round-trip isolates the shorthand rather than tripping on type rendering.
         let sql = "CREATE TABLE t (a INTEGER, b INTEGER AS (a + 1) STORED)";
-        let parsed = parse_with(sql, MySql).expect("shorthand generated column parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect("shorthand generated column parses");
         let generated = generated_column_of(&parsed, 1);
         assert_eq!(generated.spelling, GeneratedColumnSpelling::Shorthand);
         assert_eq!(generated.storage, Some(GeneratedColumnStorage::Stored));
@@ -8211,7 +8225,7 @@ mod tests {
         // The standard keyworded form still tags `GeneratedAlways`.
         let standard = parse_with(
             "CREATE TABLE t (a INT, b INT GENERATED ALWAYS AS (a + 1) STORED)",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("standard generated column parses");
         assert_eq!(
@@ -8226,8 +8240,10 @@ mod tests {
         // which require `GENERATED ALWAYS AS` — so the bare `AS (` after the column type
         // is not a column option and is leftover input in the element list -> reject.
         let sql = "CREATE TABLE t (a INT, b INT AS (a + 1) STORED)";
-        parse_with(sql, Ansi).expect_err("ANSI has no generated-column shorthand");
-        parse_with(sql, PG_DIALECT).expect_err("PostgreSQL has no generated-column shorthand");
+        parse_with(sql, crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no generated-column shorthand");
+        parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+            .expect_err("PostgreSQL has no generated-column shorthand");
     }
 
     /// A SQLite parse + render dialect, so the gated `CREATE TABLE` decorations parse
@@ -8238,8 +8254,8 @@ mod tests {
 
     /// Assert `sql` parses under SQLite and renders back to itself.
     fn assert_sqlite_round_trips(sql: &str) {
-        let parsed =
-            parse_with(sql, SQLITE_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(SQLITE_RENDER))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let rendered = Renderer::new(SQLITE_RENDER)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -8287,8 +8303,11 @@ mod tests {
             assert_sqlite_round_trips(sql);
         }
         // PostgreSQL (flag off) syntax-rejects a string in the constraint column list.
-        parse_with("CREATE TABLE t (a, b, PRIMARY KEY ('a'))", PG_DIALECT)
-            .expect_err("PostgreSQL rejects a string literal as a constraint column name");
+        parse_with(
+            "CREATE TABLE t (a, b, PRIMARY KEY ('a'))",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect_err("PostgreSQL rejects a string literal as a constraint column name");
     }
 
     #[test]
@@ -8317,7 +8336,7 @@ mod tests {
         // `Expr::Column`, `asc = Some(false)`, and `nulls_first = None`.
         let parsed = parse_with(
             "CREATE TABLE t (a, b, UNIQUE ('b' COLLATE nocase DESC))",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("parses under SQLite");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
@@ -8357,9 +8376,9 @@ mod tests {
             "CREATE TABLE t (a INT, b INT, PRIMARY KEY (a COLLATE \"C\"))",
             "CREATE TABLE t (a INT, b INT, UNIQUE (a DESC))",
         ] {
-            parse_with(sql, Postgres)
+            parse_with(sql, crate::ParseConfig::new(Postgres))
                 .expect_err("PostgreSQL rejects COLLATE/ordering in a constraint column list");
-            parse_with(sql, DuckDb)
+            parse_with(sql, crate::ParseConfig::new(DuckDb))
                 .expect_err("DuckDB rejects COLLATE/ordering in a constraint column list");
         }
         // SQLite prohibits a general expression and NULLS FIRST/LAST here (engine-measured):
@@ -8370,7 +8389,7 @@ mod tests {
             "CREATE TABLE t (a, b, PRIMARY KEY (lower(a)))",
             "CREATE TABLE t (a, b, PRIMARY KEY (a COLLATE nocase NULLS FIRST))",
         ] {
-            parse_with(sql, SQLITE_RENDER)
+            parse_with(sql, crate::ParseConfig::new(SQLITE_RENDER))
                 .expect_err("SQLite rejects exprs / NULLS ordering in a constraint column list");
         }
     }
@@ -8413,7 +8432,7 @@ mod tests {
         // split only on the top-level commas.
         let parsed = parse_with(
             "CREATE VIRTUAL TABLE docs USING fts5(title, tokenize = 'porter unicode61')",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("virtual table parses under SQLite");
         let create = create_virtual_table_of(&parsed);
@@ -8435,14 +8454,21 @@ mod tests {
         // `USING m` (no parens) and `USING m ()` (empty parens) are distinct surfaces that both
         // parse; the `Option` on `args` keeps them apart so each round-trips to itself.
         let bare = create_virtual_table_of(
-            &parse_with("CREATE VIRTUAL TABLE t USING mymod", SQLITE_RENDER).expect("bare parses"),
+            &parse_with(
+                "CREATE VIRTUAL TABLE t USING mymod",
+                crate::ParseConfig::new(SQLITE_RENDER),
+            )
+            .expect("bare parses"),
         )
         .args
         .is_none();
         assert!(bare, "no-parens form has args: None");
 
-        let empty = parse_with("CREATE VIRTUAL TABLE t USING mymod()", SQLITE_RENDER)
-            .expect("empty parens parse");
+        let empty = parse_with(
+            "CREATE VIRTUAL TABLE t USING mymod()",
+            crate::ParseConfig::new(SQLITE_RENDER),
+        )
+        .expect("empty parens parse");
         let empty_args = create_virtual_table_of(&empty)
             .args
             .as_ref()
@@ -8464,8 +8490,11 @@ mod tests {
         // SQLite's `vtabarg` may be empty, so a doubled/leading/trailing comma is a legal empty
         // member (engine-verified accept). The parser preserves the arity — three slices, the
         // middle empty — rather than rejecting.
-        let parsed = parse_with("CREATE VIRTUAL TABLE t USING mymod(a,,b)", SQLITE_RENDER)
-            .expect("empty middle argument parses");
+        let parsed = parse_with(
+            "CREATE VIRTUAL TABLE t USING mymod(a,,b)",
+            crate::ParseConfig::new(SQLITE_RENDER),
+        )
+        .expect("empty middle argument parses");
         let args = create_virtual_table_of(&parsed)
             .args
             .as_ref()
@@ -8478,13 +8507,17 @@ mod tests {
     fn create_virtual_table_is_gated_and_reject_bounded() {
         use crate::dialect::{DuckDb, Postgres, Sqlite};
         let sql = "CREATE VIRTUAL TABLE t USING fts5(a)";
-        assert!(parse_with(sql, Sqlite).is_ok(), "SQLite accepts {sql:?}");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
+            "SQLite accepts {sql:?}"
+        );
         // Whole-statement gate off in every non-SQLite preset: `VIRTUAL` falls through to the
         // `CREATE TABLE` expectation and surfaces as an unknown statement.
-        parse_with(sql, Ansi).expect_err("ANSI has no virtual tables");
-        parse_with(sql, Postgres).expect_err("PostgreSQL has no virtual tables");
-        parse_with(sql, MySql).expect_err("MySQL has no virtual tables");
-        parse_with(sql, DuckDb).expect_err("DuckDB has no virtual tables");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no virtual tables");
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect_err("PostgreSQL has no virtual tables");
+        parse_with(sql, crate::ParseConfig::new(MySql)).expect_err("MySQL has no virtual tables");
+        parse_with(sql, crate::ParseConfig::new(DuckDb)).expect_err("DuckDB has no virtual tables");
         // A flipped-off SQLite base rejects too — the flag, not the dialect, drives acceptance.
         const SQLITE_NO_VTAB: FeatureSet =
             FeatureSet::SQLITE.with(FeatureDelta::EMPTY.statement_ddl_gates(StatementDdlGates {
@@ -8494,7 +8527,8 @@ mod tests {
         const SQLITE_NO_VTAB_DIALECT: FeatureDialect = FeatureDialect {
             features: &SQLITE_NO_VTAB,
         };
-        parse_with(sql, SQLITE_NO_VTAB_DIALECT).expect_err("the gate off must reject");
+        parse_with(sql, crate::ParseConfig::new(SQLITE_NO_VTAB_DIALECT))
+            .expect_err("the gate off must reject");
 
         // SQLite reject boundaries (all engine-verified rejects on rusqlite 3.53.2): no `TEMP`
         // virtual table, a three-part name, unbalanced parens, and a missing module name.
@@ -8505,7 +8539,8 @@ mod tests {
             "CREATE VIRTUAL TABLE t USING mymod((a)",
             "CREATE VIRTUAL TABLE t USING",
         ] {
-            parse_with(reject, Sqlite).expect_err(&format!("SQLite rejects {reject:?}"));
+            parse_with(reject, crate::ParseConfig::new(Sqlite))
+                .expect_err(&format!("SQLite rejects {reject:?}"));
         }
     }
 
@@ -8538,7 +8573,8 @@ mod tests {
             "CREATE SEQUENCE s START WITH 1 INCREMENT BY 2 MINVALUE 1 MAXVALUE 10 CYCLE",
             "CREATE SEQUENCE s MAXVALUE 10 MINVALUE 1 INCREMENT BY 1",
         ] {
-            let pg = parse_with(sql, PG_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let pg = parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert_eq!(
                 Renderer::new(PG_DIALECT)
                     .render_parsed(&pg)
@@ -8558,7 +8594,7 @@ mod tests {
         // option vocabulary, parsed in written order.
         let parsed = parse_with(
             "CREATE SEQUENCE myschema.s START WITH 3 INCREMENT BY 2 NO MAXVALUE CYCLE",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("sequence parses under PostgreSQL");
         let create = create_sequence_of(&parsed);
@@ -8589,15 +8625,18 @@ mod tests {
         use crate::dialect::{DuckDb, Postgres, Sqlite};
         let sql = "CREATE SEQUENCE s START WITH 1";
         assert!(
-            parse_with(sql, Postgres).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
             "PostgreSQL accepts {sql:?}"
         );
-        assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB accepts {sql:?}");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+            "DuckDB accepts {sql:?}"
+        );
         // Whole-statement gate off in the dialects without sequences: `SEQUENCE` falls through
         // to the `CREATE TABLE` expectation and surfaces as an unknown statement.
-        parse_with(sql, Ansi).expect_err("ANSI has no sequences");
-        parse_with(sql, MySql).expect_err("MySQL has no sequences");
-        parse_with(sql, Sqlite).expect_err("SQLite has no sequences");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no sequences");
+        parse_with(sql, crate::ParseConfig::new(MySql)).expect_err("MySQL has no sequences");
+        parse_with(sql, crate::ParseConfig::new(Sqlite)).expect_err("SQLite has no sequences");
         // A flipped-off PostgreSQL base rejects too — the flag, not the dialect, drives it.
         const PG_NO_SEQ: FeatureSet =
             FeatureSet::POSTGRES.with(FeatureDelta::EMPTY.statement_ddl_gates(StatementDdlGates {
@@ -8607,7 +8646,8 @@ mod tests {
         const PG_NO_SEQ_DIALECT: FeatureDialect = FeatureDialect {
             features: &PG_NO_SEQ,
         };
-        parse_with(sql, PG_NO_SEQ_DIALECT).expect_err("the gate off must reject");
+        parse_with(sql, crate::ParseConfig::new(PG_NO_SEQ_DIALECT))
+            .expect_err("the gate off must reject");
 
         // Zero new over-acceptance: DuckDB's `CREATE SEQUENCE` grammar rejects the PostgreSQL
         // extended tails, and the modelled shape never admits them under DuckDB (engine-probed
@@ -8618,7 +8658,8 @@ mod tests {
             "CREATE SEQUENCE s OWNED BY t.c",
             "CREATE OR REPLACE SEQUENCE s",
         ] {
-            parse_with(reject, DuckDb).expect_err(&format!("DuckDB rejects {reject:?}"));
+            parse_with(reject, crate::ParseConfig::new(DuckDb))
+                .expect_err(&format!("DuckDB rejects {reject:?}"));
         }
     }
 
@@ -8626,8 +8667,11 @@ mod tests {
     fn drop_sequence_parses_and_is_gated() {
         // `DROP SEQUENCE` rides the same `create_sequence` flag and the shared `DropStatement`
         // grammar (`IF EXISTS`, comma list, `CASCADE`/`RESTRICT`).
-        let parsed = parse_with("DROP SEQUENCE IF EXISTS s, t CASCADE", PG_DIALECT)
-            .expect("DROP SEQUENCE parses under PostgreSQL");
+        let parsed = parse_with(
+            "DROP SEQUENCE IF EXISTS s, t CASCADE",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("DROP SEQUENCE parses under PostgreSQL");
         let [Statement::Drop { drop, .. }] = parsed.statements() else {
             panic!("expected a DROP statement, got {:?}", parsed.statements());
         };
@@ -8636,8 +8680,10 @@ mod tests {
         assert_eq!(drop.names.len(), 2);
         assert_eq!(drop.behavior, Some(DropBehavior::Cascade));
         // Off elsewhere: `SEQUENCE` is an unexpected DROP object kind under a dialect without it.
-        parse_with("DROP SEQUENCE s", Ansi).expect_err("ANSI has no DROP SEQUENCE");
-        parse_with("DROP SEQUENCE s", MySql).expect_err("MySQL has no DROP SEQUENCE");
+        parse_with("DROP SEQUENCE s", crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no DROP SEQUENCE");
+        parse_with("DROP SEQUENCE s", crate::ParseConfig::new(MySql))
+            .expect_err("MySQL has no DROP SEQUENCE");
     }
 
     fn create_trigger_of(parsed: &Parsed) -> &CreateTrigger<NoExt> {
@@ -8674,7 +8720,7 @@ mod tests {
     fn create_trigger_captures_shape() {
         let parsed = parse_with(
             "CREATE TEMP TRIGGER IF NOT EXISTS trg INSTEAD OF UPDATE OF a, b ON t FOR EACH ROW WHEN c > 0 BEGIN UPDATE t SET c = 1; SELECT 1; END",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("parses");
         let trigger = create_trigger_of(&parsed);
@@ -8694,7 +8740,7 @@ mod tests {
         // The no-timing / bare-UPDATE / single-statement defaults.
         let bare = parse_with(
             "CREATE TRIGGER trg UPDATE ON t BEGIN SELECT 1; END",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("parses");
         let trigger = create_trigger_of(&bare);
@@ -8721,7 +8767,8 @@ mod tests {
             "CREATE TRIGGER trg BOGUS ON t BEGIN SELECT 1; END", // unknown event
             "CREATE TRIGGER trg AFTER INSERT t BEGIN SELECT 1; END", // missing ON
         ] {
-            parse_with(sql, SQLITE_RENDER).expect_err(&format!("{sql:?} should be rejected"));
+            parse_with(sql, crate::ParseConfig::new(SQLITE_RENDER))
+                .expect_err(&format!("{sql:?} should be rejected"));
         }
     }
 
@@ -8732,10 +8779,13 @@ mod tests {
         // `CREATE TABLE` expectation — an unknown statement. It parses once the gate is
         // on (SQLITE_RENDER).
         let sql = "CREATE TRIGGER trg AFTER INSERT ON t BEGIN UPDATE t SET c = 1; END";
-        parse_with(sql, Ansi).expect_err("ANSI gates CREATE TRIGGER off");
-        parse_with(sql, PG_DIALECT).expect_err("PostgreSQL gates the SQLite trigger body off");
-        parse_with(sql, MySql).expect_err("MySQL gates the SQLite trigger body off");
-        parse_with(sql, SQLITE_RENDER).expect("SQLite dispatches CREATE TRIGGER");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI gates CREATE TRIGGER off");
+        parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+            .expect_err("PostgreSQL gates the SQLite trigger body off");
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect_err("MySQL gates the SQLite trigger body off");
+        parse_with(sql, crate::ParseConfig::new(SQLITE_RENDER))
+            .expect("SQLite dispatches CREATE TRIGGER");
     }
 
     /// A DuckDB parse + render dialect, so the gated `CREATE MACRO`/live-body `FUNCTION`
@@ -8756,8 +8806,8 @@ mod tests {
 
     /// Assert `sql` parses under DuckDB and renders back to itself verbatim.
     fn assert_duckdb_round_trips(sql: &str) {
-        let parsed =
-            parse_with(sql, DUCKDB_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let rendered = Renderer::new(DUCKDB_RENDER)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -8782,7 +8832,7 @@ mod tests {
         // The typeless shorthand tags `Shorthand` and leaves the column's `data_type` unset.
         let parsed = parse_with(
             "CREATE TABLE tbl (x INTEGER, gen_x AS (x + 5))",
-            DUCKDB_RENDER,
+            crate::ParseConfig::new(DUCKDB_RENDER),
         )
         .expect("typeless shorthand parses");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
@@ -8808,10 +8858,13 @@ mod tests {
         // typeless column, or a typeless column carrying a non-generated constraint, still requires
         // a type — engine-measured parse rejects on libduckdb 1.5.4 — so the narrowing does not
         // widen into the SQLite any-column typeless rule.
-        parse_with("CREATE TABLE t (x)", DuckDb)
+        parse_with("CREATE TABLE t (x)", crate::ParseConfig::new(DuckDb))
             .expect_err("DuckDB rejects a bare typeless column");
-        parse_with("CREATE TABLE t (x INTEGER, y DEFAULT 5)", DuckDb)
-            .expect_err("DuckDB rejects a typeless non-generated column");
+        parse_with(
+            "CREATE TABLE t (x INTEGER, y DEFAULT 5)",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("DuckDB rejects a typeless non-generated column");
     }
 
     #[test]
@@ -8842,7 +8895,7 @@ mod tests {
         // A scalar `MACRO` with `OR REPLACE`, a schema-qualified name, and a `:=` default.
         let parsed = parse_with(
             "CREATE OR REPLACE MACRO s.m(a, b := 10) AS a + b",
-            DUCKDB_RENDER,
+            crate::ParseConfig::new(DUCKDB_RENDER),
         )
         .expect("parses");
         let create = create_macro_of(&parsed);
@@ -8859,8 +8912,11 @@ mod tests {
         assert!(matches!(create.body, MacroBody::Scalar { .. }));
 
         // A `TABLE` macro spelled with the `FUNCTION` synonym.
-        let table =
-            parse_with("CREATE FUNCTION f(x) AS TABLE SELECT x", DUCKDB_RENDER).expect("parses");
+        let table = parse_with(
+            "CREATE FUNCTION f(x) AS TABLE SELECT x",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect("parses");
         let create = create_macro_of(&table);
         assert_eq!(create.spelling, MacroSpelling::Function);
         assert!(matches!(create.body, MacroBody::Table { .. }));
@@ -8872,18 +8928,26 @@ mod tests {
         // `MACRO` after `CREATE` is not dispatched and falls through to the `CREATE TABLE`
         // expectation — an unknown statement. It parses once the gate is on (DuckDB).
         let sql = "CREATE MACRO m(x) AS x + 1";
-        parse_with(sql, Ansi).expect_err("ANSI gates CREATE MACRO off");
-        parse_with(sql, PG_DIALECT).expect_err("PostgreSQL gates CREATE MACRO off");
-        parse_with(sql, MySql).expect_err("MySQL gates CREATE MACRO off");
-        parse_with(sql, DUCKDB_RENDER).expect("DuckDB dispatches CREATE MACRO");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI gates CREATE MACRO off");
+        parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+            .expect_err("PostgreSQL gates CREATE MACRO off");
+        parse_with(sql, crate::ParseConfig::new(MySql)).expect_err("MySQL gates CREATE MACRO off");
+        parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+            .expect("DuckDB dispatches CREATE MACRO");
 
         // The live-body `FUNCTION` spelling is likewise DuckDB-only: under PostgreSQL,
         // `CREATE FUNCTION` routes to the string-body routine parser, which rejects the
         // live expression body (`AS x + 1`, not `AS '<string>'`).
-        parse_with("CREATE FUNCTION f(x) AS x + 1", PG_DIALECT)
-            .expect_err("PostgreSQL routes CREATE FUNCTION to the string-body routine");
-        parse_with("CREATE FUNCTION f(x) AS x + 1", DUCKDB_RENDER)
-            .expect("DuckDB dispatches the live-body FUNCTION macro");
+        parse_with(
+            "CREATE FUNCTION f(x) AS x + 1",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect_err("PostgreSQL routes CREATE FUNCTION to the string-body routine");
+        parse_with(
+            "CREATE FUNCTION f(x) AS x + 1",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect("DuckDB dispatches the live-body FUNCTION macro");
     }
 
     #[test]
@@ -8910,14 +8974,18 @@ mod tests {
     #[test]
     fn drop_macro_captures_object_kind_and_is_gated() {
         // The bare form is the scalar macro; the `TABLE` form selects the table-macro kind.
-        let scalar = parse_with("DROP MACRO m", DUCKDB_RENDER).expect("DROP MACRO parses");
+        let scalar = parse_with("DROP MACRO m", crate::ParseConfig::new(DUCKDB_RENDER))
+            .expect("DROP MACRO parses");
         let [Statement::Drop { drop, .. }] = scalar.statements() else {
             panic!("expected a DROP statement, got {:?}", scalar.statements());
         };
         assert_eq!(drop.object_kind, DropObjectKind::Macro);
 
-        let table = parse_with("DROP MACRO TABLE IF EXISTS m", DUCKDB_RENDER)
-            .expect("DROP MACRO TABLE parses");
+        let table = parse_with(
+            "DROP MACRO TABLE IF EXISTS m",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect("DROP MACRO TABLE parses");
         let [Statement::Drop { drop, .. }] = table.statements() else {
             panic!("expected a DROP statement, got {:?}", table.statements());
         };
@@ -8925,16 +8993,19 @@ mod tests {
         assert!(drop.if_exists);
 
         // Gated off where `create_macro` is off: `MACRO` is an unexpected DROP object kind.
-        parse_with("DROP MACRO m", Ansi).expect_err("ANSI has no DROP MACRO");
-        parse_with("DROP MACRO m", PG_DIALECT).expect_err("PostgreSQL has no DROP MACRO");
-        parse_with("DROP MACRO m", MySql).expect_err("MySQL has no DROP MACRO");
+        parse_with("DROP MACRO m", crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no DROP MACRO");
+        parse_with("DROP MACRO m", crate::ParseConfig::new(PG_DIALECT))
+            .expect_err("PostgreSQL has no DROP MACRO");
+        parse_with("DROP MACRO m", crate::ParseConfig::new(MySql))
+            .expect_err("MySQL has no DROP MACRO");
 
         // No over-acceptance: the macro drop takes no argument-type signature (DuckDB
         // rejects `DROP MACRO m(int)`), and only `MACRO TABLE` (not `TABLE MACRO`) is a
         // table-macro drop — both are engine-measured DuckDB syntax rejects.
-        parse_with("DROP MACRO m(int)", DUCKDB_RENDER)
+        parse_with("DROP MACRO m(int)", crate::ParseConfig::new(DUCKDB_RENDER))
             .expect_err("DuckDB rejects a signature on DROP MACRO");
-        parse_with("DROP TABLE MACRO m", DUCKDB_RENDER)
+        parse_with("DROP TABLE MACRO m", crate::ParseConfig::new(DUCKDB_RENDER))
             .expect_err("DuckDB rejects TABLE MACRO order");
     }
 
@@ -8960,8 +9031,11 @@ mod tests {
             assert_duckdb_round_trips(sql);
         }
 
-        let parsed =
-            parse_with("CREATE OR REPLACE TABLE t3 (c VARCHAR)", DUCKDB_RENDER).expect("parses");
+        let parsed = parse_with(
+            "CREATE OR REPLACE TABLE t3 (c VARCHAR)",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect("parses");
         let create = create_table_of(&parsed);
         assert!(create.or_replace, "OR REPLACE flag is set");
         assert!(create.temporary.is_none());
@@ -8974,10 +9048,14 @@ mod tests {
         // spell it on VIEW/FUNCTION) but a following `TABLE` is expected to be `VIEW`, so the
         // statement rejects. Only DuckDB (and Lenient) admit `OR REPLACE TABLE`.
         let sql = "CREATE OR REPLACE TABLE t (a INT)";
-        parse_with(sql, Ansi).expect_err("ANSI gates OR REPLACE TABLE off");
-        parse_with(sql, PG_DIALECT).expect_err("PostgreSQL gates OR REPLACE TABLE off");
-        parse_with(sql, MySql).expect_err("MySQL gates OR REPLACE TABLE off");
-        parse_with(sql, DUCKDB_RENDER).expect("DuckDB accepts OR REPLACE TABLE");
+        parse_with(sql, crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI gates OR REPLACE TABLE off");
+        parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+            .expect_err("PostgreSQL gates OR REPLACE TABLE off");
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect_err("MySQL gates OR REPLACE TABLE off");
+        parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+            .expect("DuckDB accepts OR REPLACE TABLE");
     }
 
     #[test]
@@ -8994,14 +9072,18 @@ mod tests {
 
         let parsed = parse_with(
             "CREATE PERSISTENT SECRET my_s (TYPE S3, KEY_ID 'k')",
-            DUCKDB_RENDER,
+            crate::ParseConfig::new(DUCKDB_RENDER),
         )
         .expect("parses");
         let create = create_secret_of(&parsed);
         assert!(create.persistent, "PERSISTENT keyword recorded");
         assert_eq!(create.options.len(), 2);
 
-        let temp = parse_with("CREATE SECRET t (TYPE HTTP)", DUCKDB_RENDER).expect("parses");
+        let temp = parse_with(
+            "CREATE SECRET t (TYPE HTTP)",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect("parses");
         assert!(
             !create_secret_of(&temp).persistent,
             "bare SECRET is not persistent"
@@ -9013,10 +9095,12 @@ mod tests {
         // The whole-statement gate: with `create_secret` off the `PERSISTENT`/`SECRET`
         // keyword falls through to the `CREATE TABLE` expectation — an unknown statement.
         let sql = "CREATE PERSISTENT SECRET s (TYPE S3)";
-        parse_with(sql, Ansi).expect_err("ANSI gates CREATE SECRET off");
-        parse_with(sql, PG_DIALECT).expect_err("PostgreSQL gates CREATE SECRET off");
-        parse_with(sql, MySql).expect_err("MySQL gates CREATE SECRET off");
-        parse_with(sql, DUCKDB_RENDER).expect("DuckDB dispatches CREATE SECRET");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI gates CREATE SECRET off");
+        parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+            .expect_err("PostgreSQL gates CREATE SECRET off");
+        parse_with(sql, crate::ParseConfig::new(MySql)).expect_err("MySQL gates CREATE SECRET off");
+        parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+            .expect("DuckDB dispatches CREATE SECRET");
     }
 
     fn drop_secret_of(parsed: &Parsed) -> &DropSecretStmt {
@@ -9044,7 +9128,8 @@ mod tests {
             assert_duckdb_round_trips(sql);
         }
 
-        let bare = parse_with("DROP SECRET s", DUCKDB_RENDER).expect("parses");
+        let bare =
+            parse_with("DROP SECRET s", crate::ParseConfig::new(DUCKDB_RENDER)).expect("parses");
         let drop = drop_secret_of(&bare);
         assert_eq!(drop.persistence, SecretPersistence::Default);
         assert!(!drop.if_exists);
@@ -9052,7 +9137,7 @@ mod tests {
 
         let full = parse_with(
             "DROP PERSISTENT SECRET IF EXISTS s FROM local_file",
-            DUCKDB_RENDER,
+            crate::ParseConfig::new(DUCKDB_RENDER),
         )
         .expect("parses");
         let drop = drop_secret_of(&full);
@@ -9060,7 +9145,11 @@ mod tests {
         assert!(drop.if_exists);
         assert!(drop.storage.is_some());
 
-        let temp = parse_with("DROP TEMPORARY SECRET s", DUCKDB_RENDER).expect("parses");
+        let temp = parse_with(
+            "DROP TEMPORARY SECRET s",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect("parses");
         assert_eq!(
             drop_secret_of(&temp).persistence,
             SecretPersistence::Temporary
@@ -9077,22 +9166,29 @@ mod tests {
             "DROP PERSISTENT SECRET s",
             "DROP TEMPORARY SECRET IF EXISTS s",
         ] {
-            parse_with(sql, Ansi).expect_err("ANSI gates DROP SECRET off");
-            parse_with(sql, PG_DIALECT).expect_err("PostgreSQL gates DROP SECRET off");
-            parse_with(sql, MySql).expect_err("MySQL gates DROP SECRET off");
-            parse_with(sql, DUCKDB_RENDER).expect("DuckDB dispatches DROP SECRET");
+            parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI gates DROP SECRET off");
+            parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .expect_err("PostgreSQL gates DROP SECRET off");
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err("MySQL gates DROP SECRET off");
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+                .expect("DuckDB dispatches DROP SECRET");
         }
 
         // A `DROP PERSISTENT`/`DROP TEMPORARY` not followed by `SECRET` is not a secret drop and
         // must not be swallowed by the two-token lookahead — it falls through to the name-list
         // DROP path (where `PERSISTENT`/`TEMPORARY` is an unknown object kind and rejects).
-        parse_with("DROP PERSISTENT t", DUCKDB_RENDER)
+        parse_with("DROP PERSISTENT t", crate::ParseConfig::new(DUCKDB_RENDER))
             .expect_err("DROP PERSISTENT without SECRET is not a secret drop");
     }
 
     #[test]
     fn sqlite_typeless_column_records_no_type() {
-        let parsed = parse_with("CREATE TABLE t (a, b INTEGER)", SQLITE_RENDER).expect("parses");
+        let parsed = parse_with(
+            "CREATE TABLE t (a, b INTEGER)",
+            crate::ParseConfig::new(SQLITE_RENDER),
+        )
+        .expect("parses");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
             panic!("expected a definition body");
         };
@@ -9135,7 +9231,8 @@ mod tests {
 
         let sql = "CREATE TABLE t (a, b)";
         // ANSI with the flag forced on now accepts the typeless column and leaves it untyped.
-        let parsed = parse_with(sql, ANSI_PLUS_TYPELESS_DIALECT).expect("flag on accepts");
+        let parsed = parse_with(sql, crate::ParseConfig::new(ANSI_PLUS_TYPELESS_DIALECT))
+            .expect("flag on accepts");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
             panic!("expected a definition body");
         };
@@ -9144,7 +9241,7 @@ mod tests {
         };
         assert!(column.data_type.is_none(), "the bare column is typeless");
         // SQLite with the flag forced off rejects it, proving the preset default is honoured.
-        parse_with(sql, SQLITE_NO_TYPELESS_DIALECT)
+        parse_with(sql, crate::ParseConfig::new(SQLITE_NO_TYPELESS_DIALECT))
             .expect_err("flag off rejects the typeless column definition");
     }
 
@@ -9153,7 +9250,7 @@ mod tests {
         // SQLite's attribute is `AUTOINCREMENT` (tagged `Joined` so it renders back as one
         // word, not MySQL's `AUTO_INCREMENT`).
         let sql = "CREATE TABLE t (a INTEGER PRIMARY KEY AUTOINCREMENT)";
-        let parsed = parse_with(sql, SQLITE_RENDER).expect("parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(SQLITE_RENDER)).expect("parses");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
             panic!("expected a definition body");
         };
@@ -9172,7 +9269,7 @@ mod tests {
         // matching bundled SQLite, which syntax-rejects `... UNIQUE AUTO_INCREMENT`.
         parse_with(
             "CREATE TABLE t (a INTEGER UNIQUE AUTO_INCREMENT)",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect_err("SQLite has no `AUTO_INCREMENT` column attribute");
     }
@@ -9204,7 +9301,8 @@ mod tests {
         let sql = "CREATE TABLE t (a INTEGER PRIMARY KEY AUTOINCREMENT)";
         // ANSI with the flag forced on now accepts the joined attribute and records the
         // spelling.
-        let parsed = parse_with(sql, ANSI_PLUS_JOINED_DIALECT).expect("flag on accepts");
+        let parsed = parse_with(sql, crate::ParseConfig::new(ANSI_PLUS_JOINED_DIALECT))
+            .expect("flag on accepts");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
             panic!("expected a definition body");
         };
@@ -9217,7 +9315,7 @@ mod tests {
         });
         assert_eq!(spelling, Some(AutoIncrementSpelling::Joined));
         // SQLite with the flag forced off rejects it, proving the preset default is honoured.
-        parse_with(sql, SQLITE_NO_JOINED_DIALECT)
+        parse_with(sql, crate::ParseConfig::new(SQLITE_NO_JOINED_DIALECT))
             .expect_err("flag off rejects the joined AUTOINCREMENT attribute");
 
         // The joined `AUTOINCREMENT` and the underscored MySQL `AUTO_INCREMENT` gate on
@@ -9225,14 +9323,14 @@ mod tests {
         // ANSI does *not* enable the underscored attribute (it rides `table_options`, off here)…
         parse_with(
             "CREATE TABLE t (a INTEGER AUTO_INCREMENT)",
-            ANSI_PLUS_JOINED_DIALECT,
+            crate::ParseConfig::new(ANSI_PLUS_JOINED_DIALECT),
         )
         .expect_err("the joined flag does not admit the underscored spelling");
         // …and MySQL — which admits the underscored spelling via `table_options` but leaves the
         // joined flag off — rejects the bare `AUTOINCREMENT` keyword.
         parse_with(
             "CREATE TABLE t (a INTEGER PRIMARY KEY AUTOINCREMENT)",
-            MYSQL_RENDER,
+            crate::ParseConfig::new(MYSQL_RENDER),
         )
         .expect_err("MySQL has no joined AUTOINCREMENT attribute");
     }
@@ -9264,7 +9362,8 @@ mod tests {
         // ANSI with the flag forced on accepts both order directions and records the parsed
         // orientation in `ascending` (`DESC` → `Some(false)`, `ASC` → `Some(true)`).
         let ascending_of = |sql: &str, dialect| {
-            let parsed = parse_with(sql, dialect).expect("flag on accepts");
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(dialect)).expect("flag on accepts");
             let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body
             else {
                 panic!("expected a definition body");
@@ -9300,7 +9399,7 @@ mod tests {
         // preset default is honoured and the branch keys on the flag, not the dialect.
         parse_with(
             "CREATE TABLE t (a INTEGER PRIMARY KEY DESC)",
-            SQLITE_NO_ORDERING_DIALECT,
+            crate::ParseConfig::new(SQLITE_NO_ORDERING_DIALECT),
         )
         .expect_err("flag off rejects the inline PRIMARY KEY ASC/DESC qualifier");
     }
@@ -9336,7 +9435,8 @@ mod tests {
         let named = "CREATE TABLE t (a TEXT CONSTRAINT c COLLATE nocase)";
         // ANSI with both flags forced on now accepts the named COLLATE constraint and binds the
         // constraint name to it.
-        let parsed = parse_with(named, ANSI_PLUS_NAMED_DIALECT).expect("flag on accepts");
+        let parsed = parse_with(named, crate::ParseConfig::new(ANSI_PLUS_NAMED_DIALECT))
+            .expect("flag on accepts");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
             panic!("expected a definition body");
         };
@@ -9354,13 +9454,13 @@ mod tests {
         );
         // SQLite with the wrapper flag forced off rejects the named form, proving the preset
         // default is honoured…
-        parse_with(named, SQLITE_NO_NAMED_DIALECT)
+        parse_with(named, crate::ParseConfig::new(SQLITE_NO_NAMED_DIALECT))
             .expect_err("flag off rejects the CONSTRAINT-named COLLATE");
         // …while the bare column COLLATE still parses there, since it rides `column_collation`,
         // not the wrapper flag.
         parse_with(
             "CREATE TABLE t (a TEXT COLLATE nocase)",
-            SQLITE_NO_NAMED_DIALECT,
+            crate::ParseConfig::new(SQLITE_NO_NAMED_DIALECT),
         )
         .expect("bare column COLLATE stays on column_collation");
     }
@@ -9369,7 +9469,7 @@ mod tests {
     fn sqlite_column_conflict_clause_records_resolution() {
         let parsed = parse_with(
             "CREATE TABLE t (a INTEGER UNIQUE ON CONFLICT REPLACE)",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("parses");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
@@ -9410,7 +9510,8 @@ mod tests {
 
         let sql = "CREATE TABLE t (a INTEGER UNIQUE ON CONFLICT REPLACE)";
         // ANSI with the flag forced on now accepts the clause and records the resolution.
-        let parsed = parse_with(sql, ANSI_PLUS_CONFLICT_DIALECT).expect("flag on accepts");
+        let parsed = parse_with(sql, crate::ParseConfig::new(ANSI_PLUS_CONFLICT_DIALECT))
+            .expect("flag on accepts");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
             panic!("expected a definition body");
         };
@@ -9422,7 +9523,7 @@ mod tests {
             Some(ConflictResolution::Replace),
         );
         // SQLite with the flag forced off rejects it, proving the preset default is honoured.
-        parse_with(sql, SQLITE_NO_CONFLICT_DIALECT)
+        parse_with(sql, crate::ParseConfig::new(SQLITE_NO_CONFLICT_DIALECT))
             .expect_err("flag off rejects the column ON CONFLICT clause");
     }
 
@@ -9431,8 +9532,11 @@ mod tests {
         // A trailing bodyless `CONSTRAINT <name>` in a column def: the name parses with no
         // element after it and round-trips verbatim.
         assert_sqlite_round_trips("CREATE TABLE t (a INTEGER CONSTRAINT cn)");
-        let parsed = parse_with("CREATE TABLE t (a INTEGER CONSTRAINT cn)", SQLITE_RENDER)
-            .expect("bare trailing constraint name parses");
+        let parsed = parse_with(
+            "CREATE TABLE t (a INTEGER CONSTRAINT cn)",
+            crate::ParseConfig::new(SQLITE_RENDER),
+        )
+        .expect("bare trailing constraint name parses");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
             panic!("expected a definition body");
         };
@@ -9452,7 +9556,7 @@ mod tests {
         assert_sqlite_round_trips("CREATE TABLE t (a INTEGER CONSTRAINT cn NOT NULL)");
         let parsed = parse_with(
             "CREATE TABLE t (a INTEGER CONSTRAINT cn NOT NULL)",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("named constraint with a body parses");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
@@ -9472,7 +9576,7 @@ mod tests {
         assert_sqlite_round_trips("CREATE TABLE t (a INTEGER CONSTRAINT cn CONSTRAINT cn2)");
         let parsed = parse_with(
             "CREATE TABLE t (a INTEGER CONSTRAINT cn CONSTRAINT cn2)",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("stacked bare constraint names parse");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
@@ -9491,14 +9595,18 @@ mod tests {
 
         // `CONSTRAINT` with no name at all is still a clean parse error — the name is
         // mandatory, only the element after it is optional.
-        parse_with("CREATE TABLE t (a INTEGER CONSTRAINT)", SQLITE_RENDER)
-            .expect_err("a CONSTRAINT with no name is still a parse error");
+        parse_with(
+            "CREATE TABLE t (a INTEGER CONSTRAINT)",
+            crate::ParseConfig::new(SQLITE_RENDER),
+        )
+        .expect_err("a CONSTRAINT with no name is still a parse error");
 
         // Off-dialect (ANSI/PostgreSQL both require a constraint element after the name), the
         // bare form is a clean parse error.
         let sql = "CREATE TABLE t (a INTEGER CONSTRAINT cn)";
-        parse_with(sql, Ansi).expect_err("ANSI requires a constraint element after the name");
-        parse_with(sql, PG_DIALECT)
+        parse_with(sql, crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI requires a constraint element after the name");
+        parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
             .expect_err("PostgreSQL requires a constraint element after the name");
     }
 
@@ -9507,8 +9615,11 @@ mod tests {
         // A standalone bare `CONSTRAINT <name>` as a whole table constraint (no preceding
         // constraint in the list): round-trips verbatim.
         assert_sqlite_round_trips("CREATE TABLE t (a INTEGER, CONSTRAINT cn)");
-        let parsed = parse_with("CREATE TABLE t (a INTEGER, CONSTRAINT cn)", SQLITE_RENDER)
-            .expect("a standalone bare table constraint parses");
+        let parsed = parse_with(
+            "CREATE TABLE t (a INTEGER, CONSTRAINT cn)",
+            crate::ParseConfig::new(SQLITE_RENDER),
+        )
+        .expect("a standalone bare table constraint parses");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
             panic!("expected a definition body");
         };
@@ -9530,17 +9641,17 @@ mod tests {
         // these are accept-only checks, not round-trips.
         parse_with(
             "CREATE TABLE t (a INTEGER, UNIQUE (a) CONSTRAINT cn)",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("elided comma after a bodied table constraint accepts");
         parse_with(
             "CREATE TABLE t (a INTEGER, CONSTRAINT u1 UNIQUE (a) CONSTRAINT u2)",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("elided comma after a named-with-body table constraint accepts");
         let parsed = parse_with(
             "CREATE TABLE t (a INTEGER, UNIQUE(a) CONSTRAINT cn)",
-            SQLITE_RENDER,
+            crate::ParseConfig::new(SQLITE_RENDER),
         )
         .expect("elided-comma bare trailing table constraint parses");
         let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
@@ -9562,8 +9673,9 @@ mod tests {
         // Off-dialect (ANSI/PostgreSQL both require a constraint element after the name), the
         // bare table constraint is a clean parse error.
         let sql = "CREATE TABLE t (a INTEGER, CONSTRAINT cn)";
-        parse_with(sql, Ansi).expect_err("ANSI requires a constraint element after the name");
-        parse_with(sql, PG_DIALECT)
+        parse_with(sql, crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI requires a constraint element after the name");
+        parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
             .expect_err("PostgreSQL requires a constraint element after the name");
     }
 
@@ -9593,7 +9705,11 @@ mod tests {
 
         let sql = "CREATE TABLE t (a INTEGER PRIMARY KEY) WITHOUT ROWID";
         // ANSI with the flag forced on now accepts the trailing option and records it.
-        let parsed = parse_with(sql, ANSI_PLUS_WITHOUT_ROWID_DIALECT).expect("flag on accepts");
+        let parsed = parse_with(
+            sql,
+            crate::ParseConfig::new(ANSI_PLUS_WITHOUT_ROWID_DIALECT),
+        )
+        .expect("flag on accepts");
         let create = create_table_of(&parsed);
         assert!(
             matches!(
@@ -9604,8 +9720,11 @@ mod tests {
             create.options[0].kind,
         );
         // SQLite with the flag forced off rejects it, proving the preset default is honoured.
-        parse_with(sql, SQLITE_NO_WITHOUT_ROWID_DIALECT)
-            .expect_err("flag off rejects the WITHOUT ROWID table option");
+        parse_with(
+            sql,
+            crate::ParseConfig::new(SQLITE_NO_WITHOUT_ROWID_DIALECT),
+        )
+        .expect_err("flag off rejects the WITHOUT ROWID table option");
     }
 
     #[test]
@@ -9634,7 +9753,8 @@ mod tests {
 
         let sql = "CREATE TABLE t (a INTEGER) STRICT";
         // ANSI with the flag forced on now accepts the trailing option and records it.
-        let parsed = parse_with(sql, ANSI_PLUS_STRICT_DIALECT).expect("flag on accepts");
+        let parsed = parse_with(sql, crate::ParseConfig::new(ANSI_PLUS_STRICT_DIALECT))
+            .expect("flag on accepts");
         let create = create_table_of(&parsed);
         assert!(
             matches!(create.options[0].kind, CreateTableOptionKind::Strict { .. }),
@@ -9642,7 +9762,7 @@ mod tests {
             create.options[0].kind,
         );
         // SQLite with the flag forced off rejects it, proving the preset default is honoured.
-        parse_with(sql, SQLITE_NO_STRICT_DIALECT)
+        parse_with(sql, crate::ParseConfig::new(SQLITE_NO_STRICT_DIALECT))
             .expect_err("flag off rejects the STRICT table option");
     }
 
@@ -9667,7 +9787,8 @@ mod tests {
             "CREATE TABLE t (a TEXT CONSTRAINT c COLLATE NOCASE)",
             "CREATE TABLE t (a INTEGER PRIMARY KEY DESC)",
         ] {
-            parse_with(sql, Ansi).expect_err(&format!("ANSI must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err(&format!("ANSI must reject {sql:?}"));
         }
     }
 
@@ -9692,8 +9813,8 @@ mod tests {
             "CREATE EXTENSION foo VERSION $$bar$$",
             "ALTER EXTENSION foo UPDATE TO 'bar'",
         ] {
-            let parsed =
-                parse_with(sql, PG_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -9708,11 +9829,20 @@ mod tests {
             "CREATE EXTENSION foo VERSION select",
             "ALTER EXTENSION foo UPDATE TO b'0'",
         ] {
-            parse_with(sql, PG_DIALECT).expect_err(&format!("PostgreSQL must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .expect_err(&format!("PostgreSQL must reject {sql:?}"));
         }
         // The word and `Sconst` spellings resolve to their distinct surface variants.
-        let word = parse_with("CREATE EXTENSION foo VERSION bar", PG_DIALECT).unwrap();
-        let string = parse_with("CREATE EXTENSION foo VERSION 'bar'", PG_DIALECT).unwrap();
+        let word = parse_with(
+            "CREATE EXTENSION foo VERSION bar",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .unwrap();
+        let string = parse_with(
+            "CREATE EXTENSION foo VERSION 'bar'",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .unwrap();
         assert!(matches!(
             extension_version_of(&word),
             crate::ast::ExtensionVersion::Word { .. }
@@ -9751,8 +9881,8 @@ mod tests {
             // The single-quoted body is the same axis variant (dollar-quoting is a spelling).
             "CREATE FUNCTION add(a INTEGER, b INTEGER) RETURNS INTEGER AS 'select $1 + $2' LANGUAGE sql",
         ] {
-            let pg =
-                parse_with(sql, PG_DIALECT).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+            let pg = parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&pg)
                 .unwrap_or_else(|err| panic!("RENDER {sql:?}: {err:?}"));
@@ -9812,8 +9942,8 @@ mod tests {
                 true,
             ),
         ] {
-            let pg =
-                parse_with(sql, PG_DIALECT).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+            let pg = parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&pg)
                 .unwrap_or_else(|err| panic!("RENDER {sql:?}: {err:?}"));
@@ -9844,7 +9974,7 @@ mod tests {
             "CREATE FUNCTION f() RETURNS INTEGER LANGUAGE x'ab' AS 'x'",
             "CREATE FUNCTION f() RETURNS INTEGER LANGUAGE N'sql' AS 'x'",
         ] {
-            parse_with(sql, PG_DIALECT)
+            parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
                 .expect_err(&format!("{sql:?}: a non-Sconst LANGUAGE name is rejected"));
         }
     }
@@ -9857,12 +9987,12 @@ mod tests {
     fn mysql_routine_language_rejects_string_spelling() {
         parse_with(
             "CREATE PROCEDURE p() LANGUAGE SQL BEGIN SELECT 1; END",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("MySQL admits the bare-word routine LANGUAGE");
         parse_with(
             "CREATE PROCEDURE p() LANGUAGE 'SQL' BEGIN SELECT 1; END",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect_err("MySQL rejects the string-constant routine LANGUAGE spelling");
     }
@@ -9885,8 +10015,8 @@ mod tests {
                 FunctionParamDefaultSpelling::Equals,
             ),
         ] {
-            let pg =
-                parse_with(sql, PG_DIALECT).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+            let pg = parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
             let [Statement::CreateFunction { create, .. }] = pg.statements() else {
                 panic!("{sql:?}: expected one CREATE FUNCTION");
             };
@@ -9902,8 +10032,11 @@ mod tests {
         }
 
         // A default-less parameter leaves the slot empty (the bare-type form is unchanged).
-        let bare = parse_with("CREATE FUNCTION f(a INTEGER) LANGUAGE sql", PG_DIALECT)
-            .expect("bare parameter parses");
+        let bare = parse_with(
+            "CREATE FUNCTION f(a INTEGER) LANGUAGE sql",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("bare parameter parses");
         let [Statement::CreateFunction { create, .. }] = bare.statements() else {
             panic!("expected one CREATE FUNCTION");
         };
@@ -9942,8 +10075,8 @@ mod tests {
                 FunctionParamMode::In,
             ),
         ] {
-            let pg =
-                parse_with(sql, PG_DIALECT).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+            let pg = parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
             let [Statement::CreateFunction { create, .. }] = pg.statements() else {
                 panic!("{sql:?}: expected one CREATE FUNCTION");
             };
@@ -9955,8 +10088,11 @@ mod tests {
         }
 
         // A mode-less parameter leaves the slot empty, and modes compose across a list.
-        let bare = parse_with("CREATE FUNCTION f(a INTEGER) LANGUAGE sql", PG_DIALECT)
-            .expect("bare parameter parses");
+        let bare = parse_with(
+            "CREATE FUNCTION f(a INTEGER) LANGUAGE sql",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("bare parameter parses");
         let [Statement::CreateFunction { create, .. }] = bare.statements() else {
             panic!("expected one CREATE FUNCTION");
         };
@@ -9964,7 +10100,7 @@ mod tests {
 
         let multi = parse_with(
             "CREATE FUNCTION f(IN a INTEGER, OUT b INTEGER) LANGUAGE sql",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("multi-parameter mode list parses");
         let [Statement::CreateFunction { create, .. }] = multi.statements() else {
@@ -9982,8 +10118,11 @@ mod tests {
     #[test]
     fn create_function_parameter_name_uses_type_function_name_class() {
         // A `type_func_name` keyword is a valid parameter name (a bare `ColId` rejects it).
-        let ok = parse_with("CREATE FUNCTION f(left INTEGER) LANGUAGE sql", PG_DIALECT)
-            .expect("a type_func_name keyword is a valid parameter name");
+        let ok = parse_with(
+            "CREATE FUNCTION f(left INTEGER) LANGUAGE sql",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("a type_func_name keyword is a valid parameter name");
         let [Statement::CreateFunction { create, .. }] = ok.statements() else {
             panic!("expected one CREATE FUNCTION");
         };
@@ -9999,10 +10138,16 @@ mod tests {
 
         // A `col_name` keyword cannot be a parameter name, so `f(int int)` is a parse error
         // (PostgreSQL rejects it), while a lone `int` is the type.
-        parse_with("CREATE FUNCTION f(int int) LANGUAGE sql", PG_DIALECT)
-            .expect_err("a col_name keyword is rejected as a parameter name");
-        let lone = parse_with("CREATE FUNCTION f(int) LANGUAGE sql", PG_DIALECT)
-            .expect("a lone col_name type keyword is the type");
+        parse_with(
+            "CREATE FUNCTION f(int int) LANGUAGE sql",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect_err("a col_name keyword is rejected as a parameter name");
+        let lone = parse_with(
+            "CREATE FUNCTION f(int) LANGUAGE sql",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("a lone col_name type keyword is the type");
         let [Statement::CreateFunction { create, .. }] = lone.statements() else {
             panic!("expected one CREATE FUNCTION");
         };
@@ -10018,11 +10163,18 @@ mod tests {
     /// parses. The `routines`-sibling `routine_arg_defaults` precedent.
     #[test]
     fn mysql_rejects_function_parameter_modes() {
-        parse_with("CREATE FUNCTION f(a INT)", MySql).expect("MySQL accepts a bare parameter");
-        parse_with("CREATE FUNCTION f(IN a INT)", MySql)
-            .expect_err("MySQL rejects an IN parameter mode");
-        parse_with("CREATE FUNCTION f(VARIADIC a INT)", MySql)
-            .expect_err("MySQL rejects a VARIADIC parameter mode");
+        parse_with("CREATE FUNCTION f(a INT)", crate::ParseConfig::new(MySql))
+            .expect("MySQL accepts a bare parameter");
+        parse_with(
+            "CREATE FUNCTION f(IN a INT)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("MySQL rejects an IN parameter mode");
+        parse_with(
+            "CREATE FUNCTION f(VARIADIC a INT)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("MySQL rejects a VARIADIC parameter mode");
     }
 
     /// MySQL has no routine-parameter defaults, so the `routine_arg_defaults` gate is off: a
@@ -10032,17 +10184,25 @@ mod tests {
     fn mysql_rejects_function_parameter_defaults() {
         // The bare parameter parses under MySQL, so the rejection below isolates the default
         // clause rather than an unrelated trailing option.
-        parse_with("CREATE FUNCTION f(a INT)", MySql).expect("MySQL accepts a bare parameter");
-        parse_with("CREATE FUNCTION f(a INT DEFAULT 0)", MySql)
-            .expect_err("MySQL rejects a DEFAULT parameter default");
-        parse_with("CREATE FUNCTION f(a INT = 0)", MySql)
-            .expect_err("MySQL rejects an `=` parameter default");
+        parse_with("CREATE FUNCTION f(a INT)", crate::ParseConfig::new(MySql))
+            .expect("MySQL accepts a bare parameter");
+        parse_with(
+            "CREATE FUNCTION f(a INT DEFAULT 0)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("MySQL rejects a DEFAULT parameter default");
+        parse_with(
+            "CREATE FUNCTION f(a INT = 0)",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("MySQL rejects an `=` parameter default");
     }
 
     /// Parse `sql` under MySQL, render it back through the MySQL target, and assert the text
     /// round-trips exactly — the routine-DDL faithfulness check.
     fn mysql_round_trips(sql: &str) -> Parsed {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
         let rendered = Renderer::new(MYSQL_RENDER)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("RENDER {sql:?}: {err:?}"));
@@ -10119,11 +10279,14 @@ mod tests {
             Some(FunctionBody::Block { .. })
         ));
         // RETURN in a PROCEDURE body rejects (server ER_SP_BADRETURN) — top-level and nested.
-        parse_with("CREATE PROCEDURE p() BEGIN RETURN 1; END", MySql)
-            .expect_err("RETURN in a procedure body must reject");
+        parse_with(
+            "CREATE PROCEDURE p() BEGIN RETURN 1; END",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("RETURN in a procedure body must reject");
         parse_with(
             "CREATE PROCEDURE p() BEGIN IF 1 THEN RETURN 1; END IF; END",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect_err("a nested RETURN in a procedure body must reject");
         // The bare non-compound procedure body (a single statement) parses.
@@ -10189,7 +10352,7 @@ mod tests {
         // The ordering anchor is captured on the node.
         let parsed = parse_with(
             "CREATE TRIGGER tr BEFORE INSERT ON t1 FOR EACH ROW FOLLOWS other_tr BEGIN END",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("ordered trigger parses");
         let Statement::CreateStoredTrigger { create, .. } = &parsed.statements()[0] else {
@@ -10206,22 +10369,25 @@ mod tests {
         // `INSTEAD OF` timing and statement-level triggers do not exist in MySQL.
         parse_with(
             "CREATE TRIGGER tr INSTEAD OF INSERT ON t1 FOR EACH ROW BEGIN END",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect_err("MySQL has no INSTEAD OF trigger timing");
-        parse_with("CREATE TRIGGER tr BEFORE INSERT ON t1 BEGIN END", MySql)
-            .expect_err("MySQL requires FOR EACH ROW");
+        parse_with(
+            "CREATE TRIGGER tr BEFORE INSERT ON t1 BEGIN END",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("MySQL requires FOR EACH ROW");
         // A trigger body is not a function body: `RETURN` rejects (server ER_SP_BADRETURN).
         parse_with(
             "CREATE TRIGGER tr BEFORE INSERT ON t1 FOR EACH ROW BEGIN RETURN 1; END",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect_err("RETURN is illegal in a trigger body");
         // Non-MySQL dialects have no stored-program trigger: the SQLite `create_trigger` grammar
         // rejects the MySQL `FOR EACH ROW <stmt>` body, and ANSI/PostgreSQL reject `TRIGGER`.
         parse_with(
             "CREATE TRIGGER tr BEFORE INSERT ON t1 FOR EACH ROW INSERT INTO t2 VALUES (1)",
-            Ansi,
+            crate::ParseConfig::new(Ansi),
         )
         .expect_err("ANSI has no CREATE TRIGGER");
     }
@@ -10234,8 +10400,8 @@ mod tests {
             "DROP TRIGGER IF EXISTS zzp_tr",
             "DROP TRIGGER s.zzp_tr",
         ] {
-            let parsed =
-                parse_with(sql, MySql).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
             let Statement::Drop { drop, .. } = &parsed.statements()[0] else {
                 panic!("expected a DROP for {sql:?}");
             };
@@ -10246,13 +10412,15 @@ mod tests {
             assert_eq!(rendered, sql, "drop-trigger round-trip {sql:?}");
         }
         // SQLite shares the same name-only trigger drop (its `create_trigger` flag also gates it).
-        let sqlite = parse_with("DROP TRIGGER zzp_tr", Sqlite).expect("SQLite has DROP TRIGGER");
+        let sqlite = parse_with("DROP TRIGGER zzp_tr", crate::ParseConfig::new(Sqlite))
+            .expect("SQLite has DROP TRIGGER");
         let Statement::Drop { drop, .. } = &sqlite.statements()[0] else {
             panic!("expected a DROP");
         };
         assert_eq!(drop.object_kind, DropObjectKind::Trigger);
         // ANSI/PostgreSQL do not model this name-only trigger drop (no trigger flag on).
-        parse_with("DROP TRIGGER zzp_tr", Ansi).expect_err("ANSI has no DROP TRIGGER object kind");
+        parse_with("DROP TRIGGER zzp_tr", crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no DROP TRIGGER object kind");
     }
 
     #[test]
@@ -10271,8 +10439,11 @@ mod tests {
         mysql_round_trips("ALTER PROCEDURE p LANGUAGE SQL SQL SECURITY INVOKER");
         // DETERMINISTIC is not an ALTER-legal characteristic (server rejects it): left
         // unconsumed, it surfaces as a clean parse error.
-        parse_with("ALTER PROCEDURE p DETERMINISTIC", MySql)
-            .expect_err("ALTER rejects the DETERMINISTIC characteristic");
+        parse_with(
+            "ALTER PROCEDURE p DETERMINISTIC",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("ALTER rejects the DETERMINISTIC characteristic");
     }
 
     #[test]
@@ -10362,12 +10533,15 @@ mod tests {
         // The clause order is fixed: a COMMENT before the status is a syntax error (server 1064).
         parse_with(
             "CREATE EVENT e ON SCHEDULE AT NOW() COMMENT 'c' ENABLE DO BEGIN END",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect_err("COMMENT must follow the status clause");
         // An event body carries no return value; RETURN is rejected (server ER_SP_BADRETURN).
-        parse_with("CREATE EVENT e ON SCHEDULE AT NOW() DO RETURN 1", MySql)
-            .expect_err("RETURN is rejected in an event body");
+        parse_with(
+            "CREATE EVENT e ON SCHEDULE AT NOW() DO RETURN 1",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect_err("RETURN is rejected in an event body");
     }
 
     #[test]
@@ -10389,7 +10563,8 @@ mod tests {
         );
 
         // At least one clause is required: a bare `ALTER EVENT e` is a syntax error (server 1064).
-        parse_with("ALTER EVENT e", MySql).expect_err("ALTER EVENT requires at least one clause");
+        parse_with("ALTER EVENT e", crate::ParseConfig::new(MySql))
+            .expect_err("ALTER EVENT requires at least one clause");
     }
 
     #[test]
@@ -10406,33 +10581,50 @@ mod tests {
         };
         assert!(drop.if_exists);
         // A single name only — no comma list, no CASCADE/RESTRICT (server 1064).
-        parse_with("DROP EVENT a, b", MySql).expect_err("DROP EVENT names exactly one event");
-        parse_with("DROP EVENT e CASCADE", MySql).expect_err("DROP EVENT takes no drop behaviour");
+        parse_with("DROP EVENT a, b", crate::ParseConfig::new(MySql))
+            .expect_err("DROP EVENT names exactly one event");
+        parse_with("DROP EVENT e CASCADE", crate::ParseConfig::new(MySql))
+            .expect_err("DROP EVENT takes no drop behaviour");
     }
 
     #[test]
     fn non_mysql_dialects_reject_event_ddl() {
         // Event DDL rides `compound_statements` (off for ANSI/PostgreSQL): `EVENT` falls through
         // to the ordinary CREATE/ALTER/DROP paths and rejects.
-        parse_with("CREATE EVENT e ON SCHEDULE AT NOW() DO BEGIN END", Ansi)
-            .expect_err("ANSI has no CREATE EVENT");
-        parse_with("ALTER EVENT e DISABLE", PG_DIALECT).expect_err("PostgreSQL has no ALTER EVENT");
-        parse_with("DROP EVENT e", Ansi).expect_err("ANSI has no DROP EVENT");
+        parse_with(
+            "CREATE EVENT e ON SCHEDULE AT NOW() DO BEGIN END",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no CREATE EVENT");
+        parse_with("ALTER EVENT e DISABLE", crate::ParseConfig::new(PG_DIALECT))
+            .expect_err("PostgreSQL has no ALTER EVENT");
+        parse_with("DROP EVENT e", crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no DROP EVENT");
     }
 
     #[test]
     fn non_mysql_dialects_reject_stored_routine_ddl() {
         // The routine-with-body surface rides `compound_statements` (off for ANSI/PostgreSQL):
         // `PROCEDURE`/`DEFINER` fall through to the `TABLE` expectation and reject.
-        parse_with("CREATE PROCEDURE p() BEGIN END", Ansi)
-            .expect_err("ANSI has no CREATE PROCEDURE");
-        parse_with("CREATE PROCEDURE p() BEGIN END", PG_DIALECT)
-            .expect_err("PostgreSQL has no MySQL CREATE PROCEDURE body");
-        parse_with("ALTER PROCEDURE p COMMENT 'x'", Ansi).expect_err("ANSI has no ALTER PROCEDURE");
+        parse_with(
+            "CREATE PROCEDURE p() BEGIN END",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no CREATE PROCEDURE");
+        parse_with(
+            "CREATE PROCEDURE p() BEGIN END",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect_err("PostgreSQL has no MySQL CREATE PROCEDURE body");
+        parse_with(
+            "ALTER PROCEDURE p COMMENT 'x'",
+            crate::ParseConfig::new(Ansi),
+        )
+        .expect_err("ANSI has no ALTER PROCEDURE");
         // The PostgreSQL string-body / RETURN-expr CREATE FUNCTION is unaffected.
         parse_with(
             "CREATE FUNCTION f() RETURNS INTEGER LANGUAGE sql RETURN 1",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("PostgreSQL RETURN-expr routine still parses");
     }
@@ -10447,8 +10639,8 @@ mod tests {
             "SELECT sqrt(4)",
             "SELECT COALESCE(a, b, c) FROM t",
         ] {
-            let pg =
-                parse_with(sql, PG_DIALECT).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+            let pg = parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&pg)
                 .unwrap_or_else(|err| panic!("RENDER {sql:?}: {err:?}"));
@@ -10469,8 +10661,8 @@ mod tests {
             "CREATE OR REPLACE FUNCTION f() RETURNS INTEGER RETURN 42",
             "CREATE FUNCTION f() RETURNS INTEGER RETURN (SELECT max(x) FROM t)",
         ] {
-            let pg =
-                parse_with(sql, PG_DIALECT).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+            let pg = parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&pg)
                 .unwrap_or_else(|err| panic!("RENDER {sql:?}: {err:?}"));
@@ -10503,7 +10695,8 @@ mod tests {
     #[test]
     fn create_function_return_body_is_a_trailing_slot_after_options() {
         let ok = "CREATE FUNCTION f() RETURNS INTEGER LANGUAGE sql RETURN 1";
-        let pg = parse_with(ok, PG_DIALECT).unwrap_or_else(|err| panic!("PARSE {ok:?}: {err:?}"));
+        let pg = parse_with(ok, crate::ParseConfig::new(PG_DIALECT))
+            .unwrap_or_else(|err| panic!("PARSE {ok:?}: {err:?}"));
         let rendered = Renderer::new(PG_DIALECT)
             .render_parsed(&pg)
             .unwrap_or_else(|err| panic!("RENDER {ok:?}: {err:?}"));
@@ -10518,7 +10711,7 @@ mod tests {
         // rejects this exact spelling).
         parse_with(
             "CREATE FUNCTION f() RETURNS INTEGER RETURN 1 LANGUAGE sql",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect_err("a RETURN body cannot precede an option");
     }
@@ -10530,10 +10723,16 @@ mod tests {
     #[test]
     fn create_function_return_body_rides_routines_gate() {
         use crate::dialect::Sqlite;
-        parse_with("CREATE FUNCTION f() RETURNS INT RETURN 1", MySql)
-            .expect("MySQL routines accept a RETURN expression body");
-        parse_with("CREATE FUNCTION f() RETURNS INT RETURN 1", Sqlite)
-            .expect_err("SQLite has no stored routines");
+        parse_with(
+            "CREATE FUNCTION f() RETURNS INT RETURN 1",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL routines accept a RETURN expression body");
+        parse_with(
+            "CREATE FUNCTION f() RETURNS INT RETURN 1",
+            crate::ParseConfig::new(Sqlite),
+        )
+        .expect_err("SQLite has no stored routines");
     }
 
     /// PostgreSQL with drop behaviour disabled, to prove `CASCADE`/`RESTRICT` is gated.
@@ -10595,16 +10794,40 @@ mod tests {
     /// variant. The `*_of` helpers panic on any other variant, pinning the boundary.
     #[test]
     fn dispatch_routes_ddl_keywords_to_this_family() {
-        let _ =
-            create_table_of(&parse_with("CREATE TABLE t (id INT)", TestDialect).expect("table"));
-        let _ = create_schema_of(&parse_with("CREATE SCHEMA s", TestDialect).expect("schema"));
-        let _ =
-            create_view_of(&parse_with("CREATE VIEW v AS SELECT 1", TestDialect).expect("view"));
-        let _ =
-            create_index_of(&parse_with("CREATE INDEX i ON t (a)", TestDialect).expect("index"));
-        let _ =
-            alter_of(&parse_with("ALTER TABLE t ADD COLUMN c INT", TestDialect).expect("alter"));
-        let _ = drop_of(&parse_with("DROP TABLE t", TestDialect).expect("drop"));
+        let _ = create_table_of(
+            &parse_with(
+                "CREATE TABLE t (id INT)",
+                crate::ParseConfig::new(TestDialect),
+            )
+            .expect("table"),
+        );
+        let _ = create_schema_of(
+            &parse_with("CREATE SCHEMA s", crate::ParseConfig::new(TestDialect)).expect("schema"),
+        );
+        let _ = create_view_of(
+            &parse_with(
+                "CREATE VIEW v AS SELECT 1",
+                crate::ParseConfig::new(TestDialect),
+            )
+            .expect("view"),
+        );
+        let _ = create_index_of(
+            &parse_with(
+                "CREATE INDEX i ON t (a)",
+                crate::ParseConfig::new(TestDialect),
+            )
+            .expect("index"),
+        );
+        let _ = alter_of(
+            &parse_with(
+                "ALTER TABLE t ADD COLUMN c INT",
+                crate::ParseConfig::new(TestDialect),
+            )
+            .expect("alter"),
+        );
+        let _ = drop_of(
+            &parse_with("DROP TABLE t", crate::ParseConfig::new(TestDialect)).expect("drop"),
+        );
     }
 
     #[test]
@@ -10617,7 +10840,8 @@ mod tests {
             CONSTRAINT u UNIQUE (name), \
             CHECK (id > 0)\
         )";
-        let parsed = parse_with(sql, TestDialect).expect("CREATE TABLE parses");
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(TestDialect)).expect("CREATE TABLE parses");
         let create = create_table_of(&parsed);
 
         assert_eq!(create.temporary, None);
@@ -10748,8 +10972,8 @@ mod tests {
             "CREATE TABLE t (a INT,)",
             "CREATE TABLE t (a INT, PRIMARY KEY (a),)",
         ] {
-            let parsed =
-                parse_with(sql, DuckDb).unwrap_or_else(|e| panic!("DuckDB {sql:?}: {e:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|e| panic!("DuckDB {sql:?}: {e:?}"));
             let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body
             else {
                 panic!("expected a table definition body for {sql:?}");
@@ -10757,25 +10981,34 @@ mod tests {
             assert!(!elements.is_empty(), "{sql:?} kept its elements");
         }
         // Only a single trailing comma; a doubled or leading comma stays a parse error.
-        parse_with("CREATE TABLE t (a INT, b INT,,)", DuckDb)
-            .expect_err("doubled trailing comma rejects");
-        parse_with("CREATE TABLE t (,)", DuckDb).expect_err("empty-after-comma rejects");
-        parse_with("CREATE TABLE t (, a INT)", DuckDb).expect_err("leading comma rejects");
+        parse_with(
+            "CREATE TABLE t (a INT, b INT,,)",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("doubled trailing comma rejects");
+        parse_with("CREATE TABLE t (,)", crate::ParseConfig::new(DuckDb))
+            .expect_err("empty-after-comma rejects");
+        parse_with("CREATE TABLE t (, a INT)", crate::ParseConfig::new(DuckDb))
+            .expect_err("leading comma rejects");
 
         // Flag off elsewhere: the dangling comma falls to the element parser and yields the
         // standard clean parse error — the same reject the engines report.
         let sql = "CREATE TABLE t (a INT, b INT,)";
-        parse_with(sql, Ansi).expect_err("ANSI rejects the trailing comma");
-        parse_with(sql, Postgres).expect_err("PostgreSQL rejects the trailing comma");
-        parse_with(sql, MySql).expect_err("MySQL rejects the trailing comma");
-        parse_with(sql, Sqlite).expect_err("SQLite rejects the trailing comma");
+        parse_with(sql, crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI rejects the trailing comma");
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect_err("PostgreSQL rejects the trailing comma");
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect_err("MySQL rejects the trailing comma");
+        parse_with(sql, crate::ParseConfig::new(Sqlite))
+            .expect_err("SQLite rejects the trailing comma");
     }
 
     #[test]
     fn create_temp_table_as_select_parses_with_no_data() {
         let parsed = parse_with(
             "CREATE TEMP TABLE IF NOT EXISTS t AS SELECT 1 WITH NO DATA",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("CTAS parses");
         let create = create_table_of(&parsed);
@@ -10800,7 +11033,7 @@ mod tests {
     fn create_table_as_select_parses_columns_and_options_before_as() {
         let parsed = parse_with(
             "CREATE TEMP TABLE t (id) ON COMMIT DROP AS SELECT 1 WITH DATA",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("CTAS columns and options parse");
         let create = create_table_of(&parsed);
@@ -10830,8 +11063,11 @@ mod tests {
 
     #[test]
     fn create_table_as_select_rejects_typed_columns_before_as() {
-        parse_with("CREATE TABLE t (id INT) AS SELECT 1", TestDialect)
-            .expect_err("PostgreSQL rejects typed column definitions before CTAS AS");
+        parse_with(
+            "CREATE TABLE t (id INT) AS SELECT 1",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("PostgreSQL rejects typed column definitions before CTAS AS");
     }
 
     #[test]
@@ -10839,7 +11075,7 @@ mod tests {
         let parsed = parse_with(
             "CREATE TEMPORARY TABLE t (id INT) \
              WITH (fillfactor = 70) ON COMMIT DROP TABLESPACE pg_default",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("CREATE TABLE options parse");
         let create = create_table_of(&parsed);
@@ -10880,7 +11116,8 @@ mod tests {
     fn mysql_create_table_options_and_auto_increment_column() {
         let sql = "CREATE TABLE t (id INT AUTO_INCREMENT PRIMARY KEY) \
                    ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COMMENT='x'";
-        let parsed = parse_with(sql, MySql).expect("MySQL CREATE TABLE options parse");
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect("MySQL CREATE TABLE options parse");
         let create = create_table_of(&parsed);
 
         // The column carries the `AUTO_INCREMENT` attribute alongside `PRIMARY KEY`.
@@ -10956,7 +11193,7 @@ mod tests {
         // collapse to the same canonical key/value shape.
         let parsed = parse_with(
             "CREATE TABLE t (id INT) ENGINE InnoDB ROW_FORMAT = DYNAMIC",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("MySQL accepts the `=`-less and keyword-valued forms");
         let create = create_table_of(&parsed);
@@ -10977,8 +11214,9 @@ mod tests {
             "CREATE TABLE t (id INT) ENGINE=InnoDB",
             "CREATE TABLE t (id INT AUTO_INCREMENT)",
         ] {
-            parse_with(sql, Ansi).expect_err("ANSI rejects MySQL CREATE TABLE storage syntax");
-            parse_with(sql, TestDialect)
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err("ANSI rejects MySQL CREATE TABLE storage syntax");
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
                 .expect_err("PostgreSQL rejects MySQL CREATE TABLE storage syntax");
         }
     }
@@ -11005,7 +11243,7 @@ mod tests {
         // accepts them.
         let parsed = parse_with(
             "CREATE TABLE t (a INT REFERENCES p (id) ON DELETE CASCADE ON UPDATE SET NULL)",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("REFERENCES with ON DELETE/ON UPDATE parses");
         let reference = column_reference_of(&parsed);
@@ -11034,62 +11272,82 @@ mod tests {
         // (1) FK cascading actions — RESTRICT / NO ACTION still parse.
         parse_with(
             "CREATE TABLE c (id INT REFERENCES p (id) ON DELETE CASCADE)",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect_err("DuckDB rejects ON DELETE CASCADE");
         parse_with(
             "CREATE TABLE c (id INT REFERENCES p (id) ON UPDATE SET NULL)",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect_err("DuckDB rejects ON UPDATE SET NULL");
         parse_with(
             "CREATE TABLE c (id INT REFERENCES p (id) ON DELETE SET DEFAULT)",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect_err("DuckDB rejects ON DELETE SET DEFAULT");
         parse_with(
             "CREATE TABLE c (id INT REFERENCES p (id) ON DELETE RESTRICT)",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("DuckDB still admits ON DELETE RESTRICT");
         parse_with(
             "CREATE TABLE c (id INT REFERENCES p (id) ON DELETE NO ACTION)",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("DuckDB still admits ON DELETE NO ACTION");
         // PostgreSQL keeps the cascading surface.
         parse_with(
             "CREATE TABLE c (id INT REFERENCES p (id) ON DELETE CASCADE)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("PostgreSQL admits ON DELETE CASCADE");
 
         // (2) Subqueries in CHECK.
-        parse_with("CREATE TABLE t (x INT CHECK (x IN (SELECT 1)))", DuckDb)
-            .expect_err("DuckDB rejects subquery in CHECK");
-        parse_with("CREATE TABLE t (x INT CHECK (x > 0))", DuckDb)
-            .expect("DuckDB admits plain CHECK");
+        parse_with(
+            "CREATE TABLE t (x INT CHECK (x IN (SELECT 1)))",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("DuckDB rejects subquery in CHECK");
+        parse_with(
+            "CREATE TABLE t (x INT CHECK (x > 0))",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDB admits plain CHECK");
 
         // (3) CREATE DATABASE — DuckDB uses ATTACH.
-        parse_with("CREATE DATABASE mydb", DuckDb).expect_err("DuckDB has no CREATE DATABASE");
-        parse_with("CREATE DATABASE mydb", Postgres).expect("PostgreSQL admits CREATE DATABASE");
+        parse_with("CREATE DATABASE mydb", crate::ParseConfig::new(DuckDb))
+            .expect_err("DuckDB has no CREATE DATABASE");
+        parse_with("CREATE DATABASE mydb", crate::ParseConfig::new(Postgres))
+            .expect("PostgreSQL admits CREATE DATABASE");
 
         // (4) OR REPLACE + IF NOT EXISTS mutual exclusion on TABLE.
         parse_with(
             "CREATE OR REPLACE TABLE IF NOT EXISTS integers (i INTEGER)",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect_err("DuckDB rejects OR REPLACE + IF NOT EXISTS on TABLE");
-        parse_with("CREATE OR REPLACE TABLE integers (i INTEGER)", DuckDb)
-            .expect("DuckDB admits bare OR REPLACE TABLE");
+        parse_with(
+            "CREATE OR REPLACE TABLE integers (i INTEGER)",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDB admits bare OR REPLACE TABLE");
 
         // (5) Multi-action ALTER TABLE.
-        parse_with("ALTER TABLE t ADD COLUMN j INT, DROP COLUMN j", DuckDb)
-            .expect_err("DuckDB rejects multi-action ALTER");
-        parse_with("ALTER TABLE t ADD COLUMN j INT", DuckDb)
-            .expect("DuckDB admits single-action ALTER");
-        parse_with("ALTER TABLE t ADD COLUMN j INT, DROP COLUMN j", Postgres)
-            .expect("PostgreSQL admits multi-action ALTER");
+        parse_with(
+            "ALTER TABLE t ADD COLUMN j INT, DROP COLUMN j",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("DuckDB rejects multi-action ALTER");
+        parse_with(
+            "ALTER TABLE t ADD COLUMN j INT",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDB admits single-action ALTER");
+        parse_with(
+            "ALTER TABLE t ADD COLUMN j INT, DROP COLUMN j",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("PostgreSQL admits multi-action ALTER");
     }
 
     #[test]
@@ -11100,7 +11358,7 @@ mod tests {
             "CREATE TABLE t (a INT, b INT, \
              FOREIGN KEY (a, b) REFERENCES p (x, y) \
              MATCH FULL ON UPDATE RESTRICT ON DELETE SET NULL (a, b))",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("order-independent FK actions parse");
         let create = create_table_of(&parsed);
@@ -11139,7 +11397,7 @@ mod tests {
             "CREATE TABLE t (a INT, b INT, FOREIGN KEY (a, b) REFERENCES p \
              ON UPDATE NO ACTION ON DELETE NO ACTION MATCH FULL)",
         ] {
-            parse_with(sql, TestDialect)
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
                 .expect_err(&format!("MATCH after actions is rejected: {sql:?}"));
         }
     }
@@ -11151,14 +11409,14 @@ mod tests {
         // `MATCH SIMPLE` stay accepted.
         parse_with(
             "CREATE TABLE t (a INT REFERENCES p MATCH PARTIAL)",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect_err("MATCH PARTIAL is rejected");
         assert_eq!(
             column_reference_of(
                 &parse_with(
                     "CREATE TABLE t (a INT REFERENCES p MATCH FULL)",
-                    TestDialect
+                    crate::ParseConfig::new(TestDialect)
                 )
                 .expect("MATCH FULL parses"),
             )
@@ -11169,7 +11427,7 @@ mod tests {
             column_reference_of(
                 &parse_with(
                     "CREATE TABLE t (a INT REFERENCES p MATCH SIMPLE)",
-                    TestDialect,
+                    crate::ParseConfig::new(TestDialect),
                 )
                 .expect("MATCH SIMPLE parses"),
             )
@@ -11188,7 +11446,8 @@ mod tests {
             "CREATE TABLE t (a INT REFERENCES p ON UPDATE SET NULL (a))", // list only on ON DELETE
             "CREATE TABLE t (a INT REFERENCES p ON DELETE CASCADE ON DELETE SET NULL)", // duplicate
         ] {
-            parse_with(sql, TestDialect).expect_err(&format!("should reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(TestDialect))
+                .expect_err(&format!("should reject {sql:?}"));
         }
     }
 
@@ -11197,7 +11456,7 @@ mod tests {
         let parsed = parse_with(
             "CREATE TABLE t (id BIGINT GENERATED ALWAYS AS IDENTITY \
              (START WITH 10 INCREMENT BY 2 NO MINVALUE MAXVALUE 100 CACHE 5 NO CYCLE))",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("identity options parse");
         let create = create_table_of(&parsed);
@@ -11248,7 +11507,7 @@ mod tests {
              DROP CONSTRAINT old_pk RESTRICT, \
              ALTER COLUMN a SET DEFAULT 0, \
              ALTER b DROP NOT NULL",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("multi-action ALTER TABLE parses");
         let alter = alter_of(&parsed);
@@ -11321,7 +11580,7 @@ mod tests {
              ALTER COLUMN c SET NOT NULL, \
              ALTER COLUMN d DROP DEFAULT",
             // `b::TEXT` needs the PostgreSQL typecast operator.
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("ALTER COLUMN type/set/drop forms parse");
         let alter = alter_of(&parsed);
@@ -11363,8 +11622,11 @@ mod tests {
     fn duckdb_alter_table_nested_column_paths_match_engine_boundary() {
         use crate::dialect::{DuckDb, Postgres};
 
-        let parsed = parse_with("ALTER TABLE t ADD COLUMN s.s2.j INTEGER", DuckDb)
-            .expect("DuckDB accepts nested ADD COLUMN targets");
+        let parsed = parse_with(
+            "ALTER TABLE t ADD COLUMN s.s2.j INTEGER",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDB accepts nested ADD COLUMN targets");
         let alter = alter_of(&parsed);
         let AlterTableAction::AddColumn { target, column, .. } = &alter.actions[0] else {
             panic!("expected ADD COLUMN");
@@ -11378,8 +11640,11 @@ mod tests {
         assert_eq!(names, ["s", "s2", "j"]);
         assert_eq!(parsed.resolver().resolve(column.name.sym), "j");
 
-        let parsed = parse_with("ALTER TABLE t DROP COLUMN IF EXISTS s.s2.k", DuckDb)
-            .expect("DuckDB accepts nested DROP COLUMN targets");
+        let parsed = parse_with(
+            "ALTER TABLE t DROP COLUMN IF EXISTS s.s2.k",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDB accepts nested DROP COLUMN targets");
         let alter = alter_of(&parsed);
         let AlterTableAction::DropColumn {
             if_exists, name, ..
@@ -11395,23 +11660,38 @@ mod tests {
             .collect();
         assert_eq!(names, ["s", "s2", "k"]);
 
-        parse_with("ALTER TABLE t RENAME COLUMN s.s2.k TO kk", DuckDb)
-            .expect("DuckDB accepts nested old-side RENAME COLUMN targets");
+        parse_with(
+            "ALTER TABLE t RENAME COLUMN s.s2.k TO kk",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDB accepts nested old-side RENAME COLUMN targets");
 
-        parse_with("ALTER TABLE t ADD COLUMN s.s2.j INTEGER", Postgres)
-            .expect_err("PostgreSQL does not parse nested ADD COLUMN targets");
-        parse_with("ALTER TABLE t DROP COLUMN s.s2.k", Postgres)
-            .expect_err("PostgreSQL does not parse nested DROP COLUMN targets");
-        parse_with("ALTER TABLE t RENAME COLUMN s.s2.k TO kk", Postgres)
-            .expect_err("PostgreSQL does not parse nested RENAME COLUMN targets");
+        parse_with(
+            "ALTER TABLE t ADD COLUMN s.s2.j INTEGER",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL does not parse nested ADD COLUMN targets");
+        parse_with(
+            "ALTER TABLE t DROP COLUMN s.s2.k",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL does not parse nested DROP COLUMN targets");
+        parse_with(
+            "ALTER TABLE t RENAME COLUMN s.s2.k TO kk",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL does not parse nested RENAME COLUMN targets");
 
         parse_with(
             "ALTER TABLE t ALTER COLUMN s.s2.k SET DATA TYPE BIGINT",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect_err("DuckDB rejects nested ALTER COLUMN targets");
-        parse_with("ALTER TABLE t RENAME COLUMN s.s2.k TO s.s2.kk", DuckDb)
-            .expect_err("DuckDB rejects nested RENAME COLUMN destinations");
+        parse_with(
+            "ALTER TABLE t RENAME COLUMN s.s2.k TO s.s2.kk",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("DuckDB rejects nested RENAME COLUMN destinations");
     }
 
     #[test]
@@ -11421,7 +11701,7 @@ mod tests {
              ADD COLUMN IF NOT EXISTS a INT, \
              DROP COLUMN IF EXISTS b, \
              DROP CONSTRAINT IF EXISTS c",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("ALTER TABLE IF EXISTS parses under PostgreSQL");
         let alter = alter_of(&parsed);
@@ -11451,8 +11731,11 @@ mod tests {
 
     #[test]
     fn drop_family_parses_object_kinds_names_and_behaviour() {
-        let parsed =
-            parse_with("DROP TABLE a, b.c RESTRICT", TestDialect).expect("DROP TABLE parses");
+        let parsed = parse_with(
+            "DROP TABLE a, b.c RESTRICT",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("DROP TABLE parses");
         let drop = drop_of(&parsed);
         assert_eq!(drop.object_kind, DropObjectKind::Table);
         assert!(!drop.if_exists);
@@ -11466,16 +11749,19 @@ mod tests {
             ("DROP INDEX i", DropObjectKind::Index),
             ("DROP SCHEMA s CASCADE", DropObjectKind::Schema),
         ] {
-            let parsed =
-                parse_with(sql, TestDialect).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(TestDialect))
+                .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
             assert_eq!(drop_of(&parsed).object_kind, kind, "{sql}");
         }
     }
 
     #[test]
     fn drop_if_exists_parses_under_postgres() {
-        let parsed = parse_with("DROP TABLE IF EXISTS t CASCADE", PG_DIALECT)
-            .expect("DROP TABLE IF EXISTS parses under PostgreSQL");
+        let parsed = parse_with(
+            "DROP TABLE IF EXISTS t CASCADE",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("DROP TABLE IF EXISTS parses under PostgreSQL");
         let drop = drop_of(&parsed);
         assert!(drop.if_exists);
         assert_eq!(drop.behavior, Some(DropBehavior::Cascade));
@@ -11485,27 +11771,42 @@ mod tests {
     fn ansi_rejects_if_exists_existence_guard() {
         // `IF EXISTS` is gated off under ANSI, so the guard is left unconsumed and the
         // trailing tokens surface as a parse error.
-        parse_with("DROP TABLE IF EXISTS t", TestDialect)
-            .expect_err("ANSI has no IF EXISTS on DROP");
-        parse_with("ALTER TABLE IF EXISTS t DROP COLUMN c", TestDialect)
-            .expect_err("ANSI has no IF EXISTS on ALTER");
-        parse_with("ALTER TABLE t ADD COLUMN IF NOT EXISTS c INT", TestDialect)
-            .expect_err("ANSI has no IF NOT EXISTS on ADD COLUMN");
+        parse_with(
+            "DROP TABLE IF EXISTS t",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI has no IF EXISTS on DROP");
+        parse_with(
+            "ALTER TABLE IF EXISTS t DROP COLUMN c",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI has no IF EXISTS on ALTER");
+        parse_with(
+            "ALTER TABLE t ADD COLUMN IF NOT EXISTS c INT",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI has no IF NOT EXISTS on ADD COLUMN");
     }
 
     #[test]
     fn drop_behavior_is_gated_by_dialect_data() {
         // With drop behaviour disabled the trailing CASCADE is leftover input.
-        parse_with("DROP TABLE t CASCADE", NO_DROP_BEHAVIOR_DIALECT)
-            .expect_err("CASCADE is rejected when drop behaviour is disabled");
+        parse_with(
+            "DROP TABLE t CASCADE",
+            crate::ParseConfig::new(NO_DROP_BEHAVIOR_DIALECT),
+        )
+        .expect_err("CASCADE is rejected when drop behaviour is disabled");
         parse_with(
             "ALTER TABLE t DROP COLUMN c RESTRICT",
-            NO_DROP_BEHAVIOR_DIALECT,
+            crate::ParseConfig::new(NO_DROP_BEHAVIOR_DIALECT),
         )
         .expect_err("RESTRICT is rejected when drop behaviour is disabled");
         // Without the trailing behaviour the same statement parses.
-        parse_with("DROP TABLE t", NO_DROP_BEHAVIOR_DIALECT)
-            .expect("a behaviour-free DROP parses with the flag off");
+        parse_with(
+            "DROP TABLE t",
+            crate::ParseConfig::new(NO_DROP_BEHAVIOR_DIALECT),
+        )
+        .expect("a behaviour-free DROP parses with the flag off");
     }
 
     #[test]
@@ -11520,7 +11821,7 @@ mod tests {
             "DROP TABLE a,",                    // dangling comma
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "{sql:?} should be rejected",
             );
         }
@@ -11530,7 +11831,7 @@ mod tests {
     fn create_schema_parses_name_guard_and_authorization() {
         let parsed = parse_with(
             "CREATE SCHEMA IF NOT EXISTS s AUTHORIZATION joe",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("CREATE SCHEMA parses");
         let schema = create_schema_of(&parsed);
@@ -11549,8 +11850,11 @@ mod tests {
         );
 
         // `AUTHORIZATION <role>` alone, with the schema name derived from the role.
-        let parsed = parse_with("CREATE SCHEMA AUTHORIZATION joe", TestDialect)
-            .expect("CREATE SCHEMA AUTHORIZATION parses");
+        let parsed = parse_with(
+            "CREATE SCHEMA AUTHORIZATION joe",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("CREATE SCHEMA AUTHORIZATION parses");
         let schema = create_schema_of(&parsed);
         assert!(schema.name.is_none());
         assert!(schema.authorization.is_some());
@@ -11560,7 +11864,7 @@ mod tests {
     fn create_or_replace_view_parses_columns_and_check_option() {
         let parsed = parse_with(
             "CREATE OR REPLACE VIEW v (a, b) AS SELECT 1, 2 WITH CASCADED CHECK OPTION",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("CREATE VIEW parses");
         let view = create_view_of(&parsed);
@@ -11581,7 +11885,8 @@ mod tests {
     }
 
     fn assert_mysql_view_round_trips(sql: &str) {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("PARSE {sql:?}: {err:?}"));
         let rendered = Renderer::new(MYSQL_RENDER)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("RENDER {sql:?}: {err:?}"));
@@ -11614,7 +11919,7 @@ mod tests {
 
         let parsed = parse_with(
             "CREATE ALGORITHM = MERGE DEFINER = root SQL SECURITY INVOKER VIEW v AS SELECT 1",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("MySQL view option prefix parses");
         let view = create_view_of(&parsed);
@@ -11642,7 +11947,8 @@ mod tests {
             // The options after the VIEW keyword.
             "CREATE VIEW ALGORITHM = MERGE v AS SELECT 1",
         ] {
-            parse_with(sql, MySql).expect_err(&format!("MySQL rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err(&format!("MySQL rejects {sql:?}"));
         }
     }
 
@@ -11651,10 +11957,16 @@ mod tests {
     #[test]
     fn create_view_option_prefix_rides_view_definition_options_gate() {
         use crate::dialect::Postgres;
-        parse_with("CREATE ALGORITHM = MERGE VIEW v AS SELECT 1", Postgres)
-            .expect_err("PostgreSQL has no view definition-option prefix");
-        parse_with("CREATE SQL SECURITY INVOKER VIEW v AS SELECT 1", Postgres)
-            .expect_err("PostgreSQL has no SQL SECURITY view prefix");
+        parse_with(
+            "CREATE ALGORITHM = MERGE VIEW v AS SELECT 1",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no view definition-option prefix");
+        parse_with(
+            "CREATE SQL SECURITY INVOKER VIEW v AS SELECT 1",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no SQL SECURITY view prefix");
     }
 
     /// The MySQL `ALTER [ALGORITHM = …] [DEFINER = …] [SQL SECURITY …] VIEW <name> [(cols)]
@@ -11688,7 +12000,7 @@ mod tests {
         let parsed = parse_with(
             "ALTER ALGORITHM = MERGE DEFINER = root SQL SECURITY INVOKER VIEW v (a) \
              AS SELECT 1 WITH LOCAL CHECK OPTION",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("MySQL ALTER VIEW parses");
         let alter = alter_view_of(&parsed);
@@ -11720,7 +12032,8 @@ mod tests {
             "ALTER ALGORITHM = BOGUS VIEW v AS SELECT 1",
             "ALTER ALGORITHM VIEW v AS SELECT 1",
         ] {
-            parse_with(sql, MySql).expect_err(&format!("MySQL rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err(&format!("MySQL rejects {sql:?}"));
         }
     }
 
@@ -11729,8 +12042,11 @@ mod tests {
     #[test]
     fn alter_view_rides_view_definition_options_gate() {
         use crate::dialect::Postgres;
-        parse_with("ALTER VIEW v AS SELECT 1", Postgres)
-            .expect_err("PostgreSQL has no ALTER VIEW redefinition");
+        parse_with(
+            "ALTER VIEW v AS SELECT 1",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL has no ALTER VIEW redefinition");
     }
 
     /// Under Lenient (the permissive superset) the MySQL `ALTER VIEW … AS` redefinition and the
@@ -11740,20 +12056,26 @@ mod tests {
     #[test]
     fn alter_view_lenient_disambiguates_redefinition_from_set_schema() {
         use crate::dialect::Lenient;
-        let redefine =
-            parse_with("ALTER VIEW v AS SELECT 1", Lenient).expect("Lenient parses redefinition");
+        let redefine = parse_with("ALTER VIEW v AS SELECT 1", crate::ParseConfig::new(Lenient))
+            .expect("Lenient parses redefinition");
         assert!(matches!(
             &redefine.statements()[0],
             Statement::AlterView { .. }
         ));
-        let relocate = parse_with("ALTER VIEW v SET SCHEMA s", Lenient)
-            .expect("Lenient parses the DuckDB relocation");
+        let relocate = parse_with(
+            "ALTER VIEW v SET SCHEMA s",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses the DuckDB relocation");
         assert!(matches!(
             &relocate.statements()[0],
             Statement::AlterObjectSchema { .. }
         ));
-        let relocate_guarded = parse_with("ALTER VIEW IF EXISTS v SET SCHEMA s", Lenient)
-            .expect("Lenient parses the guarded relocation");
+        let relocate_guarded = parse_with(
+            "ALTER VIEW IF EXISTS v SET SCHEMA s",
+            crate::ParseConfig::new(Lenient),
+        )
+        .expect("Lenient parses the guarded relocation");
         assert!(matches!(
             &relocate_guarded.statements()[0],
             Statement::AlterObjectSchema { .. }
@@ -11764,7 +12086,7 @@ mod tests {
     fn create_materialized_view_parses_guard_and_with_data() {
         let parsed = parse_with(
             "CREATE MATERIALIZED VIEW IF NOT EXISTS m AS SELECT 1 WITH NO DATA",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("CREATE MATERIALIZED VIEW parses");
         let view = create_view_of(&parsed);
@@ -11790,7 +12112,7 @@ mod tests {
 
         let parsed = parse_with(
             "CREATE RECURSIVE VIEW v (x, y) AS SELECT 1, 2",
-            DUCKDB_RENDER,
+            crate::ParseConfig::new(DUCKDB_RENDER),
         )
         .expect("recursive view parses");
         let view = create_view_of(&parsed);
@@ -11804,8 +12126,11 @@ mod tests {
         // The engine desugars a recursive view to `WITH RECURSIVE`, which names its
         // output columns, so the bare form (no column list) is rejected — mirroring the
         // engine's "syntax error at or near AS".
-        parse_with("CREATE RECURSIVE VIEW v AS SELECT 1", DUCKDB_RENDER)
-            .expect_err("a recursive view requires an explicit column list");
+        parse_with(
+            "CREATE RECURSIVE VIEW v AS SELECT 1",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect_err("a recursive view requires an explicit column list");
     }
 
     #[test]
@@ -11813,8 +12138,11 @@ mod tests {
         use crate::dialect::Postgres;
         // `RECURSIVE VIEW` is gated to DuckDB/Lenient; PostgreSQL leaves `RECURSIVE`
         // unconsumed before the expected `VIEW` and rejects it.
-        parse_with("CREATE RECURSIVE VIEW v (x) AS SELECT 1", Postgres)
-            .expect_err("PostgreSQL does not dispatch CREATE RECURSIVE VIEW");
+        parse_with(
+            "CREATE RECURSIVE VIEW v (x) AS SELECT 1",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL does not dispatch CREATE RECURSIVE VIEW");
     }
 
     #[test]
@@ -11825,12 +12153,12 @@ mod tests {
         // syntax error at the `VIEW` expectation.
         parse_with(
             "CREATE MATERIALIZED RECURSIVE VIEW v (x) AS SELECT 1",
-            DUCKDB_RENDER,
+            crate::ParseConfig::new(DUCKDB_RENDER),
         )
         .expect_err("MATERIALIZED RECURSIVE is rejected");
         parse_with(
             "CREATE RECURSIVE MATERIALIZED VIEW v (x) AS SELECT 1",
-            DUCKDB_RENDER,
+            crate::ParseConfig::new(DUCKDB_RENDER),
         )
         .expect_err("RECURSIVE MATERIALIZED is rejected");
     }
@@ -11840,7 +12168,7 @@ mod tests {
         let parsed = parse_with(
             "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS i ON s.t \
              USING btree (a, lower(b) DESC NULLS LAST) WHERE a IS NOT NULL",
-            PG_DIALECT,
+            crate::ParseConfig::new(PG_DIALECT),
         )
         .expect("CREATE INDEX with PostgreSQL options parses");
         let index = create_index_of(&parsed);
@@ -11871,8 +12199,11 @@ mod tests {
 
     #[test]
     fn create_index_without_a_name_parses() {
-        let parsed = parse_with("CREATE INDEX ON t (a)", TestDialect)
-            .expect("an unnamed CREATE INDEX parses");
+        let parsed = parse_with(
+            "CREATE INDEX ON t (a)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("an unnamed CREATE INDEX parses");
         let index = create_index_of(&parsed);
         assert!(index.name.is_none());
         assert!(!index.unique);
@@ -11884,15 +12215,27 @@ mod tests {
     fn ansi_rejects_postgres_index_extensions() {
         // CONCURRENTLY / USING / the partial WHERE are gated by dialect data; under
         // ANSI the keyword is left unconsumed and surfaces as a parse error.
-        parse_with("CREATE INDEX CONCURRENTLY i ON t (a)", TestDialect)
-            .expect_err("ANSI has no CONCURRENTLY index build");
-        parse_with("CREATE INDEX i ON t USING btree (a)", TestDialect)
-            .expect_err("ANSI has no USING access-method clause");
-        parse_with("CREATE INDEX i ON t (a) WHERE a IS NOT NULL", TestDialect)
-            .expect_err("ANSI has no partial-index WHERE");
+        parse_with(
+            "CREATE INDEX CONCURRENTLY i ON t (a)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI has no CONCURRENTLY index build");
+        parse_with(
+            "CREATE INDEX i ON t USING btree (a)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI has no USING access-method clause");
+        parse_with(
+            "CREATE INDEX i ON t (a) WHERE a IS NOT NULL",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect_err("ANSI has no partial-index WHERE");
         // The base form (and `UNIQUE`) still parse under ANSI.
-        parse_with("CREATE UNIQUE INDEX i ON t (a, b)", TestDialect)
-            .expect("a base UNIQUE index parses under ANSI");
+        parse_with(
+            "CREATE UNIQUE INDEX i ON t (a, b)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("a base UNIQUE index parses under ANSI");
     }
 
     #[test]
@@ -11907,7 +12250,7 @@ mod tests {
             "CREATE INDEX i t (a)",              // missing ON
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "{sql:?} should be rejected",
             );
         }
@@ -11916,11 +12259,14 @@ mod tests {
     #[test]
     fn truncate_parses_clauses_and_is_ungated() {
         // No FeatureSet gate: TRUNCATE is standard SQL accepted by every dialect.
-        assert!(parse_with("TRUNCATE t", Ansi).is_ok());
-        assert!(parse_with("TRUNCATE TABLE t", MySql).is_ok());
+        assert!(parse_with("TRUNCATE t", crate::ParseConfig::new(Ansi)).is_ok());
+        assert!(parse_with("TRUNCATE TABLE t", crate::ParseConfig::new(MySql)).is_ok());
 
-        let parsed = parse_with("TRUNCATE TABLE a, b RESTART IDENTITY CASCADE", PG_DIALECT)
-            .expect("truncate parses");
+        let parsed = parse_with(
+            "TRUNCATE TABLE a, b RESTART IDENTITY CASCADE",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .expect("truncate parses");
         let Statement::Truncate {
             tables,
             restart_identity,
@@ -11935,7 +12281,11 @@ mod tests {
         assert_eq!(*behavior, Some(DropBehavior::Cascade));
 
         // The absent and `CONTINUE IDENTITY` forms stay distinct so they round-trip.
-        let continue_id = parse_with("TRUNCATE TABLE t CONTINUE IDENTITY", PG_DIALECT).unwrap();
+        let continue_id = parse_with(
+            "TRUNCATE TABLE t CONTINUE IDENTITY",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .unwrap();
         let Statement::Truncate {
             restart_identity, ..
         } = &continue_id.statements()[0]
@@ -11944,7 +12294,7 @@ mod tests {
         };
         assert_eq!(*restart_identity, Some(false));
 
-        let bare = parse_with("TRUNCATE TABLE t", PG_DIALECT).unwrap();
+        let bare = parse_with("TRUNCATE TABLE t", crate::ParseConfig::new(PG_DIALECT)).unwrap();
         let Statement::Truncate {
             restart_identity,
             behavior,
@@ -11959,7 +12309,11 @@ mod tests {
 
     #[test]
     fn comment_on_parses_targets_null_and_procedure_signature() {
-        let table = parse_with("COMMENT ON TABLE t IS 'a note'", PG_DIALECT).unwrap();
+        let table = parse_with(
+            "COMMENT ON TABLE t IS 'a note'",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .unwrap();
         let Statement::CommentOn { comment, .. } = &table.statements()[0] else {
             panic!("expected a comment-on statement");
         };
@@ -11967,14 +12321,22 @@ mod tests {
         assert!(comment.comment.is_some());
 
         // `IS NULL` clears the comment, so it maps to `None`.
-        let null = parse_with("COMMENT ON TABLE t IS NULL", PG_DIALECT).unwrap();
+        let null = parse_with(
+            "COMMENT ON TABLE t IS NULL",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .unwrap();
         let Statement::CommentOn { comment, .. } = &null.statements()[0] else {
             panic!("expected a comment-on statement");
         };
         assert!(comment.comment.is_none());
 
         // A procedure carries its argument-type signature alongside the name.
-        let proc = parse_with("COMMENT ON PROCEDURE p(integer, text) IS 'r'", PG_DIALECT).unwrap();
+        let proc = parse_with(
+            "COMMENT ON PROCEDURE p(integer, text) IS 'r'",
+            crate::ParseConfig::new(PG_DIALECT),
+        )
+        .unwrap();
         let Statement::CommentOn { comment, .. } = &proc.statements()[0] else {
             panic!("expected a comment-on statement");
         };
@@ -11989,10 +12351,16 @@ mod tests {
         // `N'...'` is a national-string prefix the PostgreSQL scanner treats as NCHAR +
         // string, not a bare `Sconst`, so the comment value rejects it to keep parity —
         // even though the tokenizer folds it into one String token under this preset.
-        assert!(parse_with("COMMENT ON TABLE t IS N'x'", PG_DIALECT).is_err());
+        assert!(
+            parse_with(
+                "COMMENT ON TABLE t IS N'x'",
+                crate::ParseConfig::new(PG_DIALECT)
+            )
+            .is_err()
+        );
         // ANSI and MySQL gate the whole statement off (`comment_on` false).
-        assert!(parse_with("COMMENT ON TABLE t IS 'x'", Ansi).is_err());
-        assert!(parse_with("COMMENT ON TABLE t IS 'x'", MySql).is_err());
+        assert!(parse_with("COMMENT ON TABLE t IS 'x'", crate::ParseConfig::new(Ansi)).is_err());
+        assert!(parse_with("COMMENT ON TABLE t IS 'x'", crate::ParseConfig::new(MySql)).is_err());
     }
 
     fn create_type_of(parsed: &Parsed) -> &CreateType<NoExt> {
@@ -12036,7 +12404,7 @@ mod tests {
         // literals, not a data type.
         let parsed = parse_with(
             "CREATE OR REPLACE TYPE s.mood AS ENUM('sad', 'ok')",
-            DUCKDB_RENDER,
+            crate::ParseConfig::new(DUCKDB_RENDER),
         )
         .expect("parses");
         let create = create_type_of(&parsed);
@@ -12051,15 +12419,22 @@ mod tests {
         assert!(labels.iter().all(|l| l.kind == LiteralKind::String));
 
         // The empty label list is a distinct, valid shape (`ENUM ()`).
-        let empty = parse_with("CREATE TYPE e AS ENUM()", DUCKDB_RENDER).expect("parses");
+        let empty = parse_with(
+            "CREATE TYPE e AS ENUM()",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect("parses");
         let CreateTypeDefinition::Enum { labels, .. } = &create_type_of(&empty).definition else {
             panic!("expected an ENUM definition");
         };
         assert!(labels.is_empty());
 
         // The label-query form is its own variant.
-        let from_query =
-            parse_with("CREATE TYPE e AS ENUM (SELECT l FROM t)", DUCKDB_RENDER).expect("parses");
+        let from_query = parse_with(
+            "CREATE TYPE e AS ENUM (SELECT l FROM t)",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect("parses");
         assert!(matches!(
             create_type_of(&from_query).definition,
             CreateTypeDefinition::EnumFromQuery { .. }
@@ -12068,7 +12443,7 @@ mod tests {
         // A non-ENUM spelling aliases a data type; `IF NOT EXISTS` sets the guard.
         let alias = parse_with(
             "CREATE TYPE IF NOT EXISTS p AS STRUCT(i INTEGER)",
-            DUCKDB_RENDER,
+            crate::ParseConfig::new(DUCKDB_RENDER),
         )
         .expect("parses");
         let create = create_type_of(&alias);
@@ -12099,7 +12474,8 @@ mod tests {
             "CREATE TYPE m AS ENUM ('a') CASCADE",
             "CREATE TYPE s AS STRUCT()",
         ] {
-            parse_with(sql, DUCKDB_RENDER).expect_err(&format!("DuckDB rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+                .expect_err(&format!("DuckDB rejects {sql:?}"));
         }
     }
 
@@ -12118,7 +12494,11 @@ mod tests {
         ] {
             assert_duckdb_round_trips(sql);
         }
-        let parsed = parse_with("DROP TYPE IF EXISTS a, b CASCADE", DUCKDB_RENDER).expect("parses");
+        let parsed = parse_with(
+            "DROP TYPE IF EXISTS a, b CASCADE",
+            crate::ParseConfig::new(DUCKDB_RENDER),
+        )
+        .expect("parses");
         let [Statement::Drop { drop, .. }] = parsed.statements() else {
             panic!("expected a DROP statement");
         };
@@ -12134,10 +12514,14 @@ mod tests {
         // PostgreSQL/MySQL, so `TYPE` after `CREATE` falls through to the `CREATE TABLE`
         // expectation and `TYPE` is an unexpected `DROP` object kind — both reject.
         for sql in ["CREATE TYPE mood AS ENUM ('a')", "DROP TYPE mood"] {
-            parse_with(sql, Ansi).expect_err("ANSI gates CREATE/DROP TYPE off");
-            parse_with(sql, PG_DIALECT).expect_err("PostgreSQL gates CREATE/DROP TYPE off");
-            parse_with(sql, MySql).expect_err("MySQL gates CREATE/DROP TYPE off");
-            parse_with(sql, DUCKDB_RENDER).expect("DuckDB dispatches CREATE/DROP TYPE");
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err("ANSI gates CREATE/DROP TYPE off");
+            parse_with(sql, crate::ParseConfig::new(PG_DIALECT))
+                .expect_err("PostgreSQL gates CREATE/DROP TYPE off");
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err("MySQL gates CREATE/DROP TYPE off");
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
+                .expect("DuckDB dispatches CREATE/DROP TYPE");
         }
 
         // Prove the flag itself drives dispatch, not the concrete dialect: a POSTGRES base
@@ -12151,9 +12535,12 @@ mod tests {
         const FLAGGED_DIALECT: FeatureDialect = FeatureDialect {
             features: &PG_PLUS_TYPE,
         };
-        parse_with("CREATE TYPE mood AS ENUM ('a')", FLAGGED_DIALECT)
-            .expect("create_type on: PostgreSQL base now dispatches CREATE TYPE");
-        parse_with("DROP TYPE mood", FLAGGED_DIALECT)
+        parse_with(
+            "CREATE TYPE mood AS ENUM ('a')",
+            crate::ParseConfig::new(FLAGGED_DIALECT),
+        )
+        .expect("create_type on: PostgreSQL base now dispatches CREATE TYPE");
+        parse_with("DROP TYPE mood", crate::ParseConfig::new(FLAGGED_DIALECT))
             .expect("create_type on: PostgreSQL base now dispatches DROP TYPE");
     }
 
@@ -12172,7 +12559,11 @@ mod tests {
         assert_duckdb_round_trips("SELECT 'a'::SET('x', 'y')");
         // Under MySQL both `ENUM` and `SET` are value-list column types (SET is a column
         // type but not a `CAST` target, so it is exercised in a column definition).
-        parse_with("CREATE TABLE t (c SET('x', 'y'))", MySql).expect("MySQL has SET");
+        parse_with(
+            "CREATE TABLE t (c SET('x', 'y'))",
+            crate::ParseConfig::new(MySql),
+        )
+        .expect("MySQL has SET");
     }
 
     #[test]
@@ -12191,7 +12582,7 @@ mod tests {
             "CREATE TABLE t (a bool DEFAULT 1 = ANY(ARRAY[1, 2]))",
             "CREATE TABLE t (a int DEFAULT 1 + 2 IN (3, 4))",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).expect_err(&format!(
                 "PostgreSQL restricts a column DEFAULT to b_expr: {sql:?}"
             ));
         }
@@ -12205,12 +12596,13 @@ mod tests {
             "CREATE TABLE t (a int DEFAULT abs(1 IN (2, 3)))",
             "CREATE TABLE error_tbl (b1 bool DEFAULT (1 IN (1, 2)))",
         ] {
-            parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         }
         // The asymmetric `ALTER COLUMN … SET DEFAULT` site keeps the full `a_expr`.
         parse_with(
             "ALTER TABLE t ALTER COLUMN a SET DEFAULT 1 IN (1, 2)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("ALTER … SET DEFAULT is a_expr, not b_expr");
     }
@@ -12220,20 +12612,26 @@ mod tests {
         use crate::dialect::Postgres;
         parse_with(
             "CREATE SCHEMA IF NOT EXISTS s CREATE TABLE abc (a int)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect_err("CREATE SCHEMA IF NOT EXISTS cannot include a schema element");
         // The plain `IF NOT EXISTS` schema (terminator follows) parses, as does the element
         // form without `IF NOT EXISTS`.
-        parse_with("CREATE SCHEMA IF NOT EXISTS s", Postgres)
-            .expect("CREATE SCHEMA IF NOT EXISTS with no element parses");
+        parse_with(
+            "CREATE SCHEMA IF NOT EXISTS s",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("CREATE SCHEMA IF NOT EXISTS with no element parses");
         parse_with(
             "CREATE SCHEMA IF NOT EXISTS s; CREATE TABLE abc (a int)",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("a semicolon-separated CREATE after INE schema parses");
-        parse_with("CREATE SCHEMA s CREATE TABLE abc (a int)", Postgres)
-            .expect("CREATE SCHEMA + element without IF NOT EXISTS parses");
+        parse_with(
+            "CREATE SCHEMA s CREATE TABLE abc (a int)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("CREATE SCHEMA + element without IF NOT EXISTS parses");
     }
 
     /// The SQL-standard embedded schema-element form parses as ONE `CreateSchema`
@@ -12244,8 +12642,11 @@ mod tests {
         use crate::dialect::Postgres;
 
         // One element: exactly one top-level statement, one embedded child.
-        let parsed = parse_with("CREATE SCHEMA s CREATE TABLE t (a INTEGER)", Postgres)
-            .expect("embedded element parses");
+        let parsed = parse_with(
+            "CREATE SCHEMA s CREATE TABLE t (a INTEGER)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("embedded element parses");
         assert_eq!(
             parsed.statements().len(),
             1,
@@ -12263,7 +12664,7 @@ mod tests {
             "CREATE SCHEMA AUTHORIZATION joe CREATE TABLE t (a INTEGER)",
             "CREATE SCHEMA s AUTHORIZATION joe CREATE VIEW v AS SELECT 1",
         ] {
-            let parsed = parse_with(sql, Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             assert_eq!(parsed.statements().len(), 1, "{sql:?} is ONE statement");
             let rendered = Renderer::new(PG_DIALECT)
@@ -12282,7 +12683,7 @@ mod tests {
             "CREATE SCHEMA s SELECT 1",
             "CREATE SCHEMA s DROP TABLE t",
         ] {
-            parse_with(sql, Postgres)
+            parse_with(sql, crate::ParseConfig::new(Postgres))
                 .expect_err(&format!("{sql:?} is not an admissible schema element"));
         }
 
@@ -12292,11 +12693,18 @@ mod tests {
         // trailing `CREATE` is a syntax error; with an explicit `;` the same input is two
         // ordinary statements, the embedding being PostgreSQL/Lenient only.
         assert!(
-            parse_with("CREATE SCHEMA s CREATE TABLE t (a INTEGER)", TestDialect).is_err(),
+            parse_with(
+                "CREATE SCHEMA s CREATE TABLE t (a INTEGER)",
+                crate::ParseConfig::new(TestDialect)
+            )
+            .is_err(),
             "off-gate dialect rejects the separator-less trailing CREATE",
         );
-        let split = parse_with("CREATE SCHEMA s; CREATE TABLE t (a INTEGER)", TestDialect)
-            .expect("off-gate dialect parses the `;`-separated form");
+        let split = parse_with(
+            "CREATE SCHEMA s; CREATE TABLE t (a INTEGER)",
+            crate::ParseConfig::new(TestDialect),
+        )
+        .expect("off-gate dialect parses the `;`-separated form");
         assert_eq!(
             split.statements().len(),
             2,
@@ -12341,7 +12749,7 @@ mod tests {
             "ALTER TABLE p DETACH PARTITION c CONCURRENTLY",
             "ALTER TABLE p DETACH PARTITION c FINALIZE",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -12357,7 +12765,7 @@ mod tests {
         use crate::dialect::Postgres;
         let parsed = parse_with(
             "CREATE TABLE c PARTITION OF p (b WITH OPTIONS NOT NULL) FOR VALUES IN ('c')",
-            Postgres,
+            crate::ParseConfig::new(Postgres),
         )
         .expect("WITH OPTIONS augmentation parses");
         assert_eq!(
@@ -12400,7 +12808,8 @@ mod tests {
             "ALTER TABLE p ATTACH PARTITION c",
             "ALTER TABLE p ADD COLUMN x INT, ATTACH PARTITION c DEFAULT",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("PostgreSQL must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("PostgreSQL must reject {sql:?}"));
         }
     }
 
@@ -12425,14 +12834,18 @@ mod tests {
             "ALTER TABLE p ATTACH PARTITION c DEFAULT",
             "ALTER TABLE p DETACH PARTITION c",
         ] {
-            parse_with(sql, Ansi).expect_err(&format!("ANSI has no partitioning: {sql:?}"));
-            parse_with(sql, MySql).expect_err(&format!("MySQL has no PG partitioning: {sql:?}"));
-            parse_with(sql, Sqlite).expect_err(&format!("SQLite has no partitioning: {sql:?}"));
-            parse_with(sql, DuckDb).expect_err(&format!("DuckDB has no partitioning: {sql:?}"));
-            parse_with(sql, PG_NO_PARTITIONING_DIALECT)
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err(&format!("ANSI has no partitioning: {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err(&format!("MySQL has no PG partitioning: {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
+                .expect_err(&format!("SQLite has no partitioning: {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .expect_err(&format!("DuckDB has no partitioning: {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(PG_NO_PARTITIONING_DIALECT))
                 .expect_err(&format!("the gate off must reject: {sql:?}"));
             // On under PostgreSQL, the same statement parses.
-            parse_with(sql, crate::dialect::Postgres)
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("PostgreSQL accepts {sql:?}: {err:?}"));
         }
     }
@@ -12469,7 +12882,7 @@ mod tests {
             // LIKE + INHERITS + PARTITION BY all at once
             "CREATE TABLE t (LIKE src INCLUDING IDENTITY) INHERITS (p) PARTITION BY LIST (a)",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -12505,7 +12918,8 @@ mod tests {
             // LIKE as a statement-level clause (MySQL's form) is not the PostgreSQL element
             "CREATE TABLE t LIKE src",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("PostgreSQL must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("PostgreSQL must reject {sql:?}"));
         }
     }
 
@@ -12549,22 +12963,33 @@ mod tests {
                 PG_NO_LIKE_DIALECT,
             ),
         ] {
-            parse_with(sql, Ansi).expect_err(&format!("ANSI rejects {sql:?}"));
-            parse_with(sql, MySql).expect_err(&format!("MySQL rejects {sql:?}"));
-            parse_with(sql, Sqlite).expect_err(&format!("SQLite rejects {sql:?}"));
-            parse_with(sql, DuckDb).expect_err(&format!("DuckDB rejects {sql:?}"));
-            parse_with(sql, flag_off).expect_err(&format!("the gate off must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err(&format!("ANSI rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err(&format!("MySQL rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
+                .expect_err(&format!("SQLite rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .expect_err(&format!("DuckDB rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(flag_off))
+                .expect_err(&format!("the gate off must reject {sql:?}"));
             // On under PostgreSQL, the same statement parses.
-            parse_with(sql, crate::dialect::Postgres)
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("PostgreSQL accepts {sql:?}: {err:?}"));
         }
         // The bare `LIKE src` element (no options): the flag-cleared PostgreSQL dialect rejects it
         // (PostgreSQL reserves `LIKE`, so it cannot be a bare column name), proving the flag drives
         // acceptance even where SQLite's laxer identifier rules would read it as a column.
-        parse_with("CREATE TABLE t (LIKE src)", PG_NO_LIKE_DIALECT)
-            .expect_err("the LIKE gate off must reject a bare LIKE element on PostgreSQL");
-        parse_with("CREATE TABLE t (LIKE src)", crate::dialect::Postgres)
-            .expect("PostgreSQL accepts a bare LIKE element");
+        parse_with(
+            "CREATE TABLE t (LIKE src)",
+            crate::ParseConfig::new(PG_NO_LIKE_DIALECT),
+        )
+        .expect_err("the LIKE gate off must reject a bare LIKE element on PostgreSQL");
+        parse_with(
+            "CREATE TABLE t (LIKE src)",
+            crate::ParseConfig::new(crate::dialect::Postgres),
+        )
+        .expect("PostgreSQL accepts a bare LIKE element");
     }
 
     /// MySQL's statement-level `CREATE TABLE t LIKE src` table-clone body and its parenthesized
@@ -12584,7 +13009,7 @@ mod tests {
             ("CREATE TABLE t LIKE myschema.src", false),
             ("CREATE TABLE myschema.t (LIKE src)", true),
         ] {
-            let parsed = parse_with(sql, MySql)
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             match &create_table_of(&parsed).body {
                 CreateTableBody::LikeSource {
@@ -12614,7 +13039,8 @@ mod tests {
             "CREATE TABLE t (LIKE src, LIKE other)",
             "CREATE TABLE t (LIKE src INCLUDING ALL)",
         ] {
-            parse_with(sql, MySql).expect_err(&format!("MySQL must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err(&format!("MySQL must reject {sql:?}"));
         }
     }
 
@@ -12635,16 +13061,22 @@ mod tests {
             features: &MYSQL_NO_STMT_LIKE,
         };
         let sql = "CREATE TABLE t LIKE src";
-        parse_with(sql, Ansi).expect_err("ANSI rejects the statement-level clone");
-        parse_with(sql, Postgres).expect_err("PostgreSQL rejects the bare statement-level clone");
-        parse_with(sql, Sqlite).expect_err("SQLite rejects the statement-level clone");
-        parse_with(sql, DuckDb).expect_err("DuckDB rejects the statement-level clone");
-        parse_with(sql, MYSQL_NO_STMT_LIKE_DIALECT)
+        parse_with(sql, crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI rejects the statement-level clone");
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect_err("PostgreSQL rejects the bare statement-level clone");
+        parse_with(sql, crate::ParseConfig::new(Sqlite))
+            .expect_err("SQLite rejects the statement-level clone");
+        parse_with(sql, crate::ParseConfig::new(DuckDb))
+            .expect_err("DuckDB rejects the statement-level clone");
+        parse_with(sql, crate::ParseConfig::new(MYSQL_NO_STMT_LIKE_DIALECT))
             .expect_err("the gate off must reject the statement-level clone");
-        parse_with(sql, MySql).expect("MySQL accepts the statement-level clone");
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect("MySQL accepts the statement-level clone");
         // Lenient reads the parenthesized `(LIKE src)` as the PostgreSQL element (its superset),
         // but the bare form is this MySQL body — both accept there.
-        parse_with(sql, crate::dialect::Lenient).expect("Lenient accepts the bare clone");
+        parse_with(sql, crate::ParseConfig::new(crate::dialect::Lenient))
+            .expect("Lenient accepts the bare clone");
     }
 
     /// Round-trip the column-definition `COLLATE <collation>` surface under the PostgreSQL
@@ -12676,7 +13108,7 @@ mod tests {
             "CREATE TABLE t (a TEXT COLLATE \"C\" DEFERRABLE)",
             "ALTER TABLE t ADD COLUMN a TEXT COLLATE \"C\"",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -12697,7 +13129,8 @@ mod tests {
             "CREATE TABLE t (a TEXT COLLATE)",
             "CREATE TABLE t (a TEXT CONSTRAINT c COLLATE \"C\")",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("PostgreSQL must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("PostgreSQL must reject {sql:?}"));
         }
     }
 
@@ -12722,25 +13155,29 @@ mod tests {
         };
         let sql = "CREATE TABLE t (a TEXT COLLATE nocase)";
         for dialect_accepts in [
-            parse_with(sql, crate::dialect::Postgres).is_ok(),
-            parse_with(sql, Sqlite).is_ok(),
-            parse_with(sql, DuckDb).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres)).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
         ] {
             assert!(dialect_accepts, "PG/SQLite/DuckDB accept {sql:?}");
         }
-        parse_with(sql, Ansi).expect_err("ANSI has no column COLLATE");
-        parse_with(sql, MySql).expect_err("MySQL's column COLLATE is a distinct attribute grammar");
-        parse_with(sql, PG_NO_COLLATION_DIALECT).expect_err("the gate off must reject");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no column COLLATE");
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect_err("MySQL's column COLLATE is a distinct attribute grammar");
+        parse_with(sql, crate::ParseConfig::new(PG_NO_COLLATION_DIALECT))
+            .expect_err("the gate off must reject");
         // The named form is SQLite-only (`named_column_collate_constraint`): SQLite accepts, DuckDB
         // rejects (both engine-verified on the bundled/live engines).
         let named = "CREATE TABLE t (a TEXT CONSTRAINT c COLLATE nocase)";
-        parse_with(named, Sqlite).expect("SQLite names a COLLATE constraint");
-        parse_with(named, DuckDb).expect_err("DuckDB rejects a named COLLATE");
+        parse_with(named, crate::ParseConfig::new(Sqlite))
+            .expect("SQLite names a COLLATE constraint");
+        parse_with(named, crate::ParseConfig::new(DuckDb))
+            .expect_err("DuckDB rejects a named COLLATE");
         // SQLite accepts a repeated column COLLATE (engine-verified); the constraint loop
         // preserves both.
         parse_with(
             "CREATE TABLE t (a TEXT COLLATE nocase COLLATE binary)",
-            Sqlite,
+            crate::ParseConfig::new(Sqlite),
         )
         .expect("SQLite accepts repeated COLLATE clauses");
     }
@@ -12794,7 +13231,7 @@ mod tests {
             "CREATE TABLE t (a INTEGER) WITHOUT OIDS TABLESPACE ts",
             "CREATE TABLE t (a INTEGER) USING heap WITHOUT OIDS",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -12844,7 +13281,8 @@ mod tests {
             // PostgreSQL's grammar has no affirmative WITH OIDS
             "CREATE TABLE t (a INT) WITH OIDS",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("PostgreSQL must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("PostgreSQL must reject {sql:?}"));
         }
     }
 
@@ -12894,17 +13332,25 @@ mod tests {
         };
         // UNLOGGED: PostgreSQL + DuckDB accept; the rest (and the flag-cleared base) reject.
         let unlogged = "CREATE UNLOGGED TABLE t (a INT)";
-        parse_with(unlogged, crate::dialect::Postgres).expect("PostgreSQL accepts UNLOGGED");
-        parse_with(unlogged, DuckDb).expect("DuckDB accepts UNLOGGED");
-        parse_with("CREATE OR REPLACE UNLOGGED TABLE t (a INT)", DuckDb)
-            .expect("DuckDB accepts OR REPLACE UNLOGGED (engine-verified)");
-        parse_with(unlogged, Ansi).expect_err("ANSI rejects UNLOGGED");
-        parse_with(unlogged, MySql).expect_err("MySQL rejects UNLOGGED");
-        parse_with(unlogged, Sqlite).expect_err("SQLite rejects UNLOGGED");
-        parse_with(unlogged, PG_NO_UNLOGGED_DIALECT).expect_err("the gate off must reject");
+        parse_with(unlogged, crate::ParseConfig::new(crate::dialect::Postgres))
+            .expect("PostgreSQL accepts UNLOGGED");
+        parse_with(unlogged, crate::ParseConfig::new(DuckDb)).expect("DuckDB accepts UNLOGGED");
+        parse_with(
+            "CREATE OR REPLACE UNLOGGED TABLE t (a INT)",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DuckDB accepts OR REPLACE UNLOGGED (engine-verified)");
+        parse_with(unlogged, crate::ParseConfig::new(Ansi)).expect_err("ANSI rejects UNLOGGED");
+        parse_with(unlogged, crate::ParseConfig::new(MySql)).expect_err("MySQL rejects UNLOGGED");
+        parse_with(unlogged, crate::ParseConfig::new(Sqlite)).expect_err("SQLite rejects UNLOGGED");
+        parse_with(unlogged, crate::ParseConfig::new(PG_NO_UNLOGGED_DIALECT))
+            .expect_err("the gate off must reject");
         // DuckDB matches PostgreSQL's TEMP/UNLOGGED mutual exclusion (engine-verified).
-        parse_with("CREATE TEMP UNLOGGED TABLE t (a INT)", DuckDb)
-            .expect_err("DuckDB rejects TEMP UNLOGGED");
+        parse_with(
+            "CREATE TEMP UNLOGGED TABLE t (a INT)",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect_err("DuckDB rejects TEMP UNLOGGED");
         // The PostgreSQL-only clauses: off everywhere else, including DuckDB. MySQL is asserted
         // only where its open `<name> [=] <value>` trailing-option list does not apply: that
         // recorded-bound list reads a trailing `USING heap` / `WITHOUT OIDS` as an ordinary
@@ -12936,16 +13382,21 @@ mod tests {
                 true,
             ),
         ] {
-            parse_with(sql, Ansi).expect_err(&format!("ANSI rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err(&format!("ANSI rejects {sql:?}"));
             if mysql_rejects {
-                parse_with(sql, MySql).expect_err(&format!("MySQL rejects {sql:?}"));
+                parse_with(sql, crate::ParseConfig::new(MySql))
+                    .expect_err(&format!("MySQL rejects {sql:?}"));
             }
             if sqlite_rejects {
-                parse_with(sql, Sqlite).expect_err(&format!("SQLite rejects {sql:?}"));
+                parse_with(sql, crate::ParseConfig::new(Sqlite))
+                    .expect_err(&format!("SQLite rejects {sql:?}"));
             }
-            parse_with(sql, DuckDb).expect_err(&format!("DuckDB rejects {sql:?}"));
-            parse_with(sql, flag_off).expect_err(&format!("the gate off must reject {sql:?}"));
-            parse_with(sql, crate::dialect::Postgres)
+            parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .expect_err(&format!("DuckDB rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(flag_off))
+                .expect_err(&format!("the gate off must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("PostgreSQL accepts {sql:?}: {err:?}"));
         }
     }
@@ -12957,7 +13408,7 @@ mod tests {
     fn persistence_and_storage_populate_the_ast() {
         let parsed = parse_with(
             "CREATE UNLOGGED TABLE t (a TEXT STORAGE MAIN COMPRESSION lz4 NOT NULL) USING heap2",
-            crate::dialect::Postgres,
+            crate::ParseConfig::new(crate::dialect::Postgres),
         )
         .expect("parses");
         let create = create_table_of(&parsed);
@@ -13009,7 +13460,7 @@ mod tests {
             "CREATE TABLE t OF mytype TABLESPACE ts",
             "CREATE TABLE t OF mytype USING heap WITHOUT OIDS",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -13026,7 +13477,7 @@ mod tests {
     fn of_type_augmentation_normalizes_with_options_and_is_typeless() {
         let with_options = parse_with(
             "CREATE TABLE t OF mytype (a WITH OPTIONS NOT NULL) PARTITION BY RANGE (a)",
-            crate::dialect::Postgres,
+            crate::ParseConfig::new(crate::dialect::Postgres),
         )
         .expect("WITH OPTIONS parses");
         let rendered = Renderer::new(PG_DIALECT)
@@ -13074,7 +13525,8 @@ mod tests {
             "CREATE TABLE t OF mytype (a WITH OPTIONS INT)",
             "CREATE TABLE t OF mytype INHERITS (p)",
         ] {
-            parse_with(sql, Postgres).expect_err(&format!("PostgreSQL must reject {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Postgres))
+                .expect_err(&format!("PostgreSQL must reject {sql:?}"));
         }
     }
 
@@ -13095,12 +13547,13 @@ mod tests {
             features: &PG_NO_TYPED,
         };
         let sql = "CREATE TABLE t OF mytype (a WITH OPTIONS NOT NULL)";
-        parse_with(sql, Ansi).expect_err("ANSI has no typed tables");
-        parse_with(sql, MySql).expect_err("MySQL has no typed tables");
-        parse_with(sql, Sqlite).expect_err("SQLite has no typed tables");
-        parse_with(sql, DuckDb).expect_err("DuckDB has no typed tables");
-        parse_with(sql, PG_NO_TYPED_DIALECT).expect_err("the gate off must reject");
-        parse_with(sql, crate::dialect::Postgres)
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no typed tables");
+        parse_with(sql, crate::ParseConfig::new(MySql)).expect_err("MySQL has no typed tables");
+        parse_with(sql, crate::ParseConfig::new(Sqlite)).expect_err("SQLite has no typed tables");
+        parse_with(sql, crate::ParseConfig::new(DuckDb)).expect_err("DuckDB has no typed tables");
+        parse_with(sql, crate::ParseConfig::new(PG_NO_TYPED_DIALECT))
+            .expect_err("the gate off must reject");
+        parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
             .unwrap_or_else(|err| panic!("PostgreSQL accepts {sql:?}: {err:?}"));
     }
 
@@ -13130,7 +13583,7 @@ mod tests {
             "CREATE TABLE t (a INTEGER, EXCLUDE USING gist (a WITH =) WHERE (a > 0))",
             "CREATE TABLE t (a INTEGER, CONSTRAINT e EXCLUDE (a WITH =) INITIALLY DEFERRED)",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -13149,9 +13602,9 @@ mod tests {
             "CREATE TABLE t (a INTEGER, EXCLUDE USING gist (5 WITH =))",
             "CREATE TABLE t (a INTEGER, EXCLUDE USING gist (a + 1 WITH =))",
         ] {
-            parse_with(sql, crate::dialect::Postgres).expect_err(&format!(
-                "a bare non-parenthesized key must reject: {sql:?}"
-            ));
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres)).expect_err(
+                &format!("a bare non-parenthesized key must reject: {sql:?}"),
+            );
         }
     }
 
@@ -13161,11 +13614,16 @@ mod tests {
     fn postgres_exclude_constraint_is_gated() {
         use crate::dialect::{Ansi, DuckDb, MySql, Sqlite};
         let sql = "CREATE TABLE t (a INTEGER, EXCLUDE USING gist (a WITH =))";
-        parse_with(sql, Ansi).expect_err("ANSI has no exclusion constraints");
-        parse_with(sql, MySql).expect_err("MySQL has no exclusion constraints");
-        parse_with(sql, Sqlite).expect_err("SQLite has no exclusion constraints");
-        parse_with(sql, DuckDb).expect_err("DuckDB rejects exclusion constraints");
-        parse_with(sql, crate::dialect::Postgres).expect("PostgreSQL accepts EXCLUDE");
+        parse_with(sql, crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI has no exclusion constraints");
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect_err("MySQL has no exclusion constraints");
+        parse_with(sql, crate::ParseConfig::new(Sqlite))
+            .expect_err("SQLite has no exclusion constraints");
+        parse_with(sql, crate::ParseConfig::new(DuckDb))
+            .expect_err("DuckDB rejects exclusion constraints");
+        parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
+            .expect("PostgreSQL accepts EXCLUDE");
     }
 
     /// Round-trip the `CREATE TABLE … AS EXECUTE <prepared> [(args)] [WITH [NO] DATA]` CTAS
@@ -13178,7 +13636,7 @@ mod tests {
             "CREATE TABLE t AS EXECUTE p WITH DATA",
             "CREATE TEMPORARY TABLE t AS EXECUTE q(200, 'x') WITH NO DATA",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -13193,10 +13651,11 @@ mod tests {
     fn postgres_create_table_as_execute_is_gated() {
         use crate::dialect::{Ansi, DuckDb, MySql};
         let sql = "CREATE TABLE t AS EXECUTE p";
-        parse_with(sql, Ansi).expect_err("ANSI has no AS EXECUTE");
-        parse_with(sql, MySql).expect_err("MySQL has no AS EXECUTE");
-        parse_with(sql, DuckDb).expect_err("DuckDB rejects AS EXECUTE");
-        parse_with(sql, crate::dialect::Postgres).expect("PostgreSQL accepts AS EXECUTE");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no AS EXECUTE");
+        parse_with(sql, crate::ParseConfig::new(MySql)).expect_err("MySQL has no AS EXECUTE");
+        parse_with(sql, crate::ParseConfig::new(DuckDb)).expect_err("DuckDB rejects AS EXECUTE");
+        parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
+            .expect("PostgreSQL accepts AS EXECUTE");
     }
 
     /// Round-trip the `NO INHERIT` / `NOT VALID` constraint markers on the constraint kinds
@@ -13213,7 +13672,7 @@ mod tests {
             "CREATE TABLE t (a INTEGER, FOREIGN KEY (a) REFERENCES u (x) NOT VALID)",
             "CREATE TABLE t (a INTEGER CHECK (a > 0) NO INHERIT)",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -13229,9 +13688,9 @@ mod tests {
             "CREATE TABLE t (a INTEGER CHECK (a > 0) NOT VALID)",
             "CREATE TABLE t (a INTEGER REFERENCES u (x) NOT VALID)",
         ] {
-            parse_with(sql, crate::dialect::Postgres).expect_err(&format!(
-                "PostgreSQL rejects this marker/kind pair: {sql:?}"
-            ));
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres)).expect_err(
+                &format!("PostgreSQL rejects this marker/kind pair: {sql:?}"),
+            );
         }
     }
 
@@ -13241,11 +13700,15 @@ mod tests {
     fn postgres_constraint_markers_are_gated() {
         use crate::dialect::{Ansi, DuckDb, MySql, Sqlite};
         let sql = "CREATE TABLE t (a INTEGER, CHECK (a > 0) NO INHERIT)";
-        parse_with(sql, Ansi).expect_err("ANSI has no NO INHERIT marker");
-        parse_with(sql, MySql).expect_err("MySQL has no NO INHERIT marker");
-        parse_with(sql, Sqlite).expect_err("SQLite has no NO INHERIT marker");
-        parse_with(sql, DuckDb).expect("DuckDB shares the NO INHERIT marker");
-        parse_with(sql, crate::dialect::Postgres).expect("PostgreSQL accepts NO INHERIT");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no NO INHERIT marker");
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect_err("MySQL has no NO INHERIT marker");
+        parse_with(sql, crate::ParseConfig::new(Sqlite))
+            .expect_err("SQLite has no NO INHERIT marker");
+        parse_with(sql, crate::ParseConfig::new(DuckDb))
+            .expect("DuckDB shares the NO INHERIT marker");
+        parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
+            .expect("PostgreSQL accepts NO INHERIT");
     }
 
     /// Round-trip the PostgreSQL `UNIQUE`/`PRIMARY KEY` index-constraint parameters: the covering
@@ -13263,7 +13726,7 @@ mod tests {
             "CREATE TABLE t (a INTEGER PRIMARY KEY USING INDEX TABLESPACE pg_default)",
             "CREATE TABLE t (a INTEGER UNIQUE USING INDEX TABLESPACE ts)",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -13278,11 +13741,12 @@ mod tests {
     fn postgres_index_constraint_parameters_are_gated() {
         use crate::dialect::{Ansi, DuckDb, MySql, Sqlite};
         let sql = "CREATE TABLE t (a INTEGER, b INTEGER, PRIMARY KEY (a) INCLUDE (b))";
-        parse_with(sql, Ansi).expect_err("ANSI has no INCLUDE");
-        parse_with(sql, MySql).expect_err("MySQL has no INCLUDE");
-        parse_with(sql, Sqlite).expect_err("SQLite has no INCLUDE");
-        parse_with(sql, DuckDb).expect_err("DuckDB rejects INCLUDE");
-        parse_with(sql, crate::dialect::Postgres).expect("PostgreSQL accepts INCLUDE");
+        parse_with(sql, crate::ParseConfig::new(Ansi)).expect_err("ANSI has no INCLUDE");
+        parse_with(sql, crate::ParseConfig::new(MySql)).expect_err("MySQL has no INCLUDE");
+        parse_with(sql, crate::ParseConfig::new(Sqlite)).expect_err("SQLite has no INCLUDE");
+        parse_with(sql, crate::ParseConfig::new(DuckDb)).expect_err("DuckDB rejects INCLUDE");
+        parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
+            .expect("PostgreSQL accepts INCLUDE");
     }
 
     /// A signed `numeric`/`decimal` precision/scale (`NUMERIC(3, -6)`) parses and round-trips
@@ -13295,7 +13759,7 @@ mod tests {
             "CREATE TABLE t (a NUMERIC(3, -6))",
             "CREATE TABLE t (a NUMERIC(-3, 6))",
         ] {
-            let parsed = parse_with(sql, crate::dialect::Postgres)
+            let parsed = parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(PG_DIALECT)
                 .render_parsed(&parsed)
@@ -13307,7 +13771,7 @@ mod tests {
         // the negative scale through.
         let parsed = parse_with(
             "CREATE TABLE t (a DECIMAL(5, -2))",
-            crate::dialect::Postgres,
+            crate::ParseConfig::new(crate::dialect::Postgres),
         )
         .expect("DECIMAL(5, -2) parses");
         assert_eq!(
@@ -13317,10 +13781,14 @@ mod tests {
             "CREATE TABLE t (a NUMERIC(5, -2))",
         );
         let sql = "CREATE TABLE t (a NUMERIC(3, -6))";
-        parse_with(sql, Ansi).expect_err("ANSI requires an unsigned modifier");
-        parse_with(sql, MySql).expect_err("MySQL requires an unsigned modifier");
-        parse_with(sql, Sqlite).expect_err("SQLite requires an unsigned modifier");
-        parse_with(sql, DuckDb).expect_err("DuckDB requires an unsigned modifier");
+        parse_with(sql, crate::ParseConfig::new(Ansi))
+            .expect_err("ANSI requires an unsigned modifier");
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect_err("MySQL requires an unsigned modifier");
+        parse_with(sql, crate::ParseConfig::new(Sqlite))
+            .expect_err("SQLite requires an unsigned modifier");
+        parse_with(sql, crate::ParseConfig::new(DuckDb))
+            .expect_err("DuckDB requires an unsigned modifier");
     }
 
     /// A Lenient parse + render dialect (the permissive superset), for the shared `ALTER
@@ -13344,7 +13812,7 @@ mod tests {
         // Structural spot-checks.
         let create = parse_with(
             "CREATE SERVER s FOREIGN DATA WRAPPER mysql OPTIONS (HOST 'h', PORT 3306)",
-            MYSQL_RENDER,
+            crate::ParseConfig::new(MYSQL_RENDER),
         )
         .unwrap();
         let Statement::CreateServer { create, .. } = &create.statements()[0] else {
@@ -13355,7 +13823,11 @@ mod tests {
         assert_eq!(create.options[1].kind, ServerOptionKind::Port);
 
         // The unqualified `ALTER DATABASE` form (default schema) leaves the name unset.
-        let noname = parse_with("ALTER DATABASE CHARACTER SET utf8mb4", MYSQL_RENDER).unwrap();
+        let noname = parse_with(
+            "ALTER DATABASE CHARACTER SET utf8mb4",
+            crate::ParseConfig::new(MYSQL_RENDER),
+        )
+        .unwrap();
         let Statement::AlterDatabaseOptions { alter, .. } = &noname.statements()[0] else {
             panic!("expected an ALTER DATABASE options statement");
         };
@@ -13370,7 +13842,7 @@ mod tests {
 
         let inst = parse_with(
             "ALTER INSTANCE RELOAD TLS FOR CHANNEL ch NO ROLLBACK ON ERROR",
-            MYSQL_RENDER,
+            crate::ParseConfig::new(MYSQL_RENDER),
         )
         .unwrap();
         let Statement::AlterInstance { alter, .. } = &inst.statements()[0] else {
@@ -13422,8 +13894,8 @@ mod tests {
             "ALTER DATABASE CHARACTER SET utf8mb4",
             "ALTER SCHEMA d CHARACTER SET utf8mb4",
         ] {
-            let parsed =
-                parse_with(sql, MYSQL_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_RENDER))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -13457,7 +13929,8 @@ mod tests {
             "ALTER DATABASE d DEFAULT READ ONLY 1",
             "ALTER DATABASE d.x CHARACTER SET utf8mb4",
         ] {
-            parse_with(sql, MySql).expect_err(&format!("MySQL rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err(&format!("MySQL rejects {sql:?}"));
         }
     }
 
@@ -13472,24 +13945,33 @@ mod tests {
             "ALTER INSTANCE RELOAD TLS",
             "ALTER DATABASE d CHARACTER SET utf8mb4",
         ] {
-            parse_with(sql, MySql).unwrap_or_else(|err| panic!("MySQL accepts {sql:?}: {err:?}"));
-            parse_with(sql, LENIENT_RENDER)
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("MySQL accepts {sql:?}: {err:?}"));
+            parse_with(sql, crate::ParseConfig::new(LENIENT_RENDER))
                 .unwrap_or_else(|err| panic!("Lenient accepts {sql:?}: {err:?}"));
-            parse_with(sql, Ansi).expect_err(&format!("ANSI rejects {sql:?}"));
-            parse_with(sql, Sqlite).expect_err(&format!("SQLite rejects {sql:?}"));
-            parse_with(sql, crate::dialect::Postgres)
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err(&format!("ANSI rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
+                .expect_err(&format!("SQLite rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .expect_err(&format!("PostgreSQL rejects {sql:?}"));
         }
         // Lenient keeps DuckDB's disjoint `ALTER DATABASE … SET ALIAS TO` behaviour alongside
         // MySQL's option list — the head is disambiguated by the `SET` lookahead.
-        let alias = parse_with("ALTER DATABASE d SET ALIAS TO e", LENIENT_RENDER)
-            .expect("Lenient keeps DuckDB SET ALIAS");
+        let alias = parse_with(
+            "ALTER DATABASE d SET ALIAS TO e",
+            crate::ParseConfig::new(LENIENT_RENDER),
+        )
+        .expect("Lenient keeps DuckDB SET ALIAS");
         assert!(matches!(
             alias.statements()[0],
             Statement::AlterDatabase { .. }
         ));
-        let options = parse_with("ALTER DATABASE d CHARACTER SET utf8mb4", LENIENT_RENDER)
-            .expect("Lenient accepts MySQL options");
+        let options = parse_with(
+            "ALTER DATABASE d CHARACTER SET utf8mb4",
+            crate::ParseConfig::new(LENIENT_RENDER),
+        )
+        .expect("Lenient accepts MySQL options");
         assert!(matches!(
             options.statements()[0],
             Statement::AlterDatabaseOptions { .. }
@@ -13578,7 +14060,7 @@ mod tests {
             "DROP LOGFILE GROUP lg ENGINE = ndbcluster",
             "DROP LOGFILE GROUP lg ENGINE = ndbcluster WAIT",
         ] {
-            let parsed = parse_with(sql, MySql)
+            let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
                 .unwrap_or_else(|err| panic!("{sql:?} should parse: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
@@ -13591,7 +14073,7 @@ mod tests {
         // byte-identical round-trip.
         let comma = parse_with(
             "CREATE TABLESPACE ts ADD DATAFILE 'ts.ibd' INITIAL_SIZE = 128M, ENGINE = InnoDB",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("comma-separated options parse");
         assert_eq!(
@@ -13613,7 +14095,7 @@ mod tests {
 
         let parsed = parse_with(
             "CREATE UNDO TABLESPACE ut ADD DATAFILE 'ut.ibu' ENGINE = InnoDB",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .expect("parses");
         let Statement::CreateTablespace { create, .. } = &parsed.statements()[0] else {
@@ -13624,7 +14106,7 @@ mod tests {
 
         let parsed = parse_with(
             "CREATE TABLESPACE ts ADD DATAFILE 'ts.ibd' MAX_SIZE = 2G",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .unwrap();
         let Statement::CreateTablespace { create, .. } = &parsed.statements()[0] else {
@@ -13636,7 +14118,11 @@ mod tests {
         assert_eq!(*kind, TablespaceSizeOption::MaxSize);
         assert_eq!(size.unit, Some(SizeUnit::Giga), "the G suffix is tagged");
 
-        let parsed = parse_with("ALTER UNDO TABLESPACE ut SET INACTIVE", MySql).unwrap();
+        let parsed = parse_with(
+            "ALTER UNDO TABLESPACE ut SET INACTIVE",
+            crate::ParseConfig::new(MySql),
+        )
+        .unwrap();
         let Statement::AlterTablespace { alter, .. } = &parsed.statements()[0] else {
             panic!("expected ALTER TABLESPACE");
         };
@@ -13651,7 +14137,7 @@ mod tests {
         // A bare byte-count size carries no unit tag.
         let parsed = parse_with(
             "CREATE TABLESPACE ts ADD DATAFILE 'ts.ibd' INITIAL_SIZE = 134217728",
-            MySql,
+            crate::ParseConfig::new(MySql),
         )
         .unwrap();
         let Statement::CreateTablespace { create, .. } = &parsed.statements()[0] else {
@@ -13690,7 +14176,8 @@ mod tests {
             "CREATE TABLESPACE ts ADD DATAFILE 'ts.ibd' INITIAL_SIZE = 16 M",
             "CREATE TABLESPACE ts ADD DATAFILE 'ts.ibd' INITIAL_SIZE = 16MB",
         ] {
-            parse_with(sql, MySql).expect_err(&format!("{sql:?} must reject"));
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err(&format!("{sql:?} must reject"));
         }
     }
     /// Every grammar-valid form of the MySQL spatial-reference-system and resource-group DDL
@@ -13707,7 +14194,7 @@ mod tests {
         let srs = parse_with(
             "CREATE SPATIAL REFERENCE SYSTEM 990001 DESCRIPTION 'd' ORGANIZATION 'o' \
              IDENTIFIED BY 5 NAME 'z' DEFINITION 'w'",
-            MYSQL_RENDER,
+            crate::ParseConfig::new(MYSQL_RENDER),
         )
         .unwrap();
         let Statement::CreateSpatialReferenceSystem { create, .. } = &srs.statements()[0] else {
@@ -13732,7 +14219,7 @@ mod tests {
 
         let rg = parse_with(
             "CREATE RESOURCE GROUP g TYPE = USER VCPU = 0-2, 4 THREAD_PRIORITY = -5 DISABLE",
-            MYSQL_RENDER,
+            crate::ParseConfig::new(MYSQL_RENDER),
         )
         .unwrap();
         let Statement::CreateResourceGroup { create, .. } = &rg.statements()[0] else {
@@ -13750,7 +14237,11 @@ mod tests {
         assert_eq!(create.state, Some(ResourceGroupState::Disable));
 
         // `ALTER … FORCE` with no state keyword: `force` is a peer of `state`, not its suffix.
-        let force = parse_with("ALTER RESOURCE GROUP g FORCE", MYSQL_RENDER).unwrap();
+        let force = parse_with(
+            "ALTER RESOURCE GROUP g FORCE",
+            crate::ParseConfig::new(MYSQL_RENDER),
+        )
+        .unwrap();
         let Statement::AlterResourceGroup { alter, .. } = &force.statements()[0] else {
             panic!("expected an ALTER RESOURCE GROUP statement");
         };
@@ -13803,8 +14294,8 @@ mod tests {
             "DROP RESOURCE GROUP zzp_rg",
             "DROP RESOURCE GROUP g FORCE",
         ] {
-            let parsed =
-                parse_with(sql, MYSQL_RENDER).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_RENDER))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(MYSQL_RENDER)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -13815,7 +14306,7 @@ mod tests {
         // on mysql:8.4.10) and normalize to the canonical comma list on render.
         let bare = parse_with(
             "CREATE RESOURCE GROUP g TYPE = USER VCPU = 0 1 2",
-            MYSQL_RENDER,
+            crate::ParseConfig::new(MYSQL_RENDER),
         )
         .unwrap();
         let rendered = Renderer::new(MYSQL_RENDER).render_parsed(&bare).unwrap();
@@ -13848,7 +14339,8 @@ mod tests {
             "CREATE RESOURCE GROUP g TYPE = USER THREAD_PRIORITY = 0x1",
             "DROP RESOURCE GROUP g, h",
         ] {
-            parse_with(sql, MySql).expect_err(&format!("MySQL rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .expect_err(&format!("MySQL rejects {sql:?}"));
         }
     }
 
@@ -13863,12 +14355,15 @@ mod tests {
             "ALTER RESOURCE GROUP g ENABLE",
             "DROP RESOURCE GROUP g",
         ] {
-            parse_with(sql, MySql).unwrap_or_else(|err| panic!("MySQL accepts {sql:?}: {err:?}"));
-            parse_with(sql, LENIENT_RENDER)
+            parse_with(sql, crate::ParseConfig::new(MySql))
+                .unwrap_or_else(|err| panic!("MySQL accepts {sql:?}: {err:?}"));
+            parse_with(sql, crate::ParseConfig::new(LENIENT_RENDER))
                 .unwrap_or_else(|err| panic!("Lenient accepts {sql:?}: {err:?}"));
-            parse_with(sql, Ansi).expect_err(&format!("ANSI rejects {sql:?}"));
-            parse_with(sql, Sqlite).expect_err(&format!("SQLite rejects {sql:?}"));
-            parse_with(sql, crate::dialect::Postgres)
+            parse_with(sql, crate::ParseConfig::new(Ansi))
+                .expect_err(&format!("ANSI rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(Sqlite))
+                .expect_err(&format!("SQLite rejects {sql:?}"));
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Postgres))
                 .expect_err(&format!("PostgreSQL rejects {sql:?}"));
         }
     }

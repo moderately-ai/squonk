@@ -22,17 +22,17 @@ pub(crate) enum Polarity {
 /// tag-independent (see [`has_objective_behavior`]).
 #[derive(Clone, Copy)]
 pub(crate) enum Probe {
-    /// `parse_with(sql, AdHocDialect(features))` must accept.
+    /// `parse_with(sql, squonk::ParseConfig::new(AdHocDialect(features)))` must accept.
     ParseAccepts {
         sql: &'static str,
         features: &'static FeatureSet,
     },
-    /// `parse_with(sql, AdHocDialect(features))` must reject.
+    /// `parse_with(sql, squonk::ParseConfig::new(AdHocDialect(features)))` must reject.
     ParseRejects {
         sql: &'static str,
         features: &'static FeatureSet,
     },
-    /// `parse_with(sql, AdHocDialect(features))` must accept and its tree match `shape`.
+    /// `parse_with(sql, squonk::ParseConfig::new(AdHocDialect(features)))` must accept and its tree match `shape`.
     /// The structural half of a divergence where both feature settings parse but the
     /// parse *shape* differs (e.g. binding-power or set-operation reassociation).
     ParseShape {
@@ -68,16 +68,18 @@ impl Probe {
     fn holds(self) -> bool {
         match self {
             Probe::ParseAccepts { sql, features } => {
-                parse_with(sql, AdHocDialect(features)).is_ok()
+                parse_with(sql, squonk::ParseConfig::new(AdHocDialect(features))).is_ok()
             }
             Probe::ParseRejects { sql, features } => {
-                parse_with(sql, AdHocDialect(features)).is_err()
+                parse_with(sql, squonk::ParseConfig::new(AdHocDialect(features))).is_err()
             }
             Probe::ParseShape {
                 sql,
                 features,
                 shape,
-            } => matches!(parse_with(sql, AdHocDialect(features)), Ok(parsed) if shape(&parsed)),
+            } => {
+                matches!(parse_with(sql, squonk::ParseConfig::new(AdHocDialect(features))), Ok(parsed) if shape(&parsed))
+            }
             Probe::TokenShape {
                 sql,
                 features,
@@ -207,5 +209,5 @@ impl Dialect for AdHocDialect<'_> {
 /// of every label — the differential and round-trip corpora resolve their
 /// `required_features` labels against this same parser path.
 pub(crate) fn accepts_under(sql: &str, features: &FeatureSet) -> bool {
-    parse_with(sql, AdHocDialect(features)).is_ok()
+    parse_with(sql, squonk::ParseConfig::new(AdHocDialect(features))).is_ok()
 }

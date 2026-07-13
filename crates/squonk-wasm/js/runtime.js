@@ -44,21 +44,42 @@ export class SqlParseError extends Error {
 }
 /** Parsed SQL document with convenience methods for traversal and rendering. */
 export class Document {
-    raw;
+    #raw;
+    #native;
+    #source;
+    #dialect;
     #keywordSymbols = null;
     #lineStarts = null;
-    constructor(token, raw) {
+    constructor(token, raw, native = null, source, dialect) {
         if (token !== WRAPPER_TOKEN)
             throw new TypeError("Document instances are created by parse()");
-        this.raw = raw;
+        if (raw === null && native === null) {
+            throw new TypeError("Document requires a native handle or materialized payload");
+        }
+        this.#raw = raw;
+        this.#native = native;
+        this.#source = source ?? raw?.source ?? native?.source ?? "";
+        this.#dialect = dialect ?? (raw?.dialect ?? native?.dialect ?? "ansi");
+    }
+    /** Raw JSON parse payload, materialized on first access. */
+    get raw() {
+        if (this.#raw === null) {
+            const native = this.#native;
+            if (native === null) {
+                throw new Error("Document has no native or materialized representation");
+            }
+            this.#raw = unwrap(() => native.to_value());
+            this.#native = null;
+        }
+        return this.#raw;
     }
     /** Original SQL source. */
     get source() {
-        return this.raw.source;
+        return this.#source;
     }
     /** Canonical dialect used to parse this document. */
     get dialect() {
-        return (this.raw.dialect ?? "ansi");
+        return this.#dialect;
     }
     /** Top-level statements wrapped as traversal nodes. */
     get statements() {
@@ -157,6 +178,9 @@ export class Document {
         }
         const dialect = options?.dialect ?? this.dialect;
         const mode = options?.mode ?? "canonical";
+        if (this.#raw === null && this.#native !== null) {
+            return unwrap(() => this.#native?.render(dialect, mode) ?? "");
+        }
         if (runtime.wasm.render_document === undefined) {
             throw new Error("Document.toSQL() requires the package's document renderer");
         }
@@ -368,25 +392,27 @@ export class Diagnostic {
         return this.span ? this.document.location(this.span.start) : null;
     }
 }
-/** Construct a typed facade over one wasm-bindgen artifact. */
+/** Construct a typed facade over a native Node-API or wasm-bindgen backend. */
 export function createSquonkApi(wasm, options) {
     const runtime = {
         wasm,
     };
     class RuntimeDocument extends Document {
-        constructor(raw) {
-            super(WRAPPER_TOKEN, raw);
+        constructor(raw, native = null, source, dialect) {
+            super(WRAPPER_TOKEN, raw, native, source, dialect);
             documentRuntimes.set(this, runtime);
         }
     }
     class RuntimeRecoveredDocument extends RecoveredDocument {
-        constructor(raw) {
-            super(WRAPPER_TOKEN, raw);
+        constructor(raw, native = null, source, dialect) {
+            super(WRAPPER_TOKEN, raw, native, source, dialect);
             documentRuntimes.set(this, runtime);
         }
     }
     function requestedDialect(callOptions) {
-        return callOptions.dialect ?? options.defaultDialect;
+        const dialect = callOptions.dialect ?? options.defaultDialect;
+        assertDialectName(dialect);
+        return dialect;
     }
     function canonicalDialectName(value) {
         const lower = value.toLowerCase();
@@ -410,22 +436,39 @@ export function createSquonkApi(wasm, options) {
         }
     }
     function parse(sql, parseOptions = {}) {
-        return new RuntimeDocument(parseJson(sql, parseOptions));
+        const requested = requestedDialect(parseOptions);
+        const dialect = canonicalDialectName(requested);
+        if (dialect === null) {
+            assertDialectName(requested);
+            throw new Error("unreachable");
+        }
+        const native = unwrap(() => wasm.parse_document_with(sql, requested, parseOptions.recursionLimit ?? undefined, parseOptions.captureTrivia ?? false, parseOptions.parseFloatAsDecimal ?? false));
+        return new RuntimeDocument(null, native, sql, dialect);
     }
     function parseJson(sql, parseOptions = {}) {
-        return unwrap(() => wasm.parse_with_options(sql, requestedDialect(parseOptions), parseOptions.recursionLimit ?? undefined, parseOptions.captureTrivia ?? false, parseOptions.parseFloatAsDecimal ?? false));
+        return unwrap(() => wasm.parse_with(sql, requestedDialect(parseOptions), parseOptions.recursionLimit ?? undefined, parseOptions.captureTrivia ?? false, parseOptions.parseFloatAsDecimal ?? false));
     }
     function parseWithLimit(sql, dialect, limit) {
         return parse(sql, { dialect, recursionLimit: limit });
     }
     function parseRecovering(sql, parseOptions = {}) {
-        return new RuntimeRecoveredDocument(parseRecoveringJson(sql, parseOptions));
+        const requested = requestedDialect(parseOptions);
+        const dialect = canonicalDialectName(requested);
+        if (dialect === null) {
+            assertDialectName(requested);
+            throw new Error("unreachable");
+        }
+        const native = unwrap(() => wasm.parse_recovering_document_with(sql, requested, parseOptions.recursionLimit ?? undefined, parseOptions.captureTrivia ?? false, parseOptions.parseFloatAsDecimal ?? false));
+        return new RuntimeRecoveredDocument(null, native, sql, dialect);
     }
     function parseRecoveringJson(sql, parseOptions = {}) {
-        return unwrap(() => wasm.parse_recovering_with_options(sql, requestedDialect(parseOptions), parseOptions.recursionLimit ?? undefined, parseOptions.captureTrivia ?? false, parseOptions.parseFloatAsDecimal ?? false));
+        return unwrap(() => wasm.parse_recovering_with(sql, requestedDialect(parseOptions), parseOptions.recursionLimit ?? undefined, parseOptions.captureTrivia ?? false, parseOptions.parseFloatAsDecimal ?? false));
     }
     function supportedDialects() {
-        return unwrap(() => wasm.supported_dialects());
+        const active = new Set(options.supportedDialects);
+        const dialects = unwrap(() => wasm.supported_dialects());
+        return dialects
+            .filter((dialect) => active.has(dialect.name));
     }
     function tokenize(sql, tokenizeOptions = {}) {
         return unwrap(() => wasm.tokenize(sql, requestedDialect(tokenizeOptions), tokenizeOptions.includeTrivia ?? false));
@@ -446,13 +489,21 @@ export function createSquonkApi(wasm, options) {
         return unwrap(() => wasm.format?.(sql, requestedDialect(formatOptions), formatOptions.indentWidth ?? 2, formatOptions.maxWidth ?? 80, formatOptions.keywordCase ?? "upper") ?? "");
     }
     function transpile(sql, transpileOptions = {}) {
-        return unwrap(() => wasm.transpile(sql, transpileOptions.sourceDialect ?? options.defaultDialect, transpileOptions.targetDialect ?? options.defaultDialect));
+        const sourceDialect = transpileOptions.sourceDialect ?? options.defaultDialect;
+        const targetDialect = transpileOptions.targetDialect ?? options.defaultDialect;
+        assertDialectName(sourceDialect);
+        assertDialectName(targetDialect);
+        return unwrap(() => wasm.transpile(sql, sourceDialect, targetDialect));
     }
     function version() {
         return wasm.version();
     }
     function schemaVersion() {
         return wasm.schema_version();
+    }
+    const runtimeInfoValue = Object.freeze(options.runtime ?? { backend: "wasm", host: "unknown" });
+    function runtimeInfo() {
+        return runtimeInfoValue;
     }
     return {
         SqlParseError,
@@ -478,6 +529,7 @@ export function createSquonkApi(wasm, options) {
         transpile,
         version,
         schemaVersion,
+        runtimeInfo,
     };
 }
 /** Build the one-shot asynchronous loader exposed by each browser entrypoint. */
@@ -487,7 +539,10 @@ export function createBrowserSquonk(initWasm, wasm, defaultWasmUrl, options) {
         if (active === undefined) {
             const input = createOptions.wasm ?? defaultWasmUrl;
             active = initWasm({ module_or_path: input })
-                .then(() => createSquonkApi(wasm, options))
+                .then(() => createSquonkApi(wasm, {
+                ...options,
+                runtime: { backend: "wasm", host: "browser" },
+            }))
                 .catch((error) => {
                 active = undefined;
                 throw error;

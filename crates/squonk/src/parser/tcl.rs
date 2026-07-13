@@ -382,7 +382,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 Ok(Literal {
                     kind: number_literal_kind(
                         self.span_text(token.span),
-                        self.parse_float_as_decimal(),
+                        self.float_as_decimal_enabled(),
                     ),
                     meta: self.make_meta(token.span),
                 })
@@ -404,7 +404,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         }
         self.advance()?;
         Ok(Literal {
-            kind: number_literal_kind(self.span_text(token.span), self.parse_float_as_decimal()),
+            kind: number_literal_kind(self.span_text(token.span), self.float_as_decimal_enabled()),
             meta: self.make_meta(token.span),
         })
     }
@@ -419,7 +419,8 @@ mod tests {
     use crate::parser::{TestDialect, parse_with};
 
     fn parse_transaction(sql: &str) -> TransactionStatement {
-        let parsed = parse_with(sql, TestDialect).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(TestDialect))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let [Statement::Transaction { transaction, .. }] = parsed.statements() else {
             panic!(
                 "{sql:?} did not parse to one transaction statement: {:?}",
@@ -469,7 +470,8 @@ mod tests {
 
     #[test]
     fn begin_statement_span_covers_the_whole_construct() {
-        let parsed = parse_with("START TRANSACTION", TestDialect).expect("parses");
+        let parsed =
+            parse_with("START TRANSACTION", crate::ParseConfig::new(TestDialect)).expect("parses");
         let [stmt @ Statement::Transaction { .. }] = parsed.statements() else {
             panic!("expected one transaction statement");
         };
@@ -609,7 +611,8 @@ mod tests {
 
     #[test]
     fn savepoint_and_release_capture_the_name() {
-        let parsed = parse_with("SAVEPOINT sp1", TestDialect).expect("parses");
+        let parsed =
+            parse_with("SAVEPOINT sp1", crate::ParseConfig::new(TestDialect)).expect("parses");
         let [Statement::Transaction { transaction, .. }] = parsed.statements() else {
             panic!("expected a transaction statement");
         };
@@ -638,7 +641,7 @@ mod tests {
             "START TRANSACTION NOT",     // NOT without DEFERRABLE
         ] {
             assert!(
-                parse_with(sql, TestDialect).is_err(),
+                parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
                 "{sql:?} should be rejected",
             );
         }
@@ -657,7 +660,8 @@ mod tests {
     };
 
     fn parse_xa(sql: &str) -> XaStatement {
-        let parsed = parse_with(sql, XA_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(XA_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let [Statement::Xa { xa, .. }] = parsed.statements() else {
             panic!(
                 "{sql:?} did not parse to one XA statement: {:?}",
@@ -673,7 +677,7 @@ mod tests {
         // it is not dispatched under ANSI, where it surfaces as an unknown statement.
         let _ = parse_xa("XA PREPARE 'x'");
         assert!(
-            parse_with("XA PREPARE 'x'", TestDialect).is_err(),
+            parse_with("XA PREPARE 'x'", crate::ParseConfig::new(TestDialect)).is_err(),
             "`XA` must not be dispatched without the gate",
         );
     }
@@ -787,7 +791,7 @@ mod tests {
         ] {
             let xa = parse_xa(sql);
             assert!(check(&xa), "{sql:?} shape: {xa:?}");
-            let parsed = parse_with(sql, XA_DIALECT).expect("parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(XA_DIALECT)).expect("parses");
             let rendered = Renderer::new(XA_DIALECT)
                 .render_parsed(&parsed)
                 .unwrap_or_else(|err| panic!("{sql:?} renders: {err:?}"));
@@ -811,8 +815,8 @@ mod tests {
             "XA START 'g', 'b', 0x10",
             "XA START 'g', 'b', 3.5",
         ] {
-            let parsed =
-                parse_with(sql, XA_DIALECT).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let parsed = parse_with(sql, crate::ParseConfig::new(XA_DIALECT))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             assert!(
                 matches!(parsed.statements(), [Statement::Xa { .. }]),
                 "{sql:?} should parse to an XA statement",
@@ -848,7 +852,7 @@ mod tests {
             "XA WOBBLE 'gtrid'",             // unknown verb
         ] {
             assert!(
-                parse_with(sql, XA_DIALECT).is_err(),
+                parse_with(sql, crate::ParseConfig::new(XA_DIALECT)).is_err(),
                 "{sql:?} should be rejected",
             );
         }

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+[package]
+name = "squonk-node"
+description = "Native Node.js bindings for the squonk SQL parser"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "=3.4.0", default-features = false, features = ["napi8", "serde-json", "dyn-symbols"] }
+napi-derive = { version = "=3.2.5", default-features = false, features = ["strict", "type-def", "ctor"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+squonk = { workspace = true, features = ["full", "serde-serialize", "serde-deserialize", "document-render"] }
+
+[build-dependencies]
+napi-build = "=2.2.4"

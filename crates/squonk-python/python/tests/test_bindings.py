@@ -98,6 +98,22 @@ def test_document_helpers_walk_source_text_locations_and_sql() -> None:
     assert tree.to_sql() == "SELECT salary FROM employees"
 
 
+def test_document_stays_native_until_structured_data_is_requested() -> None:
+    tree = squonk.parse("SELECT salary FROM employees", "postgres")
+
+    assert tree._raw is None
+    assert tree._native is not None
+    assert tree.source == "SELECT salary FROM employees"
+    assert tree.dialect == "postgres"
+    assert tree.to_sql() == "SELECT salary FROM employees"
+    assert tree._raw is None
+    assert tree._native is not None
+
+    assert tree.raw["statements"]
+    assert tree._raw is not None
+    assert tree._native is None
+
+
 def test_parse_can_capture_trivia_on_the_document_root() -> None:
     tree = squonk.parse("/* lead */ SELECT 1", capture_trivia=True)
     assert tree.trivia
@@ -182,6 +198,20 @@ def test_recovering_collects_errors_and_keeps_good_statements() -> None:
         assert error["message"]
         assert isinstance(error["span_start"], int)
         assert isinstance(error["span_end"], int)
+
+
+def test_recovering_document_renders_before_materializing_diagnostics() -> None:
+    result = squonk.parse_recovering("SELECT alpha; ); SELECT gamma")
+
+    assert result._raw is None
+    assert result._native is not None
+    assert result.to_sql() == "SELECT alpha; SELECT gamma"
+    assert result._raw is None
+    assert result._native is not None
+
+    assert result.errors
+    assert result._raw is not None
+    assert result._native is None
 
 
 def test_recovering_shares_the_parse_root_shape() -> None:

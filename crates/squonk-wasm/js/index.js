@@ -44,3 +44,5 @@ export const transpile = api.transpile;
 export const version = api.version;
 /** Return the serialized AST wire-schema version. */
 export const schemaVersion = api.schemaVersion;
+/** Describe the selected native or WebAssembly runtime backend. */
+export const runtimeInfo = api.runtimeInfo;

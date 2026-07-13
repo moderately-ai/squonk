@@ -72,10 +72,9 @@ fn parseable_lines() -> Vec<&'static str> {
         if line.is_empty() || line.starts_with("--") {
             continue;
         }
-        let standalone_ok =
-            matches!(parse_with(line, Postgres), Ok(p) if p.statements().len() == 1);
+        let standalone_ok = matches!(parse_with(line, squonk::ParseConfig::new(Postgres)), Ok(p) if p.statements().len() == 1);
         let joins_cleanly = matches!(
-            parse_with(&format!("{line} ; SELECT 1"), Postgres),
+            parse_with(&format!("{line} ; SELECT 1"), squonk::ParseConfig::new(Postgres)),
             Ok(p) if p.statements().len() == 2
         );
         if standalone_ok && joins_cleanly {
@@ -181,7 +180,10 @@ fn merge_batch(parseds: &[StockParsed]) -> (Vec<Statement<NoExt>>, FrozenResolve
 fn bulk_seq(lines: &[&str]) -> usize {
     let mut n = 0;
     for &s in lines {
-        n += parse_with(s, Postgres).expect("parses").statements().len();
+        n += parse_with(s, squonk::ParseConfig::new(Postgres))
+            .expect("parses")
+            .statements()
+            .len();
     }
     n
 }
@@ -207,14 +209,19 @@ fn bulk_rayon(lines: &[&str]) -> usize {
     use rayon::prelude::*;
     lines
         .par_iter()
-        .map(|&s| parse_with(s, Postgres).expect("parses").statements().len())
+        .map(|&s| {
+            parse_with(s, squonk::ParseConfig::new(Postgres))
+                .expect("parses")
+                .statements()
+                .len()
+        })
         .sum()
 }
 
 /// BATCH sequential baseline: ONE `parse_with` over the `;`-joined input — the
 /// production batch API, one interner + one NodeId space.
 fn batch_seq(joined: &str) -> usize {
-    parse_with(joined, Postgres)
+    parse_with(joined, squonk::ParseConfig::new(Postgres))
         .expect("batch parses")
         .statements()
         .len()
@@ -236,7 +243,7 @@ fn parse_workers(lines: &[&str], workers: usize) -> Vec<StockParsed> {
     if workers <= 1 || lines.len() < 2 {
         return lines
             .iter()
-            .map(|&s| parse_with(s, Postgres).expect("parses"))
+            .map(|&s| parse_with(s, squonk::ParseConfig::new(Postgres)).expect("parses"))
             .collect();
     }
     let chunk = lines.len().div_ceil(workers);
@@ -246,7 +253,9 @@ fn parse_workers(lines: &[&str], workers: usize) -> Vec<StockParsed> {
             .map(|c| {
                 scope.spawn(move || {
                     c.iter()
-                        .map(|&s| parse_with(s, Postgres).expect("parses"))
+                        .map(|&s| {
+                            parse_with(s, squonk::ParseConfig::new(Postgres)).expect("parses")
+                        })
                         .collect::<Vec<_>>()
                 })
             })
@@ -292,12 +301,16 @@ fn verify(lines: &[&str]) {
     // independent of raw Symbol/NodeId values — the robust identity guarantee.
     let sample = &lines[..lines.len().min(200)];
     let joined = sample.join("; ");
-    let seq_render = parse_with(&joined, Postgres)
+    let seq_render = parse_with(&joined, squonk::ParseConfig::new(Postgres))
         .expect("batch parses")
         .to_string();
     let par_render = sample
         .iter()
-        .map(|&s| parse_with(s, Postgres).expect("parses").to_string())
+        .map(|&s| {
+            parse_with(s, squonk::ParseConfig::new(Postgres))
+                .expect("parses")
+                .to_string()
+        })
         .collect::<Vec<_>>()
         .join("; ");
     assert_eq!(

@@ -13,7 +13,7 @@ use crate::parser::Dialect;
 
 /// The DuckDB dialect ([`FeatureSet::DUCKDB`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, DuckDb)`. DuckDB
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(DuckDb))`. DuckDB
 /// is PostgreSQL-dialect-compatible, so this preset is [`Postgres`](super::Postgres)'s
 /// with the measured deltas: the `0x`/`0o`/`0b` radix integer forms and `_` digit
 /// separators, the `QUALIFY` clause (and its keyword reservation), the collection
@@ -68,9 +68,12 @@ mod tests {
             "SELECT 1_000_000 + 1",   // underscore digit separators
             "SELECT 0xDEAD_BEEF + 1", // radix + separators together
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
             assert!(
-                parse_with(sql, Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
                 "ANSI rejects the DuckDB-only radix form {sql:?}",
             );
         }
@@ -85,7 +88,10 @@ mod tests {
             "SELECT $tag$dollar quoted$tag$",
             "SELECT E'\\n'",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
     }
 
@@ -96,11 +102,11 @@ mod tests {
         // the divergence the fitted preset closes — proven by the direct Postgres/DuckDb
         // contrast so the tightening cannot silently regress.
         assert!(
-            parse_with("SELECT", DuckDb).is_err(),
+            parse_with("SELECT", crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDB rejects the empty target list",
         );
         assert!(
-            parse_with("SELECT", Postgres).is_ok(),
+            parse_with("SELECT", crate::ParseConfig::new(Postgres)).is_ok(),
             "PostgreSQL accepts the empty target list (the divergence DuckDB tightens)",
         );
     }
@@ -124,7 +130,7 @@ mod tests {
         // preset reserving `QUALIFY` so the relation cannot absorb it as an alias.
         let parsed = parse_with(
             "SELECT a FROM t QUALIFY row_number() OVER (PARTITION BY id ORDER BY ts DESC) = 1",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("DuckDB parses QUALIFY");
         let select = select_of(&parsed);
@@ -146,12 +152,15 @@ mod tests {
             // parse-level contract.
             "SELECT a FROM t QUALIFY a > 1",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
         assert!(
             parse_with(
                 "SELECT a FROM t QUALIFY row_number() OVER w = 1 WINDOW w AS (PARTITION BY id)",
-                DuckDb,
+                crate::ParseConfig::new(DuckDb),
             )
             .is_err(),
             "QUALIFY cannot precede the WINDOW clause (engine-verified order)",
@@ -172,7 +181,7 @@ mod tests {
             "SELECT a FROM t GROUP BY a QUALIFY row_number() OVER () = 1 ORDER BY a LIMIT 2",
             "SELECT a FROM t WINDOW w AS (PARTITION BY id) QUALIFY row_number() OVER w = 1",
         ] {
-            let parsed = parse_with(sql, DuckDb).expect("QUALIFY parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("QUALIFY parses");
             assert_eq!(
                 Renderer::new(Lenient)
                     .render_parsed(&parsed)
@@ -192,11 +201,11 @@ mod tests {
             "SELECT a FROM t QUALIFY row_number() OVER (PARTITION BY id ORDER BY ts DESC) = 1",
         ] {
             assert!(
-                parse_with(sql, Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
                 "ANSI rejects the QUALIFY clause: {sql:?}",
             );
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects the QUALIFY clause: {sql:?}",
             );
         }
@@ -217,16 +226,16 @@ mod tests {
             "CREATE TABLE qualify (i INT)",
         ] {
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
                 "DuckDB reserves QUALIFY: {sql:?}",
             );
         }
         assert!(
-            parse_with("SELECT 1 AS qualify", DuckDb).is_ok(),
+            parse_with("SELECT 1 AS qualify", crate::ParseConfig::new(DuckDb)).is_ok(),
             "a reserved keyword is still a valid AS label",
         );
         assert!(
-            parse_with("SELECT \"qualify\" FROM t", DuckDb).is_ok(),
+            parse_with("SELECT \"qualify\" FROM t", crate::ParseConfig::new(DuckDb)).is_ok(),
             "the quoted spelling is an ordinary identifier",
         );
     }
@@ -245,11 +254,11 @@ mod tests {
             "CREATE TABLE qualify (i INT)",
         ] {
             assert!(
-                parse_with(sql, Ansi).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_ok(),
                 "ANSI leaves qualify a free identifier: {sql:?}",
             );
             assert!(
-                parse_with(sql, Postgres).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
                 "PostgreSQL leaves qualify a free identifier: {sql:?}",
             );
         }
@@ -307,15 +316,22 @@ mod tests {
 
         // The render fold: `DECIMAL()` renders as bare `DECIMAL`, while a genuine
         // `DECIMAL(18, 3)` still round-trips its modifier.
-        let empty = parse_with("SELECT CAST(x AS DECIMAL())", DuckDb).expect("DECIMAL() parses");
+        let empty = parse_with(
+            "SELECT CAST(x AS DECIMAL())",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DECIMAL() parses");
         assert_eq!(
             Renderer::new(Lenient)
                 .render_parsed(&empty)
                 .expect("renders"),
             "SELECT CAST(x AS DECIMAL)",
         );
-        let sized =
-            parse_with("SELECT CAST(x AS DECIMAL(18, 3))", DuckDb).expect("DECIMAL(18,3) parses");
+        let sized = parse_with(
+            "SELECT CAST(x AS DECIMAL(18, 3))",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DECIMAL(18,3) parses");
         assert_eq!(
             Renderer::new(Lenient)
                 .render_parsed(&sized)
@@ -333,9 +349,12 @@ mod tests {
             "SELECT CAST(x AS DEC())",
             "SELECT CAST(x AS NUMERIC())",
         ] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects {sql:?}",
             );
         }
@@ -353,7 +372,8 @@ mod tests {
             ("SELECT list_filter([1, 2, 3, 4], x -> x % 2 = 0)", 1),
             ("SELECT list_reduce([1, 2, 3], (x, y) -> x + y)", 2),
         ] {
-            let parsed = parse_with(sql, DuckDb).expect("the sweep lambda parses");
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("the sweep lambda parses");
             let select = select_of(&parsed);
             let crate::ast::SelectItem::Expr { expr, .. } = &select.projection[0] else {
                 panic!("expected an expression item for {sql:?}");
@@ -376,7 +396,8 @@ mod tests {
         // later rejects an unconsumed lambda) — so the parse-level gate is
         // position-independent too, never restricted to function arguments.
         use crate::ast::Expr;
-        let parsed = parse_with("SELECT x -> x + 1", DuckDb).expect("a bare lambda parses");
+        let parsed = parse_with("SELECT x -> x + 1", crate::ParseConfig::new(DuckDb))
+            .expect("a bare lambda parses");
         let select = select_of(&parsed);
         let crate::ast::SelectItem::Expr { expr, .. } = &select.projection[0] else {
             panic!("expected an expression item");
@@ -436,7 +457,10 @@ mod tests {
             "SELECT * FROM (UNPIVOT monthly_sales ON jan, feb)",
             "WITH x AS (SELECT 1) SELECT * FROM (WITH c AS (SELECT 2) PIVOT c ON a USING sum(b))",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
     }
 
@@ -464,7 +488,10 @@ mod tests {
             "PIVOT Cities ON Year IS NULL USING sum(Population)",
             "PIVOT Cities ON Year NOT IN (2000) USING sum(Population)",
         ] {
-            assert!(parse_with(sql, DuckDb).is_err(), "DuckDB rejects {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
+                "DuckDB rejects {sql:?}"
+            );
         }
     }
 
@@ -481,9 +508,12 @@ mod tests {
             "SELECT * FROM monthly_sales UNPIVOT (sales FOR month IN (jan, feb))",
             "SELECT * FROM (PIVOT Cities ON Year USING sum(Population))",
         ] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects {sql:?}",
             );
         }
@@ -507,18 +537,18 @@ mod tests {
             ] {
                 let sql = template.replace("{}", word);
                 assert!(
-                    parse_with(&sql, DuckDb).is_err(),
+                    parse_with(&sql, crate::ParseConfig::new(DuckDb)).is_err(),
                     "DuckDB reserves {word}: {sql:?}",
                 );
             }
             let label = format!("SELECT 1 AS {word}");
             assert!(
-                parse_with(&label, DuckDb).is_ok(),
+                parse_with(&label, crate::ParseConfig::new(DuckDb)).is_ok(),
                 "a reserved keyword is still a valid AS label",
             );
             let quoted = format!("SELECT \"{word}\" FROM t");
             assert!(
-                parse_with(&quoted, DuckDb).is_ok(),
+                parse_with(&quoted, crate::ParseConfig::new(DuckDb)).is_ok(),
                 "the quoted spelling is an ordinary identifier",
             );
         }
@@ -540,11 +570,11 @@ mod tests {
             ] {
                 let sql = template.replace("{}", word);
                 assert!(
-                    parse_with(&sql, Ansi).is_ok(),
+                    parse_with(&sql, crate::ParseConfig::new(Ansi)).is_ok(),
                     "ANSI leaves {word} a free identifier: {sql:?}",
                 );
                 assert!(
-                    parse_with(&sql, Postgres).is_ok(),
+                    parse_with(&sql, crate::ParseConfig::new(Postgres)).is_ok(),
                     "PostgreSQL leaves {word} a free identifier: {sql:?}",
                 );
             }
@@ -582,7 +612,8 @@ mod tests {
             // (the expression-entry acceptance itself is covered above).
             "UNPIVOT t ON (a + 100)::INTEGER, b INTO NAME n VALUE v",
         ] {
-            let parsed = parse_with(sql, DuckDb).expect("the pivot form parses");
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("the pivot form parses");
             assert_eq!(
                 Renderer::new(Lenient)
                     .render_parsed(&parsed)
@@ -599,10 +630,11 @@ mod tests {
         // and must keep that reading — same text, `JsonGet` node — proving the lambda
         // gate cannot bleed through the inherited surface.
         use crate::ast::{BinaryOperator, Expr, SetExpr, Statement};
-        assert!(parse_with("SELECT x -> x + 1", Ansi).is_err());
-        assert!(parse_with("SELECT (x, y) -> x + y", Ansi).is_err());
+        assert!(parse_with("SELECT x -> x + 1", crate::ParseConfig::new(Ansi)).is_err());
+        assert!(parse_with("SELECT (x, y) -> x + y", crate::ParseConfig::new(Ansi)).is_err());
 
-        let parsed = parse_with("SELECT x -> x + 1", Postgres).expect("PG reads the JSON arrow");
+        let parsed = parse_with("SELECT x -> x + 1", crate::ParseConfig::new(Postgres))
+            .expect("PG reads the JSON arrow");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };
@@ -630,7 +662,7 @@ mod tests {
         use crate::ast::{Resolver as _, SelectItem};
         let parsed = parse_with(
             "SELECT * EXCLUDE (a, t.b) REPLACE (c / 1000 AS c) RENAME (d AS e) FROM t",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the stacked modifiers parse");
         let select = select_of(&parsed);
@@ -665,10 +697,16 @@ mod tests {
             "SELECT * REPLACE x / 2 AS x FROM t",
             "SELECT * RENAME a AS b FROM t",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
-        let parsed =
-            parse_with("SELECT * EXCLUDE a, b FROM t", DuckDb).expect("the bare form parses");
+        let parsed = parse_with(
+            "SELECT * EXCLUDE a, b FROM t",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("the bare form parses");
         let select = select_of(&parsed);
         assert_eq!(
             select.projection.len(),
@@ -697,7 +735,7 @@ mod tests {
             "SELECT * EXCLUDE (a) EXCLUDE (b) FROM t",
         ] {
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
                 "DuckDB rejects the out-of-order modifiers: {sql:?}",
             );
         }
@@ -706,8 +744,11 @@ mod tests {
     #[test]
     fn duckdb_parses_qualified_wildcard_modifiers() {
         use crate::ast::SelectItem;
-        let parsed = parse_with("SELECT t.* EXCLUDE (a) FROM t", DuckDb)
-            .expect("qualified wildcard modifiers parse");
+        let parsed = parse_with(
+            "SELECT t.* EXCLUDE (a) FROM t",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("qualified wildcard modifiers parse");
         let select = select_of(&parsed);
         let SelectItem::QualifiedWildcard {
             options: Some(options),
@@ -731,7 +772,10 @@ mod tests {
             "INSERT INTO table1 VALUES (1, 2, 3) RETURNING COLUMNS('a|c')",
             "INSERT INTO table1 VALUES (1, 2, 3) RETURNING COLUMNS('a|c') + 42",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
     }
 
@@ -742,7 +786,8 @@ mod tests {
         // 1.5.4). It lands in the wildcard item's new `alias`/`alias_spelling` slots via
         // the reused projection-alias machinery, so the spelling tag rides for free.
         use crate::ast::{AliasSpelling, Resolver as _, SelectItem};
-        let parsed = parse_with("SELECT * AS idx FROM t", DuckDb).expect("`* AS idx` parses");
+        let parsed = parse_with("SELECT * AS idx FROM t", crate::ParseConfig::new(DuckDb))
+            .expect("`* AS idx` parses");
         let select = select_of(&parsed);
         let SelectItem::Wildcard {
             alias: Some(alias),
@@ -756,7 +801,8 @@ mod tests {
         assert_eq!(*alias_spelling, AliasSpelling::As);
 
         // The bare (AS-less) form keeps its own spelling tag.
-        let parsed = parse_with("SELECT * idx FROM t", DuckDb).expect("`* idx` parses");
+        let parsed = parse_with("SELECT * idx FROM t", crate::ParseConfig::new(DuckDb))
+            .expect("`* idx` parses");
         let select = select_of(&parsed);
         let SelectItem::Wildcard {
             alias: Some(alias),
@@ -771,7 +817,8 @@ mod tests {
 
         // The qualified star aliases too, and the alias co-travels with the modifier
         // tail (written after it).
-        let parsed = parse_with("SELECT t.* AS x FROM t", DuckDb).expect("`t.* AS x` parses");
+        let parsed = parse_with("SELECT t.* AS x FROM t", crate::ParseConfig::new(DuckDb))
+            .expect("`t.* AS x` parses");
         let select = select_of(&parsed);
         let SelectItem::QualifiedWildcard {
             alias: Some(alias), ..
@@ -788,7 +835,10 @@ mod tests {
             "INSERT INTO t VALUES (1) RETURNING * AS x",
             "INSERT INTO t VALUES (1) RETURNING * EXCLUDE (a) AS x",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
     }
 
@@ -798,18 +848,22 @@ mod tests {
         // the word unconsumed, so both the `AS` and bare forms reject (sqlite/ANSI reject
         // the star alias entirely; probed on 1.5.4).
         assert!(
-            parse_with("SELECT * AS x FROM t", Ansi).is_err(),
+            parse_with("SELECT * AS x FROM t", crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI rejects the star `AS` alias",
         );
         assert!(
-            parse_with("SELECT * x FROM t", Ansi).is_err(),
+            parse_with("SELECT * x FROM t", crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI rejects the bare star alias",
         );
         // The alias is written *after* the modifier tail, which is consumed first, so an
         // alias placed before it leaves the trailing modifier keyword unconsumed — a
         // syntax error there and here.
         assert!(
-            parse_with("SELECT * AS x EXCLUDE (a) FROM t", DuckDb).is_err(),
+            parse_with(
+                "SELECT * AS x EXCLUDE (a) FROM t",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err(),
             "an alias before the modifier tail rejects",
         );
     }
@@ -826,7 +880,8 @@ mod tests {
             "SELECT t.* AS x FROM t",
             "SELECT * EXCLUDE (a) AS x FROM t",
         ] {
-            let parsed = parse_with(sql, DuckDb).expect("the star alias parses");
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("the star alias parses");
             assert_eq!(
                 Renderer::new(Lenient)
                     .render_parsed(&parsed)
@@ -837,7 +892,8 @@ mod tests {
         // The bare spelling is source-fidelity data: a `PreserveSource` render (`to_sql`)
         // keeps `* idx`, while a normalizing Lenient render canonicalizes it to the
         // trailing `AS` — the bare→`AS` alias precedent.
-        let parsed = parse_with("SELECT * idx FROM t", DuckDb).expect("the bare star alias parses");
+        let parsed = parse_with("SELECT * idx FROM t", crate::ParseConfig::new(DuckDb))
+            .expect("the bare star alias parses");
         assert_eq!(parsed.to_sql(), "SELECT * idx FROM t");
         assert_eq!(
             Renderer::new(Lenient)
@@ -874,7 +930,8 @@ mod tests {
                 true,
             ),
         ] {
-            let parsed = parse_with(sql, DuckDb).expect("the COLUMNS form parses");
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("the COLUMNS form parses");
             let select = select_of(&parsed);
             let SelectItem::Expr { expr, .. } = &select.projection[0] else {
                 panic!("expected an expression item for {sql:?}");
@@ -900,9 +957,18 @@ mod tests {
         }
         // The engine takes exactly one qualifier part: `COLUMNS(s.t.*)` syntax-errors
         // (probed on 1.5.4), so the multi-part spelling stays a parse error here too.
-        assert!(parse_with("SELECT COLUMNS(s.t.*) FROM s.t", DuckDb).is_err());
-        let parsed =
-            parse_with("SELECT COLUMNS(c -> c LIKE '%num%') FROM tbl", DuckDb).expect("parses");
+        assert!(
+            parse_with(
+                "SELECT COLUMNS(s.t.*) FROM s.t",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
+        let parsed = parse_with(
+            "SELECT COLUMNS(c -> c LIKE '%num%') FROM tbl",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("parses");
         let select = select_of(&parsed);
         let SelectItem::Expr {
             expr:
@@ -933,10 +999,19 @@ mod tests {
             "SELECT DISTINCT COLUMNS('key') FROM (VALUES(1,1,2),(1,1,3)) AS t(key1,key2,v)",
             "SELECT * FROM grouped_table ORDER BY COLUMNS(*)",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
         // DuckDB takes exactly one COLUMNS argument (`COLUMNS(a, b)` syntax-errors).
-        assert!(parse_with("SELECT COLUMNS(a, b) FROM t", DuckDb).is_err());
+        assert!(
+            parse_with(
+                "SELECT COLUMNS(a, b) FROM t",
+                crate::ParseConfig::new(DuckDb)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -949,7 +1024,7 @@ mod tests {
         use crate::ast::{Expr, SelectItem};
         let parsed = parse_with(
             "SELECT string_agg(x ORDER BY ALL DESC NULLS FIRST) FROM t",
-            DuckDb,
+            crate::ParseConfig::new(DuckDb),
         )
         .expect("the aggregate-internal ALL parses");
         let select = select_of(&parsed);
@@ -977,7 +1052,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY ALL) FROM t",
-                DuckDb,
+                crate::ParseConfig::new(DuckDb),
             )
             .is_ok(),
             "WITHIN GROUP admits the ALL key too",
@@ -988,7 +1063,7 @@ mod tests {
             "SELECT row_number() OVER (ORDER BY ALL) FROM t",
         ] {
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
                 "DuckDB rejects {sql:?} (engine-verified)",
             );
         }
@@ -1014,7 +1089,8 @@ mod tests {
             // check on the type name — orthogonal to the star family under test.
             "SELECT COLUMNS(*)::INTEGER FROM t",
         ] {
-            let parsed = parse_with(sql, DuckDb).expect("the star form parses");
+            let parsed =
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("the star form parses");
             assert_eq!(
                 Renderer::new(Lenient)
                     .render_parsed(&parsed)
@@ -1024,7 +1100,8 @@ mod tests {
         }
         // The bare single-item forms canonicalize to the parenthesized spelling —
         // the same construct, so the render re-parses to a structurally equal tree.
-        let parsed = parse_with("SELECT * EXCLUDE a FROM t", DuckDb).expect("bare form parses");
+        let parsed = parse_with("SELECT * EXCLUDE a FROM t", crate::ParseConfig::new(DuckDb))
+            .expect("bare form parses");
         assert_eq!(
             Renderer::new(Lenient)
                 .render_parsed(&parsed)
@@ -1033,8 +1110,11 @@ mod tests {
         );
         // The aggregate-internal ALL canonicalizes to its engine-identical
         // `COLUMNS(*)` spelling.
-        let parsed =
-            parse_with("SELECT string_agg(x ORDER BY ALL) FROM t", DuckDb).expect("ALL parses");
+        let parsed = parse_with(
+            "SELECT string_agg(x ORDER BY ALL) FROM t",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("ALL parses");
         assert_eq!(
             Renderer::new(Lenient)
                 .render_parsed(&parsed)
@@ -1049,8 +1129,11 @@ mod tests {
         // argument list (each executes on 1.5.4). The prefix `*` is unpack only in primary
         // position, so it lands on `Expr::Columns` with the `Unpack` spelling.
         use crate::ast::{ColumnsSpelling, Expr, SelectItem};
-        let parsed = parse_with("SELECT struct_pack(*COLUMNS(*)) FROM integers", DuckDb)
-            .expect("the unpack prefix parses");
+        let parsed = parse_with(
+            "SELECT struct_pack(*COLUMNS(*)) FROM integers",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("the unpack prefix parses");
         let select = select_of(&parsed);
         let SelectItem::Expr {
             expr: Expr::Function { call, .. },
@@ -1073,14 +1156,20 @@ mod tests {
             "SELECT 2 IN (*COLUMNS(*)) FROM integers",
             "SELECT struct_pack(*COLUMNS(* EXCLUDE (id))) FROM integers",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
         // A *leading* `*COLUMNS(...)` in a select projection is the unpack expression, not
         // the bare `SELECT *` wildcard: `SELECT *COLUMNS('a') + 42` reads as an ordinary
         // value expression (`*COLUMNS('a')` folded into the `+ 42`), so the projection item
         // is an `Expr` whose head is `Expr::Columns`/`Unpack`, never `SelectItem::Wildcard`.
-        let parsed = parse_with("SELECT *COLUMNS('a') + 42 FROM integers", DuckDb)
-            .expect("the leading unpack prefix parses in projection position");
+        let parsed = parse_with(
+            "SELECT *COLUMNS('a') + 42 FROM integers",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("the leading unpack prefix parses in projection position");
         let select = select_of(&parsed);
         let SelectItem::Expr {
             expr: Expr::BinaryOp { left, .. },
@@ -1099,8 +1188,11 @@ mod tests {
         ));
         // The infix `*` never collides: `id * COLUMNS(*)` is multiplication (the climb
         // loop consumes the star after its left operand), not unpack.
-        let parsed = parse_with("SELECT id * COLUMNS(*) FROM integers", DuckDb)
-            .expect("the multiplication parses");
+        let parsed = parse_with(
+            "SELECT id * COLUMNS(*) FROM integers",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("the multiplication parses");
         let select = select_of(&parsed);
         let SelectItem::Expr { expr, .. } = &select.projection[0] else {
             panic!("expected an expression item");
@@ -1119,7 +1211,8 @@ mod tests {
         // `1 < 2 == 3` is `1 < (2 = 3)`). `1 = 2 == 3` therefore parses — the `==` is the
         // right operand of `=`, never a second comparison in a chain.
         use crate::ast::{BinaryOperator, EqualsSpelling, Expr, SelectItem};
-        let parsed = parse_with("SELECT 1 = 2 == 3", DuckDb).expect("`=` then `==` parses");
+        let parsed = parse_with("SELECT 1 = 2 == 3", crate::ParseConfig::new(DuckDb))
+            .expect("`=` then `==` parses");
         let select = select_of(&parsed);
         let SelectItem::Expr {
             expr:
@@ -1148,13 +1241,16 @@ mod tests {
             "SELECT 1 < 2 == 3",
             "SELECT 1 + 1 == 2",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
         // The bare `=`/`<` comparisons stay non-associative: a genuine chain is still a
         // clean reject (only `==`, the generic operator, may chain).
         for sql in ["SELECT 1 = 2 = 3", "SELECT 1 < 2 < 3"] {
             assert!(
-                parse_with(sql, DuckDb).is_err(),
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
                 "DuckDB rejects the non-associative chain {sql:?}",
             );
         }
@@ -1167,8 +1263,11 @@ mod tests {
         // column positions, each carrying the optional wildcard modifiers (probed on
         // 1.5.4). It lands on `Expr::Columns` with the pattern-free `Star` spelling.
         use crate::ast::{ColumnsSpelling, Expr, Statement};
-        let parsed = parse_with("SELECT * FROM integers ORDER BY * DESC NULLS LAST", DuckDb)
-            .expect("ORDER BY * parses");
+        let parsed = parse_with(
+            "SELECT * FROM integers ORDER BY * DESC NULLS LAST",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("ORDER BY * parses");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };
@@ -1198,7 +1297,10 @@ mod tests {
             "UNPIVOT t1 ON * EXCLUDE (id) INTO NAME col VALUE val",
             "UNPIVOT t1 ON *, id INTO NAME c VALUE v",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
 
         // The bare star is a query-tail / aggregate sort key only: DuckDB syntax-rejects
@@ -1207,7 +1309,7 @@ mod tests {
         assert!(
             parse_with(
                 "SELECT row_number() OVER (ORDER BY *) FROM integers",
-                DuckDb,
+                crate::ParseConfig::new(DuckDb),
             )
             .is_err(),
             "the window ORDER BY rejects the bare star",
@@ -1231,7 +1333,8 @@ mod tests {
             "SELECT * FROM t1 UNPIVOT (val FOR col IN (*))",
             "UNPIVOT t1 ON * EXCLUDE (id) INTO NAME col VALUE val",
         ] {
-            let parsed = parse_with(sql, DuckDb).expect("the star-expansion form parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .expect("the star-expansion form parses");
             assert_eq!(
                 Renderer::new(Lenient)
                     .render_parsed(&parsed)
@@ -1252,11 +1355,11 @@ mod tests {
             "SELECT * FROM integers ORDER BY * DESC",
         ] {
             assert!(
-                parse_with(sql, Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
                 "ANSI rejects the star expansion: {sql:?}",
             );
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects the star expansion: {sql:?}",
             );
         }
@@ -1276,11 +1379,11 @@ mod tests {
             "INSERT INTO v0 VALUES (1) RETURNING * EXCLUDE c1",
         ] {
             assert!(
-                parse_with(sql, Ansi).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
                 "ANSI rejects the wildcard modifiers: {sql:?}",
             );
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects the wildcard modifiers: {sql:?}",
             );
         }
@@ -1292,8 +1395,11 @@ mod tests {
         // text keeps its function-call reading (the lambda no-bleed-through
         // precedent): same acceptance, different node.
         use crate::ast::{Expr, SelectItem, SetExpr, Statement};
-        let parsed =
-            parse_with("SELECT COLUMNS('re') FROM t", Postgres).expect("PG reads a plain call");
+        let parsed = parse_with(
+            "SELECT COLUMNS('re') FROM t",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("PG reads a plain call");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };
@@ -1320,7 +1426,8 @@ mod tests {
             ("SELECT list_transform(bb, lambda x: [x, b])", 1),
             ("SELECT list_reduce(a, lambda x, y: x + y)", 2),
         ] {
-            let parsed = parse_with(sql, DuckDb).expect("the keyword lambda parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .expect("the keyword lambda parses");
             let select = select_of(&parsed);
             let SelectItem::Expr {
                 expr: Expr::Function { call, .. },
@@ -1352,7 +1459,10 @@ mod tests {
             "SELECT * FROM tbl ORDER BY COLUMNS(lambda x: x[-1] IN ('2', '3'))",
             "SELECT COLUMNS(lambda x: x LIKE 'col%') FROM integers",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
     }
 
@@ -1368,14 +1478,17 @@ mod tests {
             "SELECT lambda FROM t",
             "SELECT lambda AS x",
         ] {
-            assert!(parse_with(sql, DuckDb).is_err(), "DuckDB rejects {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
+                "DuckDB rejects {sql:?}"
+            );
         }
         assert!(
-            parse_with("SELECT 1 AS lambda", DuckDb).is_ok(),
+            parse_with("SELECT 1 AS lambda", crate::ParseConfig::new(DuckDb)).is_ok(),
             "`lambda` is still a valid AS label",
         );
         assert!(
-            parse_with("SELECT lambda FROM t", Ansi).is_ok(),
+            parse_with("SELECT lambda FROM t", crate::ParseConfig::new(Ansi)).is_ok(),
             "ANSI leaves `lambda` a free column name (not reserved)",
         );
     }
@@ -1389,9 +1502,12 @@ mod tests {
             "SELECT list_filter(NULL, lambda x: x)",
             "SELECT COLUMNS(lambda x: x <> 'i') FROM integers",
         ] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects {sql:?}",
             );
         }
@@ -1411,7 +1527,10 @@ mod tests {
             "SELECT [x + 1 for x in [1, 2, 3] if x > 1]",
             "SELECT [upper(x) for x in ['a', 'b']]",
         ] {
-            assert!(parse_with(sql, DuckDb).is_ok(), "DuckDB parses {sql:?}");
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB parses {sql:?}"
+            );
         }
     }
 
@@ -1420,8 +1539,11 @@ mod tests {
         // The general form carries element/var/source/filter; the column-star source
         // keeps its parenthesization and wildcard modifiers.
         use crate::ast::{ArrayExpr, ComprehensionSource, Expr, SelectItem};
-        let parsed =
-            parse_with("SELECT [x + 1 for x in [1, 2, 3] if x > 1]", DuckDb).expect("parses");
+        let parsed = parse_with(
+            "SELECT [x + 1 for x in [1, 2, 3] if x > 1]",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("parses");
         let select = select_of(&parsed);
         let SelectItem::Expr {
             expr: Expr::Array { array, .. },
@@ -1439,8 +1561,11 @@ mod tests {
             "a general list source",
         );
 
-        let parsed =
-            parse_with("SELECT [x for x in (* EXCLUDE (i))]", DuckDb).expect("star source parses");
+        let parsed = parse_with(
+            "SELECT [x for x in (* EXCLUDE (i))]",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("star source parses");
         let select = select_of(&parsed);
         let SelectItem::Expr {
             expr: Expr::Array { array, .. },
@@ -1472,9 +1597,12 @@ mod tests {
             "SELECT [x for x in [1, 2, 3]]",
             "SELECT [x + 1 for x in [1, 2, 3] if x > 1]",
         ] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects {sql:?}",
             );
         }
@@ -1501,7 +1629,8 @@ mod tests {
             "SELECT COLUMNS([x for x in (* EXCLUDE (i))]) FROM integers",
             "SELECT COLUMNS([x for x in (* REPLACE (i AS i))]) FROM integers",
         ] {
-            let parsed = parse_with(sql, DuckDb).expect("the python-style form parses");
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .expect("the python-style form parses");
             assert_eq!(
                 Renderer::new(Lenient)
                     .render_parsed(&parsed)

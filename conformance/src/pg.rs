@@ -124,7 +124,7 @@ pub fn postgres_accepts(sql: &str) -> bool {
 
 /// Whether `squonk` accepts `sql` under the PostgreSQL feature preset.
 pub fn squonk_accepts(sql: &str) -> bool {
-    parse_with(sql, Postgres).is_ok()
+    parse_with(sql, squonk::ParseConfig::new(Postgres)).is_ok()
 }
 
 /// The accept/reject divergence for `sql` — `Some(detail)` when `pg_query` and
@@ -143,7 +143,7 @@ pub fn squonk_accepts(sql: &str) -> bool {
 /// agreement. Comparing counts makes the raw-byte fuzz loop hunt that whole class
 /// continuously instead of relying on a boolean coincidence to break.
 pub fn pg_accept_reject_divergence(sql: &str) -> Option<String> {
-    let ours = parse_with(sql, Postgres).ok();
+    let ours = parse_with(sql, squonk::ParseConfig::new(Postgres)).ok();
     let pg = pg_query::parse(sql).ok();
     match (&ours, &pg) {
         (Some(ours), Some(pg)) => {
@@ -201,7 +201,7 @@ impl StructuralOracle for PgStructuralOracle {
 /// [`fuzz`](crate::fuzz)'s comparable predicate and the corpus restricts it to
 /// mapped SQL.
 pub fn pg_structural_divergence(sql: &str) -> Option<String> {
-    let ours = match parse_with(sql, Postgres) {
+    let ours = match parse_with(sql, squonk::ParseConfig::new(Postgres)) {
         Ok(parsed) => parsed,
         Err(err) => return Some(format!("squonk rejected: {err:?}")),
     };
@@ -256,7 +256,7 @@ pub enum PgMediatedVerdict {
 /// For a both-accept statement `s`, it round-trips `s` through our parser and canonical
 /// renderer and asks the real PostgreSQL parser whether the *shape* survived, by
 /// comparing `pg_query::fingerprint(s).hex` against
-/// `pg_query::fingerprint(render_statements(&parse_with(s, Postgres)?, Canonical)).hex`.
+/// `pg_query::fingerprint(render_statements(&parse_with(s, Postgres)?, squonk::ParseConfig::new(Canonical))).hex`.
 /// Each engine self-compares engine-tree vs engine-tree in its OWN fingerprint space, so
 /// there is no cross-engine neutral vocabulary to reconcile — a small adapter instead of
 /// the hundreds-of-lines hand-written mapper.
@@ -282,7 +282,7 @@ impl PgMediatedStructuralOracle {
     /// it recomputes the both-accept precondition, so a non-comparable statement is a
     /// [`Skip`](PgMediatedVerdict::Skip) rather than a panic.
     pub fn verdict(&self, sql: &str) -> PgMediatedVerdict {
-        let parsed = match parse_with(sql, Postgres) {
+        let parsed = match parse_with(sql, squonk::ParseConfig::new(Postgres)) {
             Ok(parsed) => parsed,
             Err(err) => return PgMediatedVerdict::Skip(format!("squonk rejected: {err:?}")),
         };
@@ -343,7 +343,7 @@ pub fn assert_accept_reject_parity(sql: &'static str) {
 /// Panics if either parser rejects `sql`, if the PostgreSQL protobuf contains an
 /// unmapped top-level construct, or if the mapped structures differ.
 pub fn assert_structural_parity(sql: &str) {
-    let ours = parse_with(sql, Postgres)
+    let ours = parse_with(sql, squonk::ParseConfig::new(Postgres))
         .unwrap_or_else(|err| panic!("expected squonk to parse {sql:?}: {err:?}"));
     let pg = pg_query::parse(sql)
         .unwrap_or_else(|err| panic!("expected pg_query to parse {sql:?}: {err:?}"));

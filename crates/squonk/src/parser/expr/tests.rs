@@ -19,9 +19,7 @@ use crate::ast::{
     WindowFrameUnits, WindowSpec,
 };
 use crate::dialect::{Ansi, DuckDb, MySql, Postgres, Sqlite};
-use crate::parser::{
-    FeatureDialect, ParseOptions, Parsed, TestDialect, parse_with, parse_with_options,
-};
+use crate::parser::{FeatureDialect, ParseConfig, Parsed, TestDialect, parse_with};
 use crate::render::Renderer;
 
 /// ANSI plus all PostgreSQL expression-syntax extensions, so the tests below
@@ -151,8 +149,11 @@ fn selection_expr(parsed: &Parsed) -> &Expr<NoExt> {
 
 #[test]
 fn literal_keywords_parse_as_literals_in_expression_position() {
-    let parsed =
-        parse_with("SELECT TRUE, FALSE, NULL", TestDialect).expect("literal keywords parse");
+    let parsed = parse_with(
+        "SELECT TRUE, FALSE, NULL",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("literal keywords parse");
     let Statement::Query { query, .. } = &parsed.statements()[0] else {
         panic!("expected a query statement");
     };
@@ -190,11 +191,14 @@ fn literal_keywords_still_follow_identifier_rules_outside_expression_position() 
     // an identifier — and NULL is reserved (PostgreSQL), so a bare `FROM null`
     // is rejected while quoting bypasses reservation and makes it a table name.
     assert!(
-        parse_with("SELECT a FROM null", TestDialect).is_err(),
+        parse_with("SELECT a FROM null", crate::ParseConfig::new(TestDialect)).is_err(),
         "a reserved keyword is not a bare table name",
     );
-    let parsed = parse_with("SELECT a FROM \"null\"", TestDialect)
-        .expect("a quoted reserved word is a valid table name");
+    let parsed = parse_with(
+        "SELECT a FROM \"null\"",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("a quoted reserved word is a valid table name");
     let Statement::Query { query, .. } = &parsed.statements()[0] else {
         panic!("expected a query statement");
     };
@@ -211,7 +215,8 @@ fn literal_keywords_still_follow_identifier_rules_outside_expression_position() 
 #[test]
 fn multiplication_binds_tighter_than_addition() {
     // `1 + 2 * 3` parses as `1 + (2 * 3)`.
-    let parsed = parse_with("SELECT 1 + 2 * 3", TestDialect).expect("valid expression");
+    let parsed = parse_with("SELECT 1 + 2 * 3", crate::ParseConfig::new(TestDialect))
+        .expect("valid expression");
     let Expr::BinaryOp {
         left,
         op: BinaryOperator::Plus,
@@ -237,7 +242,8 @@ fn multiplication_binds_tighter_than_addition() {
 #[test]
 fn parentheses_override_precedence() {
     // `(1 + 2) * 3` parses as `(1 + 2) * 3`; the parens are not stored as a node.
-    let parsed = parse_with("SELECT (1 + 2) * 3", TestDialect).expect("valid expression");
+    let parsed = parse_with("SELECT (1 + 2) * 3", crate::ParseConfig::new(TestDialect))
+        .expect("valid expression");
     let Expr::BinaryOp {
         left,
         op: BinaryOperator::Multiply,
@@ -266,7 +272,8 @@ fn parentheses_override_precedence() {
 #[test]
 fn and_binds_tighter_than_or() {
     // `a AND b OR c` parses as `(a AND b) OR c`.
-    let parsed = parse_with("SELECT a AND b OR c", TestDialect).expect("valid expression");
+    let parsed = parse_with("SELECT a AND b OR c", crate::ParseConfig::new(TestDialect))
+        .expect("valid expression");
     let Expr::BinaryOp {
         left,
         op: BinaryOperator::Or,
@@ -292,7 +299,8 @@ fn and_binds_tighter_than_or() {
 #[test]
 fn string_concat_binds_between_additive_and_comparison() {
     // PostgreSQL ranking (the M1 oracle): `a = b || c` parses as `a = (b || c)`.
-    let parsed = parse_with("SELECT a = b || c", TestDialect).expect("valid expression");
+    let parsed = parse_with("SELECT a = b || c", crate::ParseConfig::new(TestDialect))
+        .expect("valid expression");
     let Expr::BinaryOp {
         op: BinaryOperator::Eq(_),
         right,
@@ -357,7 +365,8 @@ const LOGICAL_OR_PIPE_DIALECT: FeatureDialect = {
 fn pipe_operator_meaning_is_dialect_data() {
     // ANSI/PostgreSQL: `||` concatenates and binds tighter than `=`, so `=` is the
     // root of `a = b || c` with `b || c` on its right.
-    let concat = parse_with("SELECT a = b || c", TestDialect).expect("concat dialect parses");
+    let concat = parse_with("SELECT a = b || c", crate::ParseConfig::new(TestDialect))
+        .expect("concat dialect parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Eq(_),
         right,
@@ -380,8 +389,11 @@ fn pipe_operator_meaning_is_dialect_data() {
     // MySQL-like: `||` is logical OR — the loosest operator — so it is the root of
     // `a = b || c` and `a = b` is its left operand. Same canonical `Or` shape as
     // the `OR` keyword; only the acceptance/meaning of the token changed.
-    let logical_or =
-        parse_with("SELECT a = b || c", LOGICAL_OR_PIPE_DIALECT).expect("OR-pipe dialect parses");
+    let logical_or = parse_with(
+        "SELECT a = b || c",
+        crate::ParseConfig::new(LOGICAL_OR_PIPE_DIALECT),
+    )
+    .expect("OR-pipe dialect parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Or,
         left,
@@ -416,13 +428,17 @@ fn double_ampersand_meaning_is_dialect_data() {
     // appear as an infix operator — the expression ends and the trailing `&& c`
     // is a parse error.
     assert!(
-        parse_with("SELECT a && b", TestDialect).is_err(),
+        parse_with("SELECT a && b", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI does not accept `&&` as a scalar operator",
     );
 
     // MySQL-like: `&&` is logical AND, the same canonical shape as the `AND`
     // keyword. `a && b` parses to a single `And`.
-    let and = parse_with("SELECT a && b", LOGICAL_AND_AMP_DIALECT).expect("AND-amp dialect parses");
+    let and = parse_with(
+        "SELECT a && b",
+        crate::ParseConfig::new(LOGICAL_AND_AMP_DIALECT),
+    )
+    .expect("AND-amp dialect parses");
     assert!(
         matches!(
             project_expr(&and),
@@ -436,8 +452,11 @@ fn double_ampersand_meaning_is_dialect_data() {
 
     // The `AND` binding power follows automatically: AND is looser than `=`, so
     // `&&` is the root of `a = b && c` with `a = b` as its left operand.
-    let rooted =
-        parse_with("SELECT a = b && c", LOGICAL_AND_AMP_DIALECT).expect("AND-amp dialect parses");
+    let rooted = parse_with(
+        "SELECT a = b && c",
+        crate::ParseConfig::new(LOGICAL_AND_AMP_DIALECT),
+    )
+    .expect("AND-amp dialect parses");
     let Expr::BinaryOp {
         op: BinaryOperator::And,
         left,
@@ -484,7 +503,8 @@ fn keyword_operators_bind_at_their_dialect_precedence() {
             BinaryOperator::Modulo(ModuloSpelling::Mod),
         ),
     ] {
-        let parsed = parse_with(sql, KEYWORD_OPERATOR_DIALECT).expect("multiplicative parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(KEYWORD_OPERATOR_DIALECT))
+            .expect("multiplicative parses");
         let Expr::BinaryOp {
             op: BinaryOperator::Plus,
             right,
@@ -501,8 +521,11 @@ fn keyword_operators_bind_at_their_dialect_precedence() {
 
     // `XOR` ranks strictly between `OR` and `AND`. `AND` binds tighter, so
     // `a XOR b AND c` roots at `XOR` with `b AND c` on its right...
-    let xor_and =
-        parse_with("SELECT a XOR b AND c", KEYWORD_OPERATOR_DIALECT).expect("`XOR`/`AND` parses");
+    let xor_and = parse_with(
+        "SELECT a XOR b AND c",
+        crate::ParseConfig::new(KEYWORD_OPERATOR_DIALECT),
+    )
+    .expect("`XOR`/`AND` parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Xor,
         right,
@@ -524,8 +547,11 @@ fn keyword_operators_bind_at_their_dialect_precedence() {
 
     // ...while `OR` binds looser, so `a XOR b OR c` roots at `OR` with `a XOR b`
     // on its left.
-    let xor_or =
-        parse_with("SELECT a XOR b OR c", KEYWORD_OPERATOR_DIALECT).expect("`XOR`/`OR` parses");
+    let xor_or = parse_with(
+        "SELECT a XOR b OR c",
+        crate::ParseConfig::new(KEYWORD_OPERATOR_DIALECT),
+    )
+    .expect("`XOR`/`OR` parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Or,
         left,
@@ -552,7 +578,8 @@ fn keyword_operators_bind_at_their_dialect_precedence() {
         ("SELECT a + b RLIKE c", RegexpSpelling::Rlike),
         ("SELECT a + b REGEXP c", RegexpSpelling::Regexp),
     ] {
-        let parsed = parse_with(sql, KEYWORD_OPERATOR_DIALECT).expect("regex match parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(KEYWORD_OPERATOR_DIALECT))
+            .expect("regex match parses");
         let Expr::BinaryOp {
             op: BinaryOperator::Regexp(spelling),
             left,
@@ -586,7 +613,7 @@ fn keyword_operators_round_trip_exact_spelling() {
         "SELECT a RLIKE b",
         "SELECT a REGEXP b",
     ] {
-        let parsed = parse_with(sql, KEYWORD_OPERATOR_DIALECT)
+        let parsed = parse_with(sql, crate::ParseConfig::new(KEYWORD_OPERATOR_DIALECT))
             .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(KEYWORD_OPERATOR_DIALECT)
             .render_parsed(&parsed)
@@ -607,8 +634,8 @@ fn duckdb_equals_and_integer_divide_spellings_round_trip() {
             BinaryOperator::IntegerDivide(IntegerDivideSpelling::SlashSlash),
         ),
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::BinaryOp { op: parsed_op, .. } = project_expr(&parsed) else {
             panic!("expected a binary operator for {sql}");
         };
@@ -624,7 +651,11 @@ fn duckdb_equals_and_integer_divide_spellings_round_trip() {
 fn duckdb_integer_divide_slash_binds_multiplicative() {
     // `//` binds at multiplicative precedence, tighter than `+`: `a + b // c` roots at
     // `+` with `b // c` on its right.
-    let parsed = parse_with("SELECT a + b // c", DUCKDB_TYPE_DIALECT).expect("`//` parses");
+    let parsed = parse_with(
+        "SELECT a + b // c",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("`//` parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Plus,
         right,
@@ -651,7 +682,8 @@ fn duckdb_string_projection_alias_round_trips() {
     // reusing the MySQL round-trip machinery — the value becomes the alias and the single
     // quote is recorded so it renders back verbatim.
     let sql = "SELECT 1 AS 'x'";
-    let parsed = parse_with(sql, DUCKDB_TYPE_DIALECT).expect("string alias parses");
+    let parsed =
+        parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).expect("string alias parses");
     let rendered = Renderer::new(DUCKDB_TYPE_DIALECT)
         .render_parsed(&parsed)
         .unwrap_or_else(|err| panic!("{err}"));
@@ -664,19 +696,23 @@ fn duckdb_symbol_spellings_and_string_alias_reject_elsewhere() {
     // leaves the doubled byte unmunched (the second `=`/`/` is leftover input) and admits only
     // an identifier alias — each is a clean reject.
     for sql in ["SELECT a == b", "SELECT a // b", "SELECT 1 AS 'x'"] {
-        assert!(parse_with(sql, TestDialect).is_err(), "ANSI rejects {sql}");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
+            "ANSI rejects {sql}"
+        );
     }
     // Under PostgreSQL the DuckDB *spellings* still do not transfer — `==`/`//` do NOT fold
     // onto `Eq`/`IntegerDivide` — but they are not rejected either: the general operator
     // surface (`custom_operators`) reads each as a generic symbolic operator (`Op`-class run),
     // exactly as the real PostgreSQL parser does (a user-operator name, resolved at analysis).
     for sql in ["SELECT a == b", "SELECT a // b"] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("PG accepts {sql}: {e}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("PG accepts {sql}: {e}"));
         assert!(matches!(project_expr(&parsed), Expr::NamedOperator { .. }));
     }
     // The single-quoted projection alias, by contrast, has no operator reading, so PostgreSQL
     // (no `alias_string_literals`) still rejects it.
-    assert!(parse_with("SELECT 1 AS 'x'", Postgres).is_err());
+    assert!(parse_with("SELECT 1 AS 'x'", crate::ParseConfig::new(Postgres)).is_err());
 }
 
 #[test]
@@ -700,7 +736,7 @@ fn duckdb_shares_the_general_symbolic_operator_surface() {
         assert!(
             matches!(
                 project_expr(
-                    &parse_with(sql, DuckDb)
+                    &parse_with(sql, crate::ParseConfig::new(DuckDb))
                         .unwrap_or_else(|e| panic!("DuckDb accepts {sql}: {e}"))
                 ),
                 Expr::NamedOperator { .. }
@@ -712,7 +748,7 @@ fn duckdb_shares_the_general_symbolic_operator_surface() {
         assert!(
             matches!(
                 project_expr(
-                    &parse_with(sql, DuckDb)
+                    &parse_with(sql, crate::ParseConfig::new(DuckDb))
                         .unwrap_or_else(|e| panic!("DuckDb accepts {sql}: {e}"))
                 ),
                 Expr::PrefixOperator { .. }
@@ -730,9 +766,12 @@ fn duckdb_shares_the_general_symbolic_operator_surface() {
         "SELECT 1 ? 2",
         "SELECT 1 &#& 2",
     ] {
-        assert!(parse_with(sql, DuckDb).is_err(), "DuckDb rejects {sql}");
         assert!(
-            parse_with(sql, Postgres).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
+            "DuckDb rejects {sql}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
             "Postgres keeps # / ? in its operator runs: {sql}"
         );
     }
@@ -748,8 +787,8 @@ fn duckdb_general_operator_trees_round_trip() {
         "SELECT @ 1",
         "SELECT 1 ` 2",
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(DUCKDB_TYPE_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -781,7 +820,7 @@ fn duckdb_postfix_symbolic_operators_parse_in_operand_absent_position() {
         assert!(
             matches!(
                 project_expr(
-                    &parse_with(sql, DuckDb)
+                    &parse_with(sql, crate::ParseConfig::new(DuckDb))
                         .unwrap_or_else(|e| panic!("DuckDb accepts {sql}: {e}"))
                 ),
                 Expr::PostfixOperator { .. }
@@ -793,7 +832,10 @@ fn duckdb_postfix_symbolic_operators_parse_in_operand_absent_position() {
     // `1 ! (+2)` (a bare named operator), never a postfix `1!`.
     assert!(
         matches!(
-            project_expr(&parse_with("SELECT 1 ! + 2", DuckDb).expect("infix `!` parses")),
+            project_expr(
+                &parse_with("SELECT 1 ! + 2", crate::ParseConfig::new(DuckDb))
+                    .expect("infix `!` parses")
+            ),
             Expr::NamedOperator { .. }
         ),
         "an operand after the operator keeps the infix reading",
@@ -801,7 +843,7 @@ fn duckdb_postfix_symbolic_operators_parse_in_operand_absent_position() {
     // The JSON arrows are NOT postfix-eligible — DuckDB syntax-errors a trailing `->`/`->>`.
     for sql in ["SELECT 1 ->", "SELECT 1 ->>"] {
         assert!(
-            parse_with(sql, DuckDb).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
             "DuckDb rejects trailing {sql}"
         );
     }
@@ -823,13 +865,13 @@ fn duckdb_postfix_operator_precedence_and_round_trip() {
         ("SELECT 1! :: INT", "SELECT 1 !::INTEGER"),
         ("SELECT 1! IS NULL", "SELECT 1 ! IS NULL"),
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(DUCKDB_TYPE_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
         assert_eq!(rendered, expected, "render for {sql}");
-        let reparsed = parse_with(&rendered, DUCKDB_TYPE_DIALECT)
+        let reparsed = parse_with(&rendered, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
             .unwrap_or_else(|err| panic!("re-parse {rendered}: {err:?}"));
         let again = Renderer::new(DUCKDB_TYPE_DIALECT)
             .render_parsed(&reparsed)
@@ -838,7 +880,8 @@ fn duckdb_postfix_operator_precedence_and_round_trip() {
     }
     // `2 * 3!` groups `(2 * 3)!` — the postfix wraps the whole product (looser than `*`), not
     // `2 * (3!)`. Verify the tree directly so the grouping is not merely a render coincidence.
-    let parsed = parse_with("SELECT 2 * 3!", DuckDb).expect("`2 * 3!` parses");
+    let parsed =
+        parse_with("SELECT 2 * 3!", crate::ParseConfig::new(DuckDb)).expect("`2 * 3!` parses");
     let Expr::PostfixOperator {
         postfix_operator, ..
     } = project_expr(&parsed)
@@ -850,7 +893,8 @@ fn duckdb_postfix_operator_precedence_and_round_trip() {
         "the postfix operand is the whole `2 * 3` product",
     );
     // `1! < 2` groups `(1!) < 2` — the comparison's left operand is the postfix.
-    let parsed = parse_with("SELECT 1! < 2", DuckDb).expect("`1! < 2` parses");
+    let parsed =
+        parse_with("SELECT 1! < 2", crate::ParseConfig::new(DuckDb)).expect("`1! < 2` parses");
     let Expr::BinaryOp { left, .. } = project_expr(&parsed) else {
         panic!("`1! < 2` is a comparison at the top");
     };
@@ -866,11 +910,11 @@ fn postfix_operators_reject_without_the_dialect() {
     // removed postfix operators in 14, so `SELECT 10!` rejects there (the `!` is left
     // unconsumed); ANSI/MySQL/SQLite, with no general operator surface at all, reject too.
     for dialect_rejects in [
-        parse_with("SELECT 10!", Postgres).is_err(),
-        parse_with("SELECT 1 ~", Postgres).is_err(),
-        parse_with("SELECT 10!", Ansi).is_err(),
-        parse_with("SELECT 10!", MySql).is_err(),
-        parse_with("SELECT 10!", Sqlite).is_err(),
+        parse_with("SELECT 10!", crate::ParseConfig::new(Postgres)).is_err(),
+        parse_with("SELECT 1 ~", crate::ParseConfig::new(Postgres)).is_err(),
+        parse_with("SELECT 10!", crate::ParseConfig::new(Ansi)).is_err(),
+        parse_with("SELECT 10!", crate::ParseConfig::new(MySql)).is_err(),
+        parse_with("SELECT 10!", crate::ParseConfig::new(Sqlite)).is_err(),
     ] {
         assert!(
             dialect_rejects,
@@ -897,8 +941,8 @@ fn duckdb_unparenthesized_in_parses_as_in_expr_and_round_trips() {
         ("SELECT z IN $1", false),
         ("SELECT z NOT IN y", true),
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::InExpr {
             negated: parsed_negated,
             ..
@@ -940,7 +984,7 @@ fn duckdb_unparenthesized_in_rejects_constant_and_unary_leading_rhs() {
         "SELECT z NOT IN -5",
     ] {
         assert!(
-            parse_with(sql, DUCKDB_TYPE_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).is_err(),
             "DuckDB rejects {sql} (constant/unary/excluded leading token)",
         );
     }
@@ -957,8 +1001,8 @@ fn duckdb_parenthesized_in_stays_the_standard_predicate() {
         ("SELECT z IN (a, b)", false),
         ("SELECT z IN (SELECT 1)", true),
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let expr = project_expr(&parsed);
         if is_subquery {
             assert!(
@@ -983,7 +1027,11 @@ fn duckdb_unparenthesized_in_binds_tighter_than_comparison_and_arithmetic() {
     // `z IN y IN w` is left-associative: `(z IN y) IN w`.
 
     // `z = w IN y` -> `=` at the root with the `InExpr` on its right.
-    let parsed = parse_with("SELECT z = w IN y", DUCKDB_TYPE_DIALECT).expect("parses");
+    let parsed = parse_with(
+        "SELECT z = w IN y",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Eq(EqualsSpelling::Single),
         right,
@@ -998,7 +1046,11 @@ fn duckdb_unparenthesized_in_binds_tighter_than_comparison_and_arithmetic() {
     );
 
     // `z IN y = w` -> `=` at the root with the `InExpr` on its left.
-    let parsed = parse_with("SELECT z IN y = w", DUCKDB_TYPE_DIALECT).expect("parses");
+    let parsed = parse_with(
+        "SELECT z IN y = w",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Eq(EqualsSpelling::Single),
         left,
@@ -1013,7 +1065,11 @@ fn duckdb_unparenthesized_in_binds_tighter_than_comparison_and_arithmetic() {
     );
 
     // `a * b IN y` -> `InExpr` at the root with `a * b` as its left operand.
-    let parsed = parse_with("SELECT a * b IN y", DUCKDB_TYPE_DIALECT).expect("parses");
+    let parsed = parse_with(
+        "SELECT a * b IN y",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("parses");
     let Expr::InExpr { expr, .. } = project_expr(&parsed) else {
         panic!("expected `InExpr` at the root");
     };
@@ -1029,7 +1085,11 @@ fn duckdb_unparenthesized_in_binds_tighter_than_comparison_and_arithmetic() {
     );
 
     // `z IN y IN w` -> left-associative: the outer `InExpr`'s left operand is another one.
-    let parsed = parse_with("SELECT z IN y IN w", DUCKDB_TYPE_DIALECT).expect("parses");
+    let parsed = parse_with(
+        "SELECT z IN y IN w",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("parses");
     let Expr::InExpr { expr, .. } = project_expr(&parsed) else {
         panic!("expected `InExpr` at the root");
     };
@@ -1046,7 +1106,11 @@ fn duckdb_unparenthesized_in_rhs_is_c_expr() {
     // `(z IN y)::INT`) — both measured on 1.5.4.
 
     // `z IN y[1]` -> the subscript is inside the RHS (root is `InExpr`, RHS a `Subscript`).
-    let parsed = parse_with("SELECT z IN y[1]", DUCKDB_TYPE_DIALECT).expect("parses");
+    let parsed = parse_with(
+        "SELECT z IN y[1]",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("parses");
     let Expr::InExpr { rhs, .. } = project_expr(&parsed) else {
         panic!("expected `InExpr` at the root");
     };
@@ -1056,7 +1120,11 @@ fn duckdb_unparenthesized_in_rhs_is_c_expr() {
     );
 
     // `z IN y::INT` -> the cast is outside the RHS (root is `Cast` over the `InExpr`).
-    let parsed = parse_with("SELECT z IN y::INT", DUCKDB_TYPE_DIALECT).expect("parses");
+    let parsed = parse_with(
+        "SELECT z IN y::INT",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("parses");
     let Expr::Cast { expr, .. } = project_expr(&parsed) else {
         panic!("expected `Cast` at the root");
     };
@@ -1076,14 +1144,17 @@ fn duckdb_unparenthesized_in_gated_off_in_other_dialects() {
         "SELECT z NOT IN y",
         "SELECT z IN [1, 2, 3]",
     ] {
-        assert!(parse_with(sql, TestDialect).is_err(), "ANSI rejects {sql}");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
+            "ANSI rejects {sql}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects {sql}"
         );
     }
     assert!(
-        parse_with("SELECT z IN (y)", Postgres).is_ok(),
+        parse_with("SELECT z IN (y)", crate::ParseConfig::new(Postgres)).is_ok(),
         "the parenthesized form still parses",
     );
 }
@@ -1101,11 +1172,11 @@ fn keyword_operators_are_inert_without_the_dialect() {
         "SELECT a REGEXP b",
     ] {
         assert!(
-            parse_with(sql, TestDialect).is_err(),
+            parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
             "ANSI does not treat the keyword as an operator: {sql}",
         );
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL does not treat the keyword as an operator: {sql}",
         );
     }
@@ -1135,7 +1206,8 @@ fn mysql_preset_gives_keyword_operators_their_meaning() {
         ),
     ];
     for (sql, expected) in cases {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::BinaryOp { op, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a binary operator expression");
         };
@@ -1157,7 +1229,8 @@ fn is_distinct_from_parses_to_binary_op_in_both_polarities() {
             BinaryOperator::IsNotDistinctFrom(IsNotDistinctFromSpelling::Keyword),
         ),
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::BinaryOp { op, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a binary operator expression");
         };
@@ -1174,7 +1247,10 @@ fn is_distinct_from_is_non_associative() {
         "SELECT a IS DISTINCT FROM b IS DISTINCT FROM c",
         "SELECT a IS NOT DISTINCT FROM b IS NOT DISTINCT FROM c",
     ] {
-        assert!(parse_with(sql, Postgres).is_err(), "{sql} should reject");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+            "{sql} should reject"
+        );
     }
 }
 
@@ -1191,7 +1267,8 @@ fn is_truth_predicate_parses_all_six_forms() {
         ("SELECT a IS UNKNOWN", TruthValue::Unknown, false),
         ("SELECT a IS NOT UNKNOWN", TruthValue::Unknown, true),
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::IsTruth { value, negated, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected Expr::IsTruth");
         };
@@ -1205,7 +1282,11 @@ fn is_truth_binds_tighter_than_boolean_and() {
     // `IS TRUE` is a comparison-level predicate, so it binds tighter than `AND`:
     // `a IS TRUE AND b IS FALSE` is `(a IS TRUE) AND (b IS FALSE)`, a top-level boolean AND
     // over two truth tests (engine-confirmed on pg_query).
-    let parsed = parse_with("SELECT a IS TRUE AND b IS FALSE", Postgres).expect("parses");
+    let parsed = parse_with(
+        "SELECT a IS TRUE AND b IS FALSE",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("parses");
     let Expr::BinaryOp {
         left,
         op: BinaryOperator::And,
@@ -1241,10 +1322,18 @@ fn is_truth_is_non_associative() {
     // uniformly non-associative — see the sibling `is_distinct_from_is_non_associative`.)
     // The parenthesized nesting parses.
     assert!(
-        parse_with("SELECT a IS TRUE IS FALSE", Postgres).is_err(),
+        parse_with(
+            "SELECT a IS TRUE IS FALSE",
+            crate::ParseConfig::new(Postgres)
+        )
+        .is_err(),
         "unparenthesized truth-test chain should reject"
     );
-    let parsed = parse_with("SELECT (a IS TRUE) IS FALSE", Postgres).expect("parenthesized nests");
+    let parsed = parse_with(
+        "SELECT (a IS TRUE) IS FALSE",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("parenthesized nests");
     let Expr::IsTruth {
         value: TruthValue::False,
         ..
@@ -1260,7 +1349,8 @@ fn is_truth_gated_off_under_sqlite_general_equality() {
     // `a IS TRUE` folds onto the null-safe-equality operator against the boolean literal
     // (never an `Expr::IsTruth`), tagged with the bare-`IS` spelling, engine-measured via
     // rusqlite.
-    let parsed = parse_with("SELECT a IS TRUE", Sqlite).expect("SQLite parses `a IS TRUE`");
+    let parsed = parse_with("SELECT a IS TRUE", crate::ParseConfig::new(Sqlite))
+        .expect("SQLite parses `a IS TRUE`");
     assert!(
         matches!(
             project_expr(&parsed),
@@ -1273,7 +1363,8 @@ fn is_truth_gated_off_under_sqlite_general_equality() {
     );
     // And `a IS UNKNOWN` there is equality against an identifier `unknown` — it must not be
     // rejected (SQLite accepts it against a bound column), and it is never `Expr::IsTruth`.
-    let parsed = parse_with("SELECT a IS UNKNOWN", Sqlite).expect("SQLite parses `a IS UNKNOWN`");
+    let parsed = parse_with("SELECT a IS UNKNOWN", crate::ParseConfig::new(Sqlite))
+        .expect("SQLite parses `a IS UNKNOWN`");
     assert!(
         !matches!(project_expr(&parsed), Expr::IsTruth { .. }),
         "SQLite `a IS UNKNOWN` is general equality against `unknown`, not a truth test",
@@ -1308,8 +1399,8 @@ const SQLITE_DIALECT: FeatureDialect = FeatureDialect {
 #[test]
 fn parameter_placeholders_parse_to_parameter_expressions() {
     // Positional `$1` carries its 1-based index; `?` is anonymous.
-    let positional =
-        parse_with("SELECT $1", PARAMETER_DIALECT).expect("positional parameter parses");
+    let positional = parse_with("SELECT $1", crate::ParseConfig::new(PARAMETER_DIALECT))
+        .expect("positional parameter parses");
     assert!(
         matches!(
             project_expr(&positional),
@@ -1322,7 +1413,8 @@ fn parameter_placeholders_parse_to_parameter_expressions() {
         project_expr(&positional),
     );
 
-    let anonymous = parse_with("SELECT ?", PARAMETER_DIALECT).expect("anonymous parameter parses");
+    let anonymous = parse_with("SELECT ?", crate::ParseConfig::new(PARAMETER_DIALECT))
+        .expect("anonymous parameter parses");
     assert!(
         matches!(
             project_expr(&anonymous),
@@ -1336,11 +1428,11 @@ fn parameter_placeholders_parse_to_parameter_expressions() {
 
     // The placeholder forms are dialect-gated: ANSI accepts neither.
     assert!(
-        parse_with("SELECT $1", TestDialect).is_err(),
+        parse_with("SELECT $1", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects `$1`",
     );
     assert!(
-        parse_with("SELECT ?", TestDialect).is_err(),
+        parse_with("SELECT ?", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects `?`",
     );
 }
@@ -1353,7 +1445,8 @@ fn named_parameters_parse_and_round_trip() {
         ("SELECT :user_id", "user_id", ParameterSigil::Colon),
         ("SELECT @count", "count", ParameterSigil::At),
     ] {
-        let parsed = parse_with(sql, PARAMETER_DIALECT).expect("named parameter parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(PARAMETER_DIALECT))
+            .expect("named parameter parses");
         let Expr::Parameter {
             kind: ParameterKind::Named { name: sym, sigil },
             ..
@@ -1382,11 +1475,11 @@ fn named_parameters_parse_and_round_trip() {
     // Dialect-gated: ANSI accepts neither named sigil. `:name` is a parse error
     // (lone `:` cannot begin an expression); `@name` is a lexical stray byte.
     assert!(
-        parse_with("SELECT :user_id", TestDialect).is_err(),
+        parse_with("SELECT :user_id", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects `:name`",
     );
     assert!(
-        parse_with("SELECT @count", TestDialect).is_err(),
+        parse_with("SELECT @count", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects `@name`",
     );
 }
@@ -1400,7 +1493,8 @@ fn sqlite_numbered_parameter_parses_range_checks_and_round_trips() {
         ("SELECT ?123", 123),
         ("SELECT ?32766", 32766),
     ] {
-        let parsed = parse_with(sql, SQLITE_DIALECT).unwrap_or_else(|e| panic!("{sql:?}: {e}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(SQLITE_DIALECT))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e}"));
         assert!(
             matches!(
                 project_expr(&parsed),
@@ -1421,7 +1515,8 @@ fn sqlite_numbered_parameter_parses_range_checks_and_round_trips() {
         );
     }
     // The number is a maximal digit munch: `?1abc` is `?1` aliased `abc`.
-    parse_with("SELECT ?1abc", SQLITE_DIALECT).expect("`?1abc` is `?1` aliased `abc`");
+    parse_with("SELECT ?1abc", crate::ParseConfig::new(SQLITE_DIALECT))
+        .expect("`?1abc` is `?1` aliased `abc`");
     // SQLite restricts the index to 1..=32766 (SQLITE_MAX_VARIABLE_NUMBER); out-of-range and
     // overflowing forms reject at parse time (engine-measured), not silently accept.
     for sql in [
@@ -1430,7 +1525,8 @@ fn sqlite_numbered_parameter_parses_range_checks_and_round_trips() {
         "SELECT ?70000",
         "SELECT ?999999999999999999999",
     ] {
-        let err = parse_with(sql, SQLITE_DIALECT).expect_err(&format!("{sql:?} is out of range"));
+        let err = parse_with(sql, crate::ParseConfig::new(SQLITE_DIALECT))
+            .expect_err(&format!("{sql:?} is out of range"));
         assert_eq!(
             err.expected.as_str(),
             "a numbered parameter index between ?1 and ?32766",
@@ -1438,7 +1534,10 @@ fn sqlite_numbered_parameter_parses_range_checks_and_round_trips() {
         );
     }
     // Dialect-gated: ANSI has no numbered `?` (and no anonymous `?` either), so `?1` rejects.
-    assert!(parse_with("SELECT ?1", Ansi).is_err(), "ANSI rejects `?1`");
+    assert!(
+        parse_with("SELECT ?1", crate::ParseConfig::new(Ansi)).is_err(),
+        "ANSI rejects `?1`"
+    );
 }
 
 #[test]
@@ -1448,7 +1547,8 @@ fn sqlite_bare_string_projection_alias_round_trips() {
     // spells the alias with `AS` — SQLite accepts both forms — and that render re-parses,
     // proving the round-trip is structurally sound.
     let sql = "SELECT 1 'x'";
-    let parsed = parse_with(sql, SQLITE_DIALECT).expect("bare string alias parses");
+    let parsed =
+        parse_with(sql, crate::ParseConfig::new(SQLITE_DIALECT)).expect("bare string alias parses");
     let rendered = Renderer::new(SQLITE_DIALECT)
         .render_parsed(&parsed)
         .expect("renders");
@@ -1456,15 +1556,16 @@ fn sqlite_bare_string_projection_alias_round_trips() {
         rendered, "SELECT 1 AS 'x'",
         "bare alias canonicalises to the `AS` spelling"
     );
-    parse_with(&rendered, SQLITE_DIALECT).expect("the canonical render re-parses");
+    parse_with(&rendered, crate::ParseConfig::new(SQLITE_DIALECT))
+        .expect("the canonical render re-parses");
     // DuckDB accepts only the `AS 'x'` form (probed), so the bare form rejects there — proving
     // the axis is separate from `alias_string_literals`.
     assert!(
-        parse_with("SELECT 1 'x'", DuckDb).is_err(),
+        parse_with("SELECT 1 'x'", crate::ParseConfig::new(DuckDb)).is_err(),
         "DuckDB rejects the bare string alias (AS-only)",
     );
     assert!(
-        parse_with("SELECT 1 'x'", Ansi).is_err(),
+        parse_with("SELECT 1 'x'", crate::ParseConfig::new(Ansi)).is_err(),
         "ANSI rejects the bare string alias",
     );
 }
@@ -1478,7 +1579,8 @@ fn mysql_bare_string_alias_and_adjacent_concat_split_by_parse_order() {
     // engine-measured on mysql:8.4.10 (`mysql-bare-string-alias-vs-adjacent-concat`).
     // Bare alias: the string names the column; the expression is the untouched operand.
     for (sql, alias) in [("SELECT 1 'x'", "x"), ("SELECT 1 \"x\"", "x")] {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("{sql}: expected a query");
         };
@@ -1517,7 +1619,8 @@ fn mysql_bare_string_alias_and_adjacent_concat_split_by_parse_order() {
         ("SELECT \"a\" \"b\"", "ab"),
         ("SELECT N'a' 'b'", "ab"),
     ] {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("{sql}: expected a query");
         };
@@ -1552,7 +1655,10 @@ fn mysql_bare_string_alias_and_adjacent_concat_split_by_parse_order() {
         "SELECT _utf8'a' _utf8'b'",
         "SELECT 'a' N'b'",
     ] {
-        assert!(parse_with(sql, MySql).is_err(), "{sql}: rejects");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+            "{sql}: rejects"
+        );
     }
 }
 
@@ -1560,8 +1666,11 @@ fn mysql_bare_string_alias_and_adjacent_concat_split_by_parse_order() {
 fn positional_parameter_index_overflow_is_a_clean_error() {
     // `$<huge>` lexes as one placeholder, but the index does not fit in u32, so
     // parsing reports a precise error rather than panicking on the overflow.
-    let err = parse_with("SELECT $99999999999", PARAMETER_DIALECT)
-        .expect_err("an out-of-range positional index is rejected");
+    let err = parse_with(
+        "SELECT $99999999999",
+        crate::ParseConfig::new(PARAMETER_DIALECT),
+    )
+    .expect_err("an out-of-range positional index is rejected");
     assert_eq!(
         err.expected.as_str(),
         "a positional parameter index within u32 range",
@@ -1605,7 +1714,8 @@ fn session_variables_parse_and_round_trip() {
             "sql_mode",
         ),
     ] {
-        let parsed = parse_with(sql, SESSION_VARIABLE_DIALECT).expect("session variable parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(SESSION_VARIABLE_DIALECT))
+            .expect("session variable parses");
         let Expr::SessionVariable {
             kind, name: sym, ..
         } = project_expr(&parsed)
@@ -1632,8 +1742,11 @@ fn session_variables_parse_and_round_trip() {
 
     // `@@global` with no `.name` is a system variable literally named `global`
     // (implicit scope), not a scoped reference.
-    let bare =
-        parse_with("SELECT @@global", SESSION_VARIABLE_DIALECT).expect("bare `@@global` parses");
+    let bare = parse_with(
+        "SELECT @@global",
+        crate::ParseConfig::new(SESSION_VARIABLE_DIALECT),
+    )
+    .expect("bare `@@global` parses");
     assert!(
         matches!(
             project_expr(&bare),
@@ -1647,7 +1760,11 @@ fn session_variables_parse_and_round_trip() {
 
     // An unrecognised `@@scope.name` scope is a clean parse error, not a misparse.
     assert!(
-        parse_with("SELECT @@bogus.x", SESSION_VARIABLE_DIALECT).is_err(),
+        parse_with(
+            "SELECT @@bogus.x",
+            crate::ParseConfig::new(SESSION_VARIABLE_DIALECT)
+        )
+        .is_err(),
         "an unknown system-variable scope is rejected",
     );
 
@@ -1659,16 +1776,19 @@ fn session_variables_parse_and_round_trip() {
         "SELECT @@global.time_zone",
         "SELECT @@session.sql_mode",
     ] {
-        assert!(parse_with(sql, MySql).is_ok(), "MySQL parses {sql:?}",);
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
+            "MySQL parses {sql:?}",
+        );
     }
 
     // Dialect-gated: ANSI lexes `@`/`@@` as stray bytes, so neither form parses.
     assert!(
-        parse_with("SELECT @x", TestDialect).is_err(),
+        parse_with("SELECT @x", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects `@x`",
     );
     assert!(
-        parse_with("SELECT @@x", TestDialect).is_err(),
+        parse_with("SELECT @@x", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects `@@x`",
     );
 }
@@ -1676,8 +1796,8 @@ fn session_variables_parse_and_round_trip() {
 #[test]
 fn parser_reads_binding_powers_from_the_dialect() {
     // Standard M1: `||` is looser than `*`, so this is `a || (b * c)`.
-    let standard =
-        parse_with("SELECT a || b * c", TestDialect).expect("standard precedence parses");
+    let standard = parse_with("SELECT a || b * c", crate::ParseConfig::new(TestDialect))
+        .expect("standard precedence parses");
     let Expr::BinaryOp {
         op: BinaryOperator::StringConcat,
         right,
@@ -1698,8 +1818,11 @@ fn parser_reads_binding_powers_from_the_dialect() {
     );
 
     // Custom dialect: `||` is tighter than `*`, so this is `(a || b) * c`.
-    let custom =
-        parse_with("SELECT a || b * c", HIGH_CONCAT_DIALECT).expect("custom precedence parses");
+    let custom = parse_with(
+        "SELECT a || b * c",
+        crate::ParseConfig::new(HIGH_CONCAT_DIALECT),
+    )
+    .expect("custom precedence parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Multiply,
         left,
@@ -1722,7 +1845,8 @@ fn parser_reads_binding_powers_from_the_dialect() {
 
 #[test]
 fn not_parses_as_a_prefix_unary() {
-    let parsed = parse_with("SELECT NOT a", TestDialect).expect("valid expression");
+    let parsed =
+        parse_with("SELECT NOT a", crate::ParseConfig::new(TestDialect)).expect("valid expression");
     let Expr::UnaryOp {
         op: UnaryOperator::Not,
         expr,
@@ -1737,7 +1861,8 @@ fn not_parses_as_a_prefix_unary() {
 #[test]
 fn unary_minus_wraps_its_operand() {
     // `- 1` is a unary operator over the literal, not a folded negative literal.
-    let parsed = parse_with("SELECT - 1", TestDialect).expect("valid expression");
+    let parsed =
+        parse_with("SELECT - 1", crate::ParseConfig::new(TestDialect)).expect("valid expression");
     let Expr::UnaryOp {
         op: UnaryOperator::Minus,
         expr,
@@ -1754,7 +1879,11 @@ fn unary_minus_wraps_its_operand() {
 
 #[test]
 fn cast_parses_numeric_and_character_type_names() {
-    let parsed = parse_with("SELECT CAST(a AS INT)", TestDialect).expect("CAST parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS INT)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("CAST parses");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Integer {
@@ -1763,8 +1892,11 @@ fn cast_parses_numeric_and_character_type_names() {
         }
     ));
 
-    let parsed = parse_with("SELECT CAST(1 AS NUMERIC(10, 2))", TestDialect)
-        .expect("NUMERIC precision and scale parse");
+    let parsed = parse_with(
+        "SELECT CAST(1 AS NUMERIC(10, 2))",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("NUMERIC precision and scale parse");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Decimal {
@@ -1775,8 +1907,11 @@ fn cast_parses_numeric_and_character_type_names() {
         }
     ));
 
-    let parsed = parse_with("SELECT CAST(a AS CHARACTER VARYING(5))", TestDialect)
-        .expect("CHARACTER VARYING size parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS CHARACTER VARYING(5))",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("CHARACTER VARYING size parses");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Character {
@@ -1789,8 +1924,11 @@ fn cast_parses_numeric_and_character_type_names() {
 
 #[test]
 fn cast_parses_temporal_interval_and_array_type_names() {
-    let parsed = parse_with("SELECT CAST(a AS TIMESTAMP(3) WITH TIME ZONE)", TestDialect)
-        .expect("TIMESTAMP WITH TIME ZONE parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS TIMESTAMP(3) WITH TIME ZONE)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("TIMESTAMP WITH TIME ZONE parses");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Timestamp {
@@ -1801,8 +1939,11 @@ fn cast_parses_temporal_interval_and_array_type_names() {
         }
     ));
 
-    let parsed = parse_with("SELECT CAST(a AS INTERVAL DAY TO SECOND(3))", TestDialect)
-        .expect("INTERVAL DAY TO SECOND precision parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS INTERVAL DAY TO SECOND(3))",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("INTERVAL DAY TO SECOND precision parses");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Interval {
@@ -1812,8 +1953,11 @@ fn cast_parses_temporal_interval_and_array_type_names() {
         }
     ));
 
-    let parsed =
-        parse_with("SELECT CAST(a AS VARCHAR(5)[])", TestDialect).expect("array suffix parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS VARCHAR(5)[])",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("array suffix parses");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Array { element, .. }
@@ -1830,8 +1974,11 @@ fn cast_parses_temporal_interval_and_array_type_names() {
 
 #[test]
 fn cast_parses_user_defined_qualified_type_names() {
-    let parsed = parse_with("SELECT CAST(a AS public.geometry(4326))", TestDialect)
-        .expect("qualified user-defined type parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS public.geometry(4326))",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("qualified user-defined type parses");
     let DataType::UserDefined {
         name, modifiers, ..
     } = cast_type(&parsed)
@@ -1854,7 +2001,8 @@ fn cast_parses_user_defined_qualified_type_names() {
 
 #[test]
 fn scalar_subquery_parses_as_expression() {
-    let parsed = parse_with("SELECT (SELECT 1)", TestDialect).expect("subquery parses");
+    let parsed = parse_with("SELECT (SELECT 1)", crate::ParseConfig::new(TestDialect))
+        .expect("subquery parses");
     let Expr::Subquery { query, .. } = project_expr(&parsed) else {
         panic!("expected a scalar subquery expression");
     };
@@ -1866,8 +2014,11 @@ fn scalar_subquery_parses_as_expression() {
 
 #[test]
 fn exists_predicate_parses_as_distinct_expression() {
-    let parsed = parse_with("SELECT * FROM t WHERE EXISTS (SELECT 1)", TestDialect)
-        .expect("EXISTS predicate parses");
+    let parsed = parse_with(
+        "SELECT * FROM t WHERE EXISTS (SELECT 1)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("EXISTS predicate parses");
     let Expr::Exists { query, .. } = selection_expr(&parsed) else {
         panic!("expected an EXISTS predicate");
     };
@@ -1887,7 +2038,8 @@ fn special_value_functions_parse_nullary_and_precision_forms() {
             SpecialFunctionKeyword::CurrentCatalog,
         ),
     ] {
-        let parsed = parse_with(sql, Postgres).expect("special value function parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("special value function parses");
         let Expr::SpecialFunction {
             keyword,
             precision: None,
@@ -1900,7 +2052,8 @@ fn special_value_functions_parse_nullary_and_precision_forms() {
     }
 
     // The four temporal forms accept an optional `(precision)`.
-    let parsed = parse_with("SELECT CURRENT_TIME(3)", Postgres).expect("precision form parses");
+    let parsed = parse_with("SELECT CURRENT_TIME(3)", crate::ParseConfig::new(Postgres))
+        .expect("precision form parses");
     let Expr::SpecialFunction {
         keyword: SpecialFunctionKeyword::CurrentTime,
         precision: Some(3),
@@ -1912,19 +2065,25 @@ fn special_value_functions_parse_nullary_and_precision_forms() {
 
     // A nullary form rejects a trailing argument (`CURRENT_DATE(1)` is not a
     // production), matching PostgreSQL.
-    assert!(parse_with("SELECT CURRENT_DATE(1)", Postgres).is_err());
+    assert!(parse_with("SELECT CURRENT_DATE(1)", crate::ParseConfig::new(Postgres)).is_err());
 
     // `CURRENT_SCHEMA` is also an ordinary function name, so the call form stays
     // a generic function while the bare keyword is the special value function.
     assert!(matches!(
-        project_expr(&parse_with("SELECT current_schema", Postgres).expect("bare parses")),
+        project_expr(
+            &parse_with("SELECT current_schema", crate::ParseConfig::new(Postgres))
+                .expect("bare parses")
+        ),
         Expr::SpecialFunction {
             keyword: SpecialFunctionKeyword::CurrentSchema,
             ..
         }
     ));
     assert!(matches!(
-        project_expr(&parse_with("SELECT current_schema()", Postgres).expect("call parses")),
+        project_expr(
+            &parse_with("SELECT current_schema()", crate::ParseConfig::new(Postgres))
+                .expect("call parses")
+        ),
         Expr::Function { .. }
     ));
 }
@@ -1939,7 +2098,8 @@ fn special_value_functions_round_trip_through_rendering() {
         "SELECT USER",
         "SELECT SESSION_USER",
     ] {
-        let parsed = parse_with(sql, Postgres).expect("special value function parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("special value function parses");
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .expect("special value function renders");
@@ -1950,7 +2110,8 @@ fn special_value_functions_round_trip_through_rendering() {
 #[test]
 fn nullif_requires_exactly_two_arguments() {
     // The valid two-argument form keeps the canonical `Function` shape.
-    let parsed = parse_with("SELECT nullif(a, b)", Postgres).expect("NULLIF(a, b) parses");
+    let parsed = parse_with("SELECT nullif(a, b)", crate::ParseConfig::new(Postgres))
+        .expect("NULLIF(a, b) parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a NULLIF function call");
     };
@@ -1965,25 +2126,33 @@ fn nullif_requires_exactly_two_arguments() {
         "SELECT nullif(*)",
         "SELECT nullif(DISTINCT a, b)",
     ] {
-        assert!(parse_with(sql, Postgres).is_err(), "{sql} must be rejected");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+            "{sql} must be rejected"
+        );
     }
 
     // A bare `nullif` is an ordinary column reference (it is `col_name`).
-    let bare = parse_with("SELECT nullif", Postgres).expect("bare nullif parses");
+    let bare =
+        parse_with("SELECT nullif", crate::ParseConfig::new(Postgres)).expect("bare nullif parses");
     assert_eq!(column_name(&bare, project_expr(&bare)), "nullif");
 }
 
 #[test]
 fn bare_exists_is_a_column_reference() {
     // `exists` is `col_name`, so without a following `(` it is a column.
-    let parsed = parse_with("SELECT exists", Postgres).expect("bare exists parses");
+    let parsed =
+        parse_with("SELECT exists", crate::ParseConfig::new(Postgres)).expect("bare exists parses");
     assert_eq!(column_name(&parsed, project_expr(&parsed)), "exists");
 
     // `EXISTS (<query>)` is still the subquery operator.
     assert!(matches!(
         selection_expr(
-            &parse_with("SELECT * FROM t WHERE EXISTS (SELECT 1)", Postgres)
-                .expect("EXISTS predicate parses"),
+            &parse_with(
+                "SELECT * FROM t WHERE EXISTS (SELECT 1)",
+                crate::ParseConfig::new(Postgres)
+            )
+            .expect("EXISTS predicate parses"),
         ),
         Expr::Exists { .. }
     ));
@@ -1993,7 +2162,10 @@ fn bare_exists_is_a_column_reference() {
 fn cast_parses_special_postgres_type_productions() {
     // BIT [VARYING] [(n)].
     assert!(matches!(
-        cast_type(&parse_with("SELECT CAST(x AS bit)", Postgres).expect("bit parses")),
+        cast_type(
+            &parse_with("SELECT CAST(x AS bit)", crate::ParseConfig::new(Postgres))
+                .expect("bit parses")
+        ),
         DataType::Bit {
             varying: false,
             size: None,
@@ -2002,7 +2174,11 @@ fn cast_parses_special_postgres_type_productions() {
     ));
     assert!(matches!(
         cast_type(
-            &parse_with("SELECT CAST(x AS bit varying(3))", Postgres).expect("bit varying parses")
+            &parse_with(
+                "SELECT CAST(x AS bit varying(3))",
+                crate::ParseConfig::new(Postgres)
+            )
+            .expect("bit varying parses")
         ),
         DataType::Bit {
             varying: true,
@@ -2013,14 +2189,20 @@ fn cast_parses_special_postgres_type_productions() {
 
     // JSON is a built-in (distinct from the `jsonb` user-defined name).
     assert!(matches!(
-        cast_type(&parse_with("SELECT CAST(x AS json)", Postgres).expect("json parses")),
+        cast_type(
+            &parse_with("SELECT CAST(x AS json)", crate::ParseConfig::new(Postgres))
+                .expect("json parses")
+        ),
         DataType::Json { .. }
     ));
 
     // UUID is a first-class built-in too — the canonical identity a type planner reads,
     // ungated like JSON and case-insensitive, rather than a `UserDefined` name.
     assert!(matches!(
-        cast_type(&parse_with("SELECT CAST(x AS uuid)", Postgres).expect("uuid parses")),
+        cast_type(
+            &parse_with("SELECT CAST(x AS uuid)", crate::ParseConfig::new(Postgres))
+                .expect("uuid parses")
+        ),
         DataType::Uuid { .. }
     ));
     // A `UUID '…'` typed literal resolves the same variant as its cast target.
@@ -2028,7 +2210,7 @@ fn cast_parses_special_postgres_type_productions() {
         cast_type(
             &parse_with(
                 "SELECT UUID '00000000-0000-0000-0000-000000000000'",
-                Postgres,
+                crate::ParseConfig::new(Postgres),
             )
             .expect("uuid typed literal parses")
         ),
@@ -2047,7 +2229,8 @@ fn cast_parses_special_postgres_type_productions() {
             CharacterTypeName::NationalChar,
         ),
     ] {
-        let parsed = parse_with(sql, Postgres).expect("national character type parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("national character type parses");
         let DataType::Character { spelling, .. } = cast_type(&parsed) else {
             panic!("expected a character type for {sql}");
         };
@@ -2056,14 +2239,23 @@ fn cast_parses_special_postgres_type_productions() {
 
     // A bare `DOUBLE` (without `PRECISION`) is an ordinary user-defined type name.
     assert!(matches!(
-        cast_type(&parse_with("SELECT CAST(x AS double)", Postgres).expect("bare double parses")),
+        cast_type(
+            &parse_with(
+                "SELECT CAST(x AS double)",
+                crate::ParseConfig::new(Postgres)
+            )
+            .expect("bare double parses")
+        ),
         DataType::UserDefined { .. }
     ));
     // `DOUBLE PRECISION` stays the built-in.
     assert!(matches!(
         cast_type(
-            &parse_with("SELECT CAST(x AS double precision)", Postgres)
-                .expect("double precision parses")
+            &parse_with(
+                "SELECT CAST(x AS double precision)",
+                crate::ParseConfig::new(Postgres)
+            )
+            .expect("double precision parses")
         ),
         DataType::Double { .. }
     ));
@@ -2078,8 +2270,8 @@ fn uuid_type_name_renders_canonical_uppercase() {
         ("SELECT CAST(x AS UUID)", "SELECT CAST(x AS UUID)"),
         ("SELECT CAST(x AS uuid)", "SELECT CAST(x AS UUID)"),
     ] {
-        let parsed =
-            parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         assert!(
             matches!(cast_type(&parsed), DataType::Uuid { .. }),
             "UUID identity for {sql}",
@@ -2095,7 +2287,7 @@ fn uuid_type_name_renders_canonical_uppercase() {
 fn in_subquery_predicate_preserves_negation_and_lhs() {
     let parsed = parse_with(
         "SELECT * FROM t WHERE a NOT IN (SELECT b FROM u)",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("NOT IN subquery predicate parses");
     let Expr::InSubquery {
@@ -2129,7 +2321,8 @@ fn quantified_comparison_parses_any_all_and_some() {
             Quantifier::Some,
         ),
     ] {
-        let parsed = parse_with(sql, TestDialect).expect("quantified comparison parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(TestDialect))
+            .expect("quantified comparison parses");
         let Expr::QuantifiedComparison {
             left,
             op: _,
@@ -2150,7 +2343,7 @@ fn quantified_comparison_parses_any_all_and_some() {
 fn subquery_predicates_bind_at_comparison_precedence() {
     let parsed = parse_with(
         "SELECT * FROM t WHERE a = ANY (SELECT b) AND c = d",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("quantified comparison and AND parse");
     let Expr::BinaryOp {
@@ -2189,8 +2382,8 @@ fn quantified_list_parses_scalar_array_operand() {
         ("SELECT * FROM t WHERE a < ALL (b)", Quantifier::All),
         ("SELECT * FROM t WHERE a <> SOME (b)", Quantifier::Some),
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::QuantifiedList {
             left,
             op: _,
@@ -2220,15 +2413,19 @@ fn quantified_like_and_arbitrary_operator_parse_and_round_trip() {
         "SELECT * FROM t WHERE a ILIKE SOME (b)",
         "SELECT * FROM t WHERE a * ANY (b) > 0",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
         assert_eq!(rendered, sql, "exact round-trip for {sql}");
     }
     // The quantified-pattern node is the one the first two build.
-    let like = parse_with("SELECT * FROM t WHERE a LIKE ANY (ARRAY['%a'])", Postgres)
-        .expect("LIKE ANY parses");
+    let like = parse_with(
+        "SELECT * FROM t WHERE a LIKE ANY (ARRAY['%a'])",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("LIKE ANY parses");
     assert!(
         matches!(selection_expr(&like), Expr::QuantifiedLike { .. }),
         "LIKE ANY builds the QuantifiedLike node",
@@ -2237,7 +2434,7 @@ fn quantified_like_and_arbitrary_operator_parse_and_round_trip() {
     // subquery — the `(subquery)::type` disambiguation.
     let cast = parse_with(
         "SELECT * FROM t WHERE 'foo'::text = ANY ((SELECT ARRAY['a']::text[])::text[])",
-        Postgres,
+        crate::ParseConfig::new(Postgres),
     )
     .expect("cast-of-subquery operand parses");
     assert!(
@@ -2252,15 +2449,18 @@ fn quantified_comparison_dispatch_splits_subquery_from_list_operand() {
     // leads the parentheses and to the list node otherwise — the `IN (…)` split.
     let subquery = parse_with(
         "SELECT * FROM t WHERE a = ANY (SELECT b FROM u)",
-        DUCKDB_TYPE_DIALECT,
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
     )
     .expect("subquery operand parses");
     assert!(
         matches!(selection_expr(&subquery), Expr::QuantifiedComparison { .. }),
         "a leading SELECT keeps the subquery node even where the list form is enabled",
     );
-    let list = parse_with("SELECT * FROM t WHERE a = ANY (b)", DUCKDB_TYPE_DIALECT)
-        .expect("list operand parses");
+    let list = parse_with(
+        "SELECT * FROM t WHERE a = ANY (b)",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("list operand parses");
     assert!(
         matches!(selection_expr(&list), Expr::QuantifiedList { .. }),
         "a value operand builds the list node",
@@ -2272,26 +2472,34 @@ fn quantified_list_operand_rejected_without_the_gate() {
     // ANSI admits the subquery quantifier but not the list operand: the non-query
     // content surfaces as the standard "a subquery" parse error.
     assert!(
-        parse_with("SELECT * FROM t WHERE a = ANY (b)", TestDialect).is_err(),
+        parse_with(
+            "SELECT * FROM t WHERE a = ANY (b)",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err(),
         "ANSI rejects the list-operand quantified comparison",
     );
     parse_with(
         "SELECT * FROM t WHERE a = ANY (SELECT b FROM u)",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("ANSI still accepts the subquery quantifier");
 }
 
 #[test]
 fn subquery_predicates_do_not_chain_with_comparisons() {
-    let err = parse_with("SELECT * FROM t WHERE a IN (SELECT b) = c", TestDialect)
-        .expect_err("IN predicate is non-associative with comparisons");
+    let err = parse_with(
+        "SELECT * FROM t WHERE a IN (SELECT b) = c",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect_err("IN predicate is non-associative with comparisons");
     assert_eq!(err.expected.as_str(), "the end of the comparison");
 }
 
 #[test]
 fn comparison_parses_as_a_binary_op() {
-    let parsed = parse_with("SELECT a < b", TestDialect).expect("valid expression");
+    let parsed =
+        parse_with("SELECT a < b", crate::ParseConfig::new(TestDialect)).expect("valid expression");
     let Expr::BinaryOp {
         left,
         op: BinaryOperator::Lt,
@@ -2313,12 +2521,12 @@ fn chained_comparison_is_rejected_as_non_associative() {
     // the real Postgres preset, since MySQL now carries a per-dialect `Left`
     // override (mysql-comparison-operators-are-left-associative) that must
     // not leak into either.
-    let err =
-        parse_with("SELECT a < b < c", TestDialect).expect_err("comparison operators do not chain");
+    let err = parse_with("SELECT a < b < c", crate::ParseConfig::new(TestDialect))
+        .expect_err("comparison operators do not chain");
     // `SELECT a < b < c`: the second `<` sits at bytes 13..14.
     assert_eq!(err.span, Span::new(13, 14));
 
-    let err = parse_with("SELECT a < b < c", Postgres)
+    let err = parse_with("SELECT a < b < c", crate::ParseConfig::new(Postgres))
         .expect_err("PostgreSQL comparison operators do not chain");
     assert_eq!(err.span, Span::new(13, 14));
 }
@@ -2327,7 +2535,7 @@ fn chained_comparison_is_rejected_as_non_associative() {
 fn parenthesized_comparisons_reset_non_associative_chain_detection() {
     // Verified against libpg_query: PostgreSQL accepts both explicit
     // groupings even though it rejects `a < b < c`.
-    let parsed = parse_with("SELECT (a < b) < c", TestDialect)
+    let parsed = parse_with("SELECT (a < b) < c", crate::ParseConfig::new(TestDialect))
         .expect("parenthesized left comparison parses");
     let Expr::BinaryOp {
         left,
@@ -2350,7 +2558,7 @@ fn parenthesized_comparisons_reset_non_associative_chain_detection() {
     );
     assert_eq!(column_name(&parsed, right), "c");
 
-    let parsed = parse_with("SELECT a < (b < c)", TestDialect)
+    let parsed = parse_with("SELECT a < (b < c)", crate::ParseConfig::new(TestDialect))
         .expect("parenthesized right comparison parses");
     let Expr::BinaryOp {
         left,
@@ -2376,8 +2584,11 @@ fn parenthesized_comparisons_reset_non_associative_chain_detection() {
 
 #[test]
 fn parser_reads_comparison_associativity_from_the_dialect() {
-    let parsed = parse_with("SELECT a < b < c", LEFT_ASSOC_COMPARISON_DIALECT)
-        .expect("left-associative comparison dialect permits chains");
+    let parsed = parse_with(
+        "SELECT a < b < c",
+        crate::ParseConfig::new(LEFT_ASSOC_COMPARISON_DIALECT),
+    )
+    .expect("left-associative comparison dialect permits chains");
     let Expr::BinaryOp {
         left,
         op: BinaryOperator::Lt,
@@ -2420,7 +2631,8 @@ fn mysql_left_associates_comparison_chains() {
             BinaryOperator::NotEq(NotEqSpelling::AngleBracket),
         ),
     ] {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::BinaryOp {
             left,
             op: outer_op,
@@ -2452,14 +2664,19 @@ fn mysql_left_associates_comparison_chains() {
 fn expression_spans_are_recoverable() {
     // The generated `Spanned` recovers a binary op's span as the union of its
     // operands' spans (the operator node carries no `Meta` of its own).
-    let parsed = parse_with("SELECT 1 + 2", TestDialect).expect("valid expression");
+    let parsed =
+        parse_with("SELECT 1 + 2", crate::ParseConfig::new(TestDialect)).expect("valid expression");
     // `1` at byte 7, `2` at byte 11; the union covers 7..12.
     assert_eq!(project_expr(&parsed).span(), Span::new(7, 12));
 }
 
 #[test]
 fn function_call_parses_name_and_arguments() {
-    let parsed = parse_with("SELECT coalesce(a, b, c)", TestDialect).expect("function call parses");
+    let parsed = parse_with(
+        "SELECT coalesce(a, b, c)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("function call parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2473,20 +2690,25 @@ fn function_call_parses_name_and_arguments() {
 
 #[test]
 fn function_call_parses_empty_distinct_and_wildcard_forms() {
-    let parsed = parse_with("SELECT now()", TestDialect).expect("no-arg call parses");
+    let parsed = parse_with("SELECT now()", crate::ParseConfig::new(TestDialect))
+        .expect("no-arg call parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
     assert!(call.args.is_empty() && !call.wildcard && call.quantifier.is_none());
 
-    let parsed = parse_with("SELECT count(*)", TestDialect).expect("count star parses");
+    let parsed = parse_with("SELECT count(*)", crate::ParseConfig::new(TestDialect))
+        .expect("count star parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
     assert!(call.wildcard && call.args.is_empty());
 
-    let parsed =
-        parse_with("SELECT count(DISTINCT a)", TestDialect).expect("distinct aggregate parses");
+    let parsed = parse_with(
+        "SELECT count(DISTINCT a)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("distinct aggregate parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2501,7 +2723,8 @@ fn function_call_parses_empty_distinct_and_wildcard_forms() {
 fn function_call_parses_explicit_all_quantifier() {
     // `count(ALL x)` is the explicit spelling of the default aggregate
     // quantifier; it is captured so the surface round-trips.
-    let parsed = parse_with("SELECT count(ALL a)", TestDialect).expect("ALL aggregate parses");
+    let parsed = parse_with("SELECT count(ALL a)", crate::ParseConfig::new(TestDialect))
+        .expect("ALL aggregate parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2515,12 +2738,16 @@ fn function_call_parses_explicit_all_quantifier() {
 #[test]
 fn function_call_rejects_quantifier_with_wildcard() {
     // `ALL`/`DISTINCT` cannot combine with the `*` argument.
-    assert!(parse_with("SELECT count(ALL *)", TestDialect).is_err());
+    assert!(parse_with("SELECT count(ALL *)", crate::ParseConfig::new(TestDialect)).is_err());
 }
 
 #[test]
 fn function_call_nests_argument_expressions() {
-    let parsed = parse_with("SELECT f(a + 1, g(b))", TestDialect).expect("nested args parse");
+    let parsed = parse_with(
+        "SELECT f(a + 1, g(b))",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("nested args parse");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2531,14 +2758,18 @@ fn function_call_nests_argument_expressions() {
 #[test]
 fn function_call_span_covers_the_whole_call() {
     // `count(a)` spans bytes 7..15 within `SELECT count(a)`.
-    let parsed = parse_with("SELECT count(a)", TestDialect).expect("call parses");
+    let parsed =
+        parse_with("SELECT count(a)", crate::ParseConfig::new(TestDialect)).expect("call parses");
     assert_eq!(project_expr(&parsed).span(), Span::new(7, 15));
 }
 
 #[test]
 fn function_call_parses_order_by_modifier() {
-    let parsed = parse_with("SELECT array_agg(a ORDER BY b DESC)", TestDialect)
-        .expect("ordered-set aggregate parses");
+    let parsed = parse_with(
+        "SELECT array_agg(a ORDER BY b DESC)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("ordered-set aggregate parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2560,7 +2791,8 @@ fn duckdb_standalone_argument_order_by_parses_and_round_trips() {
         ("SELECT row_number(ORDER BY b) OVER w", 1),
         ("SELECT rank(ORDER BY b DESC, c ASC) OVER w", 2),
     ] {
-        let parsed = parse_with(sql, DUCKDB_TYPE_DIALECT).expect("standalone ORDER BY parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .expect("standalone ORDER BY parses");
         let Expr::Function { call, .. } = project_expr(&parsed) else {
             panic!("expected a function call for {sql}");
         };
@@ -2592,7 +2824,7 @@ fn duckdb_standalone_argument_order_by_rejects_trailing_comma() {
         "SELECT a FROM t ORDER BY a,",
     ] {
         assert!(
-            parse_with(sql, DUCKDB_TYPE_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).is_err(),
             "a trailing comma in an ORDER BY list must reject: {sql}",
         );
     }
@@ -2606,16 +2838,19 @@ fn standalone_argument_order_by_is_duckdb_gated() {
     // both the default table and a dialect override honour the gate.
     let sql = "SELECT rank(ORDER BY b DESC) OVER w";
     assert!(
-        parse_with(sql, TestDialect).is_err(),
+        parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects the standalone in-argument ORDER BY",
     );
     assert!(
-        parse_with(sql, Postgres).is_err(),
+        parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
         "PostgreSQL rejects the standalone in-argument ORDER BY",
     );
     // The argument-then-`ORDER BY` form is unaffected — it stays accepted everywhere.
-    parse_with("SELECT array_agg(a ORDER BY b)", TestDialect)
-        .expect("argument-then-ORDER BY is not gated");
+    parse_with(
+        "SELECT array_agg(a ORDER BY b)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("argument-then-ORDER BY is not gated");
 }
 
 #[test]
@@ -2623,7 +2858,8 @@ fn group_concat_separator_parses_and_round_trips() {
     // The MySQL `SEPARATOR '<sep>'` delimiter rides inside the call parentheses,
     // after any in-parenthesis `ORDER BY`, on the shared `FunctionCall.separator`.
     let sql = "SELECT group_concat(a ORDER BY b SEPARATOR ',')";
-    let parsed = parse_with(sql, MYSQL_EXPR_DIALECT).expect("GROUP_CONCAT SEPARATOR parses");
+    let parsed = parse_with(sql, crate::ParseConfig::new(MYSQL_EXPR_DIALECT))
+        .expect("GROUP_CONCAT SEPARATOR parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2643,14 +2879,19 @@ fn ansi_and_postgres_reject_group_concat_separator() {
     // `SEPARATOR` is gated by `group_concat_separator` (MySQL/Lenient only); elsewhere
     // it is left unconsumed and the expected closing `)` sees it as leftover -> reject.
     let sql = "SELECT group_concat(a SEPARATOR ',')";
-    parse_with(sql, TestDialect).expect_err("ANSI has no GROUP_CONCAT SEPARATOR");
-    parse_with(sql, Postgres).expect_err("PostgreSQL has no GROUP_CONCAT SEPARATOR");
+    parse_with(sql, crate::ParseConfig::new(TestDialect))
+        .expect_err("ANSI has no GROUP_CONCAT SEPARATOR");
+    parse_with(sql, crate::ParseConfig::new(Postgres))
+        .expect_err("PostgreSQL has no GROUP_CONCAT SEPARATOR");
 }
 
 #[test]
 fn function_call_parses_filter_clause() {
-    let parsed = parse_with("SELECT count(*) FILTER (WHERE a)", TestDialect)
-        .expect("aggregate FILTER parses");
+    let parsed = parse_with(
+        "SELECT count(*) FILTER (WHERE a)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("aggregate FILTER parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2663,16 +2904,22 @@ fn duckdb_filter_omits_where_keyword() {
     // DuckDB accepts an aggregate `FILTER (…)` body without the standard `WHERE`
     // (`sum(x) FILTER (x > 1)`, probed on 1.5.4); the omission round-trips through the
     // `FilterWhereSpelling` tag. The keyword-full form still parses and is tagged as such.
-    let parsed = parse_with("SELECT sum(x) FILTER (x > 1)", DuckDb)
-        .expect("DuckDB accepts a keyword-less FILTER body");
+    let parsed = parse_with(
+        "SELECT sum(x) FILTER (x > 1)",
+        crate::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDB accepts a keyword-less FILTER body");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
     assert!(call.filter.is_some());
     assert_eq!(call.filter_where, FilterWhereSpelling::Omitted);
 
-    let parsed = parse_with("SELECT sum(x) FILTER (WHERE x > 1)", DuckDb)
-        .expect("DuckDB still accepts the standard FILTER (WHERE …)");
+    let parsed = parse_with(
+        "SELECT sum(x) FILTER (WHERE x > 1)",
+        crate::ParseConfig::new(DuckDb),
+    )
+    .expect("DuckDB still accepts the standard FILTER (WHERE …)");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2680,8 +2927,16 @@ fn duckdb_filter_omits_where_keyword() {
 
     // Every other dialect requires the keyword: a keyword-less body is a clean reject.
     for dialect_rejects in [
-        parse_with("SELECT sum(x) FILTER (x > 1)", Postgres).is_err(),
-        parse_with("SELECT sum(x) FILTER (x > 1)", Sqlite).is_err(),
+        parse_with(
+            "SELECT sum(x) FILTER (x > 1)",
+            crate::ParseConfig::new(Postgres),
+        )
+        .is_err(),
+        parse_with(
+            "SELECT sum(x) FILTER (x > 1)",
+            crate::ParseConfig::new(Sqlite),
+        )
+        .is_err(),
     ] {
         assert!(
             dialect_rejects,
@@ -2694,8 +2949,8 @@ fn duckdb_filter_omits_where_keyword() {
         "SELECT sum(x) FILTER (x > 1)",
         "SELECT sum(x) FILTER (WHERE x > 1)",
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(DUCKDB_TYPE_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -2710,16 +2965,26 @@ fn bare_filter_after_a_call_is_not_a_bare_alias() {
     // matching libpg_query. The per-position model flips the prior divergence,
     // where we accepted it.
     assert!(
-        parse_with("SELECT count(*) filter", TestDialect).is_err(),
+        parse_with(
+            "SELECT count(*) filter",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err(),
         "FILTER is AS_LABEL, so it cannot be a bare alias",
     );
 
     // FILTER still introduces the aggregate filter clause when `(` follows, and
     // an explicit `AS filter` alias is accepted (a ColLabel admits every keyword).
-    parse_with("SELECT count(*) filter (WHERE a)", TestDialect)
-        .expect("FILTER (WHERE ...) is the aggregate filter clause");
-    let parsed = parse_with("SELECT count(*) AS filter", TestDialect)
-        .expect("AS filter is a valid explicit alias");
+    parse_with(
+        "SELECT count(*) filter (WHERE a)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("FILTER (WHERE ...) is the aggregate filter clause");
+    let parsed = parse_with(
+        "SELECT count(*) AS filter",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("AS filter is a valid explicit alias");
     let Statement::Query { query, .. } = &parsed.statements()[0] else {
         panic!("expected a query statement");
     };
@@ -2742,7 +3007,7 @@ fn bare_filter_after_a_call_is_not_a_bare_alias() {
 fn function_call_parses_within_group_ordered_set() {
     let parsed = parse_with(
         "SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY x DESC)",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("WITHIN GROUP ordered-set aggregate parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
@@ -2763,7 +3028,7 @@ fn within_group_precedes_filter_and_over() {
     // compose on one call in that sequence.
     let parsed = parse_with(
         "SELECT rank(a) WITHIN GROUP (ORDER BY b) FILTER (WHERE c) OVER w",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("WITHIN GROUP composes before FILTER and OVER");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
@@ -2781,7 +3046,7 @@ fn filter_before_within_group_is_rejected() {
     assert!(
         parse_with(
             "SELECT rank(a) FILTER (WHERE c) WITHIN GROUP (ORDER BY b)",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .is_err(),
         "WITHIN GROUP must precede FILTER, matching PostgreSQL",
@@ -2793,7 +3058,11 @@ fn within_group_requires_the_group_keyword() {
     // Only `WITHIN GROUP` introduces the clause; a `WITHIN` not followed by `GROUP`
     // is not consumed, so the trailing token is rejected rather than swallowed.
     assert!(
-        parse_with("SELECT count(x) WITHIN (ORDER BY y)", TestDialect).is_err(),
+        parse_with(
+            "SELECT count(x) WITHIN (ORDER BY y)",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err(),
         "a bare WITHIN without GROUP does not open the ordered-set clause",
     );
 }
@@ -2805,7 +3074,7 @@ fn within_group_rejects_distinct_and_in_paren_order_by() {
     assert!(
         parse_with(
             "SELECT array_agg(x ORDER BY y) WITHIN GROUP (ORDER BY z)",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .is_err(),
         "an in-parenthesis ORDER BY cannot combine with WITHIN GROUP",
@@ -2813,21 +3082,24 @@ fn within_group_rejects_distinct_and_in_paren_order_by() {
     assert!(
         parse_with(
             "SELECT count(DISTINCT x) WITHIN GROUP (ORDER BY y)",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .is_err(),
         "a WITHIN GROUP ordered-set aggregate cannot be DISTINCT",
     );
     // ALL is not DISTINCT, so it composes with WITHIN GROUP just as PostgreSQL admits.
-    parse_with("SELECT count(ALL x) WITHIN GROUP (ORDER BY y)", TestDialect)
-        .expect("ALL composes with WITHIN GROUP");
+    parse_with(
+        "SELECT count(ALL x) WITHIN GROUP (ORDER BY y)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("ALL composes with WITHIN GROUP");
 }
 
 #[test]
 fn function_call_parses_over_inline_window() {
     let parsed = parse_with(
         "SELECT sum(a) OVER (PARTITION BY b, c ORDER BY d DESC)",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("window function parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
@@ -2845,7 +3117,11 @@ fn function_call_parses_over_inline_window() {
 
 #[test]
 fn function_call_parses_over_named_window() {
-    let parsed = parse_with("SELECT count(*) OVER w", TestDialect).expect("named window parses");
+    let parsed = parse_with(
+        "SELECT count(*) OVER w",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("named window parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2859,7 +3135,7 @@ fn function_call_parses_over_named_window() {
 fn window_frame_parses_between_bounds_and_exclusion() {
     let parsed = parse_with(
             "SELECT avg(a) OVER (ORDER BY b ROWS BETWEEN 1 PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE TIES)",
-            TestDialect,
+            crate::ParseConfig::new(TestDialect),
         )
         .expect("framed window parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
@@ -2881,7 +3157,8 @@ fn window_frame_parses_between_bounds_and_exclusion() {
 #[test]
 fn window_frame_parses_bare_current_row_bound() {
     let sql = "SELECT avg(a) OVER (ORDER BY b RANGE CURRENT ROW)";
-    let parsed = parse_with(sql, TestDialect).expect("bare frame bound parses");
+    let parsed =
+        parse_with(sql, crate::ParseConfig::new(TestDialect)).expect("bare frame bound parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -2913,7 +3190,8 @@ fn window_frame_word_led_offset_is_a_value_expression() {
         "SELECT sum(u) OVER (ROWS BETWEEN unbounded(1) PRECEDING AND unbounded(1) FOLLOWING) FROM t",
         "SELECT sum(u) OVER (ROWS BETWEEN unbounded.x PRECEDING AND unbounded.x FOLLOWING) FROM t",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Function { call, .. } = project_expr(&parsed) else {
             panic!("expected a function call: {sql}");
         };
@@ -2937,7 +3215,7 @@ fn window_frame_word_led_offset_is_a_value_expression() {
     // `CURRENT ROW` route to the sentinel bounds even though the words are non-reserved.
     let parsed = parse_with(
         "SELECT sum(u) OVER (ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM t",
-        Postgres,
+        crate::ParseConfig::new(Postgres),
     )
     .expect("sentinel frame still parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
@@ -2979,7 +3257,7 @@ fn window_frame_rejects_impossible_bound_ordering() {
         "SELECT count(*) OVER (ORDER BY b ROWS BETWEEN 1 FOLLOWING AND 1 PRECEDING)",
     ] {
         assert!(
-            parse_with(sql, TestDialect).is_err(),
+            parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
             "an impossibly-ordered frame must reject at parse: {sql}",
         );
     }
@@ -2994,7 +3272,7 @@ fn window_frame_rejects_impossible_bound_ordering() {
         "SELECT count(*) OVER (ORDER BY b RANGE CURRENT ROW)",
     ] {
         assert!(
-            parse_with(sql, TestDialect).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(TestDialect)).is_ok(),
             "a validly-ordered frame must still parse: {sql}",
         );
     }
@@ -3008,24 +3286,24 @@ fn grouping_without_arguments_rejects_under_grouping_set_dialects() {
     // dialect without those constructs (MySQL) treats `grouping` as an ordinary function
     // name whose empty call parses. A non-empty `GROUPING(a)` parses everywhere.
     assert!(
-        parse_with("SELECT GROUPING()", Postgres).is_err(),
+        parse_with("SELECT GROUPING()", crate::ParseConfig::new(Postgres)).is_err(),
         "GROUPING() with no arguments must reject under a grouping-set dialect",
     );
     assert!(
-        parse_with("SELECT GROUPING()", TestDialect).is_err(),
+        parse_with("SELECT GROUPING()", crate::ParseConfig::new(TestDialect)).is_err(),
         "GROUPING() with no arguments must reject under a grouping-set dialect",
     );
     assert!(
-        parse_with("SELECT GROUPING()", MySql).is_ok(),
+        parse_with("SELECT GROUPING()", crate::ParseConfig::new(MySql)).is_ok(),
         "GROUPING() is an ordinary empty call where grouping-set constructs are off",
     );
     assert!(
-        parse_with("SELECT GROUPING(a)", Postgres).is_ok(),
+        parse_with("SELECT GROUPING(a)", crate::ParseConfig::new(Postgres)).is_ok(),
         "GROUPING with an argument must parse",
     );
     // A quoted / qualified spelling defeats the reserved special form (an ordinary call).
     assert!(
-        parse_with("SELECT \"grouping\"()", Postgres).is_ok(),
+        parse_with("SELECT \"grouping\"()", crate::ParseConfig::new(Postgres)).is_ok(),
         "a quoted grouping() is an ordinary call, not the GROUPING special form",
     );
 }
@@ -3034,7 +3312,7 @@ fn grouping_without_arguments_rejects_under_grouping_set_dialects() {
 fn select_window_clause_defines_named_windows() {
     let parsed = parse_with(
         "SELECT count(*) OVER w FROM t WINDOW w AS (PARTITION BY a ORDER BY b)",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("WINDOW clause parses");
     let Statement::Query { query, .. } = &parsed.statements()[0] else {
@@ -3053,7 +3331,7 @@ fn select_window_clause_defines_named_windows() {
 fn over_definition_extends_a_base_window() {
     let parsed = parse_with(
         "SELECT count(*) OVER (w ORDER BY b) FROM t WINDOW w AS (PARTITION BY a)",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("base-window reference parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
@@ -3071,8 +3349,11 @@ fn over_definition_extends_a_base_window() {
 fn frame_keywords_stay_usable_as_identifiers() {
     // The frame vocabulary is non-reserved, so these words remain valid column
     // and table names outside a window clause.
-    let parsed = parse_with("SELECT partition, range, preceding FROM rows", TestDialect)
-        .expect("non-reserved window keywords parse as identifiers");
+    let parsed = parse_with(
+        "SELECT partition, range, preceding FROM rows",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("non-reserved window keywords parse as identifiers");
     let Statement::Query { query, .. } = &parsed.statements()[0] else {
         panic!("expected a query statement");
     };
@@ -3092,7 +3373,7 @@ fn non_reserved_keyword_after_paren_parses_as_column_not_values_row() {
     // `WHERE values + 1 > 3` failing to reparse (sqlglot round-trip oracle).
     let parsed = parse_with(
         "SELECT values AS values FROM t WHERE ((values + 1) > 3)",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("a parenthesized non-reserved keyword parses as a column reference");
     let Expr::BinaryOp {
@@ -3121,8 +3402,11 @@ fn non_reserved_keyword_in_an_in_list_parses_as_column_not_values_subquery() {
     // `VALUES`-subquery arm on a following `(` via
     // `peek_starts_subquery_in_parens`, so a bare `values` after `(` stays a
     // column reference.
-    let parsed = parse_with("SELECT a FROM t WHERE x IN (values, y)", TestDialect)
-        .expect("a non-reserved keyword in an IN list parses as a column reference");
+    let parsed = parse_with(
+        "SELECT a FROM t WHERE x IN (values, y)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("a non-reserved keyword in an IN list parses as a column reference");
     let Expr::InList {
         list,
         negated: false,
@@ -3136,8 +3420,11 @@ fn non_reserved_keyword_in_an_in_list_parses_as_column_not_values_subquery() {
     assert_eq!(column_name(&parsed, &list[1]), "y");
 
     // The genuine `VALUES` constructor (`VALUES (`) still opens an IN subquery.
-    let parsed = parse_with("SELECT a FROM t WHERE x IN (VALUES (1), (2))", TestDialect)
-        .expect("a VALUES constructor still parses as an IN subquery");
+    let parsed = parse_with(
+        "SELECT a FROM t WHERE x IN (VALUES (1), (2))",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("a VALUES constructor still parses as an IN subquery");
     assert!(matches!(selection_expr(&parsed), Expr::InSubquery { .. }));
 }
 
@@ -3147,16 +3434,18 @@ fn window_is_reserved_but_over_is_not() {
     // it introduces the SELECT-level window clause, so it must not be read as a
     // table alias in `FROM t WINDOW w …` — but OVER is non-reserved and stays a
     // usable identifier (it is recognized positionally as a function-call tail).
-    assert!(parse_with("SELECT a FROM window", TestDialect).is_err());
-    parse_with("SELECT over FROM t", TestDialect).expect("OVER is a usable column name");
-    parse_with("SELECT a FROM over", TestDialect).expect("OVER is a usable table name");
+    assert!(parse_with("SELECT a FROM window", crate::ParseConfig::new(TestDialect)).is_err());
+    parse_with("SELECT over FROM t", crate::ParseConfig::new(TestDialect))
+        .expect("OVER is a usable column name");
+    parse_with("SELECT a FROM over", crate::ParseConfig::new(TestDialect))
+        .expect("OVER is a usable table name");
 }
 
 #[test]
 fn searched_case_parses_with_when_then_else() {
     let parsed = parse_with(
         "SELECT CASE WHEN a THEN b WHEN c THEN d ELSE e END",
-        TestDialect,
+        crate::ParseConfig::new(TestDialect),
     )
     .expect("searched CASE parses");
     let Expr::Case { case, .. } = project_expr(&parsed) else {
@@ -3171,8 +3460,11 @@ fn searched_case_parses_with_when_then_else() {
 
 #[test]
 fn simple_case_parses_with_operand() {
-    let parsed =
-        parse_with("SELECT CASE a WHEN 1 THEN b END", TestDialect).expect("simple CASE parses");
+    let parsed = parse_with(
+        "SELECT CASE a WHEN 1 THEN b END",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("simple CASE parses");
     let Expr::Case { case, .. } = project_expr(&parsed) else {
         panic!("expected a CASE expression");
     };
@@ -3184,8 +3476,8 @@ fn simple_case_parses_with_operand() {
 
 #[test]
 fn case_requires_at_least_one_when() {
-    let err =
-        parse_with("SELECT CASE a END", TestDialect).expect_err("CASE with no WHEN is rejected");
+    let err = parse_with("SELECT CASE a END", crate::ParseConfig::new(TestDialect))
+        .expect_err("CASE with no WHEN is rejected");
     assert_eq!(err.expected.as_str(), "`WHEN` after `CASE`");
 }
 
@@ -3194,21 +3486,31 @@ fn subscript_on_bare_case_is_rejected_but_parenthesized_is_allowed() {
     // A subscript indirection needs a parenthesized `c_expr`; a bare `CASE … END`
     // is not one, matching PostgreSQL (tighten-pg-overacceptance-trio). `Postgres`
     // enables the `[...]` subscript syntax.
-    let err = parse_with("SELECT CASE 1 WHEN 1 THEN 2 ELSE 3 END['a']", Postgres)
-        .expect_err("a subscript on a bare CASE is rejected");
+    let err = parse_with(
+        "SELECT CASE 1 WHEN 1 THEN 2 ELSE 3 END['a']",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect_err("a subscript on a bare CASE is rejected");
     assert_eq!(
         err.expected.as_str(),
         "`(` around the `CASE` expression before subscripting it"
     );
     // The parenthesized form (a grouped `c_expr`) stays accepted.
-    let parsed = parse_with("SELECT (CASE 1 WHEN 1 THEN 2 ELSE 3 END)['a']", Postgres)
-        .expect("a subscript on a parenthesized CASE parses");
+    let parsed = parse_with(
+        "SELECT (CASE 1 WHEN 1 THEN 2 ELSE 3 END)['a']",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("a subscript on a parenthesized CASE parses");
     assert!(matches!(project_expr(&parsed), Expr::Subscript { .. }));
 }
 
 #[test]
 fn extract_parses_field_and_source() {
-    let parsed = parse_with("SELECT EXTRACT(year FROM a)", TestDialect).expect("EXTRACT parses");
+    let parsed = parse_with(
+        "SELECT EXTRACT(year FROM a)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("EXTRACT parses");
     let Expr::Extract { extract, .. } = project_expr(&parsed) else {
         panic!("expected an EXTRACT expression");
     };
@@ -3219,22 +3521,29 @@ fn extract_parses_field_and_source() {
 #[test]
 fn bare_extract_stays_a_column() {
     // `extract` is non-reserved, so without a following `(` it is a column.
-    let parsed = parse_with("SELECT extract", TestDialect).expect("extract as column parses");
+    let parsed = parse_with("SELECT extract", crate::ParseConfig::new(TestDialect))
+        .expect("extract as column parses");
     assert_eq!(column_name(&parsed, project_expr(&parsed)), "extract");
 }
 
 #[test]
 fn is_null_predicate_parses_with_negation() {
-    let parsed =
-        parse_with("SELECT a FROM t WHERE a IS NULL", TestDialect).expect("IS NULL parses");
+    let parsed = parse_with(
+        "SELECT a FROM t WHERE a IS NULL",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("IS NULL parses");
     let Expr::IsNull { expr, negated, .. } = selection_expr(&parsed) else {
         panic!("expected IS NULL");
     };
     assert_eq!(column_name(&parsed, expr), "a");
     assert!(!negated);
 
-    let parsed =
-        parse_with("SELECT a FROM t WHERE a IS NOT NULL", TestDialect).expect("IS NOT NULL parses");
+    let parsed = parse_with(
+        "SELECT a FROM t WHERE a IS NOT NULL",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("IS NOT NULL parses");
     let Expr::IsNull { negated, .. } = selection_expr(&parsed) else {
         panic!("expected IS NOT NULL");
     };
@@ -3245,8 +3554,11 @@ fn is_null_predicate_parses_with_negation() {
 fn between_bounds_bind_above_the_separator_and() {
     // The inner AND is the BETWEEN separator; a trailing boolean AND binds looser,
     // so this is `(a BETWEEN 1 AND 2) AND b`.
-    let parsed = parse_with("SELECT a FROM t WHERE a BETWEEN 1 AND 2 AND b", TestDialect)
-        .expect("BETWEEN parses");
+    let parsed = parse_with(
+        "SELECT a FROM t WHERE a BETWEEN 1 AND 2 AND b",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("BETWEEN parses");
     let Expr::BinaryOp {
         left,
         op: BinaryOperator::And,
@@ -3262,8 +3574,11 @@ fn between_bounds_bind_above_the_separator_and() {
 
 #[test]
 fn not_between_parses_negated() {
-    let parsed = parse_with("SELECT a FROM t WHERE a NOT BETWEEN 1 AND 2", TestDialect)
-        .expect("NOT BETWEEN parses");
+    let parsed = parse_with(
+        "SELECT a FROM t WHERE a NOT BETWEEN 1 AND 2",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("NOT BETWEEN parses");
     assert!(matches!(
         selection_expr(&parsed),
         Expr::Between { negated: true, .. }
@@ -3272,8 +3587,11 @@ fn not_between_parses_negated() {
 
 #[test]
 fn in_value_list_is_distinct_from_in_subquery() {
-    let parsed = parse_with("SELECT a FROM t WHERE a IN (1, 2, 3)", TestDialect)
-        .expect("IN value list parses");
+    let parsed = parse_with(
+        "SELECT a FROM t WHERE a IN (1, 2, 3)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("IN value list parses");
     let Expr::InList {
         expr,
         list,
@@ -3288,15 +3606,21 @@ fn in_value_list_is_distinct_from_in_subquery() {
     assert!(!negated);
 
     // A query operand still parses to the subquery shape.
-    let parsed = parse_with("SELECT a FROM t WHERE a IN (SELECT b FROM u)", TestDialect)
-        .expect("IN subquery parses");
+    let parsed = parse_with(
+        "SELECT a FROM t WHERE a IN (SELECT b FROM u)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("IN subquery parses");
     assert!(matches!(selection_expr(&parsed), Expr::InSubquery { .. }));
 }
 
 #[test]
 fn not_in_value_list_parses_negated() {
-    let parsed = parse_with("SELECT a FROM t WHERE a NOT IN (1, 2)", TestDialect)
-        .expect("NOT IN list parses");
+    let parsed = parse_with(
+        "SELECT a FROM t WHERE a NOT IN (1, 2)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("NOT IN list parses");
     assert!(matches!(
         selection_expr(&parsed),
         Expr::InList { negated: true, .. }
@@ -3305,7 +3629,8 @@ fn not_in_value_list_parses_negated() {
 
 #[test]
 fn double_colon_cast_parses_with_syntax_tag() {
-    let parsed = parse_with("SELECT a::int", PG_EXPR_DIALECT).expect("`::` cast parses");
+    let parsed = parse_with("SELECT a::int", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("`::` cast parses");
     let Expr::Cast {
         expr,
         data_type,
@@ -3327,7 +3652,7 @@ fn double_colon_cast_parses_with_syntax_tag() {
 
     // ANSI does not enable the typecast operator: `::` lexes but is rejected.
     assert!(
-        parse_with("SELECT a::int", TestDialect).is_err(),
+        parse_with("SELECT a::int", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects the `::` cast operator",
     );
 }
@@ -3335,7 +3660,11 @@ fn double_colon_cast_parses_with_syntax_tag() {
 #[test]
 fn double_colon_cast_binds_tighter_than_arithmetic_and_unary() {
     // `a::int + b` is `(a::int) + b`: the cast binds tighter than `+`.
-    let parsed = parse_with("SELECT a::int + b", PG_EXPR_DIALECT).expect("cast in addition parses");
+    let parsed = parse_with(
+        "SELECT a::int + b",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("cast in addition parses");
     let Expr::BinaryOp {
         left,
         op: BinaryOperator::Plus,
@@ -3356,7 +3685,8 @@ fn double_colon_cast_binds_tighter_than_arithmetic_and_unary() {
     );
 
     // `- a::int` is `-(a::int)`: the cast binds tighter than the unary sign.
-    let parsed = parse_with("SELECT - a::int", PG_EXPR_DIALECT).expect("unary over cast parses");
+    let parsed = parse_with("SELECT - a::int", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("unary over cast parses");
     let Expr::UnaryOp {
         op: UnaryOperator::Minus,
         expr,
@@ -3377,7 +3707,11 @@ fn double_colon_cast_binds_tighter_than_arithmetic_and_unary() {
     );
 
     // `a::int::text` is `(a::int)::text`: left-associative chained casts.
-    let parsed = parse_with("SELECT a::int::text", PG_EXPR_DIALECT).expect("chained casts parse");
+    let parsed = parse_with(
+        "SELECT a::int::text",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("chained casts parse");
     let Expr::Cast { expr, .. } = project_expr(&parsed) else {
         panic!("expected the outer cast");
     };
@@ -3409,8 +3743,8 @@ fn pg_at_family_operators_parse_to_their_binary_operators() {
         ("SELECT a -> b", BinaryOperator::JsonGet),
         ("SELECT a ->> b", BinaryOperator::JsonGetText),
     ] {
-        let parsed =
-            parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         assert_eq!(project_binary_op(&parsed), expected, "operator for {sql}");
     }
 }
@@ -3429,7 +3763,8 @@ fn pg_jsonb_operators_parse_to_their_binary_operators() {
         ("SELECT a #>> b", BinaryOperator::JsonExtractPathText),
         ("SELECT a #- b", BinaryOperator::JsonDeletePath),
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         assert_eq!(project_binary_op(&parsed), expected, "operator for {sql}");
     }
 }
@@ -3447,7 +3782,8 @@ fn pg_jsonb_operators_round_trip() {
         "SELECT a #>> b",
         "SELECT a #- b",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -3460,7 +3796,7 @@ fn pg_jsonb_operators_sit_at_the_any_operator_rank() {
     // Engine-measured (pg_query): the `jsonb` operators bind tighter than comparison and
     // looser than additive, left-associative — the shared "any other operator" rank.
     // `a #> b = c` is `(a #> b) = c` (Op tighter than `=`).
-    let eq = parse_with("SELECT a #> b = c", Postgres).expect("parses");
+    let eq = parse_with("SELECT a #> b = c", crate::ParseConfig::new(Postgres)).expect("parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Eq(_),
         left,
@@ -3477,7 +3813,7 @@ fn pg_jsonb_operators_sit_at_the_any_operator_rank() {
         }
     ));
     // `a #> b + c` is `a #> (b + c)` (Op looser than `+`).
-    let add = parse_with("SELECT a #> b + c", Postgres).expect("parses");
+    let add = parse_with("SELECT a #> b + c", crate::ParseConfig::new(Postgres)).expect("parses");
     let Expr::BinaryOp {
         op: BinaryOperator::JsonExtractPath,
         right,
@@ -3494,7 +3830,8 @@ fn pg_jsonb_operators_sit_at_the_any_operator_rank() {
         }
     ));
     // `a #> b @@ c` is `(a #> b) @@ c` (both at the shared rank, left-associative).
-    let chain = parse_with("SELECT a #> b @@ c", Postgres).expect("parses");
+    let chain =
+        parse_with("SELECT a #> b @@ c", crate::ParseConfig::new(Postgres)).expect("parses");
     let Expr::BinaryOp {
         op: BinaryOperator::JsonPathMatch,
         left,
@@ -3517,11 +3854,15 @@ fn pg_hash_minus_munches_ahead_of_bitwise_xor() {
     // Engine-verified maximal munch: `5#-3` is the `jsonb` delete `5 #- 3`, while a space
     // splits `#` (bitwise XOR) from the unary `-` so `5 # -3` is XOR.
     assert!(matches!(
-        project_binary_op(&parse_with("SELECT 5#-3", Postgres).expect("parses")),
+        project_binary_op(
+            &parse_with("SELECT 5#-3", crate::ParseConfig::new(Postgres)).expect("parses")
+        ),
         BinaryOperator::JsonDeletePath,
     ));
     assert!(matches!(
-        project_binary_op(&parse_with("SELECT 5 # -3", Postgres).expect("parses")),
+        project_binary_op(
+            &parse_with("SELECT 5 # -3", crate::ParseConfig::new(Postgres)).expect("parses")
+        ),
         BinaryOperator::BitwiseXor(_),
     ));
 }
@@ -3534,19 +3875,19 @@ fn pg_jsonb_operators_are_dialect_gated() {
     // parameter), matching pg_query.
     use crate::dialect::Ansi;
     assert!(
-        parse_with("SELECT a ? b", Ansi).is_err(),
+        parse_with("SELECT a ? b", crate::ParseConfig::new(Ansi)).is_err(),
         "`?` is not a jsonb op in ANSI"
     );
     assert!(
-        parse_with("SELECT a #> b", Ansi).is_err(),
+        parse_with("SELECT a #> b", crate::ParseConfig::new(Ansi)).is_err(),
         "`#>` is not a jsonb op in ANSI"
     );
     assert!(
-        parse_with("SELECT a @@ b", Ansi).is_err(),
+        parse_with("SELECT a @@ b", crate::ParseConfig::new(Ansi)).is_err(),
         "`@@` is not a jsonb op in ANSI"
     );
     assert!(
-        parse_with("SELECT ?", Postgres).is_err(),
+        parse_with("SELECT ?", crate::ParseConfig::new(Postgres)).is_err(),
         "bare `?` rejects in PostgreSQL"
     );
 }
@@ -3555,7 +3896,11 @@ fn pg_jsonb_operators_are_dialect_gated() {
 fn pg_at_family_operators_bind_looser_than_arithmetic() {
     // PostgreSQL's "any other operator" rank is looser than `+`, so `a -> b + c` is
     // `a -> (b + c)` (the `+` binds first).
-    let parsed = parse_with("SELECT a -> b + c", PG_EXPR_DIALECT).expect("json arrow parses");
+    let parsed = parse_with(
+        "SELECT a -> b + c",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("json arrow parses");
     let Expr::BinaryOp {
         op: BinaryOperator::JsonGet,
         right,
@@ -3580,7 +3925,11 @@ fn pg_at_family_operators_bind_looser_than_arithmetic() {
 fn pg_at_family_operators_are_left_associative_at_one_level() {
     // Same "any other operator" rank, left-associative: `a @> b <@ c` is
     // `(a @> b) <@ c`.
-    let parsed = parse_with("SELECT a @> b <@ c", PG_EXPR_DIALECT).expect("chain parses");
+    let parsed = parse_with(
+        "SELECT a @> b <@ c",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("chain parses");
     let Expr::BinaryOp {
         op: BinaryOperator::ContainedBy,
         left,
@@ -3611,8 +3960,8 @@ fn pg_at_family_operators_round_trip() {
         "SELECT a ->> b",
         "SELECT a -> b + c",
     ] {
-        let parsed =
-            parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(PG_EXPR_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -3632,7 +3981,7 @@ fn pg_at_family_operators_are_inert_without_the_dialect() {
         "SELECT a ->> b",
     ] {
         assert!(
-            parse_with(sql, TestDialect).is_err(),
+            parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
             "{sql} must reject without the PostgreSQL operator flags",
         );
     }
@@ -3645,7 +3994,7 @@ fn duckdb_composite_type_constructors_parse() {
     // STRUCT(name TYPE, ...): a named-field composite, one field per (name, type).
     let parsed = parse_with(
         "SELECT CAST(a AS STRUCT(x INTEGER, y VARCHAR))",
-        DUCKDB_TYPE_DIALECT,
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
     )
     .expect("STRUCT type parses");
     let DataType::Struct {
@@ -3666,8 +4015,11 @@ fn duckdb_composite_type_constructors_parse() {
     ));
 
     // ROW(...) is the same canonical Struct shape under the Row spelling tag.
-    let parsed = parse_with("SELECT a::ROW(i BIGINT, j VARCHAR)", DUCKDB_TYPE_DIALECT)
-        .expect("ROW type parses");
+    let parsed = parse_with(
+        "SELECT a::ROW(i BIGINT, j VARCHAR)",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("ROW type parses");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Struct {
@@ -3679,7 +4031,7 @@ fn duckdb_composite_type_constructors_parse() {
     // UNION(tag T, ...): a distinct tagged-union variant sharing the field-list shape.
     let parsed = parse_with(
         "SELECT a::UNION(i SMALLINT, b VARCHAR)",
-        DUCKDB_TYPE_DIALECT,
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
     )
     .expect("UNION type parses");
     let DataType::Union { members, .. } = cast_type(&parsed) else {
@@ -3688,14 +4040,17 @@ fn duckdb_composite_type_constructors_parse() {
     assert_eq!(members.len(), 2);
 
     // MAP(K, V): key and value are themselves types.
-    let parsed = parse_with("SELECT NULL::MAP(VARCHAR, INTEGER)", DUCKDB_TYPE_DIALECT)
-        .expect("MAP type parses");
+    let parsed = parse_with(
+        "SELECT NULL::MAP(VARCHAR, INTEGER)",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("MAP type parses");
     assert!(matches!(cast_type(&parsed), DataType::Map { .. }));
 
     // Nested composites recurse: MAP(INTEGER[], STRUCT(x INTEGER[])).
     let parsed = parse_with(
         "SELECT NULL::MAP(INTEGER[], STRUCT(x INTEGER[]))",
-        DUCKDB_TYPE_DIALECT,
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
     )
     .expect("nested composite parses");
     let DataType::Map { key, value, .. } = cast_type(&parsed) else {
@@ -3705,8 +4060,11 @@ fn duckdb_composite_type_constructors_parse() {
     assert!(matches!(&**value, DataType::Struct { .. }));
 
     // Fixed-size array `[n]` and keyword `ARRAY[n]` carry the size; `[]`/`ARRAY` do not.
-    let parsed = parse_with("SELECT CAST(a AS INTEGER[3])", DUCKDB_TYPE_DIALECT)
-        .expect("fixed-size array parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS INTEGER[3])",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("fixed-size array parses");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Array {
@@ -3715,8 +4073,11 @@ fn duckdb_composite_type_constructors_parse() {
             ..
         }
     ));
-    let parsed = parse_with("SELECT CAST(a AS INTEGER ARRAY[3])", DUCKDB_TYPE_DIALECT)
-        .expect("keyword fixed-size array parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS INTEGER ARRAY[3])",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("keyword fixed-size array parses");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Array {
@@ -3725,8 +4086,11 @@ fn duckdb_composite_type_constructors_parse() {
             ..
         }
     ));
-    let parsed =
-        parse_with("SELECT CAST(a AS INTEGER[])", DUCKDB_TYPE_DIALECT).expect("list array parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS INTEGER[])",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("list array parses");
     assert!(matches!(
         cast_type(&parsed),
         DataType::Array {
@@ -3739,8 +4103,11 @@ fn duckdb_composite_type_constructors_parse() {
 
 #[test]
 fn duckdb_try_cast_parses_as_cast_with_try_flag() {
-    let parsed =
-        parse_with("SELECT TRY_CAST(a AS INTEGER)", DUCKDB_TYPE_DIALECT).expect("TRY_CAST parses");
+    let parsed = parse_with(
+        "SELECT TRY_CAST(a AS INTEGER)",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("TRY_CAST parses");
     assert!(matches!(
         project_expr(&parsed),
         Expr::Cast {
@@ -3750,7 +4117,11 @@ fn duckdb_try_cast_parses_as_cast_with_try_flag() {
         }
     ));
     // A plain CAST and the `::` spelling carry `try_cast: false`.
-    let parsed = parse_with("SELECT CAST(a AS INTEGER)", DUCKDB_TYPE_DIALECT).expect("CAST parses");
+    let parsed = parse_with(
+        "SELECT CAST(a AS INTEGER)",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("CAST parses");
     assert!(matches!(
         project_expr(&parsed),
         Expr::Cast {
@@ -3759,8 +4130,11 @@ fn duckdb_try_cast_parses_as_cast_with_try_flag() {
         }
     ));
     // A bare `TRY_CAST` with no `(` stays an ordinary column name.
-    let parsed =
-        parse_with("SELECT try_cast", DUCKDB_TYPE_DIALECT).expect("bare try_cast is a name");
+    let parsed = parse_with(
+        "SELECT try_cast",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("bare try_cast is a name");
     assert!(matches!(project_expr(&parsed), Expr::Column { .. }));
 }
 
@@ -3785,8 +4159,8 @@ fn duckdb_composite_types_and_try_cast_round_trip() {
         "SELECT (a::INTEGER[])[1]",
         "SELECT (a::ROW(i BIGINT, j VARCHAR))['i']",
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(DUCKDB_TYPE_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -3798,7 +4172,8 @@ fn duckdb_composite_types_and_try_cast_round_trip() {
 fn duckdb_positional_column_reference_parses_and_round_trips() {
     // `#n` is a 1-based positional column reference (`Expr::PositionalColumn`), valid
     // wherever a value expression is — every case below was probed live on DuckDB.
-    let parsed = parse_with("SELECT #1", DUCKDB_TYPE_DIALECT).expect("#1 parses");
+    let parsed =
+        parse_with("SELECT #1", crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).expect("#1 parses");
     let Expr::PositionalColumn { index, .. } = project_expr(&parsed) else {
         panic!("expected a positional column reference");
     };
@@ -3810,8 +4185,8 @@ fn duckdb_positional_column_reference_parses_and_round_trips() {
         "SELECT #1 + #2",
         "SELECT a, b FROM t ORDER BY #2, #1",
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(DUCKDB_TYPE_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -3820,22 +4195,23 @@ fn duckdb_positional_column_reference_parses_and_round_trips() {
 
     // DuckDB rejects `#0` at parse time ("Positional reference node needs to be >= 1");
     // our parser mirrors that with a clean error rather than a zero-index node.
-    assert!(parse_with("SELECT #0", DUCKDB_TYPE_DIALECT).is_err());
+    assert!(parse_with("SELECT #0", crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).is_err());
     // A bare `#` with no digit is a stray byte — DuckDB's "syntax error at or near #".
-    assert!(parse_with("SELECT #", DUCKDB_TYPE_DIALECT).is_err());
+    assert!(parse_with("SELECT #", crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).is_err());
 }
 
 #[test]
 fn positional_column_reference_rejects_without_the_dialect() {
     // The `#` lexeme is scanned only under the gate. Under ANSI, `#1` is a stray byte, so
     // the statement fails to tokenize — no dialect but DuckDB reads `#n`.
-    assert!(parse_with("SELECT #1", TestDialect).is_err());
+    assert!(parse_with("SELECT #1", crate::ParseConfig::new(TestDialect)).is_err());
     // PostgreSQL spells `#` bitwise-XOR, and `#1` there is *not* a positional column but a
     // bare-prefix `#` operator applied to the constant `1` — PostgreSQL admits any `Op`
     // token in prefix position (`qual_Op a_expr`), and `#1` tokenizes as `#` then `1`, so
     // `SELECT #1` parses as `# 1` (engine-probed: pg_query deparses it to `SELECT # 1`),
     // never the DuckDB positional reference (pg-bare-prefix-operator-glyphs).
-    let parsed = parse_with("SELECT #1", Postgres).expect("`#1` parses as a prefix operator");
+    let parsed = parse_with("SELECT #1", crate::ParseConfig::new(Postgres))
+        .expect("`#1` parses as a prefix operator");
     assert!(
         matches!(project_expr(&parsed), Expr::PrefixOperator { .. }),
         "`#1` under PostgreSQL is a prefix `#` operator, not a positional column",
@@ -3855,13 +4231,16 @@ fn duckdb_composite_types_and_try_cast_reject_without_the_dialect() {
         "SELECT TRY_CAST(a AS INTEGER)",
     ] {
         assert!(
-            parse_with(sql, PG_EXPR_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err(),
             "{sql} must reject under the PostgreSQL-like dialect (composite_types / try_cast off)",
         );
     }
     // A bare STRUCT (no parens) is an ordinary user-defined type name even under DuckDb.
-    let parsed =
-        parse_with("SELECT CAST(a AS structish)", DUCKDB_TYPE_DIALECT).expect("bare name is a UDT");
+    let parsed = parse_with(
+        "SELECT CAST(a AS structish)",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("bare name is a UDT");
     assert!(matches!(cast_type(&parsed), DataType::UserDefined { .. }));
 }
 
@@ -3870,7 +4249,11 @@ fn prefix_typed_literal_parses_as_cast_with_syntax_tag() {
     // PostgreSQL's generalized typed string constant `type 'string'` is the same
     // canonical `Expr::Cast` as `'string'::type` — a cast of the string constant to
     // the named type — bearing only the `PrefixTyped` surface tag (ADR-0011).
-    let parsed = parse_with("SELECT float8 'NaN'", PG_EXPR_DIALECT).expect("typed literal parses");
+    let parsed = parse_with(
+        "SELECT float8 'NaN'",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("typed literal parses");
     let Expr::Cast {
         expr,
         data_type,
@@ -3913,8 +4296,8 @@ fn prefix_typed_literal_parses_arbitrary_type_names() {
         ("SELECT pg_catalog.float8 'NaN'", "NaN"),
     ];
     for (sql, value) in cases {
-        let parsed =
-            parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|e| panic!("{sql} parses: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|e| panic!("{sql} parses: {e:?}"));
         let Expr::Cast { expr, syntax, .. } = project_expr(&parsed) else {
             panic!("{sql} is a typed-literal cast");
         };
@@ -3932,10 +4315,17 @@ fn prefix_typed_literal_parses_arbitrary_type_names() {
     // The target type is the canonical built-in, matching the `::` form: `real`
     // and `double precision` resolve to their built-in shapes, not user-defined
     // names — so a typed literal structurally equals the corresponding cast.
-    let real = parse_with("SELECT real 'Infinity'", PG_EXPR_DIALECT).expect("real parses");
+    let real = parse_with(
+        "SELECT real 'Infinity'",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("real parses");
     assert!(matches!(cast_type(&real), DataType::Real { .. }));
-    let double =
-        parse_with("SELECT double precision '1.5'", PG_EXPR_DIALECT).expect("double parses");
+    let double = parse_with(
+        "SELECT double precision '1.5'",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("double parses");
     assert!(matches!(cast_type(&double), DataType::Double { .. }));
 }
 
@@ -3946,7 +4336,7 @@ fn prefix_typed_literal_shares_one_shape_with_colon_and_call() {
     // in one statement so the interner is shared and the operands compare by value.
     let parsed = parse_with(
         "SELECT float8 'NaN', 'NaN'::float8, CAST('NaN' AS float8)",
-        PG_EXPR_DIALECT,
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
     )
     .expect("all three spellings parse");
     let Statement::Query { query, .. } = &parsed.statements()[0] else {
@@ -3987,8 +4377,11 @@ fn prefix_typed_literal_shares_one_shape_with_colon_and_call() {
 fn prefix_typed_literal_folds_adjacent_string_continuation() {
     // The value continues across a newline like a bare string primary (ADR-0006):
     // `float8 'x'`⏎`'y'` is the one value `xy`, matching PostgreSQL.
-    let parsed =
-        parse_with("SELECT float8 'x'\n'y'", PG_EXPR_DIALECT).expect("continuation parses");
+    let parsed = parse_with(
+        "SELECT float8 'x'\n'y'",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("continuation parses");
     let Expr::Cast { expr, syntax, .. } = project_expr(&parsed) else {
         panic!("expected a typed-literal cast");
     };
@@ -4003,14 +4396,21 @@ fn prefix_typed_literal_folds_adjacent_string_continuation() {
 fn prefix_typed_literal_disambiguation_and_rejects() {
     // No quotes: a type name followed by a non-string is not a typed constant and
     // not two adjacent primaries — rejected, like PostgreSQL's `func_name Sconst`.
-    assert!(parse_with("SELECT float8 42", PG_EXPR_DIALECT).is_err());
+    assert!(parse_with("SELECT float8 42", crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err());
     // Once the leading string commits the typed literal, a same-line second string
     // is the usual adjacency error (PostgreSQL rejects `float8 'x' 'y'` too).
-    assert!(parse_with("SELECT float8 'x' 'y'", PG_EXPR_DIALECT).is_err());
+    assert!(
+        parse_with(
+            "SELECT float8 'x' 'y'",
+            crate::ParseConfig::new(PG_EXPR_DIALECT)
+        )
+        .is_err()
+    );
 
     // The speculative gate must not disturb the hot paths it overlaps. An implicit
     // alias stays a column with an alias, never a typed literal.
-    let aliased = parse_with("SELECT a b", PG_EXPR_DIALECT).expect("implicit alias parses");
+    let aliased = parse_with("SELECT a b", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("implicit alias parses");
     let Statement::Query { query, .. } = &aliased.statements()[0] else {
         panic!("expected a query");
     };
@@ -4027,11 +4427,19 @@ fn prefix_typed_literal_disambiguation_and_rejects() {
     ));
 
     // A function call is still a call.
-    let call = parse_with("SELECT count('x')", PG_EXPR_DIALECT).expect("call parses");
+    let call = parse_with(
+        "SELECT count('x')",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("call parses");
     assert!(matches!(project_expr(&call), Expr::Function { .. }));
 
     // A bare type name with no following string is an ordinary column reference.
-    let col = parse_with("SELECT float8 FROM t", PG_EXPR_DIALECT).expect("bare name parses");
+    let col = parse_with(
+        "SELECT float8 FROM t",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("bare name parses");
     assert_eq!(column_name(&col, project_expr(&col)), "float8");
 }
 
@@ -4058,7 +4466,7 @@ fn prefix_typed_literal_value_must_be_an_sconst() {
         for value in ["B'1'", "X'ab'"] {
             let sql = format!("SELECT {head} {value}");
             assert!(
-                parse_with(&sql, PG_EXPR_DIALECT).is_err(),
+                parse_with(&sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err(),
                 "{sql} must reject: the typed-literal value is not an Sconst"
             );
         }
@@ -4067,7 +4475,7 @@ fn prefix_typed_literal_value_must_be_an_sconst() {
         // differential — `PG_EXPR_DIALECT` is ANSI-based and does not arm those lexer forms).
         let sql = format!("SELECT {head} 'x'");
         assert!(
-            parse_with(&sql, PG_EXPR_DIALECT).is_ok(),
+            parse_with(&sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).is_ok(),
             "{sql} must parse: a plain Sconst is a valid typed-literal value"
         );
     }
@@ -4080,7 +4488,11 @@ fn parameterized_typed_literal_parses_over_modifier_list() {
     // (`char(20) 'chars'`) and `func_name '(' func_arg_list ')' Sconst` for a func-name
     // head (`foo(1) 'x'`). Both fold to the one canonical `Expr::Cast`/`PrefixTyped`, the
     // type resolving to its built-in shape exactly as the bare and `::` forms do.
-    let char20 = parse_with("SELECT char(20) 'chars'", PG_EXPR_DIALECT).expect("char(20) parses");
+    let char20 = parse_with(
+        "SELECT char(20) 'chars'",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("char(20) parses");
     let Expr::Cast {
         expr,
         data_type,
@@ -4110,7 +4522,8 @@ fn parameterized_typed_literal_parses_over_modifier_list() {
     // A func-name head (unreserved identifier or a `type_func_name` keyword) opens the
     // generic form; the numeric modifiers land on the UserDefined type name.
     for (sql, name) in [("SELECT foo(1) 'x'", "foo"), ("SELECT left(1) 'x'", "left")] {
-        let parsed = parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|e| panic!("{sql}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|e| panic!("{sql}: {e:?}"));
         let Expr::Cast {
             data_type, syntax, ..
         } = project_expr(&parsed)
@@ -4146,12 +4559,13 @@ fn parameterized_typed_literal_parses_over_modifier_list() {
         "SELECT bit(4) 'x'",
         "SELECT foo(1) 'x'",
     ] {
-        let parsed = parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|e| panic!("{sql}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|e| panic!("{sql}: {e:?}"));
         let rendered = Renderer::new(PG_EXPR_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|e| panic!("{sql}: {e}"));
-        let reparsed =
-            parse_with(&rendered, PG_EXPR_DIALECT).unwrap_or_else(|e| panic!("{rendered}: {e:?}"));
+        let reparsed = parse_with(&rendered, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|e| panic!("{rendered}: {e:?}"));
         assert!(
             matches!(
                 project_expr(&reparsed),
@@ -4176,7 +4590,10 @@ fn parameterized_typed_literal_boundary_and_gating() {
         "SELECT int(4) 'x'",
         "SELECT integer(4) 'x'",
     ] {
-        assert!(parse_with(sql, PG_EXPR_DIALECT).is_err(), "{sql} rejects");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err(),
+            "{sql} rejects"
+        );
     }
 
     // An ordinary call — no trailing string — is untouched by the trailing-string probe.
@@ -4185,7 +4602,8 @@ fn parameterized_typed_literal_boundary_and_gating() {
         "SELECT substring(a, 1)",
         "SELECT left(a, 1)",
     ] {
-        let parsed = parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|e| panic!("{sql}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|e| panic!("{sql}: {e:?}"));
         assert!(
             matches!(project_expr(&parsed), Expr::Function { .. }),
             "{sql} stays a function call",
@@ -4198,8 +4616,8 @@ fn parameterized_typed_literal_boundary_and_gating() {
     // meaning, engine-measured on rusqlite (`char(20) 'chars'` prepares; `foo(1) 'x'` fails only
     // to resolve `foo`). Each parses to a `Function`, never a typed-string `Literal`.
     for sql in ["SELECT char(20) 'chars'", "SELECT foo(1) 'x'"] {
-        let parsed =
-            parse_with(sql, Sqlite).unwrap_or_else(|e| panic!("{sql} parses under SQLite: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Sqlite))
+            .unwrap_or_else(|e| panic!("{sql} parses under SQLite: {e:?}"));
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query");
         };
@@ -4228,7 +4646,8 @@ fn parameterized_typed_literal_boundary_and_gating() {
 
 #[test]
 fn subscript_parses_index_and_slice_forms() {
-    let parsed = parse_with("SELECT a[1]", PG_EXPR_DIALECT).expect("index subscript parses");
+    let parsed = parse_with("SELECT a[1]", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("index subscript parses");
     let Expr::Subscript { subscript, .. } = project_expr(&parsed) else {
         panic!("expected a subscript");
     };
@@ -4242,7 +4661,8 @@ fn subscript_parses_index_and_slice_forms() {
         ("SELECT a[:2]", false, true),
         ("SELECT a[:]", false, false),
     ] {
-        let parsed = parse_with(sql, PG_EXPR_DIALECT).expect("slice subscript parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .expect("slice subscript parses");
         let Expr::Subscript { subscript, .. } = project_expr(&parsed) else {
             panic!("expected a slice subscript for {sql}");
         };
@@ -4253,13 +4673,13 @@ fn subscript_parses_index_and_slice_forms() {
     }
 
     // An empty `[]` has no index and is rejected; ANSI rejects subscripts wholesale.
-    assert!(parse_with("SELECT a[]", PG_EXPR_DIALECT).is_err());
-    assert!(parse_with("SELECT a[1]", TestDialect).is_err());
+    assert!(parse_with("SELECT a[]", crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err());
+    assert!(parse_with("SELECT a[1]", crate::ParseConfig::new(TestDialect)).is_err());
 
     // The three-bound `[a:b:c]` slice is DuckDB-only: a two-bound dialect rejects the
     // second `:` cleanly (it is left for the `]` expectation).
-    assert!(parse_with("SELECT a[1:2:3]", PG_EXPR_DIALECT).is_err());
-    assert!(parse_with("SELECT a[1:-:2]", PG_EXPR_DIALECT).is_err());
+    assert!(parse_with("SELECT a[1:2:3]", crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err());
+    assert!(parse_with("SELECT a[1:-:2]", crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err());
 }
 
 #[test]
@@ -4276,8 +4696,8 @@ fn duckdb_three_bound_slice_parses_and_round_trips() {
         ("SELECT a[:-:3]", false, false, true),
         ("SELECT a[1:-:]", true, false, false),
     ] {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|e| panic!("{sql}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|e| panic!("{sql}: {e:?}"));
         let Expr::Subscript { subscript, .. } = project_expr(&parsed) else {
             panic!("expected a stepped slice for {sql}");
         };
@@ -4294,8 +4714,11 @@ fn duckdb_three_bound_slice_parses_and_round_trips() {
 
     // A negative-expression bound is a bound, not the `-` placeholder: `[1:-5:2]` keeps its
     // upper (the placeholder is a bare `-` immediately before the second `:`).
-    let parsed =
-        parse_with("SELECT a[1:-5:2]", DUCKDB_TYPE_DIALECT).expect("negative upper parses");
+    let parsed = parse_with(
+        "SELECT a[1:-5:2]",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("negative upper parses");
     let Expr::Subscript { subscript, .. } = project_expr(&parsed) else {
         panic!("expected a stepped slice");
     };
@@ -4316,7 +4739,7 @@ fn duckdb_three_bound_slice_parses_and_round_trips() {
         "SELECT a[1:2:3:4]",
     ] {
         assert!(
-            parse_with(sql, DUCKDB_TYPE_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).is_err(),
             "{sql} must be rejected"
         );
     }
@@ -4324,7 +4747,11 @@ fn duckdb_three_bound_slice_parses_and_round_trips() {
 
 #[test]
 fn collate_parses_with_collation_name() {
-    let parsed = parse_with("SELECT a COLLATE \"C\"", PG_EXPR_DIALECT).expect("COLLATE parses");
+    let parsed = parse_with(
+        "SELECT a COLLATE \"C\"",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("COLLATE parses");
     let Expr::Collate { collate, .. } = project_expr(&parsed) else {
         panic!("expected a COLLATE expression");
     };
@@ -4332,14 +4759,21 @@ fn collate_parses_with_collation_name() {
     assert_eq!(collate.collation.0.len(), 1);
     assert_eq!(parsed.resolver().resolve(collate.collation.0[0].sym), "C");
 
-    assert!(parse_with("SELECT a COLLATE \"C\"", TestDialect).is_err());
+    assert!(
+        parse_with(
+            "SELECT a COLLATE \"C\"",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn sqlite_collate_postfix_binds_above_comparison_across_positions() {
     // SQLite spells `expr COLLATE <name>` as an expression postfix with a bare-identifier
     // collation name (`nocase`), the same shape and binding power PostgreSQL uses.
-    let parsed = parse_with("SELECT a COLLATE nocase", Sqlite).expect("SQLite COLLATE parses");
+    let parsed = parse_with("SELECT a COLLATE nocase", crate::ParseConfig::new(Sqlite))
+        .expect("SQLite COLLATE parses");
     let Expr::Collate { collate, .. } = project_expr(&parsed) else {
         panic!("expected a COLLATE expression");
     };
@@ -4350,7 +4784,11 @@ fn sqlite_collate_postfix_binds_above_comparison_across_positions() {
     );
 
     // COLLATE binds tighter than comparison: `a = b COLLATE c` is `a = (b COLLATE c)`.
-    let parsed = parse_with("SELECT a = b COLLATE nocase", Sqlite).expect("precedence parses");
+    let parsed = parse_with(
+        "SELECT a = b COLLATE nocase",
+        crate::ParseConfig::new(Sqlite),
+    )
+    .expect("precedence parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Eq(_),
         right,
@@ -4366,29 +4804,45 @@ fn sqlite_collate_postfix_binds_above_comparison_across_positions() {
 
     // The two other family positions: an ORDER BY key and a CREATE INDEX key (an index key
     // is a full expression, so the same postfix flag admits it) both parse under SQLite.
-    parse_with("SELECT a FROM t ORDER BY a COLLATE nocase", Sqlite)
-        .expect("ORDER BY COLLATE parses");
-    parse_with("CREATE INDEX i ON t(a COLLATE nocase)", Sqlite)
-        .expect("CREATE INDEX key COLLATE parses");
+    parse_with(
+        "SELECT a FROM t ORDER BY a COLLATE nocase",
+        crate::ParseConfig::new(Sqlite),
+    )
+    .expect("ORDER BY COLLATE parses");
+    parse_with(
+        "CREATE INDEX i ON t(a COLLATE nocase)",
+        crate::ParseConfig::new(Sqlite),
+    )
+    .expect("CREATE INDEX key COLLATE parses");
 }
 
 #[test]
 fn at_time_zone_parses_with_zone_operand() {
-    let parsed =
-        parse_with("SELECT a AT TIME ZONE 'UTC'", PG_EXPR_DIALECT).expect("AT TIME ZONE parses");
+    let parsed = parse_with(
+        "SELECT a AT TIME ZONE 'UTC'",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("AT TIME ZONE parses");
     let Expr::AtTimeZone { at_time_zone, .. } = project_expr(&parsed) else {
         panic!("expected an AT TIME ZONE expression");
     };
     assert_eq!(column_name(&parsed, &at_time_zone.expr), "a");
     assert!(matches!(at_time_zone.zone, Expr::Literal { .. }));
 
-    assert!(parse_with("SELECT a AT TIME ZONE 'UTC'", TestDialect).is_err());
+    assert!(
+        parse_with(
+            "SELECT a AT TIME ZONE 'UTC'",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn semi_structured_access_parses_path_segments_and_round_trips() {
     let sql = "SELECT src:customer[0].name";
-    let parsed = parse_with(sql, SEMI_STRUCTURED_DIALECT).expect("semi-structured path parses");
+    let parsed = parse_with(sql, crate::ParseConfig::new(SEMI_STRUCTURED_DIALECT))
+        .expect("semi-structured path parses");
     let Expr::SemiStructuredAccess {
         semi_structured_access,
         ..
@@ -4422,8 +4876,11 @@ fn semi_structured_access_parses_path_segments_and_round_trips() {
 
 #[test]
 fn semi_structured_access_precedence_and_disambiguation_are_stable() {
-    let parsed =
-        parse_with("SELECT a + src:customer", SEMI_STRUCTURED_DIALECT).expect("path parses");
+    let parsed = parse_with(
+        "SELECT a + src:customer",
+        crate::ParseConfig::new(SEMI_STRUCTURED_DIALECT),
+    )
+    .expect("path parses");
     let Expr::BinaryOp {
         op: BinaryOperator::Plus,
         right,
@@ -4434,19 +4891,28 @@ fn semi_structured_access_precedence_and_disambiguation_are_stable() {
     };
     assert!(matches!(&**right, Expr::SemiStructuredAccess { .. }));
 
-    let grouped = parse_with("SELECT (a + b):customer", SEMI_STRUCTURED_DIALECT)
-        .expect("grouped base parses");
+    let grouped = parse_with(
+        "SELECT (a + b):customer",
+        crate::ParseConfig::new(SEMI_STRUCTURED_DIALECT),
+    )
+    .expect("grouped base parses");
     let rendered = Renderer::new(SEMI_STRUCTURED_DIALECT)
         .render_parsed(&grouped)
         .expect("grouped base renders");
     assert_eq!(rendered, "SELECT (a + b):customer");
 
-    let cast = parse_with("SELECT src::TEXT", SEMI_STRUCTURED_POSTFIX_DIALECT)
-        .expect("double-colon cast parses");
+    let cast = parse_with(
+        "SELECT src::TEXT",
+        crate::ParseConfig::new(SEMI_STRUCTURED_POSTFIX_DIALECT),
+    )
+    .expect("double-colon cast parses");
     assert!(matches!(project_expr(&cast), Expr::Cast { .. }));
 
-    let subscript =
-        parse_with("SELECT arr[1:2]", SEMI_STRUCTURED_POSTFIX_DIALECT).expect("array slice parses");
+    let subscript = parse_with(
+        "SELECT arr[1:2]",
+        crate::ParseConfig::new(SEMI_STRUCTURED_POSTFIX_DIALECT),
+    )
+    .expect("array slice parses");
     let Expr::Subscript { subscript, .. } = project_expr(&subscript) else {
         panic!("expected a subscript slice");
     };
@@ -4454,7 +4920,7 @@ fn semi_structured_access_precedence_and_disambiguation_are_stable() {
 
     let r#struct = parse_with(
         "SELECT {'customer': src:customer}",
-        SEMI_STRUCTURED_POSTFIX_DIALECT,
+        crate::ParseConfig::new(SEMI_STRUCTURED_POSTFIX_DIALECT),
     )
     .expect("struct key-value colon remains local to the struct parser");
     assert!(matches!(project_expr(&r#struct), Expr::Struct { .. }));
@@ -4462,8 +4928,14 @@ fn semi_structured_access_precedence_and_disambiguation_are_stable() {
 
 #[test]
 fn semi_structured_access_is_gated_and_conflicts_with_named_colon_parameters() {
-    assert!(parse_with("SELECT src:customer", TestDialect).is_err());
-    assert!(parse_with("SELECT :customer", PARAMETER_DIALECT).is_ok());
+    assert!(parse_with("SELECT src:customer", crate::ParseConfig::new(TestDialect)).is_err());
+    assert!(
+        parse_with(
+            "SELECT :customer",
+            crate::ParseConfig::new(PARAMETER_DIALECT)
+        )
+        .is_ok()
+    );
     assert_eq!(
         FeatureSet::ANSI
             .try_with(
@@ -4484,8 +4956,11 @@ fn semi_structured_access_is_gated_and_conflicts_with_named_colon_parameters() {
 
 #[test]
 fn array_constructor_parses_elements_and_subquery() {
-    let parsed =
-        parse_with("SELECT ARRAY[1, 2, 3]", PG_EXPR_DIALECT).expect("array elements parse");
+    let parsed = parse_with(
+        "SELECT ARRAY[1, 2, 3]",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("array elements parse");
     let Expr::Array { array, .. } = project_expr(&parsed) else {
         panic!("expected an array constructor");
     };
@@ -4498,8 +4973,11 @@ fn array_constructor_parses_elements_and_subquery() {
     assert_eq!(elements.len(), 3);
     assert_eq!(*spelling, ArraySpelling::Keyword);
 
-    let parsed =
-        parse_with("SELECT ARRAY(SELECT 1)", PG_EXPR_DIALECT).expect("array subquery parses");
+    let parsed = parse_with(
+        "SELECT ARRAY(SELECT 1)",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("array subquery parses");
     let Expr::Array { array, .. } = project_expr(&parsed) else {
         panic!("expected an array constructor");
     };
@@ -4507,8 +4985,9 @@ fn array_constructor_parses_elements_and_subquery() {
 
     // Empty `ARRAY[]` is valid; ANSI rejects the constructor and reads `array`
     // as a name (then the trailing `[...]` fails to parse).
-    parse_with("SELECT ARRAY[]", PG_EXPR_DIALECT).expect("empty array parses");
-    assert!(parse_with("SELECT ARRAY[1]", TestDialect).is_err());
+    parse_with("SELECT ARRAY[]", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("empty array parses");
+    assert!(parse_with("SELECT ARRAY[1]", crate::ParseConfig::new(TestDialect)).is_err());
 }
 
 #[test]
@@ -4516,8 +4995,11 @@ fn array_constructor_parses_multidimensional_rows() {
     // A PostgreSQL multidimensional literal: the outer `ARRAY[...]` is `Keyword`-spelled
     // and each bare-bracket sub-row is a `Bracket`-spelled element, so a nested row shapes
     // and renders like a DuckDB list level (engine-probed against pg_query 6.1 / PG-17).
-    let parsed =
-        parse_with("SELECT ARRAY[[1, 2], [3, 4]]", PG_EXPR_DIALECT).expect("2-D array parses");
+    let parsed = parse_with(
+        "SELECT ARRAY[[1, 2], [3, 4]]",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("2-D array parses");
     let Expr::Array { array, .. } = project_expr(&parsed) else {
         panic!("expected an array constructor");
     };
@@ -4551,8 +5033,8 @@ fn array_constructor_parses_multidimensional_rows() {
         "SELECT ARRAY[[], []]",
         "SELECT ARRAY[1, ARRAY[2, 3]]",
     ] {
-        let parsed =
-            parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(PG_EXPR_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -4570,7 +5052,7 @@ fn array_constructor_parses_multidimensional_rows() {
         "SELECT [[1, 2], [3, 4]]",
     ] {
         assert!(
-            parse_with(sql, PG_EXPR_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err(),
             "must reject {sql}"
         );
     }
@@ -4596,7 +5078,11 @@ const COLLECTION_DIALECT: FeatureDialect = {
 
 #[test]
 fn list_literal_parses_with_bracket_spelling() {
-    let parsed = parse_with("SELECT [1, 2, 3]", COLLECTION_DIALECT).expect("list parses");
+    let parsed = parse_with(
+        "SELECT [1, 2, 3]",
+        crate::ParseConfig::new(COLLECTION_DIALECT),
+    )
+    .expect("list parses");
     let Expr::Array { array, .. } = project_expr(&parsed) else {
         panic!("expected a list literal");
     };
@@ -4610,7 +5096,8 @@ fn list_literal_parses_with_bracket_spelling() {
     assert_eq!(*spelling, ArraySpelling::Bracket);
 
     // Empty `[]` is valid (DuckDB accepts it; `list_value()`).
-    let parsed = parse_with("SELECT []", COLLECTION_DIALECT).expect("empty list parses");
+    let parsed = parse_with("SELECT []", crate::ParseConfig::new(COLLECTION_DIALECT))
+        .expect("empty list parses");
     let Expr::Array { array, .. } = project_expr(&parsed) else {
         panic!("expected a list literal");
     };
@@ -4623,7 +5110,13 @@ fn list_literal_parses_with_bracket_spelling() {
     // (`SelectSyntax::trailing_comma`), which this collection-literal dialect leaves off,
     // so a trailing comma is still a clean reject here; the DuckDb preset accepts it
     // (`duckdb_trailing_comma_is_accepted_in_list_positions`).
-    assert!(parse_with("SELECT [1, 2,]", COLLECTION_DIALECT).is_err());
+    assert!(
+        parse_with(
+            "SELECT [1, 2,]",
+            crate::ParseConfig::new(COLLECTION_DIALECT)
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -4723,13 +5216,13 @@ fn duckdb_trailing_comma_is_accepted_in_list_positions() {
     for (with_tc, without_tc) in normalized_pairs {
         let with_rendered = Renderer::new(DUCKDB_TYPE_DIALECT)
             .render_parsed(
-                &parse_with(with_tc, DUCKDB_TYPE_DIALECT)
+                &parse_with(with_tc, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
                     .unwrap_or_else(|err| panic!("{with_tc}: {err:?}")),
             )
             .unwrap_or_else(|err| panic!("{with_tc}: {err}"));
         let without_rendered = Renderer::new(DUCKDB_TYPE_DIALECT)
             .render_parsed(
-                &parse_with(without_tc, DUCKDB_TYPE_DIALECT)
+                &parse_with(without_tc, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
                     .unwrap_or_else(|err| panic!("{without_tc}: {err:?}")),
             )
             .unwrap_or_else(|err| panic!("{without_tc}: {err}"));
@@ -4739,7 +5232,7 @@ fn duckdb_trailing_comma_is_accepted_in_list_positions() {
         );
         // ANSI, which leaves the gate off, rejects the dangling comma outright.
         assert!(
-            parse_with(with_tc, Ansi).is_err(),
+            parse_with(with_tc, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI must reject the trailing comma in {with_tc:?}",
         );
     }
@@ -4772,7 +5265,7 @@ fn duckdb_trailing_comma_is_accepted_in_list_positions() {
         "SELECT DISTINCT ON (a,,) a FROM t",
     ] {
         assert!(
-            parse_with(sql, DUCKDB_TYPE_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).is_err(),
             "DuckDB rejects the trailing comma here, so the parser must too: {sql:?}",
         );
     }
@@ -4780,8 +5273,11 @@ fn duckdb_trailing_comma_is_accepted_in_list_positions() {
 
 #[test]
 fn struct_literal_parses_fields_with_each_key_spelling() {
-    let parsed = parse_with("SELECT {'a': 1, b: 2, \"c d\": [3]}", COLLECTION_DIALECT)
-        .expect("struct parses");
+    let parsed = parse_with(
+        "SELECT {'a': 1, b: 2, \"c d\": [3]}",
+        crate::ParseConfig::new(COLLECTION_DIALECT),
+    )
+    .expect("struct parses");
     let Expr::Struct { r#struct, .. } = project_expr(&parsed) else {
         panic!("expected a struct literal");
     };
@@ -4801,7 +5297,11 @@ fn struct_literal_parses_fields_with_each_key_spelling() {
     assert!(matches!(r#struct.fields[2].value, Expr::Array { .. }));
 
     // A single-quoted key unescapes its doubled quote like a string body.
-    let parsed = parse_with("SELECT {'it''s': 1}", COLLECTION_DIALECT).expect("escaped key");
+    let parsed = parse_with(
+        "SELECT {'it''s': 1}",
+        crate::ParseConfig::new(COLLECTION_DIALECT),
+    )
+    .expect("escaped key");
     let Expr::Struct { r#struct, .. } = project_expr(&parsed) else {
         panic!("expected a struct literal");
     };
@@ -4809,15 +5309,30 @@ fn struct_literal_parses_fields_with_each_key_spelling() {
 
     // DuckDB rejects an empty struct, a value-position key, and a reserved bare
     // key; so do we, as clean parse errors.
-    assert!(parse_with("SELECT {}", COLLECTION_DIALECT).is_err());
-    assert!(parse_with("SELECT {1: 'x'}", COLLECTION_DIALECT).is_err());
-    assert!(parse_with("SELECT {select: 1}", COLLECTION_DIALECT).is_err());
+    assert!(parse_with("SELECT {}", crate::ParseConfig::new(COLLECTION_DIALECT)).is_err());
+    assert!(
+        parse_with(
+            "SELECT {1: 'x'}",
+            crate::ParseConfig::new(COLLECTION_DIALECT)
+        )
+        .is_err()
+    );
+    assert!(
+        parse_with(
+            "SELECT {select: 1}",
+            crate::ParseConfig::new(COLLECTION_DIALECT)
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn map_literal_parses_entries_and_bare_map_stays_a_name() {
-    let parsed = parse_with("SELECT MAP {'a': 1, [2]: 'x'}", COLLECTION_DIALECT)
-        .expect("map literal parses");
+    let parsed = parse_with(
+        "SELECT MAP {'a': 1, [2]: 'x'}",
+        crate::ParseConfig::new(COLLECTION_DIALECT),
+    )
+    .expect("map literal parses");
     let Expr::Map { map, .. } = project_expr(&parsed) else {
         panic!("expected a map literal");
     };
@@ -4827,7 +5342,8 @@ fn map_literal_parses_entries_and_bare_map_stays_a_name() {
     assert!(matches!(map.entries[1].key, Expr::Array { .. }));
 
     // Empty `MAP {}` is valid (DuckDB accepts it; `map()`).
-    let parsed = parse_with("SELECT MAP {}", COLLECTION_DIALECT).expect("empty map parses");
+    let parsed = parse_with("SELECT MAP {}", crate::ParseConfig::new(COLLECTION_DIALECT))
+        .expect("empty map parses");
     let Expr::Map { map, .. } = project_expr(&parsed) else {
         panic!("expected a map literal");
     };
@@ -4836,17 +5352,28 @@ fn map_literal_parses_entries_and_bare_map_stays_a_name() {
     // Without a following `{`, `map` is an ordinary name: the two-list
     // `MAP(<keys>, <values>)` spelling is a plain call (DuckDB's own treatment —
     // `map` is a case-insensitive function there), and a bare `map` a column.
-    let parsed = parse_with("SELECT MAP([1], [2])", COLLECTION_DIALECT).expect("call parses");
+    let parsed = parse_with(
+        "SELECT MAP([1], [2])",
+        crate::ParseConfig::new(COLLECTION_DIALECT),
+    )
+    .expect("call parses");
     assert!(matches!(project_expr(&parsed), Expr::Function { .. }));
-    let parsed = parse_with("SELECT map FROM t", COLLECTION_DIALECT).expect("column parses");
+    let parsed = parse_with(
+        "SELECT map FROM t",
+        crate::ParseConfig::new(COLLECTION_DIALECT),
+    )
+    .expect("column parses");
     assert!(matches!(project_expr(&parsed), Expr::Column { .. }));
 }
 
 #[test]
 fn collection_literals_nest_and_compose_with_subscript() {
     // The ticket's sampled sweep example: structs nested in a list.
-    let parsed = parse_with("SELECT [{'a': 42}, {'b': 84}]", COLLECTION_DIALECT)
-        .expect("nested collections parse");
+    let parsed = parse_with(
+        "SELECT [{'a': 42}, {'b': 84}]",
+        crate::ParseConfig::new(COLLECTION_DIALECT),
+    )
+    .expect("nested collections parse");
     let Expr::Array { array, .. } = project_expr(&parsed) else {
         panic!("expected a list literal");
     };
@@ -4866,7 +5393,8 @@ fn collection_literals_nest_and_compose_with_subscript() {
         ("SELECT [1, 2, 3][2]", SubscriptKind::Index),
         ("SELECT [1, 2][1:2]", SubscriptKind::Slice),
     ] {
-        let parsed = parse_with(sql, COLLECTION_DIALECT).expect("subscripted list parses");
+        let parsed = parse_with(sql, crate::ParseConfig::new(COLLECTION_DIALECT))
+            .expect("subscripted list parses");
         let Expr::Subscript { subscript, .. } = project_expr(&parsed) else {
             panic!("expected a subscript over the list literal for {sql}");
         };
@@ -4889,9 +5417,10 @@ fn collection_literals_round_trip_exactly() {
         "SELECT [1, 2, 3][2]",
         "SELECT ARRAY[1, 2]",
     ] {
-        let parsed = parse_with(sql, COLLECTION_DIALECT).unwrap_or_else(|err| {
-            panic!("{sql}: {err:?}");
-        });
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(COLLECTION_DIALECT)).unwrap_or_else(|err| {
+                panic!("{sql}: {err:?}");
+            });
         let rendered = Renderer::new(COLLECTION_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -4912,12 +5441,18 @@ fn collection_literals_are_dialect_gated() {
         "SELECT {'a': 1}",
         "SELECT MAP {'a': 1}",
     ] {
-        assert!(parse_with(sql, TestDialect).is_err(), "ANSI rejects {sql}");
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(TestDialect)).is_err(),
+            "ANSI rejects {sql}"
+        );
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects {sql}",
         );
-        assert!(parse_with(sql, MySql).is_err(), "MySQL rejects {sql}");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+            "MySQL rejects {sql}"
+        );
     }
 }
 
@@ -4929,17 +5464,19 @@ fn bracket_identifiers_do_not_bleed_into_collection_literals() {
     // `1, 2, 3`, never a list literal — the tokenizer claims `[` before the
     // expression grammar can (LexicalConflict::BracketIdentifierVersusArraySyntax
     // keeps the two disjoint per dialect).
-    let parsed = parse_with("SELECT [1, 2, 3]", Sqlite).expect("bracket identifier parses");
+    let parsed = parse_with("SELECT [1, 2, 3]", crate::ParseConfig::new(Sqlite))
+        .expect("bracket identifier parses");
     let Expr::Column { name, .. } = project_expr(&parsed) else {
         panic!("expected a bracket-quoted column identifier under SQLite");
     };
     assert_eq!(parsed.resolver().resolve(name.0[0].sym), "1, 2, 3");
     // The brace/MAP forms have no SQLite reading at all.
-    assert!(parse_with("SELECT {'a': 1}", Sqlite).is_err());
-    assert!(parse_with("SELECT MAP {'a': 1}", Sqlite).is_err());
+    assert!(parse_with("SELECT {'a': 1}", crate::ParseConfig::new(Sqlite)).is_err());
+    assert!(parse_with("SELECT MAP {'a': 1}", crate::ParseConfig::new(Sqlite)).is_err());
 
     // And under the fitted DuckDb preset the same text is the list literal.
-    let parsed = parse_with("SELECT [1, 2, 3]", DuckDb).expect("list literal parses");
+    let parsed = parse_with("SELECT [1, 2, 3]", crate::ParseConfig::new(DuckDb))
+        .expect("list literal parses");
     assert!(matches!(project_expr(&parsed), Expr::Array { .. }));
 }
 
@@ -4948,8 +5485,11 @@ fn overlaps_period_predicate_parses_row_operands() {
     // The SQL-standard `(s1, e1) OVERLAPS (s2, e2)` predicate folds onto `Expr::BinaryOp`
     // with `BinaryOperator::Overlaps`, both operands two-element rows (engine-probed
     // against pg_query 6.1 / PG-17).
-    let parsed =
-        parse_with("SELECT (a, b) OVERLAPS (c, d)", OVERLAPS_DIALECT).expect("OVERLAPS parses");
+    let parsed = parse_with(
+        "SELECT (a, b) OVERLAPS (c, d)",
+        crate::ParseConfig::new(OVERLAPS_DIALECT),
+    )
+    .expect("OVERLAPS parses");
     let Expr::BinaryOp {
         left, op, right, ..
     } = project_expr(&parsed)
@@ -4973,8 +5513,8 @@ fn overlaps_period_predicate_parses_row_operands() {
         "SELECT (a, b) OVERLAPS (c, d) AND (e, f) OVERLAPS (g, h)",
         "SELECT (a, b) OVERLAPS (c, d) = TRUE",
     ] {
-        let parsed =
-            parse_with(sql, OVERLAPS_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(OVERLAPS_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(OVERLAPS_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -4999,7 +5539,7 @@ fn overlaps_period_predicate_parses_row_operands() {
         "SELECT a OVERLAPS (c, d)",
     ] {
         assert!(
-            parse_with(sql, OVERLAPS_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(OVERLAPS_DIALECT)).is_err(),
             "must reject {sql}"
         );
     }
@@ -5007,19 +5547,27 @@ fn overlaps_period_predicate_parses_row_operands() {
     // Gated by the behaviour flag: a preset with the row constructor but not the predicate
     // (PostgreSQL expression syntax, ANSI predicate syntax) leaves `OVERLAPS` unconsumed
     // and rejects the same input.
-    assert!(parse_with("SELECT (a, b) OVERLAPS (c, d)", PG_EXPR_DIALECT).is_err());
+    assert!(
+        parse_with(
+            "SELECT (a, b) OVERLAPS (c, d)",
+            crate::ParseConfig::new(PG_EXPR_DIALECT)
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn row_constructor_parses_explicit_and_implicit_forms() {
-    let parsed = parse_with("SELECT ROW(1, 2)", PG_EXPR_DIALECT).expect("explicit ROW parses");
+    let parsed = parse_with("SELECT ROW(1, 2)", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("explicit ROW parses");
     let Expr::Row { row, .. } = project_expr(&parsed) else {
         panic!("expected a row constructor");
     };
     assert!(row.explicit);
     assert_eq!(row.fields.len(), 2);
 
-    let parsed = parse_with("SELECT (a, b, c)", PG_EXPR_DIALECT).expect("implicit row parses");
+    let parsed = parse_with("SELECT (a, b, c)", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("implicit row parses");
     let Expr::Row { row, .. } = project_expr(&parsed) else {
         panic!("expected an implicit row constructor");
     };
@@ -5027,11 +5575,12 @@ fn row_constructor_parses_explicit_and_implicit_forms() {
     assert_eq!(row.fields.len(), 3);
 
     // A single parenthesized expression stays a bare grouping, not a 1-row.
-    let parsed = parse_with("SELECT (a)", PG_EXPR_DIALECT).expect("grouping parses");
+    let parsed = parse_with("SELECT (a)", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("grouping parses");
     assert!(matches!(project_expr(&parsed), Expr::Column { .. }));
 
     // ANSI rejects the implicit comma form.
-    assert!(parse_with("SELECT (a, b)", TestDialect).is_err());
+    assert!(parse_with("SELECT (a, b)", crate::ParseConfig::new(TestDialect)).is_err());
 }
 
 /// The PostgreSQL expression surface plus the DuckDB lambda gate and the DuckDB
@@ -5096,9 +5645,10 @@ fn lambda_parses_each_param_spelling() {
             LambdaParamSpelling::RowKeyword,
         ),
     ] {
-        let parsed = parse_with(sql, LAMBDA_DIALECT).unwrap_or_else(|err| {
-            panic!("{sql}: {err:?}");
-        });
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(LAMBDA_DIALECT)).unwrap_or_else(|err| {
+                panic!("{sql}: {err:?}");
+            });
         let lambda = project_lambda(&parsed, sql);
         let params: Vec<_> = lambda
             .params
@@ -5110,8 +5660,11 @@ fn lambda_parses_each_param_spelling() {
     }
 
     // A quoted parameter keeps its quote style on the ident.
-    let parsed =
-        parse_with("SELECT \"x\" -> \"x\" + 1", LAMBDA_DIALECT).expect("quoted param parses");
+    let parsed = parse_with(
+        "SELECT \"x\" -> \"x\" + 1",
+        crate::ParseConfig::new(LAMBDA_DIALECT),
+    )
+    .expect("quoted param parses");
     let lambda = project_lambda(&parsed, "quoted");
     assert_eq!(lambda.params[0].quote, crate::ast::QuoteStyle::Double);
 }
@@ -5120,7 +5673,11 @@ fn lambda_parses_each_param_spelling() {
 fn lambda_body_captures_the_full_right_expression() {
     // `->` binds at the JSON-arrow rank, looser than arithmetic and comparison,
     // so the body swallows `x % 2 = 0` whole — the corpus `list_filter` shape.
-    let parsed = parse_with("SELECT x -> x % 2 = 0", LAMBDA_DIALECT).expect("lambda body parses");
+    let parsed = parse_with(
+        "SELECT x -> x % 2 = 0",
+        crate::ParseConfig::new(LAMBDA_DIALECT),
+    )
+    .expect("lambda body parses");
     let lambda = project_lambda(&parsed, "body");
     assert!(
         matches!(
@@ -5148,9 +5705,10 @@ fn non_param_shaped_arrows_stay_the_json_operator() {
         "SELECT (a, b.c) -> d",
         "SELECT ROW() -> 1",
     ] {
-        let parsed = parse_with(sql, LAMBDA_DIALECT).unwrap_or_else(|err| {
-            panic!("{sql}: {err:?}");
-        });
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(LAMBDA_DIALECT)).unwrap_or_else(|err| {
+                panic!("{sql}: {err:?}");
+            });
         assert!(
             matches!(
                 project_expr(&parsed),
@@ -5171,7 +5729,11 @@ fn chained_arrows_left_associate_with_only_the_first_a_lambda() {
     // LAMBDA{LAMBDA{x, y}, z} and its binder rejects the outer as lambda params),
     // so the inner `x -> y` is the lambda and the outer fold — whose LHS is now a
     // lambda, not a name — stays `JsonGet`.
-    let parsed = parse_with("SELECT x -> y -> z", LAMBDA_DIALECT).expect("chain parses");
+    let parsed = parse_with(
+        "SELECT x -> y -> z",
+        crate::ParseConfig::new(LAMBDA_DIALECT),
+    )
+    .expect("chain parses");
     let Expr::BinaryOp {
         op: BinaryOperator::JsonGet,
         left,
@@ -5198,9 +5760,10 @@ fn lambda_round_trips_exactly_and_stays_json_without_the_gate() {
         "SELECT x -> y -> z",
         "SELECT x -> x % 2 = 0",
     ] {
-        let parsed = parse_with(sql, LAMBDA_DIALECT).unwrap_or_else(|err| {
-            panic!("{sql}: {err:?}");
-        });
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(LAMBDA_DIALECT)).unwrap_or_else(|err| {
+                panic!("{sql}: {err:?}");
+            });
         let rendered = Renderer::new(LAMBDA_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -5211,9 +5774,10 @@ fn lambda_round_trips_exactly_and_stays_json_without_the_gate() {
     // JSON-arrow folds — and still round-trip byte-identically, so the split is
     // purely a node-label change, never an acceptance or spelling change.
     for sql in ["SELECT x -> x + 1", "SELECT (x, y) -> x + y"] {
-        let parsed = parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|err| {
-            panic!("{sql}: {err:?}");
-        });
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).unwrap_or_else(|err| {
+                panic!("{sql}: {err:?}");
+            });
         assert!(matches!(
             project_expr(&parsed),
             Expr::BinaryOp {
@@ -5230,7 +5794,8 @@ fn lambda_round_trips_exactly_and_stays_json_without_the_gate() {
 
 #[test]
 fn field_selection_parses_after_parenthesized_base() {
-    let parsed = parse_with("SELECT (a).b", PG_EXPR_DIALECT).expect("field selection parses");
+    let parsed = parse_with("SELECT (a).b", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("field selection parses");
     let Expr::FieldSelection {
         field_selection, ..
     } = project_expr(&parsed)
@@ -5245,20 +5810,21 @@ fn field_selection_parses_after_parenthesized_base() {
 
     // A bare `a.b` stays a qualified column reference (the dot is consumed during
     // name parsing), so field selection only applies to a parenthesized base.
-    let parsed = parse_with("SELECT a.b", PG_EXPR_DIALECT).expect("qualified column parses");
+    let parsed = parse_with("SELECT a.b", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("qualified column parses");
     let Expr::Column { name, .. } = project_expr(&parsed) else {
         panic!("expected a qualified column");
     };
     assert_eq!(name.0.len(), 2);
 
-    assert!(parse_with("SELECT (a).b", TestDialect).is_err());
+    assert!(parse_with("SELECT (a).b", crate::ParseConfig::new(TestDialect)).is_err());
 }
 
 #[test]
 fn field_wildcard_star_selection_in_value_positions() {
     // `(expr).*` off a non-name primary folds into a value composite-star expression.
-    let parsed =
-        parse_with("SELECT (f(x)).*", PG_EXPR_DIALECT).expect("composite star target parses");
+    let parsed = parse_with("SELECT (f(x)).*", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("composite star target parses");
     let Expr::FieldSelection {
         field_selection, ..
     } = project_expr(&parsed)
@@ -5273,7 +5839,8 @@ fn field_wildcard_star_selection_in_value_positions() {
 
     // A whole-row `t.*` written inside a value (a `ROW(...)` field) folds too, with a
     // bare column as the base.
-    let parsed = parse_with("SELECT ROW(t.*)", PG_EXPR_DIALECT).expect("whole-row in ROW parses");
+    let parsed = parse_with("SELECT ROW(t.*)", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("whole-row in ROW parses");
     let Expr::Row { row, .. } = project_expr(&parsed) else {
         panic!("expected a row constructor");
     };
@@ -5291,7 +5858,8 @@ fn field_wildcard_star_selection_in_value_positions() {
 
     // A bare select-list `t.*` stays a qualified wildcard, not a value star — the star
     // selector is suppressed at the projection-target top level.
-    let parsed = parse_with("SELECT t.*", PG_EXPR_DIALECT).expect("qualified wildcard parses");
+    let parsed = parse_with("SELECT t.*", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("qualified wildcard parses");
     let Statement::Query { query, .. } = &parsed.statements()[0] else {
         panic!("expected a query");
     };
@@ -5304,22 +5872,27 @@ fn field_wildcard_star_selection_in_value_positions() {
     ));
 
     // The value-position `.*` round-trips through render (whole-row keeps the parens).
-    let parsed = parse_with("SELECT f((t).*)", PG_EXPR_DIALECT).expect("whole-row arg parses");
+    let parsed = parse_with("SELECT f((t).*)", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("whole-row arg parses");
     let rendered = Renderer::new(PG_EXPR_DIALECT)
         .render_parsed(&parsed)
         .expect("render");
     assert_eq!(rendered, "SELECT f((t).*)");
 
     // With `field_wildcard` off, the value-position `.*` is left unconsumed and rejects.
-    assert!(parse_with("SELECT (f(x)).*", TestDialect).is_err());
-    assert!(parse_with("SELECT ROW(t.*)", TestDialect).is_err());
+    assert!(parse_with("SELECT (f(x)).*", crate::ParseConfig::new(TestDialect)).is_err());
+    assert!(parse_with("SELECT ROW(t.*)", crate::ParseConfig::new(TestDialect)).is_err());
 }
 
 // --- typed temporal literals ----------------------------------------------
 
 #[test]
 fn typed_temporal_literals_parse_with_kind_and_value_text() {
-    let date = parse_with("SELECT DATE '1998-12-01'", PG_EXPR_DIALECT).expect("date literal");
+    let date = parse_with(
+        "SELECT DATE '1998-12-01'",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("date literal");
     let Expr::Literal { literal, .. } = project_expr(&date) else {
         panic!("expected a literal");
     };
@@ -5331,7 +5904,7 @@ fn typed_temporal_literals_parse_with_kind_and_value_text() {
 
     let ts = parse_with(
         "SELECT TIMESTAMP WITH TIME ZONE '2020-01-01 00:00:00+00'",
-        PG_EXPR_DIALECT,
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
     )
     .expect("timestamp-with-time-zone literal");
     let Expr::Literal { literal, .. } = project_expr(&ts) else {
@@ -5348,7 +5921,11 @@ fn typed_temporal_literals_parse_with_kind_and_value_text() {
         "2020-01-01 00:00:00+00",
     );
 
-    let time = parse_with("SELECT TIME '12:00:00'", PG_EXPR_DIALECT).expect("time literal");
+    let time = parse_with(
+        "SELECT TIME '12:00:00'",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("time literal");
     let Expr::Literal { literal, .. } = project_expr(&time) else {
         panic!("expected a literal");
     };
@@ -5384,8 +5961,8 @@ fn interval_literal_captures_qualifier_and_precision() {
         ("SELECT INTERVAL '1 2:03'", None, None),
     ];
     for (sql, fields, precision) in cases {
-        let parsed =
-            parse_with(sql, PG_EXPR_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a literal");
         };
@@ -5400,11 +5977,13 @@ fn interval_literal_captures_qualifier_and_precision() {
 #[test]
 fn temporal_keyword_without_trailing_string_falls_back_to_name() {
     // No string after the keyword: it reads as an ordinary column reference...
-    let parsed = parse_with("SELECT date", PG_EXPR_DIALECT).expect("bare date column");
+    let parsed = parse_with("SELECT date", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("bare date column");
     assert_eq!(column_name(&parsed, project_expr(&parsed)), "date");
 
     // ...or a function call when a parenthesis follows (`date` is callable).
-    let parsed = parse_with("SELECT date(a)", PG_EXPR_DIALECT).expect("date(...) call");
+    let parsed = parse_with("SELECT date(a)", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("date(...) call");
     assert!(matches!(project_expr(&parsed), Expr::Function { .. }));
 }
 
@@ -5421,7 +6000,8 @@ fn temporal_literals_round_trip_exact_source_spelling() {
         "SELECT interval '1' second(3)",
     ];
     for sql in cases {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -5441,8 +6021,8 @@ fn duckdb_relaxed_interval_amount_forms_parse_with_unit_qualifier() {
         ("SELECT INTERVAL (a + 1) MINUTES", IntervalFields::Minute),
     ];
     for (sql, fields) in cases {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected an interval literal");
         };
@@ -5468,8 +6048,8 @@ fn duckdb_relaxed_interval_spellings_round_trip_exact_source() {
         "SELECT interval (days) day",
     ];
     for sql in cases {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(DUCKDB_TYPE_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -5483,7 +6063,7 @@ fn duckdb_relaxed_interval_amount_requires_a_unit() {
     // we reject it at parse time (there is no other reading of a number after `INTERVAL`).
     for sql in ["SELECT INTERVAL 3", "SELECT INTERVAL (days)"] {
         assert!(
-            parse_with(sql, DUCKDB_TYPE_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).is_err(),
             "{sql} must be rejected without a unit",
         );
     }
@@ -5495,12 +6075,18 @@ fn relaxed_interval_spellings_are_gated_off_by_default() {
     // `INTERVAL` falls back to an ordinary name and the trailing tokens do not parse.
     for sql in ["SELECT INTERVAL 3 DAYS", "SELECT INTERVAL (days) DAY"] {
         assert!(
-            parse_with(sql, PG_EXPR_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err(),
             "{sql} must be rejected without the relaxed-interval gate",
         );
     }
     // The standard quoted form still parses under both.
-    assert!(parse_with("SELECT INTERVAL '3' DAY", PG_EXPR_DIALECT).is_ok());
+    assert!(
+        parse_with(
+            "SELECT INTERVAL '3' DAY",
+            crate::ParseConfig::new(PG_EXPR_DIALECT)
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -5531,8 +6117,8 @@ fn duckdb_extended_interval_units_parse_singular_and_plural() {
         ),
     ];
     for (sql, fields) in cases {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected an interval literal");
         };
@@ -5569,8 +6155,8 @@ fn duckdb_extended_interval_units_render_canonical_singular_in_type_position() {
         ),
     ];
     for (sql, fields, canonical) in cases {
-        let parsed =
-            parse_with(sql, DUCKDB_TYPE_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         assert!(
             matches!(
                 cast_type(&parsed),
@@ -5603,14 +6189,17 @@ fn duckdb_extended_interval_units_gated_off_by_default() {
         "SELECT INTERVAL 5 MICROSECONDS",
     ] {
         assert!(
-            parse_with(sql, PG_EXPR_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err(),
             "{sql} must be rejected without the relaxed-interval gate",
         );
     }
     // Under the gate the quoted amount folds the extended unit onto its variant, whereas
     // off the gate that trailing word would be a column alias — this is the behavioural pivot.
-    let parsed = parse_with("SELECT INTERVAL '5' CENTURY", DUCKDB_TYPE_DIALECT)
-        .expect("quoted extended-unit interval parses under the relaxed gate");
+    let parsed = parse_with(
+        "SELECT INTERVAL '5' CENTURY",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("quoted extended-unit interval parses under the relaxed gate");
     let Expr::Literal { literal, .. } = project_expr(&parsed) else {
         panic!("expected an interval literal");
     };
@@ -5625,8 +6214,11 @@ fn duckdb_extended_interval_units_gated_off_by_default() {
 
 #[test]
 fn tpch_q1_date_arithmetic_keeps_literal_structure() {
-    let parsed = parse_with("SELECT date '1998-12-01' - interval '90' day", Postgres)
-        .expect("date arithmetic parses");
+    let parsed = parse_with(
+        "SELECT date '1998-12-01' - interval '90' day",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("date arithmetic parses");
     let Expr::BinaryOp {
         left, op, right, ..
     } = project_expr(&parsed)
@@ -5676,7 +6268,8 @@ fn bit_string_literals_parse_with_radix_and_value_text() {
         ("SELECT x'1ff'", BitStringRadix::Hex, "1ff"),
     ];
     for (sql, radix, digits) in cases {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a literal");
         };
@@ -5704,7 +6297,8 @@ fn sqlite_hex_blob_literals_accept_even_hex_and_reject_malformed() {
         ("SELECT x'1A'", "1A"),
         ("SELECT x''", ""),
     ] {
-        let parsed = parse_with(sql, Sqlite).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Sqlite))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a literal");
         };
@@ -5731,7 +6325,7 @@ fn sqlite_hex_blob_literals_accept_even_hex_and_reject_malformed() {
         "SELECT X'1FF'",
     ] {
         assert!(
-            parse_with(sql, Sqlite).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
             "{sql} must reject as a malformed blob",
         );
     }
@@ -5739,7 +6333,7 @@ fn sqlite_hex_blob_literals_accept_even_hex_and_reject_malformed() {
     // the deferred (odd-length-tolerant) bit-string, so enabling SQLite blobs does not
     // tighten the PostgreSQL bit-string surface.
     assert!(
-        parse_with("SELECT X'1FF'", Postgres).is_ok(),
+        parse_with("SELECT X'1FF'", crate::ParseConfig::new(Postgres)).is_ok(),
         "PostgreSQL X'1FF' stays a deferred bit-string",
     );
 }
@@ -5803,7 +6397,8 @@ fn parse_float_as_decimal_flag_reclassifies_only_floats() {
 fn parse_options_parse_float_as_decimal_reaches_the_ast_without_touching_render() {
     // Default options: a fractional literal is a Float, and its exact spelling
     // round-trips — the historical behaviour the option must not disturb.
-    let default_parsed = parse_with("SELECT 3.14", Ansi).expect("default parse");
+    let default_parsed =
+        parse_with("SELECT 3.14", crate::ParseConfig::new(Ansi)).expect("default parse");
     let Expr::Literal { literal, .. } = project_expr(&default_parsed) else {
         panic!("expected a literal");
     };
@@ -5817,9 +6412,9 @@ fn parse_options_parse_float_as_decimal_reaches_the_ast_without_touching_render(
 
     // Flag on: the same literal is now a Decimal, but the spelling is byte-identical
     // (classification is metadata, not spelling) and the value still materialises.
-    let options = ParseOptions::default().with_parse_float_as_decimal(true);
+    let options = ParseConfig::default().parse_float_as_decimal(true);
     let decimal_parsed =
-        parse_with_options("SELECT 3.14", Ansi, options).expect("float-as-decimal parse");
+        parse_with("SELECT 3.14", options.dialect(Ansi)).expect("float-as-decimal parse");
     let Expr::Literal { literal, .. } = project_expr(&decimal_parsed) else {
         panic!("expected a literal");
     };
@@ -5841,7 +6436,7 @@ fn parse_options_parse_float_as_decimal_reaches_the_ast_without_touching_render(
 
     // An integer literal is untouched even with the flag on.
     let int_parsed =
-        parse_with_options("SELECT 42", Ansi, options).expect("integer parse with flag");
+        parse_with("SELECT 42", options.dialect(Ansi)).expect("integer parse with flag");
     let Expr::Literal { literal, .. } = project_expr(&int_parsed) else {
         panic!("expected a literal");
     };
@@ -5861,7 +6456,8 @@ fn radix_integer_literals_classify_and_decode_through_as_i64() {
         ("SELECT 0b1010", 10),
     ];
     for (sql, value) in cases {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a literal");
         };
@@ -5880,7 +6476,8 @@ fn bit_string_marker_without_abutting_quote_is_an_identifier() {
     // ordinary identifier, so `b 'x'` is the generalized typed string constant `type
     // 'string'` — a cast of the plain string `'x'` to type `b`, matching PostgreSQL
     // (`func_name Sconst`) — never a bit string.
-    let parsed = parse_with("SELECT b 'x'", Postgres).expect("`b 'x'` is a typed string constant");
+    let parsed = parse_with("SELECT b 'x'", crate::ParseConfig::new(Postgres))
+        .expect("`b 'x'` is a typed string constant");
     let Expr::Cast { expr, syntax, .. } = project_expr(&parsed) else {
         panic!("`b 'x'` is a typed-literal cast, not a bit string");
     };
@@ -5892,7 +6489,8 @@ fn bit_string_marker_without_abutting_quote_is_an_identifier() {
         matches!(literal.kind, LiteralKind::String),
         "the spaced marker leaves a plain string, not a bit string",
     );
-    let parsed = parse_with("SELECT x", Postgres).expect("`x` is a column reference");
+    let parsed = parse_with("SELECT x", crate::ParseConfig::new(Postgres))
+        .expect("`x` is a column reference");
     assert!(matches!(project_expr(&parsed), Expr::Column { .. }));
 }
 
@@ -5905,7 +6503,8 @@ fn national_and_unicode_strings_parse_as_string_literals() {
     // literal `N '…'` there, pinned in `dialect::postgres`'s
     // `postgres_reads_a_national_string_spelling_as_a_typed_literal`) — and its value
     // materialization strips the one-byte `N` prefix like `E'…'`.
-    let parsed = parse_with("SELECT N'naive'", MySql).expect("MySQL lexes the national string");
+    let parsed = parse_with("SELECT N'naive'", crate::ParseConfig::new(MySql))
+        .expect("MySQL lexes the national string");
     let Expr::Literal { literal, .. } = project_expr(&parsed) else {
         panic!("SELECT N'naive': expected a literal under MySQL");
     };
@@ -5924,7 +6523,8 @@ fn national_and_unicode_strings_parse_as_string_literals() {
         (r"SELECT U&'a\\b''c'", "a\\b'c"),
     ];
     for (sql, value) in cases {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a literal");
         };
@@ -5957,7 +6557,8 @@ fn unicode_escaped_identifier_decodes_to_its_resolved_name() {
         (r#"SELECT U&"\ZZZZ" UESCAPE '!'"#, "\\ZZZZ"), // `!` makes `\` inert
     ];
     for (sql, name) in cases {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let expr = project_expr(&parsed);
         assert_eq!(column_name(&parsed, expr), name, "decoded name for {sql}");
         let Expr::Column { name: object, .. } = expr else {
@@ -5986,7 +6587,8 @@ fn unicode_escaped_identifier_preserves_source_spelling_through_canonical_render
         r#"SELECT U&"real\00A7_name""#,
         r#"SELECT * FROM U&"my\0074able""#,
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         assert_eq!(
             parsed.to_sql(),
             sql,
@@ -6008,11 +6610,12 @@ fn unicode_escaped_identifier_folds_uescape_in_every_identifier_position() {
         r#"SELECT 'tricky' AS U&"\" UESCAPE '!'"#,
         r#"SELECT * FROM U&"my\0074able""#,
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: render failed: {err:?}"));
-        parse_with(&rendered, Postgres)
+        parse_with(&rendered, crate::ParseConfig::new(Postgres))
             .unwrap_or_else(|err| panic!("{sql}: render {rendered:?} does not re-parse: {err:?}"));
     }
 }
@@ -6033,13 +6636,17 @@ fn unicode_escaped_identifier_rejects_like_postgres() {
         r#"SELECT U&"\0000""#,              // an escape decoding to NUL
         r#"SELECT U&"x" uescape FROM t"#,   // greedy UESCAPE, no following string
     ] {
-        parse_with(sql, Postgres).expect_err(&format!("{sql:?} must be rejected"));
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect_err(&format!("{sql:?} must be rejected"));
     }
 
     // A plain double-quoted identifier never folds a following `UESCAPE` — only the `U&`
     // form does — so `"x" UESCAPE '!'` is a syntax error, as in PostgreSQL.
-    parse_with(r#"SELECT "x" UESCAPE '!'"#, Postgres)
-        .expect_err("a non-U& identifier does not take a UESCAPE clause");
+    parse_with(
+        r#"SELECT "x" UESCAPE '!'"#,
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect_err("a non-U& identifier does not take a UESCAPE clause");
 }
 
 #[test]
@@ -6054,7 +6661,8 @@ fn unicode_string_with_invalid_escape_is_rejected_at_parse_time() {
         r"SELECT U&'\XYZW'",    // non-hex escape digits
         r"SELECT U&'\'",        // a dangling trailing escape
     ] {
-        let err = parse_with(sql, Postgres).expect_err(&format!("{sql:?} must be rejected"));
+        let err = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect_err(&format!("{sql:?} must be rejected"));
         assert_eq!(
             err.found.to_string(),
             "invalid escape sequence in string literal",
@@ -6066,7 +6674,8 @@ fn unicode_string_with_invalid_escape_is_rejected_at_parse_time() {
 #[test]
 fn unicode_string_invalid_escape_error_spans_the_whole_literal() {
     let sql = r"SELECT U&'\0000'";
-    let err = parse_with(sql, Postgres).expect_err("a NUL-decoding escape is rejected");
+    let err = parse_with(sql, crate::ParseConfig::new(Postgres))
+        .expect_err("a NUL-decoding escape is rejected");
     let literal_start = sql.find("U&").expect("fixture contains U&") as u32;
     assert_eq!(
         err.span,
@@ -6086,7 +6695,7 @@ fn unicode_string_validates_against_the_resolved_uescape_character_not_default_b
     // `!` the active escape character, so `\` is just two ordinary characters here
     // and the literal parses and materializes unchanged.
     let sql = r"SELECT U&'\ZZZZ' UESCAPE '!'";
-    let parsed = parse_with(sql, Postgres)
+    let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
         .unwrap_or_else(|err| panic!("{sql:?} is legal under UESCAPE '!': {err:?}"));
     let Expr::Literal { literal, .. } = project_expr(&parsed) else {
         panic!("expected a literal");
@@ -6101,7 +6710,7 @@ fn unicode_string_validates_against_the_resolved_uescape_character_not_default_b
     // active escape character, and must be rejected — the same verdict as the
     // unpaired `U&'\D800'` case above, just reached through the custom escape.
     let sql = "SELECT U&'!d800' UESCAPE '!'";
-    let err = parse_with(sql, Postgres)
+    let err = parse_with(sql, crate::ParseConfig::new(Postgres))
         .expect_err("a lone surrogate under the custom escape character is rejected");
     assert_eq!(
         err.found.to_string(),
@@ -6118,7 +6727,8 @@ fn parsed_as_str_decodes_mysql_backslash_escapes_without_naming_the_dialect() {
     // ANSI-default `Literal::as_str` still reads the same source literally — proving
     // it is the parse's dialect context, not a changed default, that unescapes.
     for sql in [r#"SELECT "a\nb""#, r"SELECT 'a\nb'"] {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a string literal");
         };
@@ -6148,7 +6758,8 @@ fn parsed_literal_str_keeps_backslashes_literal_under_postgres() {
     // (backslash escapes off). The dialect on the root, not the caller, decides,
     // through the identical `Parsed::literal_str` path.
     let sql = r"SELECT 'a\nb'";
-    let parsed = parse_with(sql, Postgres).expect(r"`'a\nb'` parses under PostgreSQL");
+    let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+        .expect(r"`'a\nb'` parses under PostgreSQL");
     let Expr::Literal { literal, .. } = project_expr(&parsed) else {
         panic!("expected a string literal");
     };
@@ -6168,7 +6779,8 @@ fn parsed_literal_str_agrees_with_ansi_as_str_and_preserves_doubled_quotes() {
     // collapse are byte-for-byte unchanged, and `Parsed::literal_str` over an
     // ANSI-family parse threads that same `StringLiteralSyntax`, so the two agree.
     let sql = "SELECT 'it''s'";
-    let parsed = parse_with(sql, Postgres).expect("doubled-quote string parses");
+    let parsed =
+        parse_with(sql, crate::ParseConfig::new(Postgres)).expect("doubled-quote string parses");
     let Expr::Literal { literal, .. } = project_expr(&parsed) else {
         panic!("expected a string literal");
     };
@@ -6188,7 +6800,8 @@ fn charset_introduced_strings_parse_as_string_literals_under_mysql() {
         ("SELECT _utf8'it''s'", "utf8", "it's"), // doubled-quote body still unescapes
     ];
     for (sql, charset, value) in cases {
-        let parsed = parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a literal");
         };
@@ -6223,13 +6836,15 @@ fn charset_introducer_is_inert_without_the_dialect_knob() {
     // — an `Expr::Cast`, not a string `Expr::Literal` — so the surface is unchanged
     // from today's behaviour (prod-literal-generic-typed). A plain string also has
     // no introducer.
-    let parsed = parse_with("SELECT _utf8'x'", Postgres).expect("`_utf8 'x'` is a typed literal");
+    let parsed = parse_with("SELECT _utf8'x'", crate::ParseConfig::new(Postgres))
+        .expect("`_utf8 'x'` is a typed literal");
     assert!(
         matches!(project_expr(&parsed), Expr::Cast { .. }),
         "charset introducers off reads `_utf8'x'` as a typed-literal cast",
     );
 
-    let parsed = parse_with("SELECT 'x'", MySql).expect("plain string parses");
+    let parsed =
+        parse_with("SELECT 'x'", crate::ParseConfig::new(MySql)).expect("plain string parses");
     let Expr::Literal { literal, .. } = project_expr(&parsed) else {
         panic!("expected a literal");
     };
@@ -6248,7 +6863,7 @@ fn charset_introduced_string_concatenates_across_a_newline() {
     // newline (SQL-standard adjacent-string concatenation): the leading segment
     // carries the introducer, the continuations are plain strings, and the joined
     // value strips the introducer (ADR-0006), like the `B'…'`/`N'…'` precedents.
-    let parsed = parse_with("SELECT _utf8'foo'\n'bar'", MySql)
+    let parsed = parse_with("SELECT _utf8'foo'\n'bar'", crate::ParseConfig::new(MySql))
         .expect("adjacent charset strings concatenate");
     let Expr::Literal { literal, .. } = project_expr(&parsed) else {
         panic!("expected a literal");
@@ -6281,7 +6896,8 @@ fn adjacent_string_literals_concatenate_across_a_newline() {
         ("SELECT 'a'\n\n'b'", "ab"),     // a blank line between
     ];
     for (sql, value) in cases {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql:?}: expected a literal");
         };
@@ -6298,8 +6914,8 @@ fn adjacent_string_literals_concatenate_across_a_newline() {
 fn bit_string_literals_concatenate_across_a_newline() {
     // Bit-string constants continue the same way (PostgreSQL continues its bit-string
     // lexer state too); the digit bodies join into one value.
-    let parsed =
-        parse_with("SELECT B'1010'\n'0101'", Postgres).expect("adjacent bit strings concatenate");
+    let parsed = parse_with("SELECT B'1010'\n'0101'", crate::ParseConfig::new(Postgres))
+        .expect("adjacent bit strings concatenate");
     let Expr::Literal { literal, .. } = project_expr(&parsed) else {
         panic!("expected a literal");
     };
@@ -6322,7 +6938,10 @@ fn adjacent_string_literals_on_one_line_are_rejected() {
         "SELECT 'a'/* \n */'b'", // a newline *inside* a comment does not count
         "SELECT 'a' -- c\n'b'",  // a line comment before the newline
     ] {
-        assert!(parse_with(sql, Postgres).is_err(), "must reject {sql:?}");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+            "must reject {sql:?}"
+        );
     }
 }
 
@@ -6336,7 +6955,10 @@ fn adjacent_string_concat_requires_a_plain_continuation_segment() {
         "SELECT 'a'\nU&'b'", // ditto
         "SELECT $$a$$\n'b'", // a dollar-quoted first segment never continues
     ] {
-        assert!(parse_with(sql, Postgres).is_err(), "must reject {sql:?}");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+            "must reject {sql:?}"
+        );
     }
 }
 
@@ -6345,7 +6967,8 @@ fn adjacent_string_concatenation_round_trips_exact_source() {
     // The literal renders its span verbatim, so the concatenated source — newline
     // and all — round-trips byte-for-byte (ADR-0006).
     for sql in ["SELECT 'foo'\n'bar'", "SELECT E'a'\n'b'\n'c'"] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql:?}: {err}"));
@@ -6364,7 +6987,8 @@ fn temporal_literal_value_string_concatenates_across_a_newline() {
         "1998-12-01",
     )];
     for (sql, kind, value) in cases {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql:?}: expected a literal");
         };
@@ -6378,7 +7002,13 @@ fn temporal_literal_value_string_concatenates_across_a_newline() {
         );
     }
     // Same-line adjacency in a temporal value string is rejected, like a bare primary.
-    assert!(parse_with("SELECT DATE '1998' '-12-01'", Postgres).is_err());
+    assert!(
+        parse_with(
+            "SELECT DATE '1998' '-12-01'",
+            crate::ParseConfig::new(Postgres)
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -6392,7 +7022,8 @@ fn pg_special_literals_round_trip_exact_source_spelling() {
         "SELECT U&'d!0061ta' UESCAPE '!'",
     ];
     for sql in cases {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -6407,7 +7038,7 @@ fn pg_special_literals_round_trip_exact_source_spelling() {
     // prefix-typed literal gets (`float8'x'` → `float8 'x'`): the type name and value
     // separate, and the render re-parses to the same tree (the structural round-trip
     // contract for casts).
-    let national = parse_with("SELECT N'naive'", NATIONAL_DIALECT)
+    let national = parse_with("SELECT N'naive'", crate::ParseConfig::new(NATIONAL_DIALECT))
         .expect("a national-arming dialect lexes the national string");
     assert_eq!(
         Renderer::new(NATIONAL_DIALECT)
@@ -6416,7 +7047,8 @@ fn pg_special_literals_round_trip_exact_source_spelling() {
         "SELECT N'naive'",
         "the national literal renders span-verbatim",
     );
-    let pg = parse_with("SELECT N'naive'", Postgres).expect("parses under PostgreSQL");
+    let pg = parse_with("SELECT N'naive'", crate::ParseConfig::new(Postgres))
+        .expect("parses under PostgreSQL");
     assert_eq!(
         Renderer::new(Postgres)
             .render_parsed(&pg)
@@ -6429,7 +7061,8 @@ fn pg_special_literals_round_trip_exact_source_spelling() {
 #[test]
 fn unicode_string_without_uescape_keyword_does_not_consume_following_tokens() {
     // The `UESCAPE` fold only fires for `U&'...'`; a plain string keeps its span.
-    let parsed = parse_with(r"SELECT U&'\0041', 1", Postgres).expect("two projection items parse");
+    let parsed = parse_with(r"SELECT U&'\0041', 1", crate::ParseConfig::new(Postgres))
+        .expect("two projection items parse");
     let Statement::Query { query, .. } = &parsed.statements()[0] else {
         panic!("expected a query");
     };
@@ -6483,7 +7116,8 @@ fn money_literals_parse_with_money_kind_and_value_text() {
         ("SELECT $.5", ".5"),
     ];
     for (sql, body) in cases {
-        let parsed = parse_with(sql, MONEY_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MONEY_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let Expr::Literal { literal, .. } = project_expr(&parsed) else {
             panic!("{sql}: expected a literal");
         };
@@ -6500,7 +7134,8 @@ fn money_literals_parse_with_money_kind_and_value_text() {
 fn signed_money_is_a_unary_op_over_an_unsigned_money_literal() {
     // Like every signed numeric literal, the sign is an operator node over the
     // unsigned money literal, never folded into it (ADR-0006).
-    let parsed = parse_with("SELECT -$1000", MONEY_DIALECT).expect("signed money parses");
+    let parsed = parse_with("SELECT -$1000", crate::ParseConfig::new(MONEY_DIALECT))
+        .expect("signed money parses");
     let Expr::UnaryOp {
         op: UnaryOperator::Minus,
         expr,
@@ -6524,11 +7159,11 @@ fn money_literals_are_dialect_gated() {
     // Money is T-SQL-only. Under ANSI the `$` is a stray byte; under PostgreSQL the
     // positional `$1234` parameter leaves a dangling `.56` — both are parse errors.
     assert!(
-        parse_with("SELECT $1234.56", TestDialect).is_err(),
+        parse_with("SELECT $1234.56", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects money literals",
     );
     assert!(
-        parse_with("SELECT $1234.56", Postgres).is_err(),
+        parse_with("SELECT $1234.56", crate::ParseConfig::new(Postgres)).is_err(),
         "PostgreSQL rejects money literals",
     );
 }
@@ -6541,7 +7176,8 @@ fn money_literals_round_trip_exact_source_spelling() {
         "SELECT $.5",
         "SELECT -$1000",
     ] {
-        let parsed = parse_with(sql, MONEY_DIALECT).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MONEY_DIALECT))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(MONEY_DIALECT)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -6553,7 +7189,8 @@ fn money_literals_round_trip_exact_source_spelling() {
 
 #[test]
 fn named_argument_arrow_parses() {
-    let parsed = parse_with("SELECT f(a => 1)", PG_EXPR_DIALECT).expect("named arg parses");
+    let parsed = parse_with("SELECT f(a => 1)", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("named arg parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -6567,8 +7204,8 @@ fn named_argument_arrow_parses() {
 
 #[test]
 fn named_argument_colon_equals_parses() {
-    let parsed =
-        parse_with("SELECT f(a := 1)", PG_EXPR_DIALECT).expect("deprecated named arg parses");
+    let parsed = parse_with("SELECT f(a := 1)", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("deprecated named arg parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -6579,7 +7216,11 @@ fn named_argument_colon_equals_parses() {
 
 #[test]
 fn mixed_positional_and_named_arguments_parse() {
-    let parsed = parse_with("SELECT f(1, b => 2)", PG_EXPR_DIALECT).expect("mixed args parse");
+    let parsed = parse_with(
+        "SELECT f(1, b => 2)",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("mixed args parse");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -6595,7 +7236,8 @@ fn mixed_positional_and_named_arguments_parse() {
 
 #[test]
 fn all_positional_arguments_stay_positional() {
-    let parsed = parse_with("SELECT f(1, 2)", PG_EXPR_DIALECT).expect("positional args parse");
+    let parsed = parse_with("SELECT f(1, 2)", crate::ParseConfig::new(PG_EXPR_DIALECT))
+        .expect("positional args parse");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -6612,11 +7254,11 @@ fn named_arguments_are_rejected_under_ansi() {
     // The arrow lexemes are dialect-gated, so under ANSI `=>` and `:=` split back
     // into their bytes and the argument is a malformed positional expression.
     assert!(
-        parse_with("SELECT f(a => 1)", TestDialect).is_err(),
+        parse_with("SELECT f(a => 1)", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects the `=>` named-argument arrow",
     );
     assert!(
-        parse_with("SELECT f(a := 1)", TestDialect).is_err(),
+        parse_with("SELECT f(a := 1)", crate::ParseConfig::new(TestDialect)).is_err(),
         "ANSI rejects the `:=` named-argument separator",
     );
 }
@@ -6628,7 +7270,8 @@ fn named_arguments_round_trip_each_arrow() {
         "SELECT f(a := 1)",
         "SELECT f(1, b => 2)",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -6640,8 +7283,11 @@ fn named_arguments_round_trip_each_arrow() {
 
 #[test]
 fn variadic_argument_marks_the_last_positional() {
-    let parsed =
-        parse_with("SELECT f(a, VARIADIC arr)", PG_EXPR_DIALECT).expect("VARIADIC arg parses");
+    let parsed = parse_with(
+        "SELECT f(a, VARIADIC arr)",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("VARIADIC arg parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -6655,8 +7301,11 @@ fn variadic_argument_marks_the_last_positional() {
 #[test]
 fn variadic_argument_combines_with_a_named_argument() {
     // `VARIADIC name => value` is a valid engine form: the marker precedes the arrow.
-    let parsed =
-        parse_with("SELECT f(VARIADIC x => arr)", PG_EXPR_DIALECT).expect("VARIADIC named parses");
+    let parsed = parse_with(
+        "SELECT f(VARIADIC x => arr)",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("VARIADIC named parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -6671,7 +7320,7 @@ fn variadic_argument_admits_the_aggregate_order_by_tail() {
     // The marker composes with the in-parenthesis ORDER BY (engine-accepted).
     let parsed = parse_with(
         "SELECT string_agg(VARIADIC arr ORDER BY b)",
-        PG_EXPR_DIALECT,
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
     )
     .expect("VARIADIC with ORDER BY parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
@@ -6690,7 +7339,7 @@ fn variadic_argument_rejected_when_not_last() {
         "SELECT f(VARIADIC a, VARIADIC b)",
     ] {
         assert!(
-            parse_with(sql, PG_EXPR_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err(),
             "VARIADIC must be the final argument: {sql}",
         );
     }
@@ -6705,7 +7354,7 @@ fn variadic_argument_rejected_with_a_quantifier() {
         "SELECT f(ALL a, VARIADIC arr)",
     ] {
         assert!(
-            parse_with(sql, PG_EXPR_DIALECT).is_err(),
+            parse_with(sql, crate::ParseConfig::new(PG_EXPR_DIALECT)).is_err(),
             "VARIADIC cannot combine with a quantifier: {sql}",
         );
     }
@@ -6716,7 +7365,11 @@ fn variadic_argument_rejected_off_dialect() {
     // Off the gating dialects the VARIADIC prefix is not admitted, so the marker before
     // an argument surfaces as a parse error rather than an accepted spread.
     assert!(
-        parse_with("SELECT f(a, VARIADIC arr)", TestDialect).is_err(),
+        parse_with(
+            "SELECT f(a, VARIADIC arr)",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err(),
         "ANSI does not admit the VARIADIC argument marker",
     );
 }
@@ -6725,7 +7378,8 @@ fn variadic_argument_rejected_off_dialect() {
 fn variadic_argument_parses_under_duckdb() {
     // Engine-probed: DuckDB parses the same VARIADIC marker (bind-layer catalog checks
     // aside).
-    let parsed = parse_with("SELECT f(a, VARIADIC arr)", DuckDb).expect("DuckDB admits VARIADIC");
+    let parsed = parse_with("SELECT f(a, VARIADIC arr)", crate::ParseConfig::new(DuckDb))
+        .expect("DuckDB admits VARIADIC");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a function call");
     };
@@ -6739,7 +7393,8 @@ fn variadic_argument_round_trips() {
         "SELECT f(a, VARIADIC arr)",
         "SELECT f(VARIADIC x => arr)",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -6751,8 +7406,11 @@ fn variadic_argument_round_trips() {
 
 #[test]
 fn operator_construct_parses_unqualified() {
-    let parsed =
-        parse_with("SELECT a OPERATOR(+) b", PG_EXPR_DIALECT).expect("OPERATOR(...) parses");
+    let parsed = parse_with(
+        "SELECT a OPERATOR(+) b",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("OPERATOR(...) parses");
     let Expr::NamedOperator { named_operator, .. } = project_expr(&parsed) else {
         panic!("expected a named-operator expression");
     };
@@ -6767,8 +7425,11 @@ fn operator_construct_parses_unqualified() {
 
 #[test]
 fn operator_construct_parses_schema_qualified() {
-    let parsed = parse_with("SELECT a OPERATOR(pg_catalog.+) b", PG_EXPR_DIALECT)
-        .expect("schema-qualified OPERATOR(...) parses");
+    let parsed = parse_with(
+        "SELECT a OPERATOR(pg_catalog.+) b",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("schema-qualified OPERATOR(...) parses");
     let Expr::NamedOperator { named_operator, .. } = project_expr(&parsed) else {
         panic!("expected a named-operator expression");
     };
@@ -6784,7 +7445,11 @@ fn operator_construct_parses_schema_qualified() {
 fn operator_construct_binds_at_the_any_other_operator_rank() {
     // `OPERATOR(...)` binds like `||` (rank 45): looser than `*` (60), so the
     // multiplication groups first on the right.
-    let tight_right = parse_with("SELECT a OPERATOR(+) b * c", PG_EXPR_DIALECT).expect("parses");
+    let tight_right = parse_with(
+        "SELECT a OPERATOR(+) b * c",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("parses");
     let Expr::NamedOperator { named_operator, .. } = project_expr(&tight_right) else {
         panic!("expected a named operator at the top");
     };
@@ -6800,7 +7465,11 @@ fn operator_construct_binds_at_the_any_other_operator_rank() {
     );
 
     // And looser than `+` (50): the addition groups first on the left.
-    let tight_left = parse_with("SELECT a + b OPERATOR(+) c", PG_EXPR_DIALECT).expect("parses");
+    let tight_left = parse_with(
+        "SELECT a + b OPERATOR(+) c",
+        crate::ParseConfig::new(PG_EXPR_DIALECT),
+    )
+    .expect("parses");
     let Expr::NamedOperator { named_operator, .. } = project_expr(&tight_left) else {
         panic!("expected a named operator at the top");
     };
@@ -6819,7 +7488,11 @@ fn operator_construct_binds_at_the_any_other_operator_rank() {
 #[test]
 fn operator_construct_is_rejected_under_ansi() {
     assert!(
-        parse_with("SELECT a OPERATOR(+) b", TestDialect).is_err(),
+        parse_with(
+            "SELECT a OPERATOR(+) b",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err(),
         "ANSI has no explicit-operator infix form",
     );
 }
@@ -6832,7 +7505,8 @@ fn operator_construct_round_trips() {
         "SELECT a OPERATOR(+) b * c",
         "SELECT a + b OPERATOR(+) c",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|err| panic!("{sql}: {err}"));
@@ -6858,7 +7532,7 @@ fn mysql_has_no_typed_interval_literal() {
         "SELECT '2020-01-01' - INTERVAL '1' SECOND(3)",
     ] {
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects the typed interval literal {sql:?}",
         );
     }
@@ -6871,7 +7545,7 @@ fn mysql_has_no_typed_interval_literal() {
          AND CURRENT ROW) FROM t",
     ] {
         assert!(
-            parse_with(sql, MySql).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
             "MySQL parses the operator-position interval {sql:?}",
         );
     }
@@ -6879,7 +7553,7 @@ fn mysql_has_no_typed_interval_literal() {
     // including the unit-less form whose fields default from the string.
     for sql in ["SELECT INTERVAL '1'", "SELECT INTERVAL '1' HOUR TO SECOND"] {
         assert!(
-            parse_with(sql, Postgres).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
             "PostgreSQL admits the interval literal {sql:?}",
         );
     }
@@ -6919,8 +7593,10 @@ fn mysql_interval_operator_parses_round_trips_and_shapes() {
     for sql in round_trip {
         for dialect in ["MySql", "Lenient"] {
             let parsed = match dialect {
-                "MySql" => parse_with(sql, MySql).unwrap_or_else(|err| panic!("{sql}: {err:?}")),
-                _ => parse_with(sql, Lenient).unwrap_or_else(|err| panic!("{sql}: {err:?}")),
+                "MySql" => parse_with(sql, crate::ParseConfig::new(MySql))
+                    .unwrap_or_else(|err| panic!("{sql}: {err:?}")),
+                _ => parse_with(sql, crate::ParseConfig::new(Lenient))
+                    .unwrap_or_else(|err| panic!("{sql}: {err:?}")),
             };
             let rendered = match dialect {
                 "MySql" => Renderer::new(MYSQL_RENDER).render_parsed(&parsed),
@@ -6933,7 +7609,11 @@ fn mysql_interval_operator_parses_round_trips_and_shapes() {
     // Structural: the operator interval is an `Expr::Interval` (a distinct node from the
     // ANSI/PostgreSQL typed-string `LiteralKind::Interval`), carrying the amount expression and
     // the mandatory unit.
-    let parsed = parse_with("SELECT NOW() - INTERVAL 3 DAY", MySql).expect("parses");
+    let parsed = parse_with(
+        "SELECT NOW() - INTERVAL 3 DAY",
+        crate::ParseConfig::new(MySql),
+    )
+    .expect("parses");
     let Expr::BinaryOp { right, .. } = project_expr(&parsed) else {
         panic!("expected a binary subtraction");
     };
@@ -6947,13 +7627,21 @@ fn mysql_interval_operator_parses_round_trips_and_shapes() {
     );
     // A parenthesized amount is a redundant grouping the AST does not retain (ADR-0008): the
     // amount round-trips paren-free because the unit keyword unambiguously terminates it.
-    let parsed = parse_with("SELECT NOW() - INTERVAL (3 + 1) DAY", MySql).expect("parses");
+    let parsed = parse_with(
+        "SELECT NOW() - INTERVAL (3 + 1) DAY",
+        crate::ParseConfig::new(MySql),
+    )
+    .expect("parses");
     let rendered = Renderer::new(MYSQL_RENDER)
         .render_parsed(&parsed)
         .expect("renders");
     assert_eq!(rendered, "SELECT NOW() - INTERVAL 3 + 1 DAY");
     // The composite units use MySQL's underscore spelling, never the ANSI `TO` form.
-    let parsed = parse_with("SELECT NOW() + INTERVAL 1 DAY_HOUR", MySql).expect("parses");
+    let parsed = parse_with(
+        "SELECT NOW() + INTERVAL 1 DAY_HOUR",
+        crate::ParseConfig::new(MySql),
+    )
+    .expect("parses");
     let Expr::BinaryOp { right, .. } = project_expr(&parsed) else {
         panic!("binary");
     };
@@ -6970,7 +7658,11 @@ fn mysql_interval_operator_parses_round_trips_and_shapes() {
 fn mysql_interval_operator_precedence_matches_left_assoc_additive() {
     // `a - INTERVAL 1 DAY + b` groups as `(a - INTERVAL 1 DAY) + b` — the interval is a primary
     // operand of `-`, and `+` (equal precedence, left-associative) stays at the outer level.
-    let parsed = parse_with("SELECT a - INTERVAL 1 DAY + b FROM t", MySql).expect("parses");
+    let parsed = parse_with(
+        "SELECT a - INTERVAL 1 DAY + b FROM t",
+        crate::ParseConfig::new(MySql),
+    )
+    .expect("parses");
     let Expr::BinaryOp {
         left,
         op: BinaryOperator::Plus,
@@ -7007,14 +7699,18 @@ fn mysql_interval_operator_boundary_rejects_and_fallthrough() {
     // so `INTERVAL` falls back to a name and the trailing tokens do not parse.
     for sql in ["SELECT NOW() - INTERVAL 3", "SELECT INTERVAL '1'"] {
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects the unit-less interval {sql:?}",
         );
     }
     // Off the gate (PostgreSQL), the bare-integer operator interval is not recognized — `INTERVAL`
     // falls back to a name and the trailing `3 DAY` does not parse.
     assert!(
-        parse_with("SELECT NOW() - INTERVAL 3 DAY", Postgres).is_err(),
+        parse_with(
+            "SELECT NOW() - INTERVAL 3 DAY",
+            crate::ParseConfig::new(Postgres)
+        )
+        .is_err(),
         "the operator interval is gated off for PostgreSQL",
     );
     // The ANSI `TO` composite and `(p)` unit precision are declined by the operator reader (both
@@ -7026,11 +7722,11 @@ fn mysql_interval_operator_boundary_rejects_and_fallthrough() {
         "SELECT INTERVAL '1' SECOND(3)",
     ] {
         assert!(
-            parse_with(sql, crate::dialect::Lenient).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(crate::dialect::Lenient)).is_ok(),
             "Lenient parses the ANSI interval literal {sql:?} via the literal path",
         );
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects the ANSI interval literal {sql:?}",
         );
     }
@@ -7049,7 +7745,7 @@ fn mysql_builtin_aggregate_rejects_an_empty_argument_list() {
         "SELECT BIT_AND()",
     ] {
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects the empty aggregate call {sql:?}",
         );
     }
@@ -7063,11 +7759,14 @@ fn mysql_builtin_aggregate_rejects_an_empty_argument_list() {
         "SELECT my_udf()",
         "SELECT db.count()",
     ] {
-        assert!(parse_with(sql, MySql).is_ok(), "MySQL parses {sql:?}",);
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
+            "MySQL parses {sql:?}",
+        );
     }
     // MySQL-only: PostgreSQL admits an empty aggregate call (arity is a bind-time check).
     assert!(
-        parse_with("SELECT COUNT()", Postgres).is_ok(),
+        parse_with("SELECT COUNT()", crate::ParseConfig::new(Postgres)).is_ok(),
         "PostgreSQL admits an empty COUNT() at parse time",
     );
 }
@@ -7085,14 +7784,18 @@ fn mysql_over_clause_requires_a_windowable_function() {
         "SELECT my_udf(x) OVER () FROM t",
     ] {
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects OVER on the non-windowable {sql:?}",
         );
     }
     // The same call without `OVER` parses, so it is the window clause the gate rejects, not
     // the call itself.
     assert!(
-        parse_with("SELECT PERCENTILE_CONT(x, 0.5) FROM t", MySql).is_ok(),
+        parse_with(
+            "SELECT PERCENTILE_CONT(x, 0.5) FROM t",
+            crate::ParseConfig::new(MySql)
+        )
+        .is_ok(),
         "the bare (non-windowed) call parses; only OVER is rejected",
     );
     // Every built-in *aggregate* stays windowable — the gate must not over-reject a valid
@@ -7113,13 +7816,17 @@ fn mysql_over_clause_requires_a_windowable_function() {
         "SELECT VARIANCE(x) OVER () FROM t",
     ] {
         assert!(
-            parse_with(sql, MySql).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
             "MySQL parses the windowed aggregate {sql:?}",
         );
     }
     // MySQL-only: PostgreSQL attaches `OVER` to any function.
     assert!(
-        parse_with("SELECT ABS(x) OVER () FROM t", Postgres).is_ok(),
+        parse_with(
+            "SELECT ABS(x) OVER () FROM t",
+            crate::ParseConfig::new(Postgres)
+        )
+        .is_ok(),
         "PostgreSQL admits OVER on any function",
     );
 }
@@ -7154,7 +7861,7 @@ fn mysql_window_functions_parse_as_call_heads_with_over() {
         "SELECT row_number () OVER ()",
     ] {
         assert!(
-            parse_with(sql, MySql).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
             "MySQL parses the window function {sql:?}",
         );
     }
@@ -7187,7 +7894,7 @@ fn mysql_window_functions_require_over_and_fixed_arity() {
         "SELECT NTILE(DISTINCT a) OVER () FROM t",
     ] {
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects the malformed window call {sql:?}",
         );
     }
@@ -7241,8 +7948,8 @@ fn mysql_window_function_tail_admits_respect_nulls_and_from_first() {
             ") FROM FIRST OVER",
         ),
     ] {
-        let parsed =
-            parse_with(sql, MySql).unwrap_or_else(|err| panic!("MySQL parses {sql:?}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|err| panic!("MySQL parses {sql:?}: {err:?}"));
         // The tail render is dialect-agnostic (it does not branch on the render target),
         // so any `RenderDialect` reproduces the post-`)` position; `MySql` is parser-only.
         let rendered = Renderer::new(Postgres)
@@ -7252,7 +7959,7 @@ fn mysql_window_function_tail_admits_respect_nulls_and_from_first() {
             rendered.contains(fragment),
             "the tail renders in the post-`)` position for {sql:?}: got {rendered:?}",
         );
-        parse_with(&rendered, MySql)
+        parse_with(&rendered, crate::ParseConfig::new(MySql))
             .unwrap_or_else(|err| panic!("the rendered tail {rendered:?} re-parses: {err:?}"));
     }
 }
@@ -7288,14 +7995,18 @@ fn mysql_window_function_tail_rejects_the_unadmitted_forms() {
         "SELECT SUM(a) RESPECT NULLS OVER () FROM t",
     ] {
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL rejects the unadmitted window tail {sql:?}",
         );
     }
     // The tail is MySQL-specific: a non-MySQL dialect leaves both the window-tail and the
     // null-treatment flags off, so PostgreSQL rejects the post-`)` spelling.
     assert!(
-        parse_with("SELECT LEAD(a) RESPECT NULLS OVER () FROM t", Postgres).is_err(),
+        parse_with(
+            "SELECT LEAD(a) RESPECT NULLS OVER () FROM t",
+            crate::ParseConfig::new(Postgres)
+        )
+        .is_err(),
         "PostgreSQL rejects the MySQL window-function tail",
     );
 }
@@ -7313,22 +8024,26 @@ fn mysql_window_function_names_reserved_outside_the_call_head() {
         "SELECT a AS lead FROM t",
     ] {
         assert!(
-            parse_with(sql, MySql).is_err(),
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
             "MySQL keeps the window name reserved in {sql:?}",
         );
     }
     // A non-MySQL dialect is unaffected: `row_number`/`rank` are ordinary function names in
     // PostgreSQL, so a bare (non-windowed) call and a bare column both parse there.
     assert!(
-        parse_with("SELECT row_number() OVER ()", Postgres).is_ok(),
+        parse_with(
+            "SELECT row_number() OVER ()",
+            crate::ParseConfig::new(Postgres)
+        )
+        .is_ok(),
         "PostgreSQL admits row_number() as an ordinary window call",
     );
     assert!(
-        parse_with("SELECT row_number()", Postgres).is_ok(),
+        parse_with("SELECT row_number()", crate::ParseConfig::new(Postgres)).is_ok(),
         "PostgreSQL does not require OVER on row_number() at parse time",
     );
     assert!(
-        parse_with("SELECT rank FROM t", Postgres).is_ok(),
+        parse_with("SELECT rank FROM t", crate::ParseConfig::new(Postgres)).is_ok(),
         "PostgreSQL admits `rank` as an ordinary column name",
     );
 }
@@ -7343,17 +8058,20 @@ fn postgres_sqljson_constructors_reject_empty_argument_list() {
         "SELECT JSON_SCALAR()",
         "SELECT JSON_SERIALIZE()",
     ] {
-        parse_with(sql, Postgres).expect_err(&format!(
+        parse_with(sql, crate::ParseConfig::new(Postgres)).expect_err(&format!(
             "SQL/JSON constructor requires an argument: {sql:?}"
         ));
     }
     // A one-argument constructor parses, and a quoted-name empty call stays an ordinary
     // (general) call PostgreSQL accepts — the gate keys on a single unquoted name.
-    parse_with("SELECT JSON('{}')", Postgres).expect("JSON('{}') parses");
-    parse_with("SELECT JSON_SCALAR(1)", Postgres).expect("JSON_SCALAR(1) parses");
-    parse_with("SELECT \"json\"()", Postgres).expect("quoted \"json\"() is a general call");
+    parse_with("SELECT JSON('{}')", crate::ParseConfig::new(Postgres)).expect("JSON('{}') parses");
+    parse_with("SELECT JSON_SCALAR(1)", crate::ParseConfig::new(Postgres))
+        .expect("JSON_SCALAR(1) parses");
+    parse_with("SELECT \"json\"()", crate::ParseConfig::new(Postgres))
+        .expect("quoted \"json\"() is a general call");
     // Off-dialect the same names are ordinary niladic calls (no PostgreSQL keyword grammar).
-    parse_with("SELECT json()", MySql).expect("MySQL treats json() as a general call");
+    parse_with("SELECT json()", crate::ParseConfig::new(MySql))
+        .expect("MySQL treats json() as a general call");
 }
 
 #[test]
@@ -7362,7 +8080,8 @@ fn postgres_merge_action_support_function() {
     // (`MERGE_ACTION '(' ')'`) raw-parse-accepted anywhere an expression is (the
     // MERGE-RETURNING-only restriction is a parse-analysis check); it folds into the
     // canonical `Function` shape with the name `merge_action` and no arguments.
-    let parsed = parse_with("SELECT merge_action()", Postgres).expect("merge_action() parses");
+    let parsed = parse_with("SELECT merge_action()", crate::ParseConfig::new(Postgres))
+        .expect("merge_action() parses");
     let Expr::Function { call, .. } = project_expr(&parsed) else {
         panic!("expected a merge_action function call");
     };
@@ -7385,21 +8104,33 @@ fn postgres_merge_action_support_function() {
         "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = 1 RETURNING merge_action() AS act",
         "SELECT merge_action() FROM t",
     ] {
-        parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
     }
 
     // The parens are strictly empty — an argument or an `OVER` tail is a syntax error,
     // matching PostgreSQL (`merge_action(1)` / `merge_action() OVER ()` both engine-probed
     // rejecting).
     for sql in ["SELECT merge_action(1)", "SELECT merge_action() OVER ()"] {
-        assert!(parse_with(sql, Postgres).is_err(), "{sql} must be rejected");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+            "{sql} must be rejected"
+        );
     }
 
     // Lenient inherits the form; ANSI (which reserves the keyword with no call form) leaves
     // it the reject it already was — the flag does not widen off PostgreSQL.
-    parse_with("SELECT merge_action()", crate::dialect::Lenient).expect("Lenient admits it");
+    parse_with(
+        "SELECT merge_action()",
+        crate::ParseConfig::new(crate::dialect::Lenient),
+    )
+    .expect("Lenient admits it");
     assert!(
-        parse_with("SELECT merge_action()", crate::dialect::Ansi).is_err(),
+        parse_with(
+            "SELECT merge_action()",
+            crate::ParseConfig::new(crate::dialect::Ansi)
+        )
+        .is_err(),
         "ANSI has no merge_action() support function",
     );
 }
@@ -7411,8 +8142,11 @@ fn postgres_collation_for_expression() {
     // `COLLATION FOR '(' a_expr ')'` production reporting the collation name for its
     // operand. It keeps its keyword surface as `StringFunc::CollationFor` (not folded to
     // the lowered `pg_collation_for(...)` call), so it round-trips as written.
-    let parsed =
-        parse_with("SELECT COLLATION FOR ('foo')", Postgres).expect("COLLATION FOR (expr) parses");
+    let parsed = parse_with(
+        "SELECT COLLATION FOR ('foo')",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("COLLATION FOR (expr) parses");
     let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
         panic!("expected Expr::StringFunc");
     };
@@ -7433,7 +8167,8 @@ fn postgres_collation_for_expression() {
         "SELECT COLLATION FOR (col1 || col2)",
         "SELECT COLLATION FOR (x) FROM t",
     ] {
-        parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
     }
 
     // The parentheses and single operand are mandatory — no parens, an empty list, a
@@ -7446,21 +8181,29 @@ fn postgres_collation_for_expression() {
         "SELECT COLLATION FOR (select 1)",
     ] {
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "{sql:?} must be rejected"
         );
     }
 
     // A plain `collation(x)` call is unaffected by the special form — it stays an
     // ordinary function call under every dialect.
-    parse_with("SELECT collation('foo')", Postgres).expect("plain collation() call parses");
+    parse_with("SELECT collation('foo')", crate::ParseConfig::new(Postgres))
+        .expect("plain collation() call parses");
 
     // Lenient inherits the form; ANSI has no `COLLATION FOR` production, so it stays the
     // reject it already was — the flag does not widen off PostgreSQL.
-    parse_with("SELECT COLLATION FOR ('foo')", crate::dialect::Lenient)
-        .expect("Lenient admits COLLATION FOR");
+    parse_with(
+        "SELECT COLLATION FOR ('foo')",
+        crate::ParseConfig::new(crate::dialect::Lenient),
+    )
+    .expect("Lenient admits COLLATION FOR");
     assert!(
-        parse_with("SELECT COLLATION FOR ('foo')", crate::dialect::Ansi).is_err(),
+        parse_with(
+            "SELECT COLLATION FOR ('foo')",
+            crate::ParseConfig::new(crate::dialect::Ansi)
+        )
+        .is_err(),
         "ANSI has no COLLATION FOR (expr) common-subexpr",
     );
 }
@@ -7473,7 +8216,7 @@ fn ceil_to_field_special_form() {
     // `CEIL(<expr> TO <field>)` is sqlparser-rs-parity surface only — no probed oracle
     // grammar admits it (pg_query/DuckDB/mysql:8.4.10 all reject the `TO` tail), so the
     // gate is Lenient-only. The `TO`-form parses to `StringFunc::CeilTo` and round-trips.
-    let parsed = parse_with("SELECT CEIL(x TO DAY)", Lenient)
+    let parsed = parse_with("SELECT CEIL(x TO DAY)", crate::ParseConfig::new(Lenient))
         .expect("CEIL(x TO field) parses under Lenient");
     let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
         panic!("expected Expr::StringFunc");
@@ -7494,8 +8237,11 @@ fn ceil_to_field_special_form() {
     );
 
     // The `CEILING` spelling carries the same grammar and round-trips as written.
-    let parsed = parse_with("SELECT CEILING(x TO HOUR)", Lenient)
-        .expect("CEILING(x TO field) parses under Lenient");
+    let parsed = parse_with(
+        "SELECT CEILING(x TO HOUR)",
+        crate::ParseConfig::new(Lenient),
+    )
+    .expect("CEILING(x TO field) parses under Lenient");
     let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
         panic!("expected Expr::StringFunc");
     };
@@ -7512,8 +8258,8 @@ fn ceil_to_field_special_form() {
 
     // The comma scale spelling stays an ordinary call everywhere — the special form
     // fires only on `TO`, never intercepting the comma-arity form.
-    let parsed =
-        parse_with("SELECT CEIL(x, 2)", Lenient).expect("CEIL(x, 2) parses as an ordinary call");
+    let parsed = parse_with("SELECT CEIL(x, 2)", crate::ParseConfig::new(Lenient))
+        .expect("CEIL(x, 2) parses as an ordinary call");
     assert!(
         matches!(project_expr(&parsed), Expr::Function { .. }),
         "CEIL(x, 2) must stay an ordinary Expr::Function, not StringFunc::CeilTo",
@@ -7523,14 +8269,18 @@ fn ceil_to_field_special_form() {
     // parse error it is today: an unexpected `TO` where the plain-call path expects `,`
     // or `)`.
     assert!(
-        parse_with("SELECT CEIL(x TO DAY)", crate::dialect::Ansi).is_err(),
+        parse_with(
+            "SELECT CEIL(x TO DAY)",
+            crate::ParseConfig::new(crate::dialect::Ansi)
+        )
+        .is_err(),
         "ANSI has no CEIL TO-field special form",
     );
 
     // No probed oracle grammar admits the `TO` tail (decision table (a)): PostgreSQL
     // parse-rejects it too, even though it has ordinary `ceil`/`ceiling` functions.
     assert!(
-        parse_with("SELECT CEIL(x TO DAY)", Postgres).is_err(),
+        parse_with("SELECT CEIL(x TO DAY)", crate::ParseConfig::new(Postgres)).is_err(),
         "PostgreSQL has no CEIL TO-field grammar (pg_query-verified)",
     );
 }
@@ -7544,7 +8294,7 @@ fn floor_to_field_special_form() {
     // grammar admits it (pg_query/DuckDB/mysql:8.4.10 all reject the `TO` tail), so the
     // gate is Lenient-only. The `TO`-form parses to `StringFunc::FloorTo` and
     // round-trips. Unlike `CEIL`/`CEILING`, `FLOOR` has no synonym spelling to track.
-    let parsed = parse_with("SELECT FLOOR(x TO DAY)", Lenient)
+    let parsed = parse_with("SELECT FLOOR(x TO DAY)", crate::ParseConfig::new(Lenient))
         .expect("FLOOR(x TO field) parses under Lenient");
     let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
         panic!("expected Expr::StringFunc");
@@ -7562,8 +8312,8 @@ fn floor_to_field_special_form() {
 
     // The comma scale spelling stays an ordinary call everywhere — the special form
     // fires only on `TO`, never intercepting the comma-arity form.
-    let parsed =
-        parse_with("SELECT FLOOR(x, 2)", Lenient).expect("FLOOR(x, 2) parses as an ordinary call");
+    let parsed = parse_with("SELECT FLOOR(x, 2)", crate::ParseConfig::new(Lenient))
+        .expect("FLOOR(x, 2) parses as an ordinary call");
     assert!(
         matches!(project_expr(&parsed), Expr::Function { .. }),
         "FLOOR(x, 2) must stay an ordinary Expr::Function, not StringFunc::FloorTo",
@@ -7573,14 +8323,18 @@ fn floor_to_field_special_form() {
     // clean parse error it is today: an unexpected `TO` where the plain-call path
     // expects `,` or `)`.
     assert!(
-        parse_with("SELECT FLOOR(x TO DAY)", crate::dialect::Ansi).is_err(),
+        parse_with(
+            "SELECT FLOOR(x TO DAY)",
+            crate::ParseConfig::new(crate::dialect::Ansi)
+        )
+        .is_err(),
         "ANSI has no FLOOR TO-field special form",
     );
 
     // No probed oracle grammar admits the `TO` tail (decision table (a)): PostgreSQL
     // parse-rejects it too, even though it has an ordinary `floor` function.
     assert!(
-        parse_with("SELECT FLOOR(x TO DAY)", Postgres).is_err(),
+        parse_with("SELECT FLOOR(x TO DAY)", crate::ParseConfig::new(Postgres)).is_err(),
         "PostgreSQL has no FLOOR TO-field grammar (pg_query-verified)",
     );
 }
@@ -7592,8 +8346,8 @@ fn mysql_convert_special_form() {
 
     // Comma form `CONVERT(<expr>, <type>)` folds onto the one `Expr::Cast` shape with the
     // `Convert` spelling tag — engine-verified on mysql:8.4.10.
-    let parsed =
-        parse_with("SELECT CONVERT(1, SIGNED)", MySql).expect("CONVERT(expr, type) parses");
+    let parsed = parse_with("SELECT CONVERT(1, SIGNED)", crate::ParseConfig::new(MySql))
+        .expect("CONVERT(expr, type) parses");
     let Expr::Cast { syntax, .. } = project_expr(&parsed) else {
         panic!("expected Expr::Cast for the comma form");
     };
@@ -7601,8 +8355,11 @@ fn mysql_convert_special_form() {
 
     // USING form `CONVERT(<expr> USING <charset>)` is the transcoding special form —
     // `StringFunc::ConvertUsing`, not a cast.
-    let parsed = parse_with("SELECT CONVERT('x' USING utf8mb4)", MySql)
-        .expect("CONVERT(expr USING cs) parses");
+    let parsed = parse_with(
+        "SELECT CONVERT('x' USING utf8mb4)",
+        crate::ParseConfig::new(MySql),
+    )
+    .expect("CONVERT(expr USING cs) parses");
     let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
         panic!("expected Expr::StringFunc for the USING form");
     };
@@ -7625,7 +8382,8 @@ fn mysql_convert_special_form() {
         "SELECT CONVERT('x' USING 'latin1')",
         "SELECT CONVERT('x' USING binary)",
     ] {
-        let parsed = parse_with(sql, Lenient).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         assert_eq!(
             Renderer::new(Lenient)
                 .render_parsed(&parsed)
@@ -7643,7 +8401,8 @@ fn mysql_convert_special_form() {
         "SELECT CONVERT(CONVERT('x', CHAR) USING utf8mb4)",
         "SELECT CONVERT(CONVERT('x' USING utf8mb4), CHAR)",
     ] {
-        parse_with(sql, MySql).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
     }
 
     // The comma form shares CAST's restricted `cast_type` gate: a non-`cast_type` target
@@ -7659,19 +8418,31 @@ fn mysql_convert_special_form() {
         "SELECT CONVERT('x' AS CHAR)",
         "SELECT CONVERT('x' USING)",
     ] {
-        assert!(parse_with(sql, MySql).is_err(), "MySQL rejects {sql:?}");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+            "MySQL rejects {sql:?}"
+        );
     }
 
     // Lenient inherits the special form. Lenient's cast targets are unrestricted, so its
     // comma form admits any type (`restricted_cast_targets` is off there).
-    parse_with("SELECT CONVERT('x' USING utf8mb4)", Lenient).expect("Lenient admits CONVERT USING");
-    parse_with("SELECT CONVERT(1, INT)", Lenient).expect("Lenient CONVERT admits any target");
+    parse_with(
+        "SELECT CONVERT('x' USING utf8mb4)",
+        crate::ParseConfig::new(Lenient),
+    )
+    .expect("Lenient admits CONVERT USING");
+    parse_with("SELECT CONVERT(1, INT)", crate::ParseConfig::new(Lenient))
+        .expect("Lenient CONVERT admits any target");
 
     // Off elsewhere: with the gate off, `CONVERT` keeps its ordinary function-name
     // reading, so the special-form-only shapes are not produced. The `USING` form is a
     // parse error under ANSI (it has no such production), matching PostgreSQL.
     assert!(
-        parse_with("SELECT CONVERT('x' USING utf8mb4)", Ansi).is_err(),
+        parse_with(
+            "SELECT CONVERT('x' USING utf8mb4)",
+            crate::ParseConfig::new(Ansi)
+        )
+        .is_err(),
         "ANSI has no CONVERT USING production",
     );
 }
@@ -7683,8 +8454,11 @@ fn mysql_match_against_fulltext() {
 
     // MySQL's full-text `MATCH (cols) AGAINST (operand [modifier])` special form parses to
     // `StringFunc::MatchAgainst` — the full grammar was PREPARE-probed on mysql:8.4.10.
-    let parsed = parse_with("SELECT MATCH(a, b) AGAINST('x') FROM t", MySql)
-        .expect("MATCH ... AGAINST parses");
+    let parsed = parse_with(
+        "SELECT MATCH(a, b) AGAINST('x') FROM t",
+        crate::ParseConfig::new(MySql),
+    )
+    .expect("MATCH ... AGAINST parses");
     let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
         panic!("expected Expr::StringFunc");
     };
@@ -7719,7 +8493,8 @@ fn mysql_match_against_fulltext() {
             Some(MatchSearchModifier::QueryExpansion),
         ),
     ] {
-        let parsed = parse_with(sql, Lenient).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Lenient))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
             panic!("{sql:?}: expected Expr::StringFunc");
         };
@@ -7745,7 +8520,8 @@ fn mysql_match_against_fulltext() {
         "SELECT 1 FROM t WHERE MATCH(a, b) AGAINST('x') > 0.5",
         "SELECT 1 FROM t ORDER BY MATCH(a, b) AGAINST('x') DESC",
     ] {
-        parse_with(sql, MySql).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
     }
 
     // Reject shapes, each `ER_PARSE_ERROR` on mysql:8.4.10: an empty column list, a
@@ -7763,15 +8539,23 @@ fn mysql_match_against_fulltext() {
         "SELECT MATCH(a, b) AGAINST('x' IN NATURAL LANGUAGE) FROM t",
         "SELECT MATCH(a, b) AGAINST('x' WITH EXPANSION) FROM t",
     ] {
-        assert!(parse_with(sql, MySql).is_err(), "MySQL rejects {sql:?}");
+        assert!(
+            parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+            "MySQL rejects {sql:?}"
+        );
     }
 
     // The gate is MySQL/Lenient-only. SQLite keeps its infix `<expr> MATCH <expr>`
     // operator untouched (a binding-power entry, not this prefix special form), and a
     // dialect without the flag never produces `MatchAgainst`.
-    parse_with("SELECT 'abc' MATCH 'a'", Sqlite).expect("SQLite infix MATCH operator still parses");
+    parse_with("SELECT 'abc' MATCH 'a'", crate::ParseConfig::new(Sqlite))
+        .expect("SQLite infix MATCH operator still parses");
     assert!(
-        parse_with("SELECT MATCH(a, b) AGAINST('x') FROM t", Ansi).is_err(),
+        parse_with(
+            "SELECT MATCH(a, b) AGAINST('x') FROM t",
+            crate::ParseConfig::new(Ansi)
+        )
+        .is_err(),
         "ANSI has no MATCH ... AGAINST special form",
     );
 }
@@ -7787,7 +8571,8 @@ fn postgres_rejects_invalid_uescape_delimiter() {
         "SELECT U&'d0061' UESCAPE ''''",
         "SELECT U&'d0061' UESCAPE '!!'",
     ] {
-        parse_with(sql, Postgres).expect_err(&format!("invalid UESCAPE delimiter: {sql:?}"));
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect_err(&format!("invalid UESCAPE delimiter: {sql:?}"));
     }
     // Legal single-character delimiters — including `-` and `\`, which `check_uescapechar`
     // permits (only `+` among the sign characters is forbidden).
@@ -7797,7 +8582,8 @@ fn postgres_rejects_invalid_uescape_delimiter() {
         "SELECT U&'d0061' UESCAPE 'g'",
         "SELECT U&'d0061' UESCAPE '\\'",
     ] {
-        parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+        parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
     }
 }
 
@@ -7820,7 +8606,8 @@ fn json_value_query_exists_map_to_json_func() {
             JsonFuncKind::Exists,
         ),
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         let Expr::JsonFunc { json_func, .. } = project_expr(&parsed) else {
             panic!("{sql:?}: expected Expr::JsonFunc");
         };
@@ -7842,7 +8629,8 @@ fn json_object_standard_form_vs_legacy_function() {
         "SELECT JSON_OBJECT('a' VALUE 1, 'b': 2 ABSENT ON NULL WITH UNIQUE KEYS RETURNING jsonb)",
         "SELECT JSON_OBJECT(RETURNING jsonb)",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         assert!(
             matches!(project_expr(&parsed), Expr::JsonObject { .. }),
             "{sql:?}: expected Expr::JsonObject",
@@ -7853,7 +8641,8 @@ fn json_object_standard_form_vs_legacy_function() {
         "SELECT JSON_OBJECT('{a,1}')",
         "SELECT JSON_OBJECT('{a}', '{1}')",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         assert!(
             matches!(project_expr(&parsed), Expr::Function { .. }),
             "{sql:?}: expected the legacy Expr::Function",
@@ -7864,8 +8653,11 @@ fn json_object_standard_form_vs_legacy_function() {
 #[test]
 fn is_json_predicate_parses() {
     use crate::ast::JsonItemType;
-    let parsed = parse_with("SELECT js IS NOT JSON ARRAY WITH UNIQUE KEYS", Postgres)
-        .expect("IS JSON predicate parses");
+    let parsed = parse_with(
+        "SELECT js IS NOT JSON ARRAY WITH UNIQUE KEYS",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("IS JSON predicate parses");
     let Expr::IsJson { is_json, .. } = project_expr(&parsed) else {
         panic!("expected Expr::IsJson");
     };
@@ -7889,7 +8681,7 @@ fn sqljson_over_accept_boundary_rejects() {
         "SELECT JSON_OBJECTAGG('k': v ORDER BY v)", // JSON_OBJECTAGG has no ORDER BY
     ] {
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "{sql:?}: PostgreSQL rejects this at raw parse, so we must too",
         );
     }
@@ -7904,8 +8696,9 @@ fn sqljson_gated_off_leaves_keywords_as_names() {
         "SELECT JSON_QUERY(js, '$' WITH WRAPPER)",
         "SELECT JSON_OBJECT('a': 1)",
     ] {
-        parse_with(sql, TestDialect).expect_err(&format!("{sql:?}: ANSI has no SQL/JSON forms"));
-        parse_with(sql, MySql)
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
+            .expect_err(&format!("{sql:?}: ANSI has no SQL/JSON forms"));
+        parse_with(sql, crate::ParseConfig::new(MySql))
             .expect_err(&format!("{sql:?}: MySQL has no SQL/JSON standard forms"));
     }
 }
@@ -7924,12 +8717,13 @@ fn sqljson_forms_round_trip() {
         "SELECT JSON_SERIALIZE('1' RETURNING text FORMAT JSON)",
         "SELECT js IS NOT JSON OBJECT WITH UNIQUE KEYS",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|e| panic!("{sql:?}: {e}"));
         // The render must re-parse to the same string (stable round-trip).
-        let reparsed = parse_with(&rendered, Postgres)
+        let reparsed = parse_with(&rendered, crate::ParseConfig::new(Postgres))
             .unwrap_or_else(|e| panic!("re-parse of {rendered:?}: {e:?}"));
         let rerendered = Renderer::new(Postgres)
             .render_parsed(&reparsed)
@@ -7946,7 +8740,7 @@ fn xml_functions_map_to_xml_func_variants() {
     // Each head lowers to the matching `XmlFunc` variant.
     let parsed = parse_with(
         "SELECT xmlelement(NAME root, xmlattributes('v' AS a, 1 + 1 AS n), 'body', xmlelement(NAME leaf))",
-        Postgres,
+        crate::ParseConfig::new(Postgres),
     )
     .expect("xmlelement parses");
     let Expr::XmlFunc { xml_func, .. } = project_expr(&parsed) else {
@@ -7969,7 +8763,7 @@ fn xml_functions_map_to_xml_func_variants() {
     // xmlroot's mandatory VERSION as NO VALUE, plus a STANDALONE NO VALUE tail.
     let parsed = parse_with(
         "SELECT xmlroot(x, version no value, standalone no value)",
-        Postgres,
+        crate::ParseConfig::new(Postgres),
     )
     .expect("xmlroot parses");
     let Expr::XmlFunc { xml_func, .. } = project_expr(&parsed) else {
@@ -7989,8 +8783,11 @@ fn xml_functions_map_to_xml_func_variants() {
 
 #[test]
 fn is_document_predicate_parses() {
-    let parsed =
-        parse_with("SELECT xml '<a/>' IS NOT DOCUMENT", Postgres).expect("IS NOT DOCUMENT parses");
+    let parsed = parse_with(
+        "SELECT xml '<a/>' IS NOT DOCUMENT",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("IS NOT DOCUMENT parses");
     let Expr::IsDocument { negated, .. } = project_expr(&parsed) else {
         panic!("expected Expr::IsDocument");
     };
@@ -8016,7 +8813,7 @@ fn xml_over_accept_boundary_rejects() {
         "SELECT xmlexists('a' || 'b' passing x)", // path is a `c_expr`, not `a_expr`
     ] {
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "{sql:?}: PostgreSQL rejects this at raw parse, so we must too",
         );
     }
@@ -8031,8 +8828,10 @@ fn xml_gated_off_leaves_keywords_as_names() {
         "SELECT xmlserialize(DOCUMENT x AS text)",
         "SELECT x IS DOCUMENT",
     ] {
-        parse_with(sql, TestDialect).expect_err(&format!("{sql:?}: ANSI has no SQL/XML forms"));
-        parse_with(sql, MySql).expect_err(&format!("{sql:?}: MySQL has no SQL/XML forms"));
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
+            .expect_err(&format!("{sql:?}: ANSI has no SQL/XML forms"));
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect_err(&format!("{sql:?}: MySQL has no SQL/XML forms"));
     }
 }
 
@@ -8040,8 +8839,11 @@ fn xml_gated_off_leaves_keywords_as_names() {
 fn xmlagg_stays_an_ordinary_aggregate() {
     // `xmlagg` is not a keyword special form; it parses through the ordinary aggregate call
     // path (with ORDER BY) as an `Expr::Function`, in every dialect.
-    let parsed =
-        parse_with("SELECT xmlagg(x ORDER BY y)", Postgres).expect("xmlagg parses as a call");
+    let parsed = parse_with(
+        "SELECT xmlagg(x ORDER BY y)",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("xmlagg parses as a call");
     assert!(
         matches!(project_expr(&parsed), Expr::Function { .. }),
         "xmlagg is an ordinary aggregate call, not a special form",
@@ -8067,12 +8869,13 @@ fn xml_forms_round_trip() {
         "SELECT x IS DOCUMENT",
         "SELECT x IS NOT DOCUMENT",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|e| panic!("{sql:?}: {e}"));
         // The render must re-parse to the same string (stable round-trip).
-        let reparsed = parse_with(&rendered, Postgres)
+        let reparsed = parse_with(&rendered, crate::ParseConfig::new(Postgres))
             .unwrap_or_else(|e| panic!("re-parse of {rendered:?}: {e:?}"));
         let rerendered = Renderer::new(Postgres)
             .render_parsed(&reparsed)
@@ -8091,7 +8894,8 @@ fn string_special_forms_map_to_string_func_variants() {
         "SELECT SUBSTRING('abcdef' FROM 2 FOR 3)",
         "SELECT SUBSTRING('abcdef' FOR 3 FROM 2)",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
             panic!("{sql:?}: expected Expr::StringFunc");
         };
@@ -8101,14 +8905,21 @@ fn string_special_forms_map_to_string_func_variants() {
         assert!(start.is_some() && count.is_some(), "{sql:?}: both operands");
     }
 
-    let parsed = parse_with("SELECT POSITION('b' IN 'abc')", Postgres).expect("POSITION parses");
+    let parsed = parse_with(
+        "SELECT POSITION('b' IN 'abc')",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("POSITION parses");
     assert!(matches!(
         project_expr(&parsed),
         Expr::StringFunc { string_func, .. } if matches!(**string_func, StringFunc::Position { .. }),
     ));
 
-    let parsed = parse_with("SELECT OVERLAY('abc' PLACING 'X' FROM 2 FOR 1)", Postgres)
-        .expect("OVERLAY parses");
+    let parsed = parse_with(
+        "SELECT OVERLAY('abc' PLACING 'X' FROM 2 FOR 1)",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("OVERLAY parses");
     let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
         panic!("expected Expr::StringFunc");
     };
@@ -8119,7 +8930,11 @@ fn string_special_forms_map_to_string_func_variants() {
 
     // TRIM: the `from` bit distinguishes `TRIM(TRAILING ' foo ')` from
     // `TRIM(TRAILING FROM ' foo ')` (both valid PostgreSQL, different meanings).
-    let parsed = parse_with("SELECT TRIM(TRAILING ' foo ')", Postgres).expect("TRIM parses");
+    let parsed = parse_with(
+        "SELECT TRIM(TRAILING ' foo ')",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("TRIM parses");
     let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
         panic!("expected Expr::StringFunc");
     };
@@ -8138,7 +8953,11 @@ fn string_special_forms_map_to_string_func_variants() {
     assert!(!from);
     assert_eq!(sources.len(), 1);
 
-    let parsed = parse_with("SELECT TRIM(BOTH 'x' FROM 'y', 'z')", Postgres).expect("TRIM parses");
+    let parsed = parse_with(
+        "SELECT TRIM(BOTH 'x' FROM 'y', 'z')",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("TRIM parses");
     let Expr::StringFunc { string_func, .. } = project_expr(&parsed) else {
         panic!("expected Expr::StringFunc");
     };
@@ -8170,7 +8989,8 @@ fn string_special_plain_calls_stay_ordinary_calls() {
         "SELECT OVERLAY('abc', 'X', 2, 1)",
         "SELECT SUBSTRING()",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         assert!(
             matches!(project_expr(&parsed), Expr::Function { .. }),
             "{sql:?}: the plain call stays an ordinary Expr::Function",
@@ -8178,7 +8998,11 @@ fn string_special_plain_calls_stay_ordinary_calls() {
     }
     // SQLite has no keyword form at all, so even `position(a, b)` is an ordinary call
     // there (it fails only at binding, not parse).
-    let parsed = parse_with("SELECT position('b', 'abc')", Sqlite).expect("sqlite plain call");
+    let parsed = parse_with(
+        "SELECT position('b', 'abc')",
+        crate::ParseConfig::new(Sqlite),
+    )
+    .expect("sqlite plain call");
     assert!(matches!(project_expr(&parsed), Expr::Function { .. }));
 }
 
@@ -8203,7 +9027,7 @@ fn string_special_over_accept_boundary_rejects() {
         "SELECT POSITION('b' NOT IN 'abc')",          // IN only, no NOT form
     ] {
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "{sql:?}: PostgreSQL rejects this at raw parse, so we must too",
         );
     }
@@ -8220,7 +9044,8 @@ fn string_special_gated_off_leaves_heads_ordinary() {
         "SELECT TRIM(BOTH 'x' FROM 'y')",
         "SELECT TRIM(FROM 'y')",
     ] {
-        parse_with(sql, Sqlite).expect_err(&format!("{sql:?}: SQLite has no keyword forms"));
+        parse_with(sql, crate::ParseConfig::new(Sqlite))
+            .expect_err(&format!("{sql:?}: SQLite has no keyword forms"));
     }
     // ANSI takes the standard shapes only: FROM-first substring, single-source trim,
     // no SIMILAR, no plain overlay call (the standard defines none).
@@ -8232,11 +9057,14 @@ fn string_special_gated_off_leaves_heads_ordinary() {
         "SELECT TRIM('a', 'b')",
         "SELECT OVERLAY('abc', 'X', 2, 1)",
     ] {
-        parse_with(sql, TestDialect)
+        parse_with(sql, crate::ParseConfig::new(TestDialect))
             .expect_err(&format!("{sql:?}: ANSI takes the standard shapes only"));
     }
-    parse_with("SELECT SUBSTRING('abcdef' FROM 2 FOR 3)", TestDialect)
-        .expect("ANSI accepts the standard FROM/FOR form");
+    parse_with(
+        "SELECT SUBSTRING('abcdef' FROM 2 FOR 3)",
+        crate::ParseConfig::new(TestDialect),
+    )
+    .expect("ANSI accepts the standard FROM/FOR form");
 }
 
 #[test]
@@ -8253,7 +9081,8 @@ fn string_special_mysql_flavor_matches_engine() {
         "SELECT TRIM ('abc')", // a spaced head demotes to the generic call
         "SELECT SUBSTRING ('abcdef', 2)", // ditto — any arity parses when spaced
     ] {
-        parse_with(sql, MySql).unwrap_or_else(|e| panic!("{sql:?}: mysql accepts: {e:?}"));
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .unwrap_or_else(|e| panic!("{sql:?}: mysql accepts: {e:?}"));
     }
     for sql in [
         "SELECT SUBSTRING('abcdef' FOR 3)", // FROM-first only
@@ -8272,12 +9101,16 @@ fn string_special_mysql_flavor_matches_engine() {
         "SELECT TRIM (LEADING 'x' FROM 'y')",       // spaced head demotes; LEADING rejects
         "SELECT SUBSTRING ('abcdef' FROM 2)",       // ditto for the keyword tail
     ] {
-        parse_with(sql, MySql).expect_err(&format!("{sql:?}: mysql:8.4 parse-rejects (1064)"));
+        parse_with(sql, crate::ParseConfig::new(MySql))
+            .expect_err(&format!("{sql:?}: mysql:8.4 parse-rejects (1064)"));
     }
     // The engine-observed composition with adjacent literal concatenation: MySQL folds
     // `'x' 'y'` into one literal, so the keyword form accepts what PostgreSQL rejects.
-    parse_with("SELECT TRIM(LEADING 'x' 'y' FROM 'z')", MySql)
-        .expect("adjacent literals concatenate inside the MySQL trim chars");
+    parse_with(
+        "SELECT TRIM(LEADING 'x' 'y' FROM 'z')",
+        crate::ParseConfig::new(MySql),
+    )
+    .expect("adjacent literals concatenate inside the MySQL trim chars");
 }
 
 #[test]
@@ -8291,7 +9124,8 @@ fn string_special_duckdb_flavor_matches_engine() {
         "SELECT TRIM('a', 'b')",
         "SELECT POSITION('a' || 'b' IN 'abc')",
     ] {
-        parse_with(sql, DuckDb).unwrap_or_else(|e| panic!("{sql:?}: duckdb accepts: {e:?}"));
+        parse_with(sql, crate::ParseConfig::new(DuckDb))
+            .unwrap_or_else(|e| panic!("{sql:?}: duckdb accepts: {e:?}"));
     }
     for sql in [
         "SELECT SUBSTRING('abcdef' SIMILAR 'a' ESCAPE '#')",
@@ -8299,7 +9133,8 @@ fn string_special_duckdb_flavor_matches_engine() {
         "SELECT OVERLAY('abc')",
         "SELECT OVERLAY()",
     ] {
-        parse_with(sql, DuckDb).expect_err(&format!("{sql:?}: duckdb parse-rejects"));
+        parse_with(sql, crate::ParseConfig::new(DuckDb))
+            .expect_err(&format!("{sql:?}: duckdb parse-rejects"));
     }
 }
 
@@ -8324,12 +9159,13 @@ fn string_special_forms_round_trip() {
         "SELECT TRIM(LEADING 'x', 'y')",
         "SELECT TRIM('a' FROM 'b', 'c')",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("{sql:?}: {e:?}"));
         let rendered = Renderer::new(Postgres)
             .render_parsed(&parsed)
             .unwrap_or_else(|e| panic!("{sql:?}: {e}"));
         // The render must re-parse to the same string (stable round-trip).
-        let reparsed = parse_with(&rendered, Postgres)
+        let reparsed = parse_with(&rendered, crate::ParseConfig::new(Postgres))
             .unwrap_or_else(|e| panic!("re-parse of {rendered:?}: {e:?}"));
         let rerendered = Renderer::new(Postgres)
             .render_parsed(&reparsed)
@@ -8339,12 +9175,16 @@ fn string_special_forms_round_trip() {
     // The MySQL SUBSTR keyword form renders canonically as SUBSTRING (MySQL is not a
     // render target, so the neutral Lenient spelling stands in) and the canonical
     // form re-parses under MySQL itself.
-    let parsed = parse_with("SELECT SUBSTR('abcdef' FROM 2 FOR 3)", MySql).expect("parses");
+    let parsed = parse_with(
+        "SELECT SUBSTR('abcdef' FROM 2 FOR 3)",
+        crate::ParseConfig::new(MySql),
+    )
+    .expect("parses");
     let rendered = Renderer::new(crate::dialect::Lenient)
         .render_parsed(&parsed)
         .expect("renders");
     assert_eq!(rendered, "SELECT SUBSTRING('abcdef' FROM 2 FOR 3)");
-    parse_with(&rendered, MySql).expect("the canonical render re-parses");
+    parse_with(&rendered, crate::ParseConfig::new(MySql)).expect("the canonical render re-parses");
 }
 
 /// ANSI plus the PostgreSQL predicate + operator surface, isolating the postfix null
@@ -8362,8 +9202,11 @@ const PG_PREDICATE_DIALECT: FeatureDialect = {
 
 #[test]
 fn between_symmetric_is_recorded_and_round_trips() {
-    let parsed =
-        parse_with("SELECT a BETWEEN SYMMETRIC 1 AND 2", PG_PREDICATE_DIALECT).expect("parses");
+    let parsed = parse_with(
+        "SELECT a BETWEEN SYMMETRIC 1 AND 2",
+        crate::ParseConfig::new(PG_PREDICATE_DIALECT),
+    )
+    .expect("parses");
     let Expr::Between { symmetric, .. } = project_expr(&parsed) else {
         panic!("expected a BETWEEN, got {:?}", project_expr(&parsed));
     };
@@ -8376,8 +9219,11 @@ fn between_symmetric_is_recorded_and_round_trips() {
 
     // The default `ASYMMETRIC` is a noise word: recorded as non-symmetric and dropped on
     // render, leaving the bare form.
-    let asym = parse_with("SELECT a BETWEEN ASYMMETRIC 1 AND 2", PG_PREDICATE_DIALECT)
-        .expect("ASYMMETRIC parses");
+    let asym = parse_with(
+        "SELECT a BETWEEN ASYMMETRIC 1 AND 2",
+        crate::ParseConfig::new(PG_PREDICATE_DIALECT),
+    )
+    .expect("ASYMMETRIC parses");
     let Expr::Between { symmetric, .. } = project_expr(&asym) else {
         panic!("expected a BETWEEN");
     };
@@ -8392,18 +9238,36 @@ fn between_symmetric_is_recorded_and_round_trips() {
 fn between_symmetric_is_rejected_where_the_gate_is_off() {
     // ANSI/MySQL (and every preset reusing `PredicateSyntax::ANSI`) leaves the modifier
     // unconsumed, so it surfaces as a clean parse error.
-    assert!(parse_with("SELECT a BETWEEN SYMMETRIC 1 AND 2", TestDialect).is_err());
-    assert!(parse_with("SELECT a BETWEEN SYMMETRIC 1 AND 2", MySql).is_err());
+    assert!(
+        parse_with(
+            "SELECT a BETWEEN SYMMETRIC 1 AND 2",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err()
+    );
+    assert!(
+        parse_with(
+            "SELECT a BETWEEN SYMMETRIC 1 AND 2",
+            crate::ParseConfig::new(MySql)
+        )
+        .is_err()
+    );
     // The bare BETWEEN is unaffected by the gate.
-    assert!(parse_with("SELECT a BETWEEN 1 AND 2", TestDialect).is_ok());
+    assert!(
+        parse_with(
+            "SELECT a BETWEEN 1 AND 2",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_ok()
+    );
 }
 
 #[test]
 fn postfix_isnull_notnull_fold_onto_is_null_with_a_spelling() {
     use crate::ast::NullTestSpelling;
     for (sql, negated) in [("SELECT a ISNULL", false), ("SELECT a NOTNULL", true)] {
-        let parsed =
-            parse_with(sql, PG_PREDICATE_DIALECT).unwrap_or_else(|e| panic!("{sql}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_PREDICATE_DIALECT))
+            .unwrap_or_else(|e| panic!("{sql}: {e:?}"));
         let Expr::IsNull {
             negated: got,
             spelling,
@@ -8425,7 +9289,11 @@ fn postfix_isnull_notnull_fold_onto_is_null_with_a_spelling() {
     }
 
     // The standard `IS NULL` keeps the `Is` spelling and its own text.
-    let is_null = parse_with("SELECT a IS NOT NULL", PG_PREDICATE_DIALECT).expect("parses");
+    let is_null = parse_with(
+        "SELECT a IS NOT NULL",
+        crate::ParseConfig::new(PG_PREDICATE_DIALECT),
+    )
+    .expect("parses");
     let Expr::IsNull { spelling, .. } = project_expr(&is_null) else {
         panic!("expected IsNull");
     };
@@ -8436,9 +9304,27 @@ fn postfix_isnull_notnull_fold_onto_is_null_with_a_spelling() {
 fn postfix_isnull_notnull_are_rejected_where_the_gate_is_off() {
     // ANSI/MySQL have no postfix synonym, so the trailing keyword is a parse error; SQLite
     // (which sets the flag) accepts it.
-    assert!(parse_with("SELECT a FROM t WHERE c ISNULL", TestDialect).is_err());
-    assert!(parse_with("SELECT a FROM t WHERE c NOTNULL", MySql).is_err());
-    assert!(parse_with("SELECT a FROM t WHERE c ISNULL", Sqlite).is_ok());
+    assert!(
+        parse_with(
+            "SELECT a FROM t WHERE c ISNULL",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err()
+    );
+    assert!(
+        parse_with(
+            "SELECT a FROM t WHERE c NOTNULL",
+            crate::ParseConfig::new(MySql)
+        )
+        .is_err()
+    );
+    assert!(
+        parse_with(
+            "SELECT a FROM t WHERE c ISNULL",
+            crate::ParseConfig::new(Sqlite)
+        )
+        .is_ok()
+    );
 }
 
 // ANSI plus SQLite's predicate surface, isolating the two-word `NOT NULL` postfix gate for
@@ -8458,7 +9344,11 @@ fn two_word_not_null_postfix_folds_onto_is_null_and_round_trips() {
     // SQLite's two-word `<expr> NOT NULL` postfix (a synonym for `IS NOT NULL`) folds onto
     // `Expr::IsNull` with the distinct `PostfixNotNull` spelling and round-trips verbatim —
     // not collapsed onto the one-word `NOTNULL` (`Postfix`).
-    let parsed = parse_with("SELECT a NOT NULL", SQLITE_PREDICATE_DIALECT).expect("parses");
+    let parsed = parse_with(
+        "SELECT a NOT NULL",
+        crate::ParseConfig::new(SQLITE_PREDICATE_DIALECT),
+    )
+    .expect("parses");
     let Expr::IsNull {
         negated, spelling, ..
     } = project_expr(&parsed)
@@ -8482,7 +9372,11 @@ fn two_word_not_null_postfix_round_trips_exact_under_duckdb() {
     // DuckDB admits the same two-word `<expr> NOT NULL` postfix (engine-measured on 1.5.4);
     // the DuckDb preset's `null_test_two_word_postfix` gate folds it onto `Expr::IsNull` with
     // the `PostfixNotNull` spelling and renders it back byte-identically (Exact).
-    let parsed = parse_with("SELECT a NOT NULL", DUCKDB_TYPE_DIALECT).expect("parses");
+    let parsed = parse_with(
+        "SELECT a NOT NULL",
+        crate::ParseConfig::new(DUCKDB_TYPE_DIALECT),
+    )
+    .expect("parses");
     let Expr::IsNull {
         negated, spelling, ..
     } = project_expr(&parsed)
@@ -8505,9 +9399,9 @@ fn two_word_not_null_postfix_is_rejected_where_the_gate_is_off() {
     // PostgreSQL accepts the one-word `NOTNULL` (engine-measured) but rejects the two-word
     // `NOT NULL` postfix, so the surfaces do not co-travel: under Postgres the two-word form
     // must not parse, while the one-word form still does. ANSI has neither.
-    assert!(parse_with("SELECT a NOT NULL", Postgres).is_err());
-    assert!(parse_with("SELECT a NOTNULL", Postgres).is_ok());
-    assert!(parse_with("SELECT a NOT NULL", Ansi).is_err());
+    assert!(parse_with("SELECT a NOT NULL", crate::ParseConfig::new(Postgres)).is_err());
+    assert!(parse_with("SELECT a NOTNULL", crate::ParseConfig::new(Postgres)).is_ok());
+    assert!(parse_with("SELECT a NOT NULL", crate::ParseConfig::new(Ansi)).is_err());
 }
 
 #[test]
@@ -8522,10 +9416,11 @@ fn two_word_not_null_does_not_disturb_the_not_led_predicate_family() {
         "SELECT NOT a",
         "SELECT NOT a NOT NULL",
     ] {
-        parse_with(sql, Sqlite).unwrap_or_else(|e| panic!("{sql}: {e:?}"));
+        parse_with(sql, crate::ParseConfig::new(Sqlite)).unwrap_or_else(|e| panic!("{sql}: {e:?}"));
     }
     // `NOT a` prefix and the postfix `NOT NULL` compose: `NOT (a NOT NULL)`.
-    let parsed = parse_with("SELECT NOT a NOT NULL", Sqlite).expect("parses");
+    let parsed =
+        parse_with("SELECT NOT a NOT NULL", crate::ParseConfig::new(Sqlite)).expect("parses");
     let Expr::UnaryOp { expr, .. } = project_expr(&parsed) else {
         panic!("expected a prefix NOT, got {:?}", project_expr(&parsed));
     };
@@ -8551,8 +9446,8 @@ fn is_normalized_records_the_form_and_round_trips() {
             true,
         ),
     ] {
-        let parsed =
-            parse_with(sql, PG_PREDICATE_DIALECT).unwrap_or_else(|e| panic!("{sql}: {e:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(PG_PREDICATE_DIALECT))
+            .unwrap_or_else(|e| panic!("{sql}: {e:?}"));
         let Expr::IsNormalized { form, negated, .. } = project_expr(&parsed) else {
             panic!(
                 "{sql}: expected IsNormalized, got {:?}",
@@ -8570,11 +9465,23 @@ fn is_normalized_records_the_form_and_round_trips() {
 
 #[test]
 fn is_normalized_is_rejected_where_the_gate_is_off() {
-    assert!(parse_with("SELECT a IS NORMALIZED", TestDialect).is_err());
-    assert!(parse_with("SELECT a IS NFC NORMALIZED", MySql).is_err());
+    assert!(
+        parse_with(
+            "SELECT a IS NORMALIZED",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_err()
+    );
+    assert!(parse_with("SELECT a IS NFC NORMALIZED", crate::ParseConfig::new(MySql)).is_err());
     // A bare `nfc`/`normalized` word without the predicate stays an ordinary name where a
     // name is admissible — the gate never steals the unreserved word.
-    assert!(parse_with("SELECT normalized FROM t", TestDialect).is_ok());
+    assert!(
+        parse_with(
+            "SELECT normalized FROM t",
+            crate::ParseConfig::new(TestDialect)
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -8591,7 +9498,8 @@ fn pg_range_predicates_bind_tighter_than_comparison() {
         "SELECT false <= -1 BETWEEN 1 AND 1",
         "SELECT false >= -1 BETWEEN 1 AND 1",
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("PG accepts {sql}: {e}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("PG accepts {sql}: {e}"));
         let Expr::BinaryOp { op, right, .. } = project_expr(&parsed) else {
             panic!("{sql}: root is the comparison operator");
         };
@@ -8622,7 +9530,8 @@ fn pg_range_predicates_bind_tighter_than_comparison() {
             (|e: &Expr<NoExt>| matches!(e, Expr::Like { .. })) as fn(&Expr<NoExt>) -> bool,
         ),
     ] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|e| panic!("PG accepts {sql}: {e}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("PG accepts {sql}: {e}"));
         let Expr::BinaryOp {
             op: BinaryOperator::Eq(_),
             right,
@@ -8645,7 +9554,8 @@ fn pg_range_predicates_bind_tighter_than_comparison() {
     // A grouped comparison as the BETWEEN principal keeps its parentheses (it binds
     // looser than the range tier): `(a = b) BETWEEN c AND d`.
     let sql = "SELECT (a = b) BETWEEN c AND d";
-    let parsed = parse_with(sql, Postgres).expect("PG accepts the grouped form");
+    let parsed =
+        parse_with(sql, crate::ParseConfig::new(Postgres)).expect("PG accepts the grouped form");
     assert!(matches!(project_expr(&parsed), Expr::Between { .. }));
     assert_eq!(
         pg.render_parsed(&parsed).expect("renders"),
@@ -8665,11 +9575,11 @@ fn range_predicate_precedence_above_comparison_is_dialect_data() {
         "SELECT true <> -1 BETWEEN 1 AND 1",
     ] {
         assert!(
-            parse_with(sql, Postgres).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
             "PostgreSQL accepts {sql}"
         );
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI (default rank) rejects {sql}"
         );
     }
@@ -8687,15 +9597,18 @@ fn pg_range_predicate_chains_reject_like_comparisons() {
         "SELECT a = b = c",
     ] {
         assert!(
-            parse_with(sql, Postgres).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
             "PostgreSQL rejects the chain {sql}"
         );
     }
 
     // A range predicate FOLLOWED by a looser comparison is fine — the comparison folds onto
     // the whole predicate: `a BETWEEN b AND c = d` -> `(a BETWEEN b AND c) = d`.
-    let parsed =
-        parse_with("SELECT a BETWEEN b AND c = d", Postgres).expect("comparison after BETWEEN");
+    let parsed = parse_with(
+        "SELECT a BETWEEN b AND c = d",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("comparison after BETWEEN");
     let Expr::BinaryOp {
         op: BinaryOperator::Eq(_),
         left,
@@ -8727,9 +9640,9 @@ fn pg_and_duckdb_is_family_ranks_below_comparison() {
         "SELECT a = b IS NULL",
         "SELECT a < b IS NOT NULL",
     ] {
-        let pg_parsed =
-            parse_with(sql, Postgres).unwrap_or_else(|e| panic!("PG accepts {sql}: {e}"));
-        let duck_parsed = parse_with(sql, DUCKDB_TYPE_DIALECT)
+        let pg_parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|e| panic!("PG accepts {sql}: {e}"));
+        let duck_parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT))
             .unwrap_or_else(|e| panic!("DuckDB accepts {sql}: {e}"));
         assert!(
             matches!(project_expr(&pg_parsed), Expr::IsNull { .. }),
@@ -8754,7 +9667,8 @@ fn pg_and_duckdb_is_family_ranks_below_comparison() {
     // Postfix `IS NULL` then a looser comparison: the null test is the comparison's LEFT
     // operand (`a IS NULL = b` -> `(a IS NULL) = b`), a chain both engines accept but our
     // parser rejected while the family sat at comparison rank.
-    let parsed = parse_with("SELECT a IS NULL = b", Postgres).expect("PG accepts IS NULL = b");
+    let parsed = parse_with("SELECT a IS NULL = b", crate::ParseConfig::new(Postgres))
+        .expect("PG accepts IS NULL = b");
     let Expr::BinaryOp {
         op: BinaryOperator::Eq(_),
         left,
@@ -8779,7 +9693,11 @@ fn pg_and_duckdb_is_family_ranks_below_comparison() {
     // Infix `IS DISTINCT FROM` sits at the same below-comparison tier: a comparison folds in
     // on EITHER side. `a = b IS DISTINCT FROM c` -> `(a = b) IS DISTINCT FROM c`;
     // `a IS DISTINCT FROM b = c` -> `a IS DISTINCT FROM (b = c)`.
-    let parsed = parse_with("SELECT a = b IS DISTINCT FROM c", Postgres).expect("parses");
+    let parsed = parse_with(
+        "SELECT a = b IS DISTINCT FROM c",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("parses");
     let Expr::BinaryOp {
         op: BinaryOperator::IsDistinctFrom(_),
         left,
@@ -8800,7 +9718,11 @@ fn pg_and_duckdb_is_family_ranks_below_comparison() {
         "SELECT a = b IS DISTINCT FROM c"
     );
 
-    let parsed = parse_with("SELECT a IS DISTINCT FROM b = c", Postgres).expect("parses");
+    let parsed = parse_with(
+        "SELECT a IS DISTINCT FROM b = c",
+        crate::ParseConfig::new(Postgres),
+    )
+    .expect("parses");
     let Expr::BinaryOp {
         op: BinaryOperator::IsDistinctFrom(_),
         right,
@@ -8830,15 +9752,15 @@ fn is_family_below_comparison_is_dialect_data() {
     // non-associative-chain reject — proving the behaviour is dialect data, not hard-coded.
     for sql in ["SELECT a <> b IS NULL", "SELECT a = b IS DISTINCT FROM c"] {
         assert!(
-            parse_with(sql, Postgres).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
             "PostgreSQL accepts {sql}"
         );
         assert!(
-            parse_with(sql, DUCKDB_TYPE_DIALECT).is_ok(),
+            parse_with(sql, crate::ParseConfig::new(DUCKDB_TYPE_DIALECT)).is_ok(),
             "DuckDB accepts {sql}"
         );
         assert!(
-            parse_with(sql, Ansi).is_err(),
+            parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
             "ANSI (default rank) rejects {sql}"
         );
     }
@@ -8846,7 +9768,7 @@ fn is_family_below_comparison_is_dialect_data() {
     // LEFT-associative, so it accepts `a <> b IS NULL` by left-folding to `(a <> b) IS NULL` —
     // the same tree the below-comparison rank produces, reached by a different route.
     assert!(
-        parse_with("SELECT a <> b IS NULL", MySql).is_ok(),
+        parse_with("SELECT a <> b IS NULL", crate::ParseConfig::new(MySql)).is_ok(),
         "MySQL accepts via left-associative comparison",
     );
 }
@@ -8881,7 +9803,8 @@ fn project_struct_constructor<'a>(
 fn struct_constructor_parses_typeless_forms() {
     // Positional values, no field names: `fields` empty marks the typeless form.
     let sql = "SELECT STRUCT(1, 2)";
-    let parsed = parse_with(sql, STRUCT_CONSTRUCTOR_DIALECT).expect("positional STRUCT parses");
+    let parsed = parse_with(sql, crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT))
+        .expect("positional STRUCT parses");
     let ctor = project_struct_constructor(&parsed, sql);
     assert!(ctor.fields.is_empty(), "typeless form carries no fields");
     assert_eq!(ctor.args.len(), 2);
@@ -8889,7 +9812,8 @@ fn struct_constructor_parses_typeless_forms() {
 
     // `AS`-named values: the alias lands on each argument.
     let sql = "SELECT STRUCT(x AS a, y AS b)";
-    let parsed = parse_with(sql, STRUCT_CONSTRUCTOR_DIALECT).expect("named STRUCT parses");
+    let parsed = parse_with(sql, crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT))
+        .expect("named STRUCT parses");
     let ctor = project_struct_constructor(&parsed, sql);
     assert!(ctor.fields.is_empty());
     let aliases: Vec<_> = ctor
@@ -8905,8 +9829,11 @@ fn struct_constructor_parses_typeless_forms() {
 
     // `STRUCT()` parse-accepts: BigQuery's at-least-one-value rule is an analysis
     // reject (the parse-vs-bind split), matching sqlparser-rs's accept.
-    let parsed =
-        parse_with("SELECT STRUCT()", STRUCT_CONSTRUCTOR_DIALECT).expect("empty STRUCT parses");
+    let parsed = parse_with(
+        "SELECT STRUCT()",
+        crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT),
+    )
+    .expect("empty STRUCT parses");
     let ctor = project_struct_constructor(&parsed, "SELECT STRUCT()");
     assert!(ctor.fields.is_empty() && ctor.args.is_empty());
 }
@@ -8916,7 +9843,8 @@ fn struct_constructor_parses_the_typed_form() {
     // Named typed fields: `STRUCT<a INT64, b STRING>(1, 'x')` — the field list rides
     // the constructor, and the value list stays positional (no aliases).
     let sql = "SELECT STRUCT<a INT64, b STRING>(1, 'x')";
-    let parsed = parse_with(sql, STRUCT_CONSTRUCTOR_DIALECT).expect("typed STRUCT parses");
+    let parsed = parse_with(sql, crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT))
+        .expect("typed STRUCT parses");
     let ctor = project_struct_constructor(&parsed, sql);
     assert_eq!(ctor.fields.len(), 2);
     assert_eq!(ctor.args.len(), 2);
@@ -8939,7 +9867,8 @@ fn struct_constructor_parses_the_typed_form() {
 
     // An anonymous typed field: BigQuery admits `STRUCT<INT64>(5)` (no field name).
     let sql = "SELECT STRUCT<INT64>(5)";
-    let parsed = parse_with(sql, STRUCT_CONSTRUCTOR_DIALECT).expect("anonymous typed field");
+    let parsed = parse_with(sql, crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT))
+        .expect("anonymous typed field");
     let ctor = project_struct_constructor(&parsed, sql);
     assert_eq!(ctor.fields.len(), 1);
     assert!(ctor.fields[0].name.is_none());
@@ -8947,7 +9876,8 @@ fn struct_constructor_parses_the_typed_form() {
     // A parameterized anonymous type keeps the whole `(…)` on the type, not a name:
     // `NUMERIC` abuts `(` (not a word), so the two-word `name TYPE` reading never fires.
     let sql = "SELECT STRUCT<NUMERIC(10, 2)>(x)";
-    let parsed = parse_with(sql, STRUCT_CONSTRUCTOR_DIALECT).expect("parameterized typed field");
+    let parsed = parse_with(sql, crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT))
+        .expect("parameterized typed field");
     let ctor = project_struct_constructor(&parsed, sql);
     assert!(ctor.fields[0].name.is_none());
 
@@ -8956,8 +9886,11 @@ fn struct_constructor_parses_the_typed_form() {
     // reads as the comparison `struct <> (1)` — the BigQuery "empty field list" error
     // is a reservation concern this token-level boundary already keeps out of the
     // constructor. An unclosed field list rejects cleanly at the missing `>`.
-    let parsed =
-        parse_with("SELECT STRUCT<>(1)", STRUCT_CONSTRUCTOR_DIALECT).expect("`<>` comparison");
+    let parsed = parse_with(
+        "SELECT STRUCT<>(1)",
+        crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT),
+    )
+    .expect("`<>` comparison");
     assert!(matches!(
         project_expr(&parsed),
         Expr::BinaryOp {
@@ -8965,7 +9898,13 @@ fn struct_constructor_parses_the_typed_form() {
             ..
         }
     ));
-    assert!(parse_with("SELECT STRUCT<a INT64(1)", STRUCT_CONSTRUCTOR_DIALECT).is_err());
+    assert!(
+        parse_with(
+            "SELECT STRUCT<a INT64(1)",
+            crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT)
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -8977,7 +9916,7 @@ fn struct_constructor_round_trips() {
         "SELECT STRUCT<INT64>(5)",
         "SELECT STRUCT()",
     ] {
-        let parsed = parse_with(sql, STRUCT_CONSTRUCTOR_DIALECT)
+        let parsed = parse_with(sql, crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT))
             .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         let rendered = Renderer::new(STRUCT_CONSTRUCTOR_DIALECT)
             .render_parsed(&parsed)
@@ -8989,8 +9928,11 @@ fn struct_constructor_round_trips() {
 #[test]
 fn struct_constructor_dispatch_is_bounded_to_the_paren_or_angle_lead() {
     // A bare `struct` — no `(`/`<` — stays an ordinary column name even under the gate.
-    let parsed =
-        parse_with("SELECT struct", STRUCT_CONSTRUCTOR_DIALECT).expect("bare struct is a column");
+    let parsed = parse_with(
+        "SELECT struct",
+        crate::ParseConfig::new(STRUCT_CONSTRUCTOR_DIALECT),
+    )
+    .expect("bare struct is a column");
     assert_eq!(column_name(&parsed, project_expr(&parsed)), "struct");
 }
 
@@ -9000,21 +9942,30 @@ fn struct_call_stays_an_ordinary_function_without_the_gate() {
     // (PostgreSQL keeps `struct(...)` an ordinary catalog-function call), the gate-off
     // parse is byte-for-byte the plain call path — never a struct constructor.
     for sql in ["SELECT struct(1, 2)", "SELECT STRUCT(x, y)"] {
-        let parsed = parse_with(sql, Postgres).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
         assert!(
             matches!(project_expr(&parsed), Expr::Function { .. }),
             "{sql} must stay an ordinary Expr::Function under PostgreSQL",
         );
     }
     // ANSI too: the baseline keeps the call reading.
-    let parsed = parse_with("SELECT struct(1)", TestDialect).expect("ANSI call parses");
+    let parsed = parse_with("SELECT struct(1)", crate::ParseConfig::new(TestDialect))
+        .expect("ANSI call parses");
     assert!(matches!(project_expr(&parsed), Expr::Function { .. }));
 
     // The typed form has no gate-off reading: `STRUCT<a INT64>(1)` under PostgreSQL is
     // the comparison `struct < a`, whose right side `a INT64` is the usual parse error.
-    assert!(parse_with("SELECT STRUCT<a INT64>(1)", Postgres).is_err());
+    assert!(
+        parse_with(
+            "SELECT STRUCT<a INT64>(1)",
+            crate::ParseConfig::new(Postgres)
+        )
+        .is_err()
+    );
     // And `struct < x` stays an ordinary comparison when the gate is off.
-    let parsed = parse_with("SELECT struct < x", Postgres).expect("comparison parses");
+    let parsed = parse_with("SELECT struct < x", crate::ParseConfig::new(Postgres))
+        .expect("comparison parses");
     assert!(matches!(
         project_expr(&parsed),
         Expr::BinaryOp {
@@ -9028,11 +9979,13 @@ fn struct_call_stays_an_ordinary_function_without_the_gate() {
 fn struct_constructor_is_on_for_the_bigquery_preset() {
     use crate::dialect::BigQuery;
     let sql = "SELECT STRUCT(1 AS a)";
-    let parsed = parse_with(sql, BigQuery).expect("the BigQuery preset admits STRUCT(...)");
+    let parsed = parse_with(sql, crate::ParseConfig::new(BigQuery))
+        .expect("the BigQuery preset admits STRUCT(...)");
     let ctor = project_struct_constructor(&parsed, sql);
     assert_eq!(ctor.args.len(), 1);
     let typed = "SELECT STRUCT<a INT64>(1)";
-    let parsed = parse_with(typed, BigQuery).expect("the BigQuery preset admits STRUCT<...>()");
+    let parsed = parse_with(typed, crate::ParseConfig::new(BigQuery))
+        .expect("the BigQuery preset admits STRUCT<...>()");
     assert_eq!(project_struct_constructor(&parsed, typed).fields.len(), 1);
 }
 
@@ -9044,10 +9997,12 @@ fn list_comprehension_single_and_multi_var_parse_under_duckdb() {
 
     // Single-var form (already supported surface).
     let sql = "SELECT [x * 2 FOR x IN [1, 2, 3]]";
-    let parsed = parse_with(sql, DuckDb).expect("single-var comprehension");
+    let parsed =
+        parse_with(sql, crate::ParseConfig::new(DuckDb)).expect("single-var comprehension");
     // Multi-var value+index — the tranche-2 gap (engine-accept on 1.5.4).
     let multi = "SELECT [x + i FOR x, i IN [10, 9, 8]]";
-    let parsed_multi = parse_with(multi, DuckDb).expect("multi-var comprehension");
+    let parsed_multi =
+        parse_with(multi, crate::ParseConfig::new(DuckDb)).expect("multi-var comprehension");
     // Extract comprehension from SELECT projection
     fn first_array(parsed: &crate::parser::Parsed) -> &ArrayExpr {
         use crate::ast::{SelectItem, SetExpr, Statement};
@@ -9084,19 +10039,24 @@ fn list_comprehension_single_and_multi_var_parse_under_duckdb() {
     .render_parsed(&parsed_multi)
     .expect("render");
     // Keywords fold to lower-case on render; structural reparse is the fidelity check.
-    parse_with(&rendered, DuckDb).expect("reparse rendered multi-var comprehension");
+    parse_with(&rendered, crate::ParseConfig::new(DuckDb))
+        .expect("reparse rendered multi-var comprehension");
     assert!(
         rendered.eq_ignore_ascii_case(multi),
         "rendered {rendered:?} should match {multi:?} ignoring keyword case"
     );
     // Gate: ANSI has no collection_literals → reject
-    parse_with(multi, Ansi).expect_err("ANSI rejects list comprehensions");
+    parse_with(multi, crate::ParseConfig::new(Ansi)).expect_err("ANSI rejects list comprehensions");
     // Filter form still works
-    parse_with("SELECT [x FOR x IN [1, 2, 3] IF x > 1]", DuckDb).expect("filter form");
+    parse_with(
+        "SELECT [x FOR x IN [1, 2, 3] IF x > 1]",
+        crate::ParseConfig::new(DuckDb),
+    )
+    .expect("filter form");
     // Nested / multi-var with filter from corpus
     parse_with(
         "WITH base AS (SELECT [4, 5, 6] AS l) SELECT [x FOR x, i IN l IF i != 2] AS filtered FROM base",
-        DuckDb,
+        crate::ParseConfig::new(DuckDb),
     )
     .expect("corpus multi-var with filter");
 }

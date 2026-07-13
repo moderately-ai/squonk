@@ -14,7 +14,7 @@ The focused packages contain ANSI plus their named dialect and default to the na
 
 ## Runtime contract
 
-Bare package imports target Node 22+ ESM and initialize their colocated artifact synchronously. Consumers call `parse()` directly; `init()` and `defaultWasmUrl` are not public.
+Bare package imports use ordered conditional exports. Node 22+ and Bun prefer an ABI-stable Node-API addon and synchronously fall back to colocated WASM when the platform package is absent or addons are disabled. Deno imports wasm-bindgen's module-target output without read or FFI permission. Wrangler/workerd and edge-light bundlers receive static WebAssembly modules. Consumers call `parse()` directly; `init()` and `defaultWasmUrl` are not public.
 
 Browser consumers import `<package>/browser` and await `createSquonk()`. The optional `{ wasm }` input supports custom URLs, responses, bytes, promises, and precompiled modules. Concurrent calls coalesce, a failed load can be retried, and the first successful source owns the package runtime.
 
@@ -33,19 +33,21 @@ npm run smoke:variants
 npm run size:check:tarball
 npm run pack:check
 npm run smoke:install
+npm run smoke:runtimes
+npm run smoke:workerd
 ```
 
-`npm run build` stages exact, dependency-free package trees in `dist/npm/<label>`. Each tree contains one WASM artifact, the matching Node and browser entrypoints, the shared typed runtime, generated AST declarations, README, license, and manifest.
+`npm run build` stages exact facade and platform-package trees in `dist/npm/<label>`. Facades contain browser/edge WASM, Deno module-target WASM, conditional runtime entrypoints, the shared typed runtime, generated AST declarations, README, license, and manifest. Eight script-free optional platform packages contain one Node-API addon each; there is no install-time compilation or download.
 
-Size ceilings are per package. Raw and gzip WASM sizes plus packed and unpacked tarball sizes have 10% measured headroom; the 18-entry package inventory is exact.
+Size ceilings are per facade package. Raw and gzip browser-WASM sizes plus packed and unpacked tarball sizes have 10% measured headroom; the 35-entry facade inventory is exact.
 
 ## Release
 
-All seven packages trust the `moderately-ai/squonk` GitHub repository,
-`release-npm.yml` workflow, and protected `npm` environment. Publishing uses npm OIDC;
-there is no npm token in GitHub.
+Every facade and platform package must trust the `moderately-ai/squonk` GitHub repository,
+`release-npm.yml` workflow, and protected `npm` environment. Publishing uses npm OIDC after
+each package's one-time registry bootstrap; no install or runtime token ships in an artifact.
 
-The release workflow builds and verifies every package before uploading one immutable artifact containing all staged trees. The protected publish job enables publishing only in those ephemeral manifests, repeats every dry-run, then publishes focused packages first and `squonk` last.
+The release workflow builds and verifies every package before uploading one immutable artifact containing all staged trees. The protected publish job enables publishing only in those ephemeral manifests, repeats every dry-run, publishes platform packages first, then focused facades and `squonk` last.
 
 Publishing is resumable. If an exact version already exists, its registry integrity must match the verified local tarball or the job stops. npm attaches signed provenance to every new package version.
 
@@ -53,4 +55,4 @@ No local implementation or rehearsal command publishes externally. A real workfl
 
 ## Post-publish smoke
 
-Install at least one focused package and the umbrella in clean Node 22 and Node 24 projects, import without initialization, and exercise parse, format, recovery, and dialect metadata. Run the browser example against packed or published artifacts and verify default loading plus a custom WASM URL.
+Install at least one focused package and the umbrella in clean Node 22 and Node 24 projects, test ESM and CommonJS, repeat under `--no-addons`, and exercise parse, format, recovery, dialect metadata, and `runtimeInfo()`. Packed-install gates also execute Bun, permissionless Deno, and a live Wrangler/workerd request. Run the browser example against packed or published artifacts and verify default loading plus a custom WASM URL.

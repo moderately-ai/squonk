@@ -41,13 +41,13 @@ pub(crate) enum Roundtrip {
 /// use ([`render_statements`](crate::render_statements) and the shared-interner
 /// structural comparison). Returns at the first diverging mode.
 pub(crate) fn roundtrip<D: Dialect<Ext = NoExt> + Copy>(sql: &str, dialect: D) -> Roundtrip {
-    let parsed = match parse_with(sql, dialect) {
+    let parsed = match parse_with(sql, squonk::ParseConfig::new(dialect)) {
         Ok(parsed) => parsed,
         Err(_) => return Roundtrip::Unparsable,
     };
     for mode in [RenderMode::Canonical, RenderMode::Parenthesized] {
         let rendered = crate::render_statements(&parsed, mode);
-        let reparsed = match parse_with(&rendered, dialect) {
+        let reparsed = match parse_with(&rendered, squonk::ParseConfig::new(dialect)) {
             Ok(reparsed) => reparsed,
             Err(err) => {
                 return Roundtrip::Failed(format!(

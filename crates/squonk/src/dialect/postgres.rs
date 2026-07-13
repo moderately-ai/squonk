@@ -15,7 +15,7 @@ use crate::render::RenderDialect;
 
 /// The PostgreSQL dialect for M1 ([`FeatureSet::POSTGRES`]).
 ///
-/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, Postgres)`.
+/// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Postgres))`.
 /// In the M1 surface it differs from [`Ansi`](super::Ansi) in
 /// [`identifier_casing`](FeatureSet::identifier_casing) (lower- vs upper-folding
 /// for unquoted-identifier *identity*) and in
@@ -95,8 +95,10 @@ mod tests {
             parsed.statements()[0].displayed(&ctx).to_string()
         };
 
-        let ansi = parse_with(REPRESENTATIVE, Ansi).expect("parses under ANSI");
-        let postgres = parse_with(REPRESENTATIVE, Postgres).expect("parses under PostgreSQL");
+        let ansi =
+            parse_with(REPRESENTATIVE, crate::ParseConfig::new(Ansi)).expect("parses under ANSI");
+        let postgres = parse_with(REPRESENTATIVE, crate::ParseConfig::new(Postgres))
+            .expect("parses under PostgreSQL");
 
         assert_eq!(
             render(&ansi),
@@ -119,9 +121,12 @@ mod tests {
             "SELECT a FROM t LIMIT 5, 10", // comma form: the `,` is trailing input
             "SELECT `c` FROM t",           // backtick identifiers do not lex
         ] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects {sql:?}"
             );
         }
@@ -144,7 +149,8 @@ mod tests {
 
         assert!(!Postgres.features().string_literals.national_strings);
 
-        let parsed = parse_with("SELECT N'x'", Postgres).expect("parses under PostgreSQL");
+        let parsed = parse_with("SELECT N'x'", crate::ParseConfig::new(Postgres))
+            .expect("parses under PostgreSQL");
         let Statement::Query { query, .. } = &parsed.statements()[0] else {
             panic!("expected a query statement");
         };
@@ -168,7 +174,7 @@ mod tests {
 
         // The DO-arg residual this flip closes: `nchar` is a legal language name to
         // PostgreSQL because `N'p'` is `N` + `'p'`, never one rejected national token.
-        assert!(parse_with("DO LANGUAGE N'p'", Postgres).is_ok());
+        assert!(parse_with("DO LANGUAGE N'p'", crate::ParseConfig::new(Postgres)).is_ok());
     }
 
     #[test]
@@ -184,9 +190,12 @@ mod tests {
             "SELECT 2 ^ 3",   // exponentiation
             "SELECT @ b",     // prefix absolute value
         ] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
             assert!(
-                parse_with(sql, Postgres).is_ok(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
                 "PostgreSQL accepts {sql:?}"
             );
         }
@@ -223,9 +232,12 @@ mod tests {
             "CREATE TABLE t (c ENUM('a', 'b'))",
             "CREATE TABLE t (c SET('a', 'b'))",
         ] {
-            assert!(parse_with(sql, Ansi).is_err(), "ANSI rejects {sql:?}");
             assert!(
-                parse_with(sql, Postgres).is_err(),
+                parse_with(sql, crate::ParseConfig::new(Ansi)).is_err(),
+                "ANSI rejects {sql:?}"
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
                 "PostgreSQL rejects {sql:?}",
             );
         }

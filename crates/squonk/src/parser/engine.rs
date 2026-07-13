@@ -25,7 +25,7 @@ use super::clause_marks::{ClauseKw, ClauseMark, ClauseMarkIndex};
 /// Deeply nested untrusted SQL is a denial-of-service vector: unbounded recursive
 /// descent overflows the stack and aborts the process. The recursion guard rejects
 /// such input with a clean [`ParseError`] instead, and this is the depth it trips
-/// at unless [`Parser::with_recursion_limit`] overrides it.
+/// at unless [`Parser::recursion_limit`] overrides it.
 ///
 /// The value is chosen for generous headroom below the empirically measured crash
 /// depths: the from-scratch stress spike overflowed an 8 MB stack at ~721 nested
@@ -39,8 +39,8 @@ use super::clause_marks::{ClauseKw, ClauseMark, ClauseMarkIndex};
 /// `sqlparser-rs` (default 50) with the extra headroom our higher measured crash
 /// points allow. A deployment that parses untrusted SQL on threads smaller than
 /// 2 MiB should lower the limit, and machine-generated deeply nested SQL on a large
-/// stack can raise it, via [`Parser::with_recursion_limit`] or
-/// [`ParseOptions`](super::ParseOptions).
+/// stack can raise it, via [`Parser::recursion_limit`] or
+/// [`ParseConfig`](super::ParseConfig).
 pub const DEFAULT_RECURSION_LIMIT: usize = 128;
 
 /// A saved cursor position for speculative parsing.
@@ -92,10 +92,10 @@ pub struct Parser<'a, D: Dialect> {
     /// The depth at which [`enter_recursion`](Self::enter_recursion) refuses to go
     /// deeper and returns a clean error instead of overflowing the stack. Defaults
     /// to [`DEFAULT_RECURSION_LIMIT`]; override with
-    /// [`with_recursion_limit`](Self::with_recursion_limit).
+    /// [`recursion_limit`](Self::recursion_limit).
     recursion_limit: usize,
     /// Off-by-default consumer request (the parser's
-    /// [`ParseOptions::parse_float_as_decimal`](crate::parser::ParseOptions::parse_float_as_decimal)):
+    /// [`ParseConfig::parse_float_as_decimal`](crate::parser::ParseConfig::parse_float_as_decimal)):
     /// when set, a fractional/scientific numeric literal is classified
     /// [`LiteralKind::Decimal`](crate::ast::LiteralKind::Decimal) rather than
     /// [`LiteralKind::Float`](crate::ast::LiteralKind::Float), the sole effect the flag
@@ -153,7 +153,7 @@ pub struct Parser<'a, D: Dialect> {
     /// ([`parse_query`](Self::parse_query)), so a scalar subquery inside the condition
     /// reads its own `PRIOR` as a plain identifier.
     pub(in crate::parser) in_connect_by: bool,
-    /// Off-by-default opt-in mirroring [`ParseOptions::capture_trivia`](crate::parser::ParseOptions):
+    /// Off-by-default opt-in mirroring [`ParseConfig::capture_trivia`](crate::parser::ParseConfig):
     /// when set, each clause-introducing keyword (`WHERE`/`FROM`/`GROUP BY`/…) is
     /// recorded into [`clause_marks`](Self::clause_marks) as the parser eats it. The
     /// gate is a single cold branch read at each clause site (the field is already
@@ -281,9 +281,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// Set the recursive-descent depth limit, consuming and returning the parser.
     ///
     // Builder convention (uniform across the crate's `by value -> Self` builders —
-    // `ParseOptions::with_*`, these `Parser::with_*`, and `Renderer::{new,with_config}`):
+    // `ParseConfig::with_*`, these `Parser::with_*`, and `Renderer::{new,with_config}`):
     // every consuming builder carries `#[must_use]`, because it returns a configured value
-    // rather than mutating in place, so discarding the result (`parser.with_recursion_limit(5);`)
+    // rather than mutating in place, so discarding the result (`parser.recursion_limit(5);`)
     // silently no-ops. This targets that build-and-discard hazard only; plain getters stay
     // unmarked (per the clippy `must_use_candidate` consensus — no blanket getter spray).
     /// The limit is the maximum number of nested recursive-descent entries (nested
@@ -294,7 +294,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// [`DEFAULT_RECURSION_LIMIT`] for how the default is chosen; lower it on small
     /// stacks, raise it for deeply nested machine-generated SQL on large stacks.
     #[must_use]
-    pub fn with_recursion_limit(mut self, limit: usize) -> Self {
+    pub fn recursion_limit(mut self, limit: usize) -> Self {
         self.recursion_limit = limit;
         self
     }
@@ -306,9 +306,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// [`LiteralKind::Decimal`](crate::ast::LiteralKind::Decimal) rather than
     /// [`LiteralKind::Float`](crate::ast::LiteralKind::Float); every other classification
     /// (integer, radix integer, money) and the source spelling are unchanged. Off by
-    /// default. Backs [`ParseOptions::parse_float_as_decimal`](crate::parser::ParseOptions::parse_float_as_decimal).
+    /// default. Backs [`ParseConfig::parse_float_as_decimal`](crate::parser::ParseConfig::parse_float_as_decimal).
     #[must_use]
-    pub fn with_parse_float_as_decimal(mut self, enabled: bool) -> Self {
+    pub fn parse_float_as_decimal(mut self, enabled: bool) -> Self {
         self.parse_float_as_decimal = enabled;
         self
     }
@@ -316,7 +316,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// Whether floating numeric literals are being classified as
     /// [`LiteralKind::Decimal`](crate::ast::LiteralKind::Decimal); read at each numeric
     /// literal classification site.
-    pub(in crate::parser) fn parse_float_as_decimal(&self) -> bool {
+    pub(in crate::parser) fn float_as_decimal_enabled(&self) -> bool {
         self.parse_float_as_decimal
     }
 
@@ -325,7 +325,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// When `enabled`, each clause-introducing keyword is recorded into the
     /// [`ClauseMarkIndex`] the root carries, drained by
     /// [`take_clause_marks`](Self::take_clause_marks). Off by default; enabled on the
-    /// same opt-in path as trivia capture (see the crate's `parse_with_trivia`).
+    /// same opt-in path as [`ParseConfig::capture_trivia`](super::ParseConfig::capture_trivia).
     pub(crate) fn with_clause_mark_capture(mut self, enabled: bool) -> Self {
         self.capture_clause_marks = enabled;
         self
@@ -610,7 +610,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     // --- Recursion guard ---------------------------------------------------
 
     /// Enter one level of recursive descent, or fail cleanly if that would exceed
-    /// the [recursion limit](Self::with_recursion_limit) (DoS-safety).
+    /// the [recursion limit](Self::recursion_limit) (DoS-safety).
     ///
     /// Returns an RAII [`RecursionGuard`] that has *already* bumped the depth;
     /// dropping it restores the depth, so every exit path — a normal return, a `?`
@@ -745,7 +745,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// Empty unless the parser was built with
     /// [`streaming_with_trivia`](Self::streaming_with_trivia). Taken by `&mut`
     /// before [`finish`](Self::finish) (which consumes the parser) so a
-    /// `parse_with_trivia` root can carry both the resolver and the trivia.
+    /// trivia-capturing parse root can carry both the resolver and the trivia.
     pub(crate) fn take_trivia(&mut self) -> TriviaIndex {
         self.cursor.take_trivia()
     }
