@@ -27,7 +27,7 @@ The suite uses one direct alternative in each shipped language ecosystem:
 | --- | --- | --- | --- |
 | Rust | `squonk` with `Ansi` | `datafusion-sqlparser-rs` with `AnsiDialect` | Native owned AST returned by each Rust library |
 | Python | `squonk` built from the recorded commit | `sqlglot==30.12.0` | Candidate wheel returns its public Python document/AST |
-| Node | `@squonk-sql/ansi` built from the recorded commit | `node-sql-parser==5.4.0` | Generated candidate entrypoint returns its public JavaScript document/AST |
+| Node | Squonk native facade built from the recorded commit | `node-sql-parser==5.4.0` | Generated candidate facade returns its public JavaScript document/AST |
 
 `node-sql-parser` has no ANSI mode, so it uses its MySQL grammar. This does not change the
 workload: all statements were frozen first and independently accepted by MySQL as well as
@@ -247,8 +247,10 @@ python3 bench/plot_performance.py
 python3 -m unittest bench.publication.test_publication
 ```
 
-The runner builds the Rust adapter, Python wheel, Node-API addon, and generated TypeScript
-entrypoint from the exact recorded source commit. It installs the pinned peer versions,
+The runner builds the Rust adapter, Python wheel, and Node-API addon from the exact recorded
+source commit. The Node adapter uses the checked-in generated TypeScript facade directly
+over that addon, preserving the public parse/document path without requiring unrelated
+browser Wasm artifacts. It installs the pinned peer versions,
 fixes CPU affinity, and writes the complete raw result. This release-candidate procedure
 avoids benchmarking an older registry artifact while a new version is being prepared. The
 registry artifacts are built from the same source after the release gate; rerun the suite

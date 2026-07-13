@@ -3,13 +3,17 @@
 
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import process from "node:process";
 import readline from "node:readline/promises";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
+import { createSquonkApi } from "../../crates/squonk-wasm/js/runtime.js";
+
 const HERE = new URL("./", import.meta.url);
 const DEFAULT_CORPUS = new URL("./corpus/portable.json", HERE);
+const require = createRequire(import.meta.url);
 
 function args() {
   const values = { mode: process.argv[2], tool: null, count: 0, corpus: DEFAULT_CORPUS };
@@ -30,9 +34,15 @@ async function loadCorpus(url) {
 
 async function adapter(tool) {
   if (tool === "squonk") {
-    // Exercise the exact checked-out release candidate. `run_on_builder.sh`
-    // builds this generated entrypoint and its native addon before measurement.
-    const module = await import("../../crates/squonk-wasm/js/ansi.js");
+    // Exercise the exact checked-out generated facade over the freshly built
+    // Node-API addon. This avoids requiring browser Wasm artifacts for a native
+    // benchmark while preserving the public parse/document implementation.
+    const bindings = require("../../crates/squonk-wasm/native/squonk.node");
+    const module = createSquonkApi(bindings, {
+      defaultDialect: "ansi",
+      supportedDialects: ["ansi"],
+      runtime: { backend: "native", host: "node" },
+    });
     return {
       version: module.version(),
       parse: (sql) => module.parse(sql),
