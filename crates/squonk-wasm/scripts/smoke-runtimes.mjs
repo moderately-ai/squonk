@@ -10,6 +10,10 @@ import { fileURLToPath } from "node:url";
 import { currentNativePackage } from "./native-package-matrix.mjs";
 
 const crateDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const requestedRuntime = process.argv[2];
+if (requestedRuntime && !["bun", "deno"].includes(requestedRuntime)) {
+  throw new Error(`unknown runtime ${JSON.stringify(requestedRuntime)}`);
+}
 const packageDir = join(crateDir, "dist", "npm", "sqlite");
 const facadeTarball = pack(packageDir);
 const native = currentNativePackage();
@@ -34,10 +38,16 @@ assert.equal(runtimeInfo().backend, expected);
 console.log(JSON.stringify(runtimeInfo()));
 `);
 
-  if (available("bun")) run("bun", ["run", "smoke.mjs"], workDir);
-  else console.log("skip Bun (not installed)");
-  if (available("deno")) run("deno", ["run", "--node-modules-dir=manual", "smoke.mjs"], workDir);
-  else console.log("skip Deno (not installed)");
+  if (!requestedRuntime || requestedRuntime === "bun") {
+    if (available("bun")) run("bun", ["run", "smoke.mjs"], workDir);
+    else if (requestedRuntime) throw new Error("Bun is not installed");
+    else console.log("skip Bun (not installed)");
+  }
+  if (!requestedRuntime || requestedRuntime === "deno") {
+    if (available("deno")) run("deno", ["run", "--node-modules-dir=manual", "smoke.mjs"], workDir);
+    else if (requestedRuntime) throw new Error("Deno is not installed");
+    else console.log("skip Deno (not installed)");
+  }
 } finally {
   rmSync(workDir, { force: true, recursive: true });
   rmSync(facadeTarball, { force: true });

@@ -43,6 +43,7 @@ jobs:
   soak:
     name: fuzz ${{ matrix.target }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       # Fuzz every target even when one crashes: each gets its own runner, budget,
       # and crash artifact, so one failing target never masks another.
@@ -103,7 +104,7 @@ jobs:
       DUCKDB_VERSION: "1.5.4"
     steps:
       - name: Check out
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install nightly toolchain
         # libFuzzer requires nightly; the crates themselves stay on stable
@@ -133,7 +134,7 @@ jobs:
 
       - name: Install cargo-fuzz
         # Prebuilt binary instead of a from-source `cargo install` compile (minutes on
-        # each of the 4 matrix runners). install-action has no native manifest for
+        # each matrix runner). install-action has no native manifest for
         # cargo-fuzz, so it fetches the prebuilt release binary via its cargo-binstall
         # fallback — still no compile. It also sidesteps the old `cargo +nightly install`
         # dance whose only purpose was to keep rust-toolchain.toml from pulling a second
@@ -142,6 +143,7 @@ jobs:
         uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
         with:
           tool: cargo-fuzz@0.13.2
+          fallback: none
 
       - name: Install libduckdb
         # Only the oracle-engines entries (sqlite/duckdb differentials) link libduckdb;
@@ -220,7 +222,7 @@ jobs:
         # can shrink and commit it per the instructions above. `if-no-files-found:
         # ignore` keeps non-crash failures (e.g. a build error) from erroring here.
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-crash-${{ matrix.target }}
           path: conformance/fuzz/artifacts/

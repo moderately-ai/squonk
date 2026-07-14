@@ -25,7 +25,7 @@ Promotion between tiers is a release-notes-worthy change and requires the higher
 | Python wheel | Linux / macOS / Windows pyo3 boundary | `ubuntu-latest` / `macos-latest` / `windows-latest` | compile-verified here; wheel tier owned by the distribution workflow | `cargo check -p squonk-python` (extension-module boundary compiles) | `ci.yml` (Linux, via preflight binding lane) + `platform.yml` (macOS/Windows) |
 | npm bindings | Node-API 8 on macOS/Linux/Windows x64+arm64; `wasm32-unknown-unknown` on Node 22+, Bun, Deno, browsers, and Workers | native OS/architecture runners + `ubuntu-24.04` | 1 — built and packaged | eight native packages; eight facade packages; Node/Bun/Deno/workerd/browser smokes | `release-npm.yml` |
 
-"Core crates" in the checks above means `squonk`, `squonk-ast`, `squonk-sourcegen`, and `squonk-wasm` (its native mirror; the `#[wasm_bindgen]` layer is `cfg(target_arch = "wasm32")`-gated, so a native build never needs a wasm toolchain). The conformance, bench, and oracle crates are excluded from the cross-OS lanes because they need a system `libduckdb` and a MySQL server, which stay nightly-only on Linux (`oracle-nightly.yml`).
+"Core crates" in the checks above means `squonk`, `squonk-ast`, `squonk-sourcegen`, `squonk-node`, and `squonk-wasm` (its native mirror; the `#[wasm_bindgen]` layer is `cfg(target_arch = "wasm32")`-gated, so a native build never needs a wasm toolchain). The conformance, bench, and oracle crates are excluded from the cross-OS lanes because they need a system `libduckdb` and a MySQL server, which stay nightly-only on Linux (`oracle-nightly.yml`).
 
 ### Why the size assertions are portable
 
@@ -41,7 +41,7 @@ The wasm32 target is compile-verified as the focused ANSI shape and the all-14-d
 
 ## Windows: Tier 1 (tested)
 
-Windows x86_64 runs the full core-crate test suite on every landing. The `cross-os` job in `platform.yml` matrixes over `[macos-latest, windows-latest]`, so Windows and macOS run the identical lane — `cargo nextest run -p squonk -p squonk-ast -p squonk-sourcegen -p squonk-wasm` — followed by a per-OS `cargo check -p squonk-python` that compile-checks the pyo3 extension boundary, where platform-specific linking bites. The 64-bit size assertions run and pass here (they are `target_pointer_width`-gated, not architecture-gated).
+Windows x86_64 runs the full core-crate test suite on every landing. The `cross-os` job in `platform.yml` matrixes over operating system and task, so each macOS/Windows core test and pyo3 compile check has an independent runner. The 64-bit size assertions run and pass in the core-test lanes (they are `target_pointer_width`-gated, not architecture-gated).
 
 The conformance, bench, and oracle crates are excluded from this lane, exactly as on the macOS lane: they need a build-time `libduckdb` and a running MySQL server, so no oracle engine is compiled or skipped cross-OS. That differential coverage stays nightly-only on Linux (`oracle-nightly.yml`), which keeps the cross-OS runners free of a C toolchain and a database service.
 
@@ -55,7 +55,7 @@ Two Windows-specific test hazards that a nextest lane would otherwise trip are h
 Two workflows enforce this matrix:
 
 - **`ci.yml`** — the lean everyday gate on `ubuntu-latest` (runner cost multiplier 1×), on every push to `main` and every PR. It is the single source of Tier 1 Linux coverage and, through the preflight binding lane, the Linux pyo3 boundary check.
-- **`platform.yml`** — the cross-platform matrix. Its cheap `wasm32` job runs on `ubuntu-latest` on every push/PR (the wasm-only code path is worth catching per-PR at 1× cost). Its expensive cross-OS job (`macos-latest` at 10×, `windows-latest` at 2×) is skipped on pull requests and runs on push to `main` (every landing), a weekly schedule (a backstop against toolchain drift with no intervening landing), and manual dispatch.
+- **`platform.yml`** — the cross-platform matrices. Its two cheap `wasm32` feature-shape jobs run on `ubuntu-latest` on every push/PR (the wasm-only code path is worth catching per-PR at 1× cost). Its cross-OS matrix gives the core tests and pyo3 compile check separate macOS and Windows runners; those expensive lanes (`macos-latest` at 10×, `windows-latest` at 2×) are skipped on pull requests and run on push to `main` (every landing), a weekly schedule (a backstop against toolchain drift with no intervening landing), and manual dispatch.
 
 The cadence split is a deliberate cost decision: paying the 10× macOS multiplier on every push of every PR iteration is not justified when the lean Linux gate already covers the common case and cross-OS regressions are caught at merge to `main`. This mirrors the repo's existing separation of everyday gates (`ci.yml`) from the heavier nightly soaks (`fuzz-nightly.yml`, `oracle-nightly.yml`).
 

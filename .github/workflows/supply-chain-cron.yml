@@ -38,9 +38,10 @@ jobs:
   deny:
     name: cargo deny check (scheduled)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Check out
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install stable toolchain
         # `cargo deny` shells out to `cargo metadata`, which needs a toolchain.
@@ -54,6 +55,7 @@ jobs:
         uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
         with:
           tool: cargo-deny@0.19.6
+          fallback: none
 
       - name: Whole-graph supply-chain audit (cargo deny check)
         run: cargo deny check

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Moderately AI Inc.
 
-# Cross-platform support matrix. `ci.yml` gates the everyday stack on a single
-# `ubuntu-latest` runner; this workflow enforces the platform tiers documented in
+# Cross-platform support matrix. `ci.yml` gates the everyday stack on independent
+# `ubuntu-latest` runners; this workflow enforces the platform tiers documented in
 # `docs/platform-support.md` on the targets that runner cannot cover. Every job here
 # is the cheapest representative check for one promised tier — nothing runs a full
 # stack it does not need to.
@@ -24,15 +24,16 @@
 #             pull_request (`if` below) and runs only on push to `main` (every
 #             landing), the weekly backstop, and manual dispatch — the lean Linux gate
 #             in `ci.yml` covers per-PR iteration, and a cross-OS regression is caught
-#             at merge. Both OSes run the same `cargo nextest` suite: the two former
+#             at merge. Each OS gets independent core-test and pyo3 compile-check
+#             runners. The two former
 #             Windows test hazards (canonicalize UNC prefix, CRLF drift — see the
 #             "Windows" section of `docs/platform-support.md`) are now handled by the
 #             repo `.gitattributes` (`* text=auto eol=lf`) and the UNC/CRLF-aware
 #             sourcegen tests, so a nextest lane runs clean on Windows. This lane is the
 #             prerequisite for promoting Windows to Tier 1 in `docs/platform-support.md`;
 #             that doc flip lands as a follow-up once this lane is confirmed green on a
-#             dispatch run (the tier is never advertised ahead of a green lane). Both
-#             additionally compile-check the pyo3 extension boundary; the wheel
+#             dispatch run (the tier is never advertised ahead of a green lane). The
+#             separate pyo3 lanes compile-check the extension boundary; the wheel
 #             build/install smoke stays in `stable-release-python-distribution`.
 #
 # The core crates are `squonk`, `squonk-ast`, `squonk-sourcegen`, and
@@ -71,11 +72,18 @@ concurrency:
 
 jobs:
   wasm:
-    name: wasm32 compile check (npm surface)
+    name: wasm32 ${{ matrix.surface }} compile check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - surface: ansi
+          - surface: all-dialects
     steps:
       - name: Check out
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install stable toolchain (+ wasm32 target)
         # rust-toolchain.toml pins `stable`; installed explicitly like the other
@@ -86,45 +94,66 @@ jobs:
 
       - name: Cache build artifacts
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: wasm32-${{ matrix.surface }}
+          cache-bin: false
 
-      - name: Compile-check wasm32 (ANSI default)
-        # The focused ANSI package shape. Exercises the wasm-only
-        # `#[wasm_bindgen]` boundary a native build never compiles.
+      - name: Compile-check focused ANSI surface
+        if: matrix.surface == 'ansi'
         run: cargo check --target wasm32-unknown-unknown -p squonk-wasm
 
-      - name: Compile-check wasm32 (full surface)
-        # Every built-in dialect — the largest feature shape,
-        # so feature-gated wasm code cannot rot unnoticed.
+      - name: Compile-check all dialects
+        if: matrix.surface == 'all-dialects'
         run: cargo check --target wasm32-unknown-unknown -p squonk-wasm --features dialects-full
+
+  wasm-success:
+    name: wasm32 compile check (npm surface)
+    if: always()
+    needs: wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Assert every wasm surface succeeded
+        env:
+          RESULT: ${{ needs.wasm.result }}
+        run: test "$RESULT" = success
 
   cross-os:
     # Expensive runners (macOS 10x, Windows 2x): skip per-PR, run on every landing to
     # `main`, the weekly backstop, and manual dispatch. The per-PR gate is `ci.yml`.
     if: ${{ github.event_name != 'pull_request' }}
-    name: ${{ matrix.os }} core crates (tested)
+    name: ${{ matrix.os }} ${{ matrix.task }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       # Independent OS failure domains: a Windows break must not hide a macOS break.
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
+        task: [core-tests, python-check]
     steps:
       - name: Check out
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
 
       - name: Cache build artifacts
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: platform-${{ matrix.task }}
+          cache-bin: false
 
       - name: Install cargo-nextest
+        if: matrix.task == 'core-tests'
         # Pinned to the same version as `ci.yml`/`oracle-nightly.yml`.
         uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
         with:
           tool: cargo-nextest@0.9.140
+          fallback: none
 
       - name: Test core crates
+        if: matrix.task == 'core-tests'
         # macOS aarch64 and Windows x86_64: the full behaviour suite for the portable
         # core crates. Excludes conformance/bench/oracle (system-dep-gated: they need a
         # build-time libduckdb and a MySQL server, so no oracle engine is compiled or
@@ -132,6 +161,7 @@ jobs:
         run: cargo nextest run -p squonk -p squonk-ast -p squonk-sourcegen -p squonk-node -p squonk-wasm
 
       - name: Compile-check Python extension boundary (pyo3)
+        if: matrix.task == 'python-check'
         # Both OSes: the pyo3 binding is where platform-specific linking bites, so its
         # boundary is compile-checked per OS. `cargo check` runs the pyo3 build script
         # (which locates the runner's preinstalled Python) but performs no final

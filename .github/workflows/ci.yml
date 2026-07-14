@@ -5,10 +5,10 @@
 # supply-chain contracts.
 #
 # ADR-0017 ("checks are local-runnable, not CI-coupled"): every gate here is a
-# command a contributor can run locally. CI fans `cargo xtask preflight` into
-# independent hygiene, Clippy, nextest, and rustdoc lanes; the unfiltered command
-# remains the complete local release gate. Engine-backed oracle and benchmark
-# lanes retain their dedicated workflows and environments.
+# command a contributor can run locally. CI gives every `cargo xtask preflight`
+# step an independent runner; the unfiltered command remains the complete local
+# release gate. Engine-backed oracle and benchmark lanes retain their dedicated
+# workflows and environments.
 
 name: ci
 
@@ -38,17 +38,41 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - lane: hygiene
-            steps: fmt,tidy
+          - lane: fmt
+            steps: fmt
             nextest: false
-          - lane: clippy
-            steps: clippy-default,clippy-bindings,clippy-conformance
+          - lane: tidy
+            steps: tidy
             nextest: false
-          - lane: nextest
-            steps: nextest-default,nextest-bindings,nextest-schema,nextest-conformance
+          - lane: clippy-default
+            steps: clippy-default
+            nextest: false
+          - lane: clippy-bindings
+            steps: clippy-bindings
+            nextest: false
+          - lane: clippy-conformance
+            steps: clippy-conformance
+            nextest: false
+          - lane: nextest-default
+            steps: nextest-default
             nextest: true
-          - lane: rustdoc
-            steps: doc-default,doc-conformance,doc-all-features
+          - lane: nextest-bindings
+            steps: nextest-bindings
+            nextest: true
+          - lane: nextest-schema
+            steps: nextest-schema
+            nextest: true
+          - lane: nextest-conformance
+            steps: nextest-conformance
+            nextest: true
+          - lane: doc-default
+            steps: doc-default
+            nextest: false
+          - lane: doc-conformance
+            steps: doc-conformance
+            nextest: false
+          - lane: doc-all-features
+            steps: doc-all-features
             nextest: false
     steps:
       - name: Check out
@@ -189,14 +213,14 @@ jobs:
     # `all(.result == "success")` conclusion-job pattern.
     #
     # Scope note: `needs` is within-workflow only, so this cannot cover the `wasm` job
-    # in platform.yml — that check stays listed individually in §5 (it is a single,
-    # stably-named job with no matrix, so it carries none of the matrix-leg fragility
-    # this aggregate exists to absorb). The PR-skipped cross-os matrix is in the other
+    # in platform.yml — that workflow exposes its own stably named `wasm-success`
+    # aggregate for branch protection. The PR-skipped cross-os matrix is in the other
     # workflow too and is deliberately never a PR gate.
     name: ci-success
     if: always()
     needs: [preflight, supply-chain, msrv, python]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Assert every required job succeeded
         # `needs` is passed via env (not interpolated into the script) so the check is
