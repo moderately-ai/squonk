@@ -35,6 +35,7 @@ export default {
 
   const server = spawn("npx", ["--yes", "wrangler@4.110.0", "dev", "--port", "8799"], {
     cwd: workDir,
+    detached: process.platform !== "win32",
     stdio: ["ignore", "pipe", "pipe"],
   });
   let diagnostics = "";
@@ -50,11 +51,46 @@ export default {
   } catch (error) {
     throw new Error(`workerd smoke failed\n${diagnostics}`, { cause: error });
   } finally {
-    server.kill("SIGTERM");
+    await stopServer(server);
   }
 } finally {
   rmSync(workDir, { force: true, recursive: true });
   rmSync(tarball, { force: true });
+}
+
+async function stopServer(server) {
+  if (server.exitCode !== null || server.signalCode !== null) return;
+  signalServer(server, "SIGTERM");
+  if (await waitForClose(server, 5_000)) return;
+  signalServer(server, "SIGKILL");
+  if (!(await waitForClose(server, 5_000))) {
+    throw new Error("workerd process group did not stop");
+  }
+}
+
+function signalServer(server, signal) {
+  try {
+    if (process.platform === "win32") server.kill(signal);
+    else process.kill(-server.pid, signal);
+  } catch (error) {
+    if (error.code !== "ESRCH") throw error;
+  }
+}
+
+function waitForClose(server, timeoutMs) {
+  if (server.exitCode !== null || server.signalCode !== null) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const onClose = () => {
+      clearTimeout(timeout);
+      resolve(true);
+    };
+    const timeout = setTimeout(() => {
+      server.off("close", onClose);
+      resolve(false);
+    }, timeoutMs);
+    timeout.unref();
+    server.once("close", onClose);
+  });
 }
 
 async function waitForResponse(url) {
