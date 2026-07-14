@@ -18,8 +18,10 @@ test("loads the interactive wasm AST explorer", async ({ page }) => {
 
   await page.goto("/");
 
-  await expect(page.locator("#dialect option")).toHaveCount(13);
-  await expect(page.locator("#target-dialect option")).toHaveCount(13);
+  await expect(page.locator("#dialect option")).toHaveCount(14);
+  await expect(page.locator("#target-dialect option")).toHaveCount(14);
+  await expect(page.locator('#dialect option[value="quiltdb"]')).toHaveCount(1);
+  await expect(page.locator('#target-dialect option[value="quiltdb"]')).toHaveCount(1);
   await expect(page.locator("#dialect")).toHaveValue("postgres");
   await expect(page.locator("#target-dialect")).toHaveValue("postgres");
   await expect(page.locator(".cm-editor")).toBeVisible();
