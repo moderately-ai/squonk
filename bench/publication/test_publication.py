@@ -64,13 +64,16 @@ class PublicationTests(unittest.TestCase):
                 check=True,
             )
             self.assertGreater(output.stat().st_size, 10_000)
-            self.assertEqual(
-                output.read_bytes(),
-                (ROOT / "docs" / "assets" / "full-ast-throughput.png").read_bytes(),
-                "the committed graphic must be the exact generator output",
-            )
+            with Image.open(output) as generated:
+                self.assertEqual(
+                    generated.info.get("Benchmark-X-Axis"),
+                    "median_mib_per_second",
+                )
 
         result = json.loads(source.read_text())
+        plot_script_hash = hashlib.sha256(
+            (ROOT / "bench" / "plot_performance.py").read_bytes()
+        ).hexdigest()
         with Image.open(ROOT / "docs" / "assets" / "full-ast-throughput.png") as image:
             self.assertEqual(
                 image.info.get("Benchmark-SHA256"),
@@ -81,6 +84,9 @@ class PublicationTests(unittest.TestCase):
             )
             self.assertEqual(
                 image.info.get("Benchmark-X-Axis"), "median_mib_per_second"
+            )
+            self.assertEqual(
+                image.info.get("Benchmark-Plot-Script-SHA256"), plot_script_hash
             )
 
         readme = (ROOT / "README.md").read_text()

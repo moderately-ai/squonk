@@ -46,6 +46,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=OUTPUT)
     args = parser.parse_args()
     result_bytes = args.input.read_bytes()
+    plot_script_bytes = Path(__file__).read_bytes()
     result = json.loads(result_bytes)
     if result["schema"] != "squonk.publication-benchmark/1":
         raise ValueError("unsupported publication result schema")
@@ -159,6 +160,9 @@ def main() -> None:
             "Benchmark-SHA256": hashlib.sha256(result_bytes).hexdigest(),
             "Benchmark-Source-Commit": result["source_commit"],
             "Benchmark-X-Axis": "median_mib_per_second",
+            "Benchmark-Plot-Script-SHA256": hashlib.sha256(
+                plot_script_bytes
+            ).hexdigest(),
         },
     )
     plt.close(fig)

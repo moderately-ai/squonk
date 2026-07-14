@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Parser-contract corpus extracted from QuiltDB's SQLLogicTest and Rust integration
+# suites. The source files are distributed under QuiltDB's Apache-2.0 licence.
+source = "https://github.com/tomsanbear/quiltdb (quiltdb-harness/slt and quiltdb-harness/tests)"
+reference = "61baa778 — the QuiltDB commit recorded in manifest.json"
+license = "Apache-2.0"
+regenerate = "From a QuiltDB checkout at the pinned reference, run QuiltDB's canonical parser-contract exporter over quiltdb-harness/slt and quiltdb-harness/tests, replace slt-corpus.json and integration-corpus.json, then update manifest.json counts and SHA-256 pins and run: cargo test -p squonk-conformance --all-features quiltdb_"
