@@ -3,7 +3,10 @@
 
 # crates.io release runbook
 
-Operational, no-surprises procedure for publishing the two Rust crates to crates.io. Every real `cargo publish` is individually human-gated: the maintainer confirms each upload. Nothing in this file should be automated end-to-end.
+Operational, no-surprises procedure for publishing the two Rust crates to crates.io.
+The protected `release-crates.yml` workflow is the primary publisher. It verifies
+freely, but registry writes require both an explicit `publish: true` dispatch from the
+exact version tag and approval of the `crates-io` GitHub environment.
 
 Version 1.0.0 completed this procedure on 2026-07-12. The current coordinated release
 candidate is **2.0.0**; `v1.0.0` remains the historical 1.x baseline and
@@ -25,17 +28,27 @@ Only `squonk-ast` and `squonk` go to crates.io. `release/semver-baseline.toml` a
 
 `squonk` declares `squonk-ast = { path = "…", version = "2.0.0" }`. crates.io resolves that `version` against the registry at upload time, so **`squonk-ast` 2.0.0 must exist on crates.io before `squonk` 2.0.0 uploads.** Publishing `squonk` first fails with `no matching package named 'squonk-ast' found`.
 
-Two supported ways to satisfy the order:
+The workflow publishes sequentially: it publishes `squonk-ast`, waits until the exact
+version and checksum appear in the sparse index, performs a normal registry-backed
+dry-run of `squonk`, and only then publishes `squonk`. Re-running a partially completed
+release is safe: an existing version is skipped only when its immutable registry
+checksum matches the artifact rebuilt from the approved tag.
 
-1. **Coordinated workspace publish (preferred, cargo ≥ 1.66).** `cargo publish -p squonk-ast -p squonk` packages both, verifies `squonk` against a locally-staged `squonk-ast`, then uploads `squonk-ast`, waits for the index, and uploads `squonk`. One command, correct order, no manual wait.
-2. **Sequential.** Publish `squonk-ast`, wait for it to appear in the sparse index, then publish `squonk` separately. Use this if the two uploads need separate maintainer gates on separate days.
+Cargo does **not** locally stage one unpublished workspace package for another during
+`cargo publish --dry-run -p squonk-ast -p squonk`. Before `squonk-ast` 2.0.0 exists in
+the registry, verification of the parser must use an explicit `[patch.crates-io]` path
+to the candidate AST. The workflow does exactly that; after the AST reaches the index,
+it repeats the parser dry-run without a patch.
 
 ## Pre-publish checklist (do all before the first upload)
 
 - [ ] **Repository metadata.** Confirm shipped metadata points at `https://github.com/moderately-ai/squonk` and public branch URLs use `main`.
 - [ ] **Version.** The workspace, Python, and npm build manifests all resolve to `2.0.0`. Confirm the historical `v1.0.0` baseline tag exists and create `v2.0.0` only from the final release commit.
 - [ ] **Ownership.** Confirm the publishing account still owns `squonk` and `squonk-ast`, and that version `2.0.0` does not already exist.
-- [ ] **Token.** `cargo login <token>` with a token scoped to publish, owned by the account that owns both names.
+- [ ] **Protected environment.** The repository has a `crates-io` GitHub environment
+  with a required reviewer. Store a crates.io API token as its
+  `CARGO_REGISTRY_TOKEN` environment secret. Scope the token to publishing `squonk`
+  and `squonk-ast`; do not store it as a repository-wide secret.
 - [ ] **Green tree.** On the exact release commit: `cargo fmt --all --check` clean, `cargo xtask preflight` green, working tree clean (no `--allow-dirty` on the real publish).
 - [ ] **Same-day version re-check.** Inspect the registry records and confirm `2.0.0` is absent:
   ```sh
@@ -46,24 +59,18 @@ Two supported ways to satisfy the order:
 
 ## Dry run (no upload — safe to run anytime)
 
-This is the honest pre-flight; it packages, verifies the dependent against the staged dependency, and aborts before upload. On a clean tree drop `--allow-dirty`.
+The release workflow's `publish: false` dispatch is the authoritative rehearsal. The
+equivalent local commands are:
 
 ```sh
-cargo publish --dry-run -p squonk-ast -p squonk
+cargo publish --dry-run -p squonk-ast
+cargo publish --dry-run -p squonk \
+  --config "patch.crates-io.squonk-ast.path='$PWD/crates/squonk-ast'"
 ```
 
-Expected tail:
-
-```
-Packaged 65 files, 5.0MiB (…KiB compressed)   # squonk-ast
-Packaged 92 files, 4.2MiB (…KiB compressed)   # squonk
-Verifying squonk-ast v…
-Verifying squonk v…
-Uploading squonk-ast v…
-warning: aborting upload due to dry run
-Uploading squonk v…
-warning: aborting upload due to dry run
-```
+The first command verifies the exact AST tarball. The second verifies the exact parser
+source tarball against the candidate AST API. A final unpatched parser dry-run occurs
+inside the publish job after the AST checksum is visible in crates.io.
 
 To review the exact shipped file inventory without building:
 
@@ -74,29 +81,17 @@ cargo package --list -p squonk
 
 The shipped set is a deliberate `include` allowlist in each `Cargo.toml` (library sources, examples for `squonk`, integration tests, README, and a crate-local `LICENSE`). Test corpora and build artifacts do not ship.
 
-## Real publish (each upload is a separate maintainer gate)
+## Real publish
 
-> **GATE.** The maintainer explicitly confirms before each `cargo publish` without `--dry-run`. Do not chain these.
+1. Create the annotated `v2.0.0` tag at the reviewed release commit and push it.
+2. Confirm the tag-triggered `release-crates` verification run is green and review its
+   `crates-io-candidates` artifact and file inventories.
+3. Dispatch `release-crates.yml` from ref `v2.0.0` with `publish: true`.
+4. Approve the protected `crates-io` environment only after confirming the run SHA and
+   version. The job publishes in dependency order and verifies both index checksums.
 
-Preferred — coordinated:
-
-```sh
-# MAINTAINER CONFIRMS → then run:
-cargo publish -p squonk-ast -p squonk
-```
-
-Sequential fallback (separate gates):
-
-```sh
-# MAINTAINER CONFIRMS squonk-ast → then run:
-cargo publish -p squonk-ast
-
-# Wait for it to land in the index (poll until 200):
-until curl -sfI https://index.crates.io/sq/uo/squonk-ast >/dev/null; do sleep 5; done
-
-# MAINTAINER CONFIRMS squonk → then run:
-cargo publish -p squonk
-```
+The sequential local commands remain an emergency fallback, but CI is the recorded,
+reviewed, least-privilege release path.
 
 ## Post-publish verification
 

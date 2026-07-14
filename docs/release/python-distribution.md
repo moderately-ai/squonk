@@ -84,13 +84,13 @@ The smoke script refuses to pass if it imported the source tree instead of the i
 
 ### 3. Build the full matrix in CI (rehearsal, no publish)
 
-- Trigger `release-python.yml` via **workflow_dispatch** with `publish: false` (the default), or push a `python-v<version>` release-candidate tag.
+- Trigger `release-python.yml` via **workflow_dispatch** with `publish: false` (the default), or push the coordinated `v<version>` release tag. The legacy `python-v<version>` trigger remains build-only and cannot publish.
 - Every matrix leg builds its wheel and runs the native install-smoke; `build-sdist` additionally compiles the sdist from source and smokes it.
 - **Gate:** all four wheel legs + the sdist leg green, and the wheel/sdist artifacts present on the run, before considering a publish.
 
 ### 4. Publish to PyPI (maintainer gate #4 — the real, irreversible upload)
 
-- Re-dispatch `release-python.yml` with `publish: true`.
+- Re-dispatch `release-python.yml` from the exact `v<version>` tag with `publish: true`; the publish job rejects branch refs and surface-specific tags.
 - The `publish` job targets the protected `pypi` environment: **approve the required-reviewer prompt only when everything above is green.** A PyPI version is immutable and cannot be re-uploaded.
 - Post-publish smoke in a clean venv against real PyPI:
 

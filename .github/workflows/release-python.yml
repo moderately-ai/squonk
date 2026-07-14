@@ -30,8 +30,9 @@ name: release-python
 
 on:
   # Manual is the primary trigger: a release is a human-initiated event. A pushed
-  # `python-v*` tag also builds artifacts (a release candidate), but publishing still
-  # requires the `pypi` environment approval below — the tag does not publish on its own.
+  # coordinated `v*` tag or legacy build-only `python-v*` tag also builds artifacts,
+  # but publishing still requires the `pypi` environment approval below — a tag never
+  # publishes on its own.
   workflow_dispatch:
     inputs:
       publish:
@@ -39,7 +40,7 @@ on:
         type: boolean
         default: false
   push:
-    tags: ["python-v*"]
+    tags: ["python-v*", "v*"]
 
 # Least privilege by default; individual jobs widen as needed (the publish job adds
 # `id-token: write` for PyPI Trusted Publishing / OIDC — no long-lived API token secret).
@@ -179,6 +180,19 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - name: Check out the approved tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Require the exact coordinated release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml)
+          test -n "$VERSION"
+          test "$GITHUB_REF" = "refs/tags/v$VERSION"
+
       - name: Download all artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

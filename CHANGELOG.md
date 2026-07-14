@@ -9,11 +9,25 @@ All notable changes to this project are documented here. The format is based on 
 
 _No unreleased changes yet._
 
-## [2.0.0] — 2026-07-13
+## [2.0.0] — 2026-07-14
 
 This release makes the deliberately breaking interface cleanup identified after the
 first stable publish and coordinates the Rust crates, Python wheel, npm facades, and
 npm native platform packages on one major version.
+
+### Added
+
+- **QuiltDB is a first-class stable dialect.** The `quiltdb` Cargo feature,
+  `QuiltDb` runtime preset, Python/WASM exposure, and `@squonk-sql/quiltdb` npm
+  facade are held to QuiltDB's frozen parser-verdict corpus, integration corpus,
+  curated reject set, and structural round trips.
+- **Prebuilt Node-API packages cover eight Tier-1 platform triples.** Separate
+  `@squonk-sql/native-*` optional packages cover arm64 and x64 on macOS, glibc and
+  musl Linux, and Windows MSVC. They are built and smoke-tested independently in
+  the release matrix; browser, Deno, workerd, and explicit `/wasm` paths remain
+  WebAssembly-only.
+- **Wire schema v2 records the 2.x AST contract.** Generated Rust, Python, and
+  TypeScript views expose the same transaction spelling and mode information.
 
 ### Changed
 
@@ -37,6 +51,20 @@ npm native platform packages on one major version.
   the `squonk` umbrella now provide conditional Node, Bun, Deno, workerd,
   edge-light, and browser entrypoints. Deno and edge entrypoints use static Wasm
   modules, while browsers use the explicit asynchronous `createSquonk()` factory.
+- **Dialect declarations enumerate their complete grammar.** Shipped presets no
+  longer inherit hidden fields through struct-update syntax; source generation
+  rejects any future production preset that does not remain explicit.
+- **Transaction-control grammar is dialect-specific.** PostgreSQL, DuckDB, SQLite,
+  and MySQL independently model opener aliases, block words, savepoints, mode
+  placement and repetition, chaining, release, and consistent snapshots according
+  to their measured engine behavior.
+
+### Fixed
+
+- Fixed DuckDB vertical-tab/comment boundary parity and carriage-return line-comment
+  handling found by raw-byte differential fuzzing.
+- Fixed SQLite diagnostic classification so quoted parser-error text cannot be
+  mistaken for a post-parse resolution failure.
 
 ### Removed
 

@@ -10,11 +10,16 @@ on:
         description: "Publish after the build (still requires npm environment approval)"
         type: boolean
         default: false
+      bootstrap:
+        description: "One-time publish of the allow-listed packages that do not exist yet"
+        type: boolean
+        default: false
   push:
-    tags: ["npm-v*"]
+    tags: ["npm-v*", "v*"]
 
 # Builds need only the source tree. The publish job widens this to OIDC locally;
-# every public package trusts this workflow and the protected `npm` environment.
+# every established public package trusts this workflow and the protected `npm`
+# environment. First releases use the narrow bootstrap job below, then add the same trust.
 permissions:
   contents: read
 
@@ -257,7 +262,7 @@ jobs:
 
   declarations:
     name: TypeScript declarations
-    needs: assemble
+    needs: [package_matrix, assemble]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -282,7 +287,13 @@ jobs:
           path: crates/squonk-wasm/dist/npm
 
       - name: Restore generated declarations
-        run: cp -R dist/npm/all/js/. js/
+        env:
+          FACADE_LABELS: ${{ needs.package_matrix.outputs.labels }}
+        run: |
+          cp -R dist/npm/all/js/. js/
+          for label in $FACADE_LABELS; do
+            cp -R "dist/npm/$label/pkg-$label" .
+          done
 
       - name: Check public declarations
         run: npm run typecheck
@@ -551,6 +562,13 @@ jobs:
       - name: Install the OIDC-capable npm CLI
         run: npm install --global npm@11.18.0
 
+      - name: Require the exact coordinated release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./all/package.json').version")
+          test "$GITHUB_REF" = "refs/tags/v$VERSION"
+
       - name: Enable publishing in the verified artifacts
         run: |
           for dir in */; do
@@ -574,6 +592,68 @@ jobs:
                 echo "$NAME@$VERSION exists with different contents; refusing to continue" >&2
                 exit 1
               fi
+              echo "$NAME@$VERSION already matches the verified artifact; skipping"
+            else
+              npm publish "./$label" --provenance --access public
+            fi
+          done
+
+  bootstrap:
+    name: bootstrap new npm packages
+    needs: [package_matrix, assemble, declarations, browser-examples, node-example, size-policy, manifest-audit, node-compat, portable-runtime, workerd-compat]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.bootstrap == 'true' && github.event.inputs.publish != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+    defaults:
+      run:
+        working-directory: packages
+    steps:
+      - name: Download the verified package tree
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: npm-packages
+          path: packages
+
+      - name: Set up Node for the one-time token-authenticated publish
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install the provenance-capable pre-OIDC npm CLI
+        run: npm install --global npm@10.9.4
+
+      - name: Require the bootstrap credential and exact coordinated release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${NODE_AUTH_TOKEN:-}"
+          VERSION=$(node -p "require('./all/package.json').version")
+          test "$GITHUB_REF" = "refs/tags/v$VERSION"
+
+      - name: Enable publishing in the verified artifacts
+        run: |
+          for dir in */; do
+            npm pkg set private=false --json --prefix "$dir"
+          done
+
+      - name: Publish only the first-release package allow-list
+        shell: bash
+        run: |
+          set -euo pipefail
+          for label in native-darwin-arm64 native-darwin-x64 native-linux-arm64-gnu native-linux-x64-gnu native-linux-arm64-musl native-linux-x64-musl native-win32-arm64-msvc native-win32-x64-msvc quiltdb; do
+            NAME=$(node -p "require('./$label/package.json').name")
+            VERSION=$(node -p "require('./$label/package.json').version")
+            EXPECTED=$(npm pack "./$label" --dry-run --json | node --input-type=module -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => process.stdout.write(JSON.parse(s)[0].integrity))')
+            if PUBLISHED=$(npm view "$NAME@$VERSION" dist.integrity 2>/dev/null); then
+              test "$PUBLISHED" = "$EXPECTED"
               echo "$NAME@$VERSION already matches the verified artifact; skipping"
             else
               npm publish "./$label" --provenance --access public

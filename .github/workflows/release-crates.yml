@@ -1,0 +1,164 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Moderately AI Inc.
+
+name: release-crates
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to crates.io after verification and environment approval"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-crates-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify crates.io artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the release candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+
+      - name: Cache release verification artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: release-crates-v1
+          cache-bin: false
+
+      - name: Resolve and validate the release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "squonk") | .version')
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/* ]] || [[ "${{ github.event.inputs.publish || 'false' }}" == true ]]; then
+            test "$GITHUB_REF" = "refs/tags/v$version"
+          fi
+
+      - name: Verify the AST crate tarball
+        run: cargo publish --dry-run -p squonk-ast
+
+      - name: Verify the parser tarball against the candidate AST
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo publish --dry-run -p squonk \
+            --config "patch.crates-io.squonk-ast.path='${GITHUB_WORKSPACE}/crates/squonk-ast'"
+
+      - name: Verify the immutable major-version baseline
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: cargo xtask semver
+
+      - name: Record the candidate artifact inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo package --list -p squonk-ast > squonk-ast-${{ steps.version.outputs.version }}.files
+          cargo package --list -p squonk > squonk-${{ steps.version.outputs.version }}.files
+          sha256sum target/package/squonk-ast-${{ steps.version.outputs.version }}.crate \
+            target/package/squonk-${{ steps.version.outputs.version }}.crate > crates.sha256
+
+      - name: Upload candidate crates and inventories
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: crates-io-candidates
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            target/package/squonk-ast-${{ steps.version.outputs.version }}.crate
+            target/package/squonk-${{ steps.version.outputs.version }}.crate
+            squonk-ast-${{ steps.version.outputs.version }}.files
+            squonk-${{ steps.version.outputs.version }}.files
+            crates.sha256
+
+  publish:
+    name: publish to crates.io
+    needs: verify
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: crates-io
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - name: Check out the approved tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+
+      - name: Require the protected registry credential and exact version tag
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CARGO_REGISTRY_TOKEN:-}"
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "squonk") | .version')
+          test "$GITHUB_REF" = "refs/tags/v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish or verify squonk-ast
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=${{ steps.version.outputs.version }}
+          cargo package -p squonk-ast
+          expected=$(sha256sum "target/package/squonk-ast-$version.crate" | cut -d' ' -f1)
+          index=https://index.crates.io/sq/uo/squonk-ast
+          published=$(curl --fail --silent --show-error "$index" | jq -r "select(.vers == \"$version\") | .cksum" | tail -1)
+          if [[ -n "$published" ]]; then
+            test "$published" = "$expected"
+            echo "squonk-ast@$version already matches the approved source; skipping"
+          else
+            cargo publish -p squonk-ast
+          fi
+          for _ in {1..60}; do
+            published=$(curl --fail --silent --show-error "$index" | jq -r "select(.vers == \"$version\") | .cksum" | tail -1)
+            [[ "$published" == "$expected" ]] && exit 0
+            sleep 5
+          done
+          echo "squonk-ast@$version did not reach the crates.io index with the expected checksum" >&2
+          exit 1
+
+      - name: Verify, then publish or verify squonk
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=${{ steps.version.outputs.version }}
+          cargo publish --dry-run -p squonk
+          expected=$(sha256sum "target/package/squonk-$version.crate" | cut -d' ' -f1)
+          index=https://index.crates.io/sq/uo/squonk
+          published=$(curl --fail --silent --show-error "$index" | jq -r "select(.vers == \"$version\") | .cksum" | tail -1)
+          if [[ -n "$published" ]]; then
+            test "$published" = "$expected"
+            echo "squonk@$version already matches the approved source; skipping"
+          else
+            cargo publish -p squonk
+          fi
+          for _ in {1..60}; do
+            published=$(curl --fail --silent --show-error "$index" | jq -r "select(.vers == \"$version\") | .cksum" | tail -1)
+            [[ "$published" == "$expected" ]] && exit 0
+            sleep 5
+          done
+          echo "squonk@$version did not reach the crates.io index with the expected checksum" >&2
+          exit 1

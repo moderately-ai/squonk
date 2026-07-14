@@ -48,6 +48,41 @@ Every facade and platform package must trust the `moderately-ai/squonk` GitHub r
 `release-npm.yml` workflow, and protected `npm` environment. Publishing uses npm OIDC after
 each package's one-time registry bootstrap; no install or runtime token ships in an artifact.
 
+`@squonk-sql/quiltdb` and the eight `@squonk-sql/native-*` packages are new in 2.0.0.
+npm requires a package to exist before trusted publishing can be configured, so they
+have a deliberately narrow bootstrap procedure:
+
+1. Create a short-lived granular npm token that can create public packages in the
+   `@squonk-sql` scope and bypasses publish 2FA. Store it only as the
+   `NPM_BOOTSTRAP_TOKEN` secret on the protected `npm` environment.
+2. Dispatch `release-npm.yml` from the exact `v2.0.0` tag with `bootstrap: true` and
+   `publish: false`, then approve the environment. The job uses npm 10 token auth and
+   provenance, and can publish only the nine hard-coded new package labels.
+3. Configure trust on all nine packages (npm 11.15+ and account 2FA required):
+
+   ```sh
+   for package in \
+     @squonk-sql/quiltdb \
+     @squonk-sql/native-darwin-arm64 @squonk-sql/native-darwin-x64 \
+     @squonk-sql/native-linux-arm64-gnu @squonk-sql/native-linux-x64-gnu \
+     @squonk-sql/native-linux-arm64-musl @squonk-sql/native-linux-x64-musl \
+     @squonk-sql/native-win32-arm64-msvc @squonk-sql/native-win32-x64-msvc
+   do
+     npm trust github "$package" --repo moderately-ai/squonk \
+       --file release-npm.yml --env npm --allow-publish --yes
+     sleep 2
+   done
+   ```
+
+4. Delete the GitHub environment secret and revoke the bootstrap token immediately.
+5. Dispatch the same workflow from `v2.0.0` with `publish: true` and
+   `bootstrap: false`. OIDC skips the already-identical bootstrap packages and
+   publishes the existing facades and umbrella update.
+
+For every existing and new package, the trusted publisher configuration is case-sensitive:
+organization `moderately-ai`, repository `squonk`, workflow `release-npm.yml`, environment
+`npm`, allowed action `npm publish`.
+
 The release workflow builds each WebAssembly facade in its own one-worker matrix job, then assembles and verifies every package before uploading one immutable artifact containing all staged trees. WASM jobs share registry and pinned-tool caches without duplicating feature-specific target trees; native jobs use target-specific dependency caches. The protected publish job enables publishing only in those ephemeral manifests, repeats every dry-run, publishes platform packages first, then focused facades and `squonk` last.
 
 Publishing is resumable. If an exact version already exists, its registry integrity must match the verified local tarball or the job stops. npm attaches signed provenance to every new package version.
