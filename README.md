@@ -126,14 +126,15 @@ language-runtime costs are not mistaken for parser-core differences.
 
 <img
   src="./docs/assets/performance-summary.png"
-  alt="Horizontal bars compare Squonk's full-AST throughput with a direct Rust, Python, and Node peer. Squonk is 2.33, 43.43, and 13.63 times its Rust, Python, and Node peers."
+  alt="Horizontal bars show actual full-AST throughput in MiB per second for Squonk and its direct Rust, Python, and Node peers. Squonk reaches 35.36, 27.70, and 20.96 MiB per second through those APIs."
   width="1200"
 />
 
 On the controlled Linux snapshot, Squonk delivered **2.33×**, **43.43×**, and **13.63×**
 the full-AST throughput of its direct Rust, Python, and Node peers, respectively. The binding
 measurements exercise the public document APIs, including their native object construction;
-they are product measurements rather than Rust-core-only results.
+they are product measurements rather than Rust-core-only results. The chart uses actual MiB/s
+on its shared axis; multiplier annotations are comparisons only within each ecosystem pair.
 
 Why this metric is useful, which comparisons are valid, cold-start and retained-memory
 results, uncertainty, limitations, and the raw observations are documented in

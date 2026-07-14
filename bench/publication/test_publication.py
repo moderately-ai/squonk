@@ -74,6 +74,9 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(
                 image.info.get("Benchmark-Source-Commit"), result["source_commit"]
             )
+            self.assertEqual(
+                image.info.get("Benchmark-X-Axis"), "median_mib_per_second"
+            )
 
     def test_published_headline_values_match_result(self) -> None:
         result = json.loads((HERE / "results" / "headline.json").read_text())

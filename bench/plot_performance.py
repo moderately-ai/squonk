@@ -75,12 +75,21 @@ def main() -> None:
     ):
         color = SQUONK if tool == "squonk" else REFERENCE
         ax.barh(
-            position, ratio, height=0.66, color=color, edgecolor="white", linewidth=1.0
+            position,
+            throughput,
+            height=0.66,
+            color=color,
+            edgecolor="white",
+            linewidth=1.0,
         )
         value = ax.text(
-            ratio + 0.05,
+            throughput + 0.35,
             position,
-            f"{ratio:.2f}×  ·  {throughput:.2f} MiB/s",
+            (
+                f"{throughput:.2f} MiB/s  ·  {ratio:.2f}× peer"
+                if tool == "squonk"
+                else f"{throughput:.2f} MiB/s  ·  peer"
+            ),
             va="center",
             ha="left",
             color=color,
@@ -102,21 +111,9 @@ def main() -> None:
             for ecosystem, tool, _, _ in rows
         ],
     )
-    ax.axvline(1.0, color=INK, linewidth=1.0, linestyle="--", alpha=0.65)
-    ax.text(
-        1.0,
-        6.05,
-        "direct peer = 1.00×",
-        ha="center",
-        va="bottom",
-        color=MUTED,
-        fontsize=9,
-    )
-    ax.set_xlim(0, max(ratio for _, _, ratio, _ in rows) + 0.65)
+    ax.set_xlim(0, max(throughput for _, _, _, throughput in rows) + 8.0)
     ax.set_ylim(-1.65, 6.35)
-    ax.set_xlabel(
-        "Throughput relative to the direct ecosystem peer  →", color=INK, labelpad=12
-    )
+    ax.set_xlabel("Median throughput (MiB/s)  →", color=INK, labelpad=12)
     ax.grid(axis="x", color=GRID, linewidth=0.8)
     ax.set_axisbelow(True)
     ax.spines[["top", "right", "left"]].set_visible(False)
@@ -133,7 +130,7 @@ def main() -> None:
     fig.text(
         0.5,
         0.885,
-        "Same frozen 256-statement workload · median of 10 isolated processes · labels include raw throughput",
+        "Same frozen 256-statement workload · median of 10 isolated processes · ratios compare within each ecosystem",
         ha="center",
         fontsize=10,
         color=MUTED,
@@ -161,6 +158,7 @@ def main() -> None:
         metadata={
             "Benchmark-SHA256": hashlib.sha256(result_bytes).hexdigest(),
             "Benchmark-Source-Commit": result["source_commit"],
+            "Benchmark-X-Axis": "median_mib_per_second",
         },
     )
     plt.close(fig)
