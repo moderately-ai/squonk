@@ -6,6 +6,7 @@
     "mysql": { "rawBytes": 4803584, "gzipBytes": 927744, "packedBytes": 2163712, "unpackedBytes": 9040896, "entryCount": 35 },
     "sqlite": { "rawBytes": 4390912, "gzipBytes": 811008, "packedBytes": 1928192, "unpackedBytes": 8251392, "entryCount": 35 },
     "duckdb": { "rawBytes": 4633600, "gzipBytes": 873472, "packedBytes": 2055168, "unpackedBytes": 8714240, "entryCount": 35 },
+    "quiltdb": { "rawBytes": 4749312, "gzipBytes": 899072, "packedBytes": 2103296, "unpackedBytes": 8920064, "entryCount": 35 },
     "lenient": { "rawBytes": 5219328, "gzipBytes": 1040384, "packedBytes": 2388992, "unpackedBytes": 9845760, "entryCount": 35 },
     "all": { "rawBytes": 8301568, "gzipBytes": 1250304, "packedBytes": 2961408, "unpackedBytes": 14306304, "entryCount": 35 }
   }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Moderately AI Inc.
 
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
   copyFileSync,
   existsSync,
@@ -13,6 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { gzipSync } from "node:zlib";
+import { availableParallelism } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { packages } from "./package-matrix.mjs";
@@ -20,13 +21,6 @@ import { packages } from "./package-matrix.mjs";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const crateDir = dirname(scriptDir);
 const workspaceRoot = join(crateDir, "..", "..");
-const wasmInput = join(
-  workspaceRoot,
-  "target",
-  "wasm32-unknown-unknown",
-  "release-wasm",
-  "squonk_wasm.wasm",
-);
 const metric = process.env.SQUONK_WASM_SIZE_METRIC === "raw" ? "raw" : "gzip";
 // Size reports live outside the per-variant `pkg-*` dirs so the published tarball
 // carries only runtime artifacts (glue + `.wasm` + `.d.ts`); `check-size-budget.mjs`
@@ -39,10 +33,9 @@ const allVariants = packages.map((variant) => ({
   pkgDir: join(crateDir, `pkg-${variant.label}`),
 }));
 const variants = selectVariants();
+const jobs = parallelism();
 
-for (const variant of variants) {
-  buildVariant(variant);
-}
+await runPool(variants, jobs, buildVariant);
 
 function selectVariants() {
   const requested = process.env.SQUONK_WASM_VARIANTS
@@ -67,7 +60,14 @@ function selectVariants() {
   });
 }
 
-function buildVariant({ label, description, pkgDir, features }) {
+async function buildVariant({ label, description, pkgDir, features }) {
+  const targetDir = join(workspaceRoot, "target", "wasm-variants", label);
+  const wasmInput = join(
+    targetDir,
+    "wasm32-unknown-unknown",
+    "release-wasm",
+    "squonk_wasm.wasm",
+  );
   const wasmOutput = join(pkgDir, "squonk_wasm_bg.wasm");
   const wasmOptimized = join(pkgDir, "squonk_wasm_bg.opt.wasm");
   const wasmStripped = join(pkgDir, "squonk_wasm_bg.strip.wasm");
@@ -84,14 +84,16 @@ function buildVariant({ label, description, pkgDir, features }) {
     "wasm32-unknown-unknown",
     "-p",
     "squonk-wasm",
+    "--target-dir",
+    targetDir,
     "--no-default-features",
   ];
   if (features.length > 0) {
     cargoArgs.push("--features", features.join(","));
   }
-  run("cargo", cargoArgs, workspaceRoot);
+  await run("cargo", cargoArgs, workspaceRoot);
 
-  run("wasm-bindgen", [
+  await run("wasm-bindgen", [
     "--target",
     "web",
     "--remove-name-section",
@@ -105,7 +107,7 @@ function buildVariant({ label, description, pkgDir, features }) {
   // The bundler target wires those module exports into wasm-bindgen's JS glue.
   const denoDir = join(pkgDir, "deno");
   mkdirSync(denoDir, { recursive: true });
-  run("wasm-bindgen", [
+  await run("wasm-bindgen", [
     "--target",
     "bundler",
     "--remove-name-section",
@@ -116,7 +118,7 @@ function buildVariant({ label, description, pkgDir, features }) {
   ], workspaceRoot);
   const denoWasm = join(denoDir, "squonk_wasm_bg.wasm");
   const denoOptimized = join(denoDir, "squonk_wasm_bg.opt.wasm");
-  run("wasm-opt", [
+  await run("wasm-opt", [
     "-all",
     "-Oz",
     "--strip-debug",
@@ -129,7 +131,7 @@ function buildVariant({ label, description, pkgDir, features }) {
   rmSync(denoOptimized, { force: true });
 
   copyFileSync(wasmOutput, wasmBaseline);
-  run("wasm-opt", [
+  await run("wasm-opt", [
     "-all",
     "--strip-debug",
     "--strip-dwarf",
@@ -138,7 +140,7 @@ function buildVariant({ label, description, pkgDir, features }) {
     "-o",
     wasmStripped,
   ], crateDir);
-  run("wasm-opt", [
+  await run("wasm-opt", [
     "-all",
     "-Oz",
     "--strip-debug",
@@ -182,17 +184,43 @@ function buildVariant({ label, description, pkgDir, features }) {
   );
 }
 
+function parallelism() {
+  const requested = process.env.SQUONK_WASM_JOBS;
+  const jobs = requested === undefined
+    ? Math.min(4, availableParallelism())
+    : Number.parseInt(requested, 10);
+  if (!Number.isSafeInteger(jobs) || jobs < 1) {
+    throw new Error(`SQUONK_WASM_JOBS must be a positive integer, got ${JSON.stringify(requested)}`);
+  }
+  return jobs;
+}
+
+async function runPool(items, concurrency, task) {
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const item = items[next];
+      next += 1;
+      await task(item);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+}
+
 function run(command, args, cwd) {
-  const result = spawnSync(command, args, {
-    cwd,
-    stdio: "inherit",
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd, stdio: "inherit" });
+    child.on("error", reject);
+    child.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(
+          `${command} ${args.join(" ")} failed with ${signal ? `signal ${signal}` : `exit code ${code}`}`,
+        ));
+      }
+    });
   });
-  if (result.error) {
-    throw result.error;
-  }
-  if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status}`);
-  }
 }
 
 function sizeOf(path) {

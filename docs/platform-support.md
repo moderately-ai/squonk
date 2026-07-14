@@ -23,7 +23,7 @@ Promotion between tiers is a release-notes-worthy change and requires the higher
 | Rust crates | other 64-bit host targets (e.g. `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`) | — | 3 — best-effort | none | — |
 | Rust crates | 32-bit / big-endian targets | — | Unsupported v1 | none | — |
 | Python wheel | Linux / macOS / Windows pyo3 boundary | `ubuntu-latest` / `macos-latest` / `windows-latest` | compile-verified here; wheel tier owned by the distribution workflow | `cargo check -p squonk-python` (extension-module boundary compiles) | `ci.yml` (Linux, via preflight binding lane) + `platform.yml` (macOS/Windows) |
-| npm bindings | Node-API 8 on macOS/Linux/Windows x64+arm64; `wasm32-unknown-unknown` on Node 22+, Bun, Deno, browsers, and Workers | native OS/architecture runners + `ubuntu-24.04` | 1 — built and packaged | eight native packages; seven facade packages; Node/Bun/Deno/workerd/browser smokes | `release-npm.yml` |
+| npm bindings | Node-API 8 on macOS/Linux/Windows x64+arm64; `wasm32-unknown-unknown` on Node 22+, Bun, Deno, browsers, and Workers | native OS/architecture runners + `ubuntu-24.04` | 1 — built and packaged | eight native packages; eight facade packages; Node/Bun/Deno/workerd/browser smokes | `release-npm.yml` |
 
 "Core crates" in the checks above means `squonk`, `squonk-ast`, `squonk-sourcegen`, and `squonk-wasm` (its native mirror; the `#[wasm_bindgen]` layer is `cfg(target_arch = "wasm32")`-gated, so a native build never needs a wasm toolchain). The conformance, bench, and oracle crates are excluded from the cross-OS lanes because they need a system `libduckdb` and a MySQL server, which stay nightly-only on Linux (`oracle-nightly.yml`).
 
@@ -37,7 +37,7 @@ This policy compile-verifies the pyo3 extension boundary (`cargo check -p squonk
 
 ## wasm / npm: coordinated with the distribution workflow
 
-The wasm32 target is compile-verified as the focused ANSI shape and the all-13-dialect `dialects-full` shape. Every package always includes document rendering. The release workflow builds six scoped packages plus the `squonk` umbrella and eight script-free Node-API platform packages. It tests native Node/Bun, Node `--no-addons`, permissionless Deno, workerd, asynchronous browser factories, ESM/CommonJS consumers, size budgets, and clean packed installs. GNU addons target the Node-supported glibc 2.28 floor; musl ships separately.
+The wasm32 target is compile-verified as the focused ANSI shape and the all-14-dialect `dialects-full` shape. Every package always includes document rendering. The release workflow builds seven scoped packages plus the `squonk` umbrella and eight script-free Node-API platform packages. It tests native Node/Bun, Node `--no-addons`, permissionless Deno, workerd, asynchronous browser factories, ESM/CommonJS consumers, size budgets, and clean packed installs. GNU addons target the Node-supported glibc 2.28 floor; musl ships separately.
 
 ## Windows: Tier 1 (tested)
 

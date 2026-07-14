@@ -64,6 +64,12 @@ async function smoke(variant, mode) {
   const document = api.parse("select 1");
   assertEqual(document.dialect, variant.defaultDialect, `${variant.packageName} default dialect`);
   assertEqual(document.toSQL(), "SELECT 1", `${variant.packageName} render`);
+  if (variant.supportedDialects.includes("quiltdb")) {
+    const quilt = api.parse("CREATE COLOCATION GROUP g PARTITION BY HASH (id) SHARDS 2", { dialect: "quilt" });
+    assertEqual(quilt.dialect, "quiltdb", `${variant.packageName} QuiltDB alias`);
+    assertEqual(api.parse(quilt.toSQL(), { dialect: "quiltdb" }).toSQL(), quilt.toSQL(),
+      `${variant.packageName} QuiltDB round trip`);
+  }
   const binary = [...api.parse("select a + 1 from t").findAll("BinaryOp")][0];
   if (!binary.isRenderable) throw new Error(`${variant.packageName}: expression not renderable`);
   assertEqual(binary.toSQL(), "a + 1", `${variant.packageName} fragment render`);

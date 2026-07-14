@@ -6,6 +6,7 @@ import { expectTypeOf } from "expect-type";
 import { parse as parseAnsi, runtimeInfo } from "../js/ansi.js";
 import { createSquonk } from "../js/postgres-browser.js";
 import * as postgresBrowser from "../js/postgres-browser.js";
+import { parse as parseQuiltDb } from "../js/quiltdb.js";
 import {
   isDialectName,
   parse as parsePostgres,
@@ -44,6 +45,12 @@ tokenizePostgres("select 1", { dialect: "duckdb" });
 // @ts-expect-error PostgreSQL package cannot transpile to SQLite.
 transpilePostgres("select 1", { sourceDialect: "postgres", targetDialect: "sqlite" });
 
+const quilt = parseQuiltDb("CREATE COLOCATION GROUP g PARTITION BY HASH (id) SHARDS 2");
+expectTypeOf(quilt.dialect).toEqualTypeOf<"quiltdb">();
+expectTypeOf(parseQuiltDb("select 1", { dialect: "quilt" }).dialect).toEqualTypeOf<"quiltdb">();
+// @ts-expect-error QuiltDB package does not compile MySQL.
+parseQuiltDb("select 1", { dialect: "mysql" });
+
 const dynamic = "PG" as string;
 if (isDialectName(dynamic)) {
   expectTypeOf(parsePostgres("select 1", { dialect: dynamic }).dialect)
@@ -54,6 +61,7 @@ expectTypeOf(parseAll("select 1").dialect).toEqualTypeOf<"ansi">();
 expectTypeOf(parseAll("select 1", { dialect: "bq" }).dialect).toEqualTypeOf<"bigquery">();
 expectTypeOf(parseAll("select 1", { dialect: "ch" }).dialect).toEqualTypeOf<"clickhouse">();
 expectTypeOf(parseAll("select 1", { dialect: "dbx" }).dialect).toEqualTypeOf<"databricks">();
+expectTypeOf(parseAll("select 1", { dialect: "quilt" }).dialect).toEqualTypeOf<"quiltdb">();
 expectTypeOf(parseAll("select 1", { dialect: "sf" }).dialect).toEqualTypeOf<"snowflake">();
 expectTypeOf(parseAll("select 1", { dialect: "amazonredshift" }).dialect).toEqualTypeOf<"redshift">();
 expectTypeOf(canonicalDialectName("SQLSERVER")).toEqualTypeOf<

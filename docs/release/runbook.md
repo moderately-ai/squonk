@@ -16,7 +16,7 @@ candidate is **2.0.0**; `v1.0.0` remains the historical 1.x baseline and
 | `squonk-ast` | crates.io | yes | The dialect-agnostic AST. Published **first** — `squonk` depends on it. |
 | `squonk` | crates.io | yes | The tokenizer/parser. Published **second**, after `squonk-ast` is live (or coordinated in one `cargo publish` invocation, see below). |
 | `squonk-python` | PyPI (via `maturin`) | no (`publish = false`) | Python wheel surface, not a crates.io crate. |
-| `squonk-wasm` | npm package family | no (`publish = false`) | Six `@squonk-sql/*` dialect packages plus the `squonk` umbrella; not a crates.io crate. |
+| `squonk-wasm` | npm package family | no (`publish = false`) | Seven `@squonk-sql/*` dialect packages plus the `squonk` umbrella; not a crates.io crate. |
 | `squonk-sourcegen` | — | no (`publish = false`) | Internal dev codegen tool; never shipped. |
 
 Only `squonk-ast` and `squonk` go to crates.io. `release/semver-baseline.toml` and `xtask/src/semver.rs` already encode exactly this published set.
@@ -126,7 +126,7 @@ Recovery from a bad publish is **a new patch version**, not an edit: yank the ba
 ## Version lineage
 
 The first stable version is **`1.0.0`** and the current release candidate is **`2.0.0`**.
-The workspace, Python wheel, six scoped npm facades, npm umbrella, and eight native npm
+The workspace, Python wheel, seven scoped npm facades, npm umbrella, and eight native npm
 platform packages move in lockstep. The `1.0.0` baseline is a hard commitment—no breaking
 public-API change is permitted before `2.0.0`.
 

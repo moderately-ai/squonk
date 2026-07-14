@@ -23,9 +23,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  package_matrix:
+    name: resolve facade package matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      labels: ${{ steps.matrix.outputs.labels }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Resolve package labels
+        id: matrix
+        working-directory: crates/squonk-wasm
+        run: |
+          echo "labels=$(node --input-type=module -e 'import { packages } from "./scripts/package-matrix.mjs"; process.stdout.write(packages.map(({ label }) => label).join(" "))')" >> "$GITHUB_OUTPUT"
+          echo "matrix=$(node --input-type=module -e 'import { packages } from "./scripts/package-matrix.mjs"; process.stdout.write(JSON.stringify(packages.map(({ label }) => label)))')" >> "$GITHUB_OUTPUT"
+
   native:
     name: native ${{ matrix.label }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -71,6 +96,13 @@ jobs:
         uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
         with:
           tool: cargo-zigbuild@0.23.0
+          fallback: none
+
+      - name: Cache native Rust dependencies
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: native-${{ matrix.label }}
+          cache-bin: false
 
       - name: Build Node-API addon
         env:
@@ -96,10 +128,69 @@ jobs:
           retention-days: 7
           path: crates/squonk-wasm/native-artifacts
 
+  wasm:
+    name: wasm ${{ matrix.label }}
+    needs: package_matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ${{ fromJSON(needs.package_matrix.outputs.matrix) }}
+    defaults:
+      run:
+        working-directory: crates/squonk-wasm
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install Rust toolchain and wasm target
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache variant build artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          shared-key: wasm-tooling
+          cache-targets: false
+
+      - name: Install wasm-bindgen CLI
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        with:
+          tool: wasm-bindgen-cli@0.2.108
+          fallback: none
+
+      - name: Install Binaryen
+        run: npm install --global --ignore-scripts binaryen@130.0.0
+
+      - name: Build WebAssembly package
+        env:
+          SQUONK_WASM_JOBS: "1"
+          SQUONK_WASM_VARIANTS: ${{ matrix.label }}
+        run: npm run build:wasm
+
+      - name: Upload WebAssembly package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: wasm-${{ matrix.label }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            crates/squonk-wasm/pkg-${{ matrix.label }}
+            crates/squonk-wasm/size-reports/${{ matrix.label }}.json
+
   build:
     name: build and smoke npm package
-    needs: native
+    needs: [package_matrix, native, wasm]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: crates/squonk-wasm
@@ -114,28 +205,28 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
-      - name: Install Rust toolchain and wasm target
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+      - name: Install JavaScript tooling
+        run: npm install --ignore-scripts --no-package-lock
+
+      - name: Download every WebAssembly package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          targets: wasm32-unknown-unknown
+          pattern: wasm-*
+          merge-multiple: true
+          path: crates/squonk-wasm
 
-      - name: Cache build artifacts
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-
-      - name: Install wasm-bindgen CLI
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
-        with:
-          tool: wasm-bindgen-cli@0.2.108
-
-      - name: Install JavaScript and Binaryen tooling
+      - name: Verify WebAssembly artifact inventory
+        env:
+          FACADE_LABELS: ${{ needs.package_matrix.outputs.labels }}
         run: |
-          npm install --ignore-scripts --no-package-lock
-          npm install --global binaryen@130.0.0
+          for label in $FACADE_LABELS; do
+            test -f "pkg-$label/squonk_wasm_bg.wasm"
+            test -f "pkg-$label/deno/squonk_wasm_bg.wasm"
+            test -f "size-reports/$label.json"
+          done
 
-      - name: Build every WebAssembly and TypeScript package
-        run: |
-          npm run build:wasm
-          npm run build:ts
+      - name: Build TypeScript packages
+        run: npm run build:ts
 
       - name: Download every native addon
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -189,6 +280,7 @@ jobs:
     name: Bun, Deno, and workerd consumers
     needs: build
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: crates/squonk-wasm
@@ -226,6 +318,7 @@ jobs:
     name: Node ${{ matrix.node }} package consumers
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -256,9 +349,10 @@ jobs:
 
   publish:
     name: publish to npm
-    needs: [build, node-compat, runtime-compat]
+    needs: [package_matrix, build, node-compat, runtime-compat]
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: npm
     permissions:
       contents: read
@@ -290,13 +384,13 @@ jobs:
 
       - name: Review every exact publish manifest again
         run: |
-          for label in native-darwin-arm64 native-darwin-x64 native-linux-arm64-gnu native-linux-x64-gnu native-linux-arm64-musl native-linux-x64-musl native-win32-arm64-msvc native-win32-x64-msvc ansi postgres mysql sqlite duckdb lenient all; do
+          for label in native-darwin-arm64 native-darwin-x64 native-linux-arm64-gnu native-linux-x64-gnu native-linux-arm64-musl native-linux-x64-musl native-win32-arm64-msvc native-win32-x64-msvc ${{ needs.package_matrix.outputs.labels }}; do
             npm publish "./$label" --dry-run --provenance --access public
           done
 
       - name: Publish with OIDC provenance
         run: |
-          for label in native-darwin-arm64 native-darwin-x64 native-linux-arm64-gnu native-linux-x64-gnu native-linux-arm64-musl native-linux-x64-musl native-win32-arm64-msvc native-win32-x64-msvc ansi postgres mysql sqlite duckdb lenient all; do
+          for label in native-darwin-arm64 native-darwin-x64 native-linux-arm64-gnu native-linux-x64-gnu native-linux-arm64-musl native-linux-x64-musl native-win32-arm64-msvc native-win32-x64-msvc ${{ needs.package_matrix.outputs.labels }}; do
             NAME=$(node -p "require('./$label/package.json').name")
             VERSION=$(node -p "require('./$label/package.json').version")
             EXPECTED=$(npm pack "./$label" --dry-run --json | node --input-type=module -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => process.stdout.write(JSON.parse(s)[0].integrity))')

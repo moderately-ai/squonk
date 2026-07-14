@@ -180,6 +180,13 @@ def test_postgres_only_syntax_selected_by_dialect() -> None:
         squonk.parse("SELECT $1", "ansi")
 
 
+def test_quiltdb_dialect_alias_and_native_syntax() -> None:
+    sql = "CREATE COLOCATION GROUP g PARTITION BY HASH (id) SHARDS 2"
+    document = squonk.parse(sql, "quilt")
+    assert document.dialect == "quiltdb"
+    assert squonk.parse(document.to_sql(), "quiltdb").to_sql() == document.to_sql()
+
+
 # --- parse_recovering ------------------------------------------------------------
 
 
@@ -241,12 +248,13 @@ def test_parse_recovering_dict_returns_raw_json_shape() -> None:
 
 def test_supported_dialects_exposes_names_and_aliases() -> None:
     dialects = squonk.supported_dialects()
-    assert {"ansi", "postgres", "mysql", "sqlite", "duckdb"}.issubset(
+    assert {"ansi", "postgres", "mysql", "sqlite", "duckdb", "quiltdb"}.issubset(
         {dialect["name"] for dialect in dialects}
     )
     ansi = next(dialect for dialect in dialects if dialect["name"] == "ansi")
     assert "generic" in ansi["aliases"]
     assert squonk.validate_dialect("PG") == "postgres"
+    assert squonk.validate_dialect("QUILT") == "quiltdb"
     with pytest.raises(ValueError):
         squonk.validate_dialect("klingon")
 
