@@ -73,6 +73,9 @@ jobs:
           set -euo pipefail
           cargo package --list -p squonk-ast > squonk-ast-${{ steps.version.outputs.version }}.files
           cargo package --list -p squonk > squonk-${{ steps.version.outputs.version }}.files
+          cargo package -p squonk-ast
+          cargo package --no-verify -p squonk \
+            --config "patch.crates-io.squonk-ast.path='${GITHUB_WORKSPACE}/crates/squonk-ast'"
           sha256sum target/package/squonk-ast-${{ steps.version.outputs.version }}.crate \
             target/package/squonk-${{ steps.version.outputs.version }}.crate > crates.sha256
 
