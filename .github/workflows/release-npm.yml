@@ -53,6 +53,8 @@ jobs:
     timeout-minutes: 45
     env:
       RUSTFLAGS: ${{ matrix.musl && '-C target-feature=-crt-static' || '' }}
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.musl && 'musl-gcc' || '' }}
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.musl && 'musl-gcc' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -103,7 +105,7 @@ jobs:
       - name: Cache native Rust dependencies
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          key: native-${{ matrix.label }}
+          key: native-v2-${{ matrix.label }}
           cache-bin: false
 
       - name: Build Node-API addon
