@@ -21,6 +21,8 @@ cargo xtask feature-matrix
 `cargo xtask preflight` is a fixed non-oracle stack: formatting, repository policy checks,
 Clippy, nextest, and rustdoc across the core, binding, and conformance crates. Oracle suites
 remain explicit because DuckDB and MySQL require engine-specific environments.
+CI fans this same stack into hygiene, Clippy, nextest, and rustdoc lanes with
+`cargo xtask preflight --only <step,...>`; the unfiltered local command remains the release gate.
 
 Generated AST support code is checked in. Change its source inputs and regenerate it; never
 edit `crates/squonk-ast/src/generated/` by hand.

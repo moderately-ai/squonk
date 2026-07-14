@@ -1,32 +1,14 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Moderately AI Inc.
 
-# Per-push / per-PR gate: the core lint/test/doc stack plus the supply-chain gate,
-# on every push to `main` and every pull request targeting it. Until now
-# `.github/workflows/` held only the nightly soaks (`fuzz-nightly.yml`,
-# `oracle-nightly.yml`); nothing enforced the everyday gates on a landing, so
-# CI and local verification use the same fixed command.
+# Per-push / per-PR gates for the core lint, test, documentation, runtime, and
+# supply-chain contracts.
 #
 # ADR-0017 ("checks are local-runnable, not CI-coupled"): every gate here is a
-# command a contributor already runs locally, and CI merely *invokes* it. The job
-# runs ONE `cargo xtask preflight` — the same ordered stack (fmt -> tidy -> clippy
-# -> nextest -> doc) contributors run. Engine-backed oracle lanes stay in
-# `oracle-nightly.yml`, where their system dependencies are available.
-#
-# The byte pins that would fail on a non-aarch64 host are `cfg(target_arch)`-gated,
-# so the ubuntu-latest nextest lanes run green (proven while building this workflow).
-#
-# `cargo deny check` (whole-graph supply-chain: advisories / licenses / sources /
-# bans; config in `deny.toml`) is a SEPARATE gate, not part of preflight — exactly
-# as it is a separate hook in `.pre-commit-config.yaml`, and complementary to
-# preflight's in-process `tidy`/`cargo xtask deps` published-surface allowlist (see
-# docs/adr/published-dependency-policy.md). It runs as its own step with
-# `if: ${{ !cancelled() }}` so a core-stack failure never masks a supply-chain
-# regression and vice versa — the independent-failure-domain principle the nightly
-# workflows use for their bench-build step.
-#
-# Bench/criterion perf gating is ADR-0016's separate machinery and is deliberately
-# NOT invoked here.
+# command a contributor can run locally. CI fans `cargo xtask preflight` into
+# independent hygiene, Clippy, nextest, and rustdoc lanes; the unfiltered command
+# remains the complete local release gate. Engine-backed oracle and benchmark
+# lanes retain their dedicated workflows and environments.
 
 name: ci
 
@@ -48,56 +30,72 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gates:
-    name: gate stack (preflight + cargo-deny)
+  preflight:
+    name: preflight (${{ matrix.lane }})
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: hygiene
+            steps: fmt,tidy
+            nextest: false
+          - lane: clippy
+            steps: clippy-default,clippy-bindings,clippy-conformance
+            nextest: false
+          - lane: nextest
+            steps: nextest-default,nextest-bindings,nextest-schema,nextest-conformance
+            nextest: true
+          - lane: rustdoc
+            steps: doc-default,doc-conformance,doc-all-features
+            nextest: false
     steps:
       - name: Check out
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install stable toolchain
-        # rust-toolchain.toml pins `stable` + rustfmt/clippy; installed explicitly
-        # (matching the nightly workflows' explicit toolchain step) with the
-        # components named so the fmt-check and clippy lanes have their tools.
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           components: rustfmt, clippy
 
       - name: Cache build artifacts
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-        # No `workspaces:` override: the gated crates are ordinary members of the
-        # root workspace, so the default (repo root) is correct — same as
-        # oracle-nightly.yml.
+        with:
+          key: preflight-${{ matrix.lane }}
+          cache-bin: false
 
       - name: Install cargo-nextest
-        # Prebuilt, checksum-verified binary (no from-source compile). The preflight
-        # nextest lanes need it. Version pinned like the nightly workflows so a tool
-        # bump is a deliberate, reviewable change.
+        if: matrix.nextest
         uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
         with:
           tool: cargo-nextest@0.9.140
+          fallback: none
+
+      - name: Run preflight lane
+        run: cargo xtask preflight --only "${{ matrix.steps }}"
+
+  supply-chain:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install cargo-deny
-        # Supply-chain gate binary (deny.toml requires >= 0.18). Prebuilt + pinned,
-        # the same convention as cargo-nextest / cargo-fuzz.
         uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
         with:
           tool: cargo-deny@0.19.6
+          fallback: none
 
-      - name: Core gate stack (cargo xtask preflight, non-oracle subset)
-        # ONE invocation of the same ordered stack contributors run locally, forced
-        # to the whole stack minus the libduckdb/MySQL oracle lanes (see header).
-        run: cargo xtask preflight
-
-      - name: Supply-chain gate (cargo deny check)
-        # Separate from preflight (see header). `!cancelled()` so it runs even when
-        # the core stack failed, surfacing both failure domains in one run.
-        if: ${{ !cancelled() }}
+      - name: Check dependency policy
         run: cargo deny check
 
   msrv:
     name: msrv (rust-version floor)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     # `rust-version = "1.85"` in `[workspace.package]` is a v1.0 semver promise
     # (docs/stable-api.md): raising it is a minor-release event. The everyday gates
     # install `stable`, so nothing here proves the published crates still COMPILE at
@@ -108,7 +106,7 @@ jobs:
     # first added (a test helper used `u*::is_multiple_of`, stable only since 1.87).
     steps:
       - name: Check out
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install stable toolchain
         # Runs `cargo-hack` itself. The MSRV toolchain is NOT pinned here: the
@@ -119,6 +117,9 @@ jobs:
 
       - name: Cache build artifacts
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: msrv
+          cache-bin: false
 
       - name: Install cargo-hack
         # Prebuilt, checksum-verified, pinned — same convention as cargo-nextest /
@@ -126,6 +127,7 @@ jobs:
         uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
         with:
           tool: cargo-hack@0.6.45
+          fallback: none
 
       - name: Compile the published crates at the declared MSRV
         # `--rust-version` reads `[workspace.package] rust-version` from Cargo.toml
@@ -139,15 +141,21 @@ jobs:
   python:
     name: python runtime and typing
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Check out
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.11"
       - name: Install stable Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: python
+          cache-bin: false
       - name: Install Python development tools
         run: python -m pip install 'maturin>=1.7,<2.0' 'pytest>=8' 'ruff>=0.6' 'mypy>=1.15' 'pyright>=1.1.400'
       - name: Build and install wheel
@@ -187,7 +195,7 @@ jobs:
     # workflow too and is deliberately never a PR gate.
     name: ci-success
     if: always()
-    needs: [gates, msrv, python]
+    needs: [preflight, supply-chain, msrv, python]
     runs-on: ubuntu-latest
     steps:
       - name: Assert every required job succeeded

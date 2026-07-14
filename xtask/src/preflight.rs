@@ -115,21 +115,21 @@ pub(crate) const NAME_WIDTH: usize = 24;
 
 /// Run the same deterministic non-oracle stack locally and in CI.
 pub fn run_preflight(root: &Path, args: &[String]) -> Result<i32, String> {
-    if !args.is_empty() {
-        return Err(
-            "preflight takes no arguments; run oracle and feature-matrix checks separately".into(),
-        );
-    }
+    let steps = select_steps(args)?;
 
     let log_dir = root.join("target/preflight");
     fs::create_dir_all(&log_dir).map_err(|err| format!("create {}: {err}", log_dir.display()))?;
-    println!(
-        "preflight: fixed non-oracle stack ({} steps)",
-        PREFLIGHT_STEPS.len()
-    );
+    if steps.len() == PREFLIGHT_STEPS.len() {
+        println!("preflight: fixed non-oracle stack ({} steps)", steps.len());
+    } else {
+        println!(
+            "preflight: selected non-oracle stack ({} steps)",
+            steps.len()
+        );
+    }
 
     let started = Instant::now();
-    for step in PREFLIGHT_STEPS {
+    for step in &steps {
         let step_started = Instant::now();
         let outcome = match &step.action {
             StepAction::Tidy => run_tidy(&log_dir),
@@ -161,10 +161,58 @@ pub fn run_preflight(root: &Path, args: &[String]) -> Result<i32, String> {
     }
     println!(
         "preflight: {} passed ({:.1}s)",
-        PREFLIGHT_STEPS.len(),
+        steps.len(),
         started.elapsed().as_secs_f64()
     );
     Ok(0)
+}
+
+fn select_steps(args: &[String]) -> Result<Vec<&'static PreflightStep>, String> {
+    if args.is_empty() {
+        return Ok(PREFLIGHT_STEPS.iter().collect());
+    }
+    let [flag, requested] = args else {
+        return Err(preflight_usage());
+    };
+    if flag != "--only" || requested.is_empty() {
+        return Err(preflight_usage());
+    }
+
+    let names: Vec<&str> = requested.split(',').collect();
+    if names.iter().any(|name| name.is_empty()) {
+        return Err(preflight_usage());
+    }
+    for (index, name) in names.iter().enumerate() {
+        if names[..index].contains(name) {
+            return Err(format!("duplicate preflight step `{name}`"));
+        }
+        if !PREFLIGHT_STEPS.iter().any(|step| step.name == *name) {
+            return Err(format!(
+                "unknown preflight step `{name}`; available steps: {}",
+                available_steps()
+            ));
+        }
+    }
+
+    Ok(PREFLIGHT_STEPS
+        .iter()
+        .filter(|step| names.contains(&step.name))
+        .collect())
+}
+
+fn preflight_usage() -> String {
+    format!(
+        "preflight accepts only `--only <comma-separated-steps>`; available steps: {}",
+        available_steps()
+    )
+}
+
+fn available_steps() -> String {
+    PREFLIGHT_STEPS
+        .iter()
+        .map(|step| step.name)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn run_tidy(log_dir: &Path) -> StepOutcome {
@@ -285,4 +333,40 @@ pub(crate) fn print_row_tail(status: &str, time: &str, note: &str) {
         println!("  {note}");
     }
     let _ = io::stdout().flush();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PREFLIGHT_STEPS, select_steps};
+
+    #[test]
+    fn empty_selection_runs_the_fixed_stack() {
+        let steps = select_steps(&[]).unwrap();
+        assert_eq!(steps.len(), PREFLIGHT_STEPS.len());
+    }
+
+    #[test]
+    fn selection_preserves_canonical_order() {
+        let args = ["--only".into(), "doc-default,fmt,tidy".into()];
+        let names: Vec<_> = select_steps(&args)
+            .unwrap()
+            .into_iter()
+            .map(|step| step.name)
+            .collect();
+        assert_eq!(names, ["fmt", "tidy", "doc-default"]);
+    }
+
+    #[test]
+    fn selection_rejects_unknown_and_duplicate_steps() {
+        let unknown = ["--only".into(), "fmt,missing".into()];
+        let Err(unknown_error) = select_steps(&unknown) else {
+            panic!("unknown step was accepted");
+        };
+        assert!(unknown_error.contains("unknown preflight step"));
+        let duplicate = ["--only".into(), "fmt,fmt".into()];
+        let Err(duplicate_error) = select_steps(&duplicate) else {
+            panic!("duplicate step was accepted");
+        };
+        assert!(duplicate_error.contains("duplicate preflight step"));
+    }
 }

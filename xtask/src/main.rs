@@ -128,6 +128,9 @@ fn usage() {
         "       cargo xtask preflight   # fixed non-oracle local/CI stack (fmt→tidy→clippy→nextest→doc)"
     );
     eprintln!(
+        "       cargo xtask preflight --only <step,...>   # run named steps in canonical order"
+    );
+    eprintln!(
         "       cargo xtask feature-matrix   # feature-combination build gate: each dialect feature solo + no-default + full + serde (check), tests at full"
     );
     eprintln!(
