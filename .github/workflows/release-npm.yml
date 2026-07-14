@@ -51,6 +51,8 @@ jobs:
     name: native ${{ matrix.label }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
+    env:
+      RUSTFLAGS: ${{ matrix.musl && '-C target-feature=-crt-static' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -109,7 +111,6 @@ jobs:
           SQUONK_NATIVE_PACKAGE: ${{ matrix.label }}
           SQUONK_NATIVE_TARGET: ${{ matrix['build-target'] || matrix.target }}
           SQUONK_CARGO_SUBCOMMAND: ${{ matrix.zig && 'zigbuild' || 'build' }}
-          RUSTFLAGS: ${{ matrix.musl && '-C target-feature=-crt-static' || '' }}
         run: npm run build:native
 
       - name: Smoke native addon
