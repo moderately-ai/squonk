@@ -143,7 +143,6 @@ jobs:
         uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
         with:
           tool: cargo-fuzz@0.13.2
-          fallback: none
 
       - name: Install libduckdb
         # Only the oracle-engines entries (sqlite/duckdb differentials) link libduckdb;
