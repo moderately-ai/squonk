@@ -27,7 +27,8 @@ pub const CLASS_PUNCTUATION: u8 = 1 << 6;
 /// Statement-boundary "trim" whitespace: it folds as whitespace like
 /// [`CLASS_WHITESPACE`], but is legal *only* as leading or trailing trivia of a
 /// statement (adjacent to the input start, a `;` separator, or the input end) — a
-/// member wedged between two content tokens of one statement is a hard error.
+/// member wedged between two content items of one statement is a hard error; comments
+/// count as content items for this boundary rule.
 /// DuckDB's vertical tab is the sole member: DuckDB trims `0x0b` at each
 /// `;`-segment's edges but its statement parser rejects an interior `\v` (measured:
 /// `"\x0bSELECT 1"`, `"SELECT 1\x0b"`, `"SELECT 1;\x0b"` accept; `"SELECT\x0b1"`,
@@ -152,8 +153,8 @@ pub const SQLITE_BYTE_CLASSES: ByteClasses =
 /// content (`"SELECT\x0b1"`, `"SELECT 1\x0bSELECT 2"`, and even `"SELECT\x20\x0b1"`
 /// reject — unlike SQLite, adjacency to a real space does not rescue an interior
 /// `\v`). The tokenizer folds the byte as whitespace, then the
-/// [`CLASS_WHITESPACE_BOUNDARY`] guard rejects a boundary byte that a content token
-/// both precedes and follows.
+/// [`CLASS_WHITESPACE_BOUNDARY`] guard rejects a boundary byte that statement content
+/// (including comments) both precedes and follows.
 pub const DUCKDB_BYTE_CLASSES: ByteClasses =
     STANDARD_BYTE_CLASSES.with_class(0x0b, CLASS_WHITESPACE | CLASS_WHITESPACE_BOUNDARY);
 

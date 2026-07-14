@@ -2366,6 +2366,7 @@ impl Spanned for TransactionMode {
             TransactionMode::IsolationLevel { meta, .. } => meta.span,
             TransactionMode::AccessMode { meta, .. } => meta.span,
             TransactionMode::Deferrable { meta, .. } => meta.span,
+            TransactionMode::ConsistentSnapshot { meta, .. } => meta.span,
         }
     }
 }

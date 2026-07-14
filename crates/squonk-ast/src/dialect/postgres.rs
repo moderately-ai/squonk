@@ -19,8 +19,8 @@ use super::{
     TypeNameSyntax, UtilitySyntax,
 };
 use crate::precedence::{
-    BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON, RANGE_PREDICATE_ABOVE_COMPARISON,
-    STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS,
+    Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
+    RANGE_PREDICATE_ABOVE_COMPARISON, STANDARD_SET_OPERATION_BINDING_POWERS,
 };
 
 impl CommentSyntax {
@@ -36,7 +36,10 @@ impl CommentSyntax {
     /// `CommentSyntax::ANSI`/`::MYSQL` reading). Everything else matches `ANSI`.
     pub const POSTGRES: Self = Self {
         line_comment_ends_at_carriage_return: true,
-        ..Self::ANSI
+        line_comment_hash: false,
+        nested_block_comments: true,
+        versioned_comments: None,
+        unterminated_block_comment_at_eof: false,
     };
 }
 
@@ -272,17 +275,14 @@ impl StatementDdlGates {
         create_macro: false,
         create_secret: false,
         create_type: false,
-        // Virtual tables are SQLite-only; PostgreSQL rejects `CREATE VIRTUAL TABLE`. DuckDB
-        // inherits this `false` through the POSTGRES spread.
+        // Virtual tables are SQLite-only; PostgreSQL rejects `CREATE VIRTUAL TABLE`.
         create_virtual_table: false,
-        // PostgreSQL and DuckDB both have the SQL:2003 T176 sequence generator; DuckDB
-        // inherits this `true` through the POSTGRES spread.
+        // PostgreSQL has the SQL:2003 T176 sequence generator.
         create_sequence: true,
         create_sequence_cache: true,
         extension_ddl: true,
         transform_ddl: true,
-        // PostgreSQL is the only shipped dialect with `ALTER SYSTEM` server-configuration
-        // DDL; DuckDB clears this `true` back to `false` through the POSTGRES spread.
+        // PostgreSQL accepts `ALTER SYSTEM` server-configuration DDL.
         alter_system: true,
         // MySQL's tablespace / logfile-group storage DDL is not a PostgreSQL statement
         // (PostgreSQL's `CREATE TABLESPACE` is a different, location-based grammar, not modelled
@@ -290,9 +290,8 @@ impl StatementDdlGates {
         tablespace_ddl: false,
         logfile_group_ddl: false,
         schemas: true,
-        // PostgreSQL is the reference for the SQL-standard embedded schema-element form
-        // (`CREATE SCHEMA s CREATE TABLE t ...`); DuckDB overrides this back to `false`
-        // through the POSTGRES spread, as it rejects the embedding.
+        // PostgreSQL accepts the SQL-standard embedded schema-element form
+        // (`CREATE SCHEMA s CREATE TABLE t ...`).
         schema_elements: true,
         databases: true,
         // PostgreSQL's `DROP DATABASE` is its own single-name form (unmodelled here) and its
@@ -302,10 +301,7 @@ impl StatementDdlGates {
         temporary_views: true,
         routines: true,
         or_replace: true,
-        // `CREATE RECURSIVE VIEW` is gated to DuckDB/Lenient (measured on the DuckDB
-        // corpus); although PostgreSQL spells the same form, it is not widened here
-        // without a differential, and DuckDB overrides this `false` to `true` through
-        // the POSTGRES spread.
+        // `CREATE RECURSIVE VIEW` stays off pending a PostgreSQL differential.
         recursive_views: false,
         // PostgreSQL routine bodies are opaque `$$…$$`/string definitions, not the
         // MySQL SQL/PSM compound statement.
@@ -332,7 +328,7 @@ impl CreateTableClauseSyntax {
         // `WITHOUT ROWID` is rejected as leftover input.
         without_rowid_table_option: false,
         // PostgreSQL has no SQLite trailing `STRICT` table option; the trailing `STRICT` is
-        // rejected as leftover input. (DuckDB inherits this `false` via the POSTGRES spread.)
+        // rejected as leftover input.
         strict_table_option: false,
         // `OR REPLACE TABLE` and `CREATE SECRET` are DuckDB-specific.
         create_or_replace_table: false,
@@ -368,20 +364,18 @@ impl ColumnDefinitionSyntax {
         // extension it rejects.
         typeless_column_definitions: false,
         // PostgreSQL requires a data type even on a generated column (`GENERATED ALWAYS AS
-        // (expr) STORED` still names a type); DuckDB's type-optional generated column is a
-        // dialect extension, so this must clear rather than be inherited by the DuckDB spread.
+        // (expr) STORED` still names a type).
         typeless_generated_columns: false,
         // PostgreSQL has no joined `AUTOINCREMENT` attribute (its auto-increment is `serial`
-        // types / `GENERATED … AS IDENTITY`); the trailing keyword is rejected. DuckDB inherits
-        // this `false` through its POSTGRES spread.
+        // types / `GENERATED … AS IDENTITY`); the trailing keyword is rejected.
         joined_autoincrement_attribute: false,
         // PostgreSQL's inline `PRIMARY KEY` takes no `ASC`/`DESC` order qualifier (ordering is a
         // per-index-column property, not an inline column constraint); the trailing keyword is
-        // rejected. DuckDB inherits this `false` through its POSTGRES spread.
+        // rejected.
         inline_primary_key_ordering: false,
         // PostgreSQL accepts a bare column `COLLATE` but rejects a `CONSTRAINT <name>` prefix on it
         // (there `COLLATE any_name` is a constraint alternative parallel to the nameable one);
-        // engine-measured reject. DuckDB inherits this `false` through its POSTGRES spread.
+        // engine-measured reject.
         named_column_collate_constraint: false,
         identity_columns: true,
         compact_identity_columns: false,
@@ -569,7 +563,29 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `POSTGRES` preset for utility syntax.
     pub const POSTGRES: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: true,
+        transaction_mode_comma_required: false,
+        transaction_modes_unique: false,
+        abort_transaction_alias: true,
+        end_transaction_alias: true,
+        transaction_release: false,
         transaction_chain: true,
+        release_savepoint_keyword_optional: true,
         copy: true,
         // PostgreSQL's `COPY` is the `{FROM | TO}` transfer (the `copy` gate above);
         // Snowflake's `COPY INTO` load/unload is a different statement PostgreSQL has no
@@ -725,7 +741,25 @@ impl TypeNameSyntax {
     /// The `POSTGRES` preset for type name syntax.
     pub const POSTGRES: Self = Self {
         signed_type_modifier: true,
-        ..Self::ANSI
+        extended_scalar_type_names: false,
+        enum_type: false,
+        set_type: false,
+        numeric_modifiers: false,
+        integer_display_width: false,
+        composite_types: false,
+        varchar_requires_length: false,
+        zoned_temporal_types: true,
+        empty_type_parens: false,
+        character_set_annotation: false,
+        nullable_type: false,
+        low_cardinality_type: false,
+        fixed_string_type: false,
+        datetime64_type: false,
+        nested_type: false,
+        bit_width_integer_names: false,
+        liberal_type_names: false,
+        string_type_modifiers: false,
+        angle_bracket_types: false,
     };
 }
 
@@ -742,8 +776,7 @@ impl ExpressionSyntax {
         semi_structured_access: false,
         array_constructor: true,
         // PostgreSQL's multidimensional array literals — the bare-bracket sub-row inside
-        // `ARRAY[...]` (`ARRAY[[1,2],[3,4]]`). DuckDB overrides the POSTGRES spread to
-        // `false` (it reaches nested lists through `collection_literals` instead).
+        // `ARRAY[...]` (`ARRAY[[1,2],[3,4]]`).
         multidim_array_literals: true,
         // The `[…]`/`{…}`/`MAP` collection literals are DuckDB's; PostgreSQL spells
         // arrays with the `ARRAY` keyword and rows with `ROW(...)`.
@@ -754,8 +787,7 @@ impl ExpressionSyntax {
         struct_constructor: false,
         field_selection: true,
         field_wildcard: true,
-        // PostgreSQL admits the temporal + generalized typed literals. DuckDB inherits
-        // these via its `..ExpressionSyntax::POSTGRES` spread.
+        // PostgreSQL admits temporal and generalized typed literals.
         typed_string_literals: true,
         // The PostgreSQL prefix-typed interval literal (`INTERVAL '1' HOUR TO SECOND`,
         // and the unit-less `INTERVAL '1'` whose fields default from the string). DuckDB
@@ -916,9 +948,7 @@ impl PredicateSyntax {
         like: true,
         ilike: true,
         similar_to: true,
-        // The SQL-standard `(s1, e1) OVERLAPS (s2, e2)` period predicate. PostgreSQL-only
-        // among the shipped engines (DuckDB overrides the `..Self::POSTGRES` spread to
-        // `false`, and MySQL/SQLite inherit ANSI's `false`).
+        // The SQL-standard `(s1, e1) OVERLAPS (s2, e2)` period predicate.
         overlaps_period_predicate: true,
         // PostgreSQL requires the parentheses; `x IN y` is a syntax error there.
         unparenthesized_in_list: false,
@@ -965,12 +995,114 @@ impl FeatureSet {
         // `a = b BETWEEN c AND d` groups `a = (b BETWEEN c AND d)` — everything else stays
         // the standard table.
         binding_powers: BindingPowerTable {
+            or: BindingPower {
+                left: 10,
+                right: 11,
+                assoc: Assoc::Left,
+            },
+            xor: BindingPower {
+                left: 15,
+                right: 16,
+                assoc: Assoc::Left,
+            },
+            and: BindingPower {
+                left: 20,
+                right: 21,
+                assoc: Assoc::Left,
+            },
+            comparison: BindingPower {
+                left: 40,
+                right: 41,
+                assoc: Assoc::NonAssoc,
+            },
             range_predicate_override: Some(RANGE_PREDICATE_ABOVE_COMPARISON),
             // The `IS`-family predicates (`IS NULL`, `IS DISTINCT FROM`, `IS TRUE`, …) rank one
             // tier below comparison, so `a <> b IS NULL` groups `(a <> b) IS NULL`
             // (`%nonassoc IS ISNULL NOTNULL`, engine-measured on PostgreSQL 16).
             is_predicate_override: Some(IS_PREDICATE_BELOW_COMPARISON),
-            ..STANDARD_BINDING_POWERS
+            double_equals: BindingPower {
+                left: 40,
+                right: 41,
+                assoc: Assoc::NonAssoc,
+            },
+            additive: BindingPower {
+                left: 50,
+                right: 51,
+                assoc: Assoc::Left,
+            },
+            multiplicative: BindingPower {
+                left: 60,
+                right: 61,
+                assoc: Assoc::Left,
+            },
+            exponent: BindingPower {
+                left: 65,
+                right: 66,
+                assoc: Assoc::Left,
+            },
+            string_concat: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            any_operator: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            json_get: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_or: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_and: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_shift: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_xor: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            prefix_not: 30,
+            prefix_sign: 80,
+            prefix_bitwise_not: 46,
+            at_time_zone: BindingPower {
+                left: 70,
+                right: 71,
+                assoc: Assoc::Left,
+            },
+            collate: BindingPower {
+                left: 74,
+                right: 75,
+                assoc: Assoc::Left,
+            },
+            subscript: BindingPower {
+                left: 84,
+                right: 85,
+                assoc: Assoc::Left,
+            },
+            typecast: BindingPower {
+                left: 88,
+                right: 89,
+                assoc: Assoc::Left,
+            },
+            field_selection: BindingPower {
+                left: 92,
+                right: 93,
+                assoc: Assoc::Left,
+            },
         },
         set_operation_powers: STANDARD_SET_OPERATION_BINDING_POWERS,
         string_literals: StringLiteralSyntax::POSTGRES,

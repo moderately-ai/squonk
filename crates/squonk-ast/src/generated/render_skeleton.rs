@@ -37,7 +37,7 @@ pub(crate) const CURRENT_RENDER_SHAPE_STMT: RenderShapeFingerprint<0x957db431c4a
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_STORED_PROGRAM: RenderShapeFingerprint<0xfb50d22f049b4cc7> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_TCL: RenderShapeFingerprint<0x316658eaf65c4c17> =
+pub(crate) const CURRENT_RENDER_SHAPE_TCL: RenderShapeFingerprint<0x53fc3a24d97e2ce3> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_TY: RenderShapeFingerprint<0x03efd7c0644eb26a> =
     RenderShapeFingerprint;
@@ -9354,20 +9354,31 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
             }
             touch(meta);
         }
-        TransactionStatement::Commit { block, chain, meta } => {
+        TransactionStatement::Commit {
+            syntax,
+            block,
+            chain,
+            release,
+            meta,
+        } => {
+            render_shape_transaction_commit_keyword(syntax);
             if let Some(item) = block.as_ref() {
                 render_shape_transaction_block_keyword(item);
             }
             touch(chain);
+            touch(release);
             touch(meta);
         }
         TransactionStatement::Rollback {
+            syntax,
             block,
             savepoint_keyword,
             to_savepoint,
             chain,
+            release,
             meta,
         } => {
+            render_shape_transaction_rollback_keyword(syntax);
             if let Some(item) = block.as_ref() {
                 render_shape_transaction_block_keyword(item);
             }
@@ -9376,6 +9387,7 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
                 render_shape_ident(item);
             }
             touch(chain);
+            touch(release);
             touch(meta);
         }
         TransactionStatement::Savepoint { name, meta } => {
@@ -9405,6 +9417,18 @@ pub(crate) fn render_shape_transaction_start(node: &TransactionStart) {
         TransactionStart::Start => {}
     }
 }
+pub(crate) fn render_shape_transaction_commit_keyword(node: &TransactionCommitKeyword) {
+    match node {
+        TransactionCommitKeyword::Commit => {}
+        TransactionCommitKeyword::End => {}
+    }
+}
+pub(crate) fn render_shape_transaction_rollback_keyword(node: &TransactionRollbackKeyword) {
+    match node {
+        TransactionRollbackKeyword::Rollback => {}
+        TransactionRollbackKeyword::Abort => {}
+    }
+}
 pub(crate) fn render_shape_transaction_block_keyword(node: &TransactionBlockKeyword) {
     match node {
         TransactionBlockKeyword::Transaction => {}
@@ -9430,6 +9454,9 @@ pub(crate) fn render_shape_transaction_mode(node: &TransactionMode) {
         }
         TransactionMode::Deferrable { deferrable, meta } => {
             touch(deferrable);
+            touch(meta);
+        }
+        TransactionMode::ConsistentSnapshot { meta } => {
             touch(meta);
         }
     }

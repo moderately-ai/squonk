@@ -19,7 +19,7 @@ workspace = true
 # Dev-only codegen toolchain. `publish = false` keeps these out of any shipped
 # dep tree; the published `squonk-ast` crate gains nothing from them.
 # `extra-traits` is omitted: no syn type is hashed/compared/`Debug`-printed here.
-syn = { version = "2", features = ["full"] }
+syn = { version = "2", features = ["full", "visit"] }
 quote = "1"
 proc-macro2 = "1"
 # Rewrites the `#[doc = "..."]` attributes the renderers emit (quote!/syn's only

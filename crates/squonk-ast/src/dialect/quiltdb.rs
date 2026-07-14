@@ -10,16 +10,27 @@
 //! `DROP PRIMARY KEY`, the front-position
 //! `COMMENT IF EXISTS ON ...` guard, and colocation-group DDL.
 //!
-//! It narrows the inherited query grammar by rejecting wildcard `EXCLUDE`/`RENAME`,
+//! Its PostgreSQL-compatible query surface rejects wildcard `EXCLUDE`/`RENAME`,
 //! `ILIKE`, `IS [NOT] DISTINCT FROM`, `NATURAL CROSS JOIN`, `TABLESAMPLE`, and
 //! `INTERSECT ALL`/`EXCEPT ALL`. Alternative DDL spellings such as `MODIFY COLUMN`,
 //! `CHANGE COLUMN`, `SET TBLPROPERTIES`, table-scoped `DROP INDEX`, and trailing
 //! index `USING` remain outside the grammar.
 
 use super::{
-    AccessControlSyntax, ExpressionSyntax, FeatureSet, IndexAlterSyntax, MutationSyntax,
-    PredicateSyntax, SelectSyntax, StatementDdlGates, TableExpressionSyntax, TypeNameSyntax,
-    UtilitySyntax,
+    AccessControlSyntax, AggregateCallSyntax, CallSyntax, CaretOperator, Casing,
+    ColumnDefinitionSyntax, CommentSyntax, ConstraintSyntax, CreateTableClauseSyntax,
+    DoubleAmpersand, ExistenceGuards, ExpressionSyntax, FeatureSet, GroupingSyntax,
+    IdentifierSyntax, IndexAlterSyntax, JoinSyntax, KeywordOperators, KeywordSet,
+    MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
+    POSTGRES_BYTE_CLASSES, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
+    RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
+    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
+    StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
+    TypeNameSyntax, UtilitySyntax,
+};
+use crate::precedence::{
+    Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
+    RANGE_PREDICATE_ABOVE_COMPARISON, STANDARD_SET_OPERATION_BINDING_POWERS,
 };
 
 impl AccessControlSyntax {
@@ -28,7 +39,10 @@ impl AccessControlSyntax {
         // Preserve user/role statement structure for downstream validation. The richer
         // PostgreSQL GRANT/REVOKE route remains selected.
         user_role_management: true,
-        ..Self::POSTGRES
+        alter_role_rename: true,
+        access_control: true,
+        access_control_extended_objects: true,
+        access_control_account_grants: false,
     };
 }
 
@@ -37,7 +51,23 @@ impl ExpressionSyntax {
     pub const QUILTDB: Self = Self {
         struct_constructor: true,
         collection_literals: true,
-        ..Self::POSTGRES
+        typecast_operator: true,
+        subscript: true,
+        slice_step: false,
+        collate: true,
+        at_time_zone: true,
+        semi_structured_access: false,
+        array_constructor: true,
+        multidim_array_literals: true,
+        row_constructor: true,
+        field_selection: true,
+        field_wildcard: true,
+        typed_string_literals: true,
+        typed_interval_literal: true,
+        relaxed_interval_syntax: false,
+        mysql_interval_operator: false,
+        positional_column: false,
+        lambda_keyword: false,
     };
 }
 
@@ -49,7 +79,23 @@ impl SelectSyntax {
         wildcard_replace: true,
         intersect_all: false,
         except_all: false,
-        ..Self::POSTGRES
+        distinct_on: true,
+        select_into: true,
+        empty_target_list: true,
+        qualify: false,
+        alias_string_literals: false,
+        bare_alias_string_literals: false,
+        union_by_name: false,
+        qualified_wildcard_alias: true,
+        from_first: false,
+        parenthesized_query_operands: true,
+        values_rows_require_equal_arity: false,
+        values_row_constructor: true,
+        as_alias_rejects_reserved: false,
+        trailing_comma: false,
+        prefix_colon_alias: false,
+        lateral_view_clause: false,
+        connect_by_clause: false,
     };
 }
 
@@ -58,7 +104,15 @@ impl PredicateSyntax {
     pub const QUILTDB: Self = Self {
         is_distinct_from: false,
         ilike: false,
-        ..Self::POSTGRES
+        like: true,
+        similar_to: true,
+        overlaps_period_predicate: true,
+        unparenthesized_in_list: false,
+        pattern_match_quantifier: true,
+        between_symmetric: true,
+        is_normalized: true,
+        empty_in_list: false,
+        null_test_two_word_postfix: false,
     };
 }
 
@@ -73,7 +127,28 @@ impl MutationSyntax {
         update_delete_tails: true,
         joined_update_delete: true,
         or_conflict_action: true,
-        ..Self::POSTGRES
+        returning: true,
+        on_conflict: true,
+        on_duplicate_key_update: false,
+        multi_column_assignment: true,
+        update_tuple_value_row_arity: false,
+        where_current_of: true,
+        merge: true,
+        insert_set: false,
+        insert_column_matching: false,
+        delete_using: true,
+        update_from: true,
+        delete_using_target_alias: true,
+        cte_before_insert: true,
+        cte_before_merge: true,
+        data_modifying_ctes: true,
+        merge_when_not_matched_by: true,
+        merge_insert_default_values: true,
+        merge_insert_overriding: true,
+        merge_update_set_star: false,
+        merge_insert_star_by_name: false,
+        merge_error_action: false,
+        update_set_qualified_column: true,
     };
 }
 
@@ -82,15 +157,44 @@ impl IndexAlterSyntax {
     pub const QUILTDB: Self = Self {
         drop_primary_key: true,
         alter_column_add_identity: true,
-        ..Self::POSTGRES
+        rename_constraint: true,
+        alter_table_set_options: true,
+        index_storage_parameters: true,
+        drop_behavior: true,
+        index_drop_on_table: false,
+        index_concurrently: true,
+        index_using_method: true,
+        partial_index: true,
+        index_if_not_exists: true,
+        index_nulls_order: true,
+        alter_table_extended: true,
+        alter_nested_column_paths: false,
+        alter_existence_guards: true,
+        alter_column_set_data_type: true,
+        routine_arg_types: true,
+        routine_arg_defaults: true,
+        routine_arg_modes: true,
+        routine_language_string: true,
+        alter_table_multiple_actions: true,
     };
 }
 
-impl super::ColumnDefinitionSyntax {
+impl ColumnDefinitionSyntax {
     /// Column-definition syntax enabled by this preset.
     pub const QUILTDB: Self = Self {
         compact_identity_columns: true,
-        ..Self::POSTGRES
+        generated_column_shorthand: false,
+        column_conflict_resolution_clause: false,
+        typeless_column_definitions: false,
+        typeless_generated_columns: false,
+        joined_autoincrement_attribute: false,
+        inline_primary_key_ordering: false,
+        named_column_collate_constraint: false,
+        identity_columns: true,
+        default_expression_requires_parens: false,
+        column_default_requires_b_expr: true,
+        column_collation: true,
+        column_storage: true,
     };
 }
 
@@ -100,7 +204,36 @@ impl StatementDdlGates {
         colocation_groups: true,
         materialized_view_to: true,
         create_sequence_cache: true,
-        ..Self::POSTGRES
+        create_trigger: false,
+        create_macro: false,
+        create_secret: false,
+        create_type: false,
+        create_virtual_table: false,
+        create_sequence: true,
+        extension_ddl: true,
+        transform_ddl: true,
+        alter_system: true,
+        tablespace_ddl: false,
+        logfile_group_ddl: false,
+        schemas: true,
+        schema_elements: true,
+        databases: true,
+        drop_database: false,
+        materialized_views: true,
+        temporary_views: true,
+        routines: true,
+        or_replace: true,
+        recursive_views: false,
+        compound_statements: false,
+        alter_database: false,
+        alter_database_options: false,
+        server_definition: false,
+        alter_instance: false,
+        spatial_reference_system: false,
+        resource_group: false,
+        alter_sequence: false,
+        alter_object_set_schema: false,
+        view_definition_options: false,
     };
 }
 
@@ -120,7 +253,13 @@ impl TypeNameSyntax {
         bit_width_integer_names: true,
         liberal_type_names: true,
         string_type_modifiers: true,
-        ..Self::POSTGRES
+        integer_display_width: false,
+        varchar_requires_length: false,
+        zoned_temporal_types: true,
+        empty_type_parens: false,
+        character_set_annotation: false,
+        signed_type_modifier: true,
+        nested_type: false,
     };
 }
 
@@ -128,7 +267,20 @@ impl TableExpressionSyntax {
     /// Table-expression syntax enabled by this preset.
     pub const QUILTDB: Self = Self {
         table_sample: false,
-        ..Self::POSTGRES
+        only: true,
+        parenthesized_joins: true,
+        table_alias_column_lists: true,
+        join_using_alias: true,
+        index_hints: false,
+        table_hints: false,
+        partition_selection: false,
+        base_table_alias_column_lists: true,
+        string_literal_aliases: false,
+        aliased_parenthesized_join: true,
+        bare_table_alias_is_bare_label: false,
+        table_version: false,
+        table_json_path: false,
+        indexed_by: false,
     };
 }
 
@@ -136,7 +288,70 @@ impl UtilitySyntax {
     /// Utility-statement syntax enabled by this preset.
     pub const QUILTDB: Self = Self {
         comment_if_exists: true,
-        ..Self::POSTGRES
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: true,
+        transaction_mode_comma_required: false,
+        transaction_modes_unique: false,
+        abort_transaction_alias: true,
+        end_transaction_alias: true,
+        transaction_release: false,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: true,
+        copy: true,
+        copy_into: false,
+        stage_references: false,
+        comment_on: true,
+        pragma: false,
+        attach: false,
+        kill: false,
+        handler_statements: false,
+        plugin_component_statements: false,
+        shutdown: false,
+        restart: false,
+        clone: false,
+        import_table: false,
+        help_statement: false,
+        binlog: false,
+        key_cache_statements: false,
+        use_statement: false,
+        use_qualified_name: false,
+        prepared_statements: true,
+        prepare_typed_parameters: true,
+        prepared_statements_from: false,
+        call: false,
+        call_bare_name: false,
+        load_extension: true,
+        load_bare_name: false,
+        load_data: false,
+        reset_scope: false,
+        detach_if_exists: false,
+        do_statement: true,
+        do_expression_list: false,
+        lock_tables: false,
+        lock_instance: false,
+        begin_transaction_mode: false,
+        xa_transactions: false,
+        rename_statement: false,
+        signal_diagnostics: false,
+        export_import_database: false,
+        update_extensions: false,
+        flush: false,
+        purge_binary_logs: false,
+        replication_statements: false,
     };
 }
 
@@ -146,7 +361,7 @@ impl FeatureSet {
         access_control_syntax: AccessControlSyntax::QUILTDB,
         expression_syntax: ExpressionSyntax::QUILTDB,
         index_alter_syntax: IndexAlterSyntax::QUILTDB,
-        column_definition_syntax: super::ColumnDefinitionSyntax::QUILTDB,
+        column_definition_syntax: ColumnDefinitionSyntax::QUILTDB,
         statement_ddl_gates: StatementDdlGates::QUILTDB,
         table_expressions: TableExpressionSyntax::QUILTDB,
         mutation_syntax: MutationSyntax::QUILTDB,
@@ -154,7 +369,152 @@ impl FeatureSet {
         select_syntax: SelectSyntax::QUILTDB,
         type_name_syntax: TypeNameSyntax::QUILTDB,
         utility_syntax: UtilitySyntax::QUILTDB,
-        ..Self::POSTGRES
+        identifier_casing: Casing::Lower,
+        identifier_quotes: STANDARD_IDENTIFIER_QUOTES,
+        default_null_ordering: NullOrdering::NullsLast,
+        reserved_column_name: RESERVED_COLUMN_NAME,
+        reserved_function_name: RESERVED_FUNCTION_NAME,
+        reserved_type_name: RESERVED_TYPE_NAME,
+        reserved_bare_alias: RESERVED_BARE_ALIAS,
+        reserved_as_label: KeywordSet::EMPTY,
+        catalog_qualified_names: true,
+        byte_classes: POSTGRES_BYTE_CLASSES,
+        binding_powers: BindingPowerTable {
+            or: BindingPower {
+                left: 10,
+                right: 11,
+                assoc: Assoc::Left,
+            },
+            xor: BindingPower {
+                left: 15,
+                right: 16,
+                assoc: Assoc::Left,
+            },
+            and: BindingPower {
+                left: 20,
+                right: 21,
+                assoc: Assoc::Left,
+            },
+            comparison: BindingPower {
+                left: 40,
+                right: 41,
+                assoc: Assoc::NonAssoc,
+            },
+            range_predicate_override: Some(RANGE_PREDICATE_ABOVE_COMPARISON),
+            // The `IS`-family predicates (`IS NULL`, `IS DISTINCT FROM`, `IS TRUE`, …) rank one
+            // tier below comparison, so `a <> b IS NULL` groups `(a <> b) IS NULL`
+            // (`%nonassoc IS ISNULL NOTNULL`, engine-measured on PostgreSQL 16).
+            is_predicate_override: Some(IS_PREDICATE_BELOW_COMPARISON),
+            double_equals: BindingPower {
+                left: 40,
+                right: 41,
+                assoc: Assoc::NonAssoc,
+            },
+            additive: BindingPower {
+                left: 50,
+                right: 51,
+                assoc: Assoc::Left,
+            },
+            multiplicative: BindingPower {
+                left: 60,
+                right: 61,
+                assoc: Assoc::Left,
+            },
+            exponent: BindingPower {
+                left: 65,
+                right: 66,
+                assoc: Assoc::Left,
+            },
+            string_concat: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            any_operator: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            json_get: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_or: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_and: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_shift: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_xor: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            prefix_not: 30,
+            prefix_sign: 80,
+            prefix_bitwise_not: 46,
+            at_time_zone: BindingPower {
+                left: 70,
+                right: 71,
+                assoc: Assoc::Left,
+            },
+            collate: BindingPower {
+                left: 74,
+                right: 75,
+                assoc: Assoc::Left,
+            },
+            subscript: BindingPower {
+                left: 84,
+                right: 85,
+                assoc: Assoc::Left,
+            },
+            typecast: BindingPower {
+                left: 88,
+                right: 89,
+                assoc: Assoc::Left,
+            },
+            field_selection: BindingPower {
+                left: 92,
+                right: 93,
+                assoc: Assoc::Left,
+            },
+        },
+        set_operation_powers: STANDARD_SET_OPERATION_BINDING_POWERS,
+        string_literals: StringLiteralSyntax::POSTGRES,
+        numeric_literals: NumericLiteralSyntax::POSTGRES,
+        parameters: ParameterSyntax::POSTGRES,
+        session_variables: SessionVariableSyntax::ANSI,
+        identifier_syntax: IdentifierSyntax::POSTGRES,
+        join_syntax: JoinSyntax::POSTGRES,
+        table_factor_syntax: TableFactorSyntax::POSTGRES,
+        operator_syntax: OperatorSyntax::POSTGRES,
+        call_syntax: CallSyntax::POSTGRES,
+        string_func_forms: StringFuncForms::POSTGRES,
+        aggregate_call_syntax: AggregateCallSyntax::POSTGRES,
+        pipe_operator: PipeOperator::StringConcat,
+        double_ampersand: DoubleAmpersand::Unsupported,
+        keyword_operators: KeywordOperators::Unsupported,
+        caret_operator: CaretOperator::Exponent,
+        hash_bitwise_xor: true,
+        comment_syntax: CommentSyntax::POSTGRES,
+        create_table_clause_syntax: CreateTableClauseSyntax::POSTGRES,
+        constraint_syntax: ConstraintSyntax::POSTGRES,
+        existence_guards: ExistenceGuards::POSTGRES,
+        query_tail_syntax: QueryTailSyntax::POSTGRES,
+        grouping_syntax: GroupingSyntax::POSTGRES,
+        show_syntax: ShowSyntax::POSTGRES,
+        maintenance_syntax: MaintenanceSyntax::POSTGRES,
+        target_spelling: TargetSpelling::Postgres,
     };
 }
 

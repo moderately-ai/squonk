@@ -97,8 +97,8 @@ use super::{
     UtilitySyntax,
 };
 use crate::precedence::{
-    BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON, RANGE_PREDICATE_ABOVE_COMPARISON,
-    STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS,
+    Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
+    RANGE_PREDICATE_ABOVE_COMPARISON, STANDARD_SET_OPERATION_BINDING_POWERS,
 };
 
 /// The permissive multi-style identifier quoting `LENIENT` accepts: the SQL-standard
@@ -965,7 +965,29 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `LENIENT` preset for utility syntax.
     pub const LENIENT: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: true,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: true,
+        transaction_multiple_modes: true,
+        transaction_mode_comma_required: false,
+        transaction_modes_unique: false,
+        abort_transaction_alias: true,
+        end_transaction_alias: true,
+        transaction_release: true,
         transaction_chain: true,
+        release_savepoint_keyword_optional: true,
         copy: true,
         // Snowflake's `COPY INTO` load/unload — a pure addition on top of the PostgreSQL
         // `COPY`, dispatched by the `INTO` after `COPY`, in keeping with the permissive
@@ -1212,13 +1234,115 @@ impl FeatureSet {
         // one tier above comparison, so `a = b BETWEEN c AND d` groups `a = (b BETWEEN c AND
         // d)` (see [`BindingPowerTable::range_predicate_override`]).
         binding_powers: BindingPowerTable {
+            or: BindingPower {
+                left: 10,
+                right: 11,
+                assoc: Assoc::Left,
+            },
+            xor: BindingPower {
+                left: 15,
+                right: 16,
+                assoc: Assoc::Left,
+            },
+            and: BindingPower {
+                left: 20,
+                right: 21,
+                assoc: Assoc::Left,
+            },
+            comparison: BindingPower {
+                left: 40,
+                right: 41,
+                assoc: Assoc::NonAssoc,
+            },
             range_predicate_override: Some(RANGE_PREDICATE_ABOVE_COMPARISON),
             // The `IS`-family predicates rank one tier below comparison (PostgreSQL/DuckDB
             // `%nonassoc IS`), so `a <> b IS NULL` groups `(a <> b) IS NULL`. The comparison-tier
             // bare `IS`/`<=>` null-safe (in)equality (SQLite/MySQL) is spelling-distinguished
             // and unaffected.
             is_predicate_override: Some(IS_PREDICATE_BELOW_COMPARISON),
-            ..STANDARD_BINDING_POWERS
+            double_equals: BindingPower {
+                left: 40,
+                right: 41,
+                assoc: Assoc::NonAssoc,
+            },
+            additive: BindingPower {
+                left: 50,
+                right: 51,
+                assoc: Assoc::Left,
+            },
+            multiplicative: BindingPower {
+                left: 60,
+                right: 61,
+                assoc: Assoc::Left,
+            },
+            exponent: BindingPower {
+                left: 65,
+                right: 66,
+                assoc: Assoc::Left,
+            },
+            string_concat: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            any_operator: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            json_get: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_or: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_and: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_shift: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            bitwise_xor: BindingPower {
+                left: 45,
+                right: 46,
+                assoc: Assoc::Left,
+            },
+            prefix_not: 30,
+            prefix_sign: 80,
+            prefix_bitwise_not: 46,
+            at_time_zone: BindingPower {
+                left: 70,
+                right: 71,
+                assoc: Assoc::Left,
+            },
+            collate: BindingPower {
+                left: 74,
+                right: 75,
+                assoc: Assoc::Left,
+            },
+            subscript: BindingPower {
+                left: 84,
+                right: 85,
+                assoc: Assoc::Left,
+            },
+            typecast: BindingPower {
+                left: 88,
+                right: 89,
+                assoc: Assoc::Left,
+            },
+            field_selection: BindingPower {
+                left: 92,
+                right: 93,
+                assoc: Assoc::Left,
+            },
         },
         set_operation_powers: STANDARD_SET_OPERATION_BINDING_POWERS,
         string_literals: StringLiteralSyntax::LENIENT,

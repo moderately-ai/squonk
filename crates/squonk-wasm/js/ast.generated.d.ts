@@ -3431,8 +3431,8 @@ export type ConditionInfoItemName =
 
 export type TransactionStatement =
   | { Begin: { syntax: TransactionStart; mode: TransactionModeKind | null; block: TransactionBlockKeyword | null; modes: TransactionMode[]; meta: Meta; } }
-  | { Commit: { block: TransactionBlockKeyword | null; chain: boolean | null; meta: Meta; } }
-  | { Rollback: { block: TransactionBlockKeyword | null; savepoint_keyword: boolean; to_savepoint: Ident | null; chain: boolean | null; meta: Meta; } }
+  | { Commit: { syntax: TransactionCommitKeyword; block: TransactionBlockKeyword | null; chain: boolean | null; release: boolean | null; meta: Meta; } }
+  | { Rollback: { syntax: TransactionRollbackKeyword; block: TransactionBlockKeyword | null; savepoint_keyword: boolean; to_savepoint: Ident | null; chain: boolean | null; release: boolean | null; meta: Meta; } }
   | { Savepoint: { name: Ident; meta: Meta; } }
   | { Release: { savepoint_keyword: boolean; savepoint: Ident; meta: Meta; } }
   | { SetCharacteristics: { modes: TransactionMode[]; meta: Meta; } };
@@ -3440,6 +3440,14 @@ export type TransactionStatement =
 export type TransactionStart =
   | "Begin"
   | "Start";
+
+export type TransactionCommitKeyword =
+  | "Commit"
+  | "End";
+
+export type TransactionRollbackKeyword =
+  | "Rollback"
+  | "Abort";
 
 export type TransactionBlockKeyword =
   | "Transaction"
@@ -3453,7 +3461,8 @@ export type TransactionModeKind =
 export type TransactionMode =
   | { IsolationLevel: { level: IsolationLevel; meta: Meta; } }
   | { AccessMode: { access: TransactionAccessMode; meta: Meta; } }
-  | { Deferrable: { deferrable: boolean; meta: Meta; } };
+  | { Deferrable: { deferrable: boolean; meta: Meta; } }
+  | { ConsistentSnapshot: { meta: Meta; } };
 
 export type IsolationLevel =
   | "ReadUncommitted"
@@ -4894,6 +4903,8 @@ export type AstNode =
   | ConditionInfoItemName
   | TransactionStatement
   | TransactionStart
+  | TransactionCommitKeyword
+  | TransactionRollbackKeyword
   | TransactionBlockKeyword
   | TransactionModeKind
   | TransactionMode

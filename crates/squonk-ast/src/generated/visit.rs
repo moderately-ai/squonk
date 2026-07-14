@@ -1914,6 +1914,14 @@ pub trait Visit<'ast, X: Extension = NoExt> {
     fn visit_transaction_start(&mut self, node: &'ast TransactionStart) {
         walk_transaction_start(self, node);
     }
+    ///Visit a [`TransactionCommitKeyword`] node and recursively walk its children.
+    fn visit_transaction_commit_keyword(&mut self, node: &'ast TransactionCommitKeyword) {
+        walk_transaction_commit_keyword(self, node);
+    }
+    ///Visit a [`TransactionRollbackKeyword`] node and recursively walk its children.
+    fn visit_transaction_rollback_keyword(&mut self, node: &'ast TransactionRollbackKeyword) {
+        walk_transaction_rollback_keyword(self, node);
+    }
     ///Visit a [`TransactionBlockKeyword`] node and recursively walk its children.
     fn visit_transaction_block_keyword(&mut self, node: &'ast TransactionBlockKeyword) {
         walk_transaction_block_keyword(self, node);
@@ -14754,20 +14762,31 @@ where
             }
             let _ = meta;
         }
-        TransactionStatement::Commit { block, chain, meta } => {
+        TransactionStatement::Commit {
+            syntax,
+            block,
+            chain,
+            release,
+            meta,
+        } => {
+            visitor.visit_transaction_commit_keyword(syntax);
             if let Some(item) = block.as_ref() {
                 visitor.visit_transaction_block_keyword(item);
             }
             let _ = chain;
+            let _ = release;
             let _ = meta;
         }
         TransactionStatement::Rollback {
+            syntax,
             block,
             savepoint_keyword,
             to_savepoint,
             chain,
+            release,
             meta,
         } => {
+            visitor.visit_transaction_rollback_keyword(syntax);
             if let Some(item) = block.as_ref() {
                 visitor.visit_transaction_block_keyword(item);
             }
@@ -14776,6 +14795,7 @@ where
                 visitor.visit_ident(item);
             }
             let _ = chain;
+            let _ = release;
             let _ = meta;
         }
         TransactionStatement::Savepoint { name, meta } => {
@@ -14809,6 +14829,34 @@ where
     match node {
         TransactionStart::Begin => {}
         TransactionStart::Start => {}
+    }
+}
+///Walk the immediate children of a [`TransactionCommitKeyword`] node.
+pub fn walk_transaction_commit_keyword<'ast, V, X>(
+    visitor: &mut V,
+    node: &'ast TransactionCommitKeyword,
+) where
+    V: Visit<'ast, X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    match node {
+        TransactionCommitKeyword::Commit => {}
+        TransactionCommitKeyword::End => {}
+    }
+}
+///Walk the immediate children of a [`TransactionRollbackKeyword`] node.
+pub fn walk_transaction_rollback_keyword<'ast, V, X>(
+    visitor: &mut V,
+    node: &'ast TransactionRollbackKeyword,
+) where
+    V: Visit<'ast, X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    match node {
+        TransactionRollbackKeyword::Rollback => {}
+        TransactionRollbackKeyword::Abort => {}
     }
 }
 ///Walk the immediate children of a [`TransactionBlockKeyword`] node.
@@ -14856,6 +14904,9 @@ where
         }
         TransactionMode::Deferrable { deferrable, meta } => {
             let _ = deferrable;
+            let _ = meta;
+        }
+        TransactionMode::ConsistentSnapshot { meta } => {
             let _ = meta;
         }
     }
@@ -20140,6 +20191,14 @@ pub trait VisitMut<X: Extension = NoExt> {
     ///Visit a mutable [`TransactionStart`] node and recursively walk its children.
     fn visit_transaction_start_mut(&mut self, node: &mut TransactionStart) {
         walk_transaction_start_mut(self, node);
+    }
+    ///Visit a mutable [`TransactionCommitKeyword`] node and recursively walk its children.
+    fn visit_transaction_commit_keyword_mut(&mut self, node: &mut TransactionCommitKeyword) {
+        walk_transaction_commit_keyword_mut(self, node);
+    }
+    ///Visit a mutable [`TransactionRollbackKeyword`] node and recursively walk its children.
+    fn visit_transaction_rollback_keyword_mut(&mut self, node: &mut TransactionRollbackKeyword) {
+        walk_transaction_rollback_keyword_mut(self, node);
     }
     ///Visit a mutable [`TransactionBlockKeyword`] node and recursively walk its children.
     fn visit_transaction_block_keyword_mut(&mut self, node: &mut TransactionBlockKeyword) {
@@ -32958,20 +33017,31 @@ where
             }
             let _ = meta;
         }
-        TransactionStatement::Commit { block, chain, meta } => {
+        TransactionStatement::Commit {
+            syntax,
+            block,
+            chain,
+            release,
+            meta,
+        } => {
+            visitor.visit_transaction_commit_keyword_mut(syntax);
             if let Some(item) = block.as_mut() {
                 visitor.visit_transaction_block_keyword_mut(item);
             }
             let _ = chain;
+            let _ = release;
             let _ = meta;
         }
         TransactionStatement::Rollback {
+            syntax,
             block,
             savepoint_keyword,
             to_savepoint,
             chain,
+            release,
             meta,
         } => {
+            visitor.visit_transaction_rollback_keyword_mut(syntax);
             if let Some(item) = block.as_mut() {
                 visitor.visit_transaction_block_keyword_mut(item);
             }
@@ -32980,6 +33050,7 @@ where
                 visitor.visit_ident_mut(item);
             }
             let _ = chain;
+            let _ = release;
             let _ = meta;
         }
         TransactionStatement::Savepoint { name, meta } => {
@@ -33013,6 +33084,34 @@ where
     match node {
         TransactionStart::Begin => {}
         TransactionStart::Start => {}
+    }
+}
+///Walk the immediate children of a mutable [`TransactionCommitKeyword`] node.
+pub fn walk_transaction_commit_keyword_mut<V, X>(
+    visitor: &mut V,
+    node: &mut TransactionCommitKeyword,
+) where
+    V: VisitMut<X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    match node {
+        TransactionCommitKeyword::Commit => {}
+        TransactionCommitKeyword::End => {}
+    }
+}
+///Walk the immediate children of a mutable [`TransactionRollbackKeyword`] node.
+pub fn walk_transaction_rollback_keyword_mut<V, X>(
+    visitor: &mut V,
+    node: &mut TransactionRollbackKeyword,
+) where
+    V: VisitMut<X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    match node {
+        TransactionRollbackKeyword::Rollback => {}
+        TransactionRollbackKeyword::Abort => {}
     }
 }
 ///Walk the immediate children of a mutable [`TransactionBlockKeyword`] node.
@@ -33058,6 +33157,9 @@ where
         }
         TransactionMode::Deferrable { deferrable, meta } => {
             let _ = deferrable;
+            let _ = meta;
+        }
+        TransactionMode::ConsistentSnapshot { meta } => {
             let _ = meta;
         }
     }

@@ -908,4 +908,55 @@ mod tests {
             "SELECT UTC_TIMESTAMP(6)"
         );
     }
+
+    #[test]
+    fn mysql_transaction_control_matches_server_grammar() {
+        // Measured against mysql:8. The block words and mode positions differ by
+        // statement head, and START/SET mode lists require comma separators.
+        for sql in [
+            "START TRANSACTION",
+            "START TRANSACTION READ ONLY",
+            "START TRANSACTION WITH CONSISTENT SNAPSHOT",
+            "START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY",
+            "BEGIN",
+            "BEGIN WORK",
+            "COMMIT WORK AND CHAIN",
+            "COMMIT NO RELEASE",
+            "ROLLBACK WORK AND CHAIN",
+            "ROLLBACK TO s",
+            "RELEASE SAVEPOINT s",
+            "SET TRANSACTION READ ONLY",
+            "SET TRANSACTION ISOLATION LEVEL READ COMMITTED",
+            "SET TRANSACTION READ ONLY, ISOLATION LEVEL READ COMMITTED",
+        ] {
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_ok(),
+                "MySQL accepts {sql:?}",
+            );
+            assert_eq!(mysql_render(sql), sql, "{sql:?} round-trips");
+        }
+
+        for sql in [
+            "START",
+            "START WORK",
+            "START TRANSACTION ISOLATION LEVEL READ COMMITTED",
+            "START TRANSACTION DEFERRABLE",
+            "START TRANSACTION READ ONLY READ WRITE",
+            "START TRANSACTION READ ONLY, READ WRITE",
+            "BEGIN TRANSACTION",
+            "BEGIN READ ONLY",
+            "COMMIT TRANSACTION",
+            "ROLLBACK TRANSACTION",
+            "ABORT",
+            "END",
+            "RELEASE s",
+            "SET TRANSACTION DEFERRABLE",
+            "SET TRANSACTION READ ONLY ISOLATION LEVEL READ COMMITTED",
+        ] {
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(MySql)).is_err(),
+                "MySQL rejects {sql:?}",
+            );
+        }
+    }
 }

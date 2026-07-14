@@ -19,10 +19,8 @@ use super::{
     StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
     UtilitySyntax,
 };
-use crate::ast::{BinaryOperator, EqualsSpelling};
 use crate::precedence::{
-    Assoc, BindingPower, BindingPowerTable, STANDARD_BINDING_POWERS,
-    STANDARD_SET_OPERATION_BINDING_POWERS,
+    Assoc, BindingPower, BindingPowerTable, STANDARD_SET_OPERATION_BINDING_POWERS,
 };
 
 /// SQLite identifier quoting: the standard `"a"`, MySQL-style `` `a` ``, and T-SQL
@@ -255,7 +253,9 @@ impl CommentSyntax {
     pub const SQLITE: Self = Self {
         nested_block_comments: false,
         unterminated_block_comment_at_eof: true,
-        ..Self::ANSI
+        line_comment_hash: false,
+        line_comment_ends_at_carriage_return: false,
+        versioned_comments: None,
     };
 }
 
@@ -303,7 +303,23 @@ impl TypeNameSyntax {
         // where they can faithfully hold the input.
         liberal_type_names: true,
         string_type_modifiers: false,
-        ..Self::ANSI
+        extended_scalar_type_names: false,
+        enum_type: false,
+        set_type: false,
+        numeric_modifiers: false,
+        composite_types: false,
+        varchar_requires_length: false,
+        zoned_temporal_types: true,
+        empty_type_parens: false,
+        character_set_annotation: false,
+        signed_type_modifier: false,
+        nullable_type: false,
+        low_cardinality_type: false,
+        fixed_string_type: false,
+        datetime64_type: false,
+        nested_type: false,
+        bit_width_integer_names: false,
+        angle_bracket_types: false,
     };
 }
 
@@ -314,7 +330,18 @@ impl TableExpressionSyntax {
         bare_table_alias_is_bare_label: true,
         // SQLite's `INDEXED BY <index>` / `NOT INDEXED` index directive on a table reference.
         indexed_by: true,
-        ..TableExpressionSyntax::ANSI
+        only: false,
+        table_sample: false,
+        parenthesized_joins: true,
+        join_using_alias: false,
+        index_hints: false,
+        table_hints: false,
+        partition_selection: false,
+        base_table_alias_column_lists: true,
+        string_literal_aliases: false,
+        aliased_parenthesized_join: true,
+        table_version: false,
+        table_json_path: false,
     };
 }
 
@@ -326,7 +353,16 @@ impl JoinSyntax {
         // inner join (engine-probed on rusqlite 3.53.2: shared-column equijoin shape, not
         // the cross product), normalized into the canonical Inner+Natural shape.
         natural_cross_join: true,
-        ..JoinSyntax::ANSI
+        full_outer_join: true,
+        straight_join: false,
+        asof_join: false,
+        positional_join: false,
+        semi_anti_join: false,
+        sided_semi_anti_join: false,
+        apply_join: false,
+        recursive_search_cycle: false,
+        recursive_union_rejects_order_limit: false,
+        recursive_using_key: false,
     };
 }
 
@@ -341,7 +377,22 @@ impl TableFactorSyntax {
         // syntax errors (engine-probed via rusqlite 3.53.2). Our parse-only parser matches
         // that grammar with the flag on; the binding reject is not a parser concern.
         table_functions: true,
-        ..TableFactorSyntax::ANSI
+        lateral: false,
+        rows_from: false,
+        unnest: false,
+        unnest_with_offset: false,
+        table_function_ordinality: false,
+        special_function_table_source: true,
+        pivot: false,
+        unpivot: false,
+        show_ref: false,
+        from_values: false,
+        json_table: false,
+        xml_table: false,
+        table_expr_factor: false,
+        pivot_value_sources: false,
+        match_recognize: false,
+        open_json: false,
     };
 }
 
@@ -395,7 +446,15 @@ impl PredicateSyntax {
         // alongside the one-word `NOTNULL`/`ISNULL`; both engine-measured via rusqlite 3.53.2
         // (`SELECT 1 WHERE 1 NOT NULL` -> 1).
         null_test_two_word_postfix: true,
-        ..Self::ANSI
+        is_distinct_from: true,
+        like: true,
+        ilike: false,
+        similar_to: false,
+        overlaps_period_predicate: false,
+        unparenthesized_in_list: false,
+        pattern_match_quantifier: false,
+        between_symmetric: false,
+        is_normalized: false,
     };
 }
 
@@ -866,7 +925,29 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `SQLITE` preset for utility syntax.
     pub const SQLITE: Self = Self {
+        start_transaction: false,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: false,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        begin_transaction_modes: false,
+        transaction_savepoints: true,
+        set_transaction: false,
+        transaction_isolation_mode: false,
+        transaction_access_mode: false,
+        transaction_deferrable_mode: false,
+        start_transaction_isolation_mode: false,
+        start_transaction_deferrable_mode: false,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: false,
+        transaction_mode_comma_required: false,
+        transaction_modes_unique: false,
+        abort_transaction_alias: false,
+        end_transaction_alias: true,
+        transaction_release: false,
         transaction_chain: false,
+        release_savepoint_keyword_optional: true,
         copy: false,
         // `COPY INTO` is Snowflake bulk load/unload; SQLite has no such statement.
         copy_into: false,
@@ -998,7 +1079,8 @@ impl AccessControlSyntax {
     };
 }
 
-/// SQLite binding powers: [`STANDARD_BINDING_POWERS`] with two deltas.
+/// SQLite binding powers, explicitly enumerated with left-associative comparisons and
+/// the tight unary bitwise-NOT rank.
 ///
 /// **Comparison associativity.** The comparison row is `Assoc::Left`, the same delta
 /// MySQL applies: SQLite parses `1 < 2 < 3` as `(1 < 2) < 3` (the 0/1 result feeding the
@@ -1013,17 +1095,113 @@ impl AccessControlSyntax {
 /// bitwise operators keep STANDARD's shared rank (engine-measured: `1 | 2 & 2` is
 /// `(1 | 2) & 2`, all four at one level between additive and comparison).
 pub const SQLITE_BINDING_POWERS: BindingPowerTable = BindingPowerTable {
+    or: BindingPower {
+        left: 10,
+        right: 11,
+        assoc: Assoc::Left,
+    },
+    xor: BindingPower {
+        left: 15,
+        right: 16,
+        assoc: Assoc::Left,
+    },
+    and: BindingPower {
+        left: 20,
+        right: 21,
+        assoc: Assoc::Left,
+    },
+    comparison: BindingPower {
+        left: 40,
+        right: 41,
+        assoc: Assoc::Left,
+    },
+    range_predicate_override: None,
+    is_predicate_override: None,
+    double_equals: BindingPower {
+        left: 40,
+        right: 41,
+        assoc: Assoc::Left,
+    },
+    additive: BindingPower {
+        left: 50,
+        right: 51,
+        assoc: Assoc::Left,
+    },
+    multiplicative: BindingPower {
+        left: 60,
+        right: 61,
+        assoc: Assoc::Left,
+    },
+    exponent: BindingPower {
+        left: 65,
+        right: 66,
+        assoc: Assoc::Left,
+    },
+    string_concat: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    any_operator: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    json_get: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    bitwise_or: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    bitwise_and: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    bitwise_shift: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    bitwise_xor: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    prefix_not: 30,
+    prefix_sign: 80,
     // SQLite's `~` binds like the unary sign, not PostgreSQL/DuckDB's between-arithmetic
     // rank.
-    prefix_bitwise_not: STANDARD_BINDING_POWERS.prefix_sign,
-    ..STANDARD_BINDING_POWERS.with_binary(
-        &BinaryOperator::Eq(EqualsSpelling::Single),
-        BindingPower {
-            left: 40,
-            right: 41,
-            assoc: Assoc::Left,
-        },
-    )
+    prefix_bitwise_not: 80,
+    at_time_zone: BindingPower {
+        left: 70,
+        right: 71,
+        assoc: Assoc::Left,
+    },
+    collate: BindingPower {
+        left: 74,
+        right: 75,
+        assoc: Assoc::Left,
+    },
+    subscript: BindingPower {
+        left: 84,
+        right: 85,
+        assoc: Assoc::Left,
+    },
+    typecast: BindingPower {
+        left: 88,
+        right: 89,
+        assoc: Assoc::Left,
+    },
+    field_selection: BindingPower {
+        left: 92,
+        right: 93,
+        assoc: Assoc::Left,
+    },
 };
 
 impl FeatureSet {
@@ -1147,7 +1325,8 @@ mod tests {
         RESERVED_TYPE_NAME,
     };
     use super::*;
-    use crate::ast::RegexpSpelling;
+    use crate::ast::{BinaryOperator, EqualsSpelling, RegexpSpelling};
+    use crate::precedence::STANDARD_BINDING_POWERS;
 
     #[test]
     fn sqlite_reserved_set_is_smaller_than_ansi_freeing_sqlite_identifiers() {

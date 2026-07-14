@@ -19,15 +19,12 @@ use crate::parser::Dialect;
 /// separators, the `QUALIFY` clause (and its keyword reservation), the collection
 /// literals (`[1, 2]`, `{'a': 1}`, `MAP {k: v}`), the single-arrow lambdas
 /// (`x -> x + 1`, `(x, y) -> x + y`), and the star-expression family — the `*`/`t.*`
-/// wildcard modifiers `EXCLUDE`/`REPLACE`/`RENAME` and the `COLUMNS(…)` column-set
-/// selector — are accepted, while the empty (bare `SELECT`) target list is rejected
-/// where PostgreSQL accepts it. The remaining DuckDB-specific grammar (`PIVOT`, `//`,
-/// `*COLUMNS(…)` unpacking, …) is owned by follow-up grammar-family tickets and not
-/// (`x -> x + 1`, `(x, y) -> x + y`), and the `PIVOT`/`UNPIVOT` operators (both the
+/// wildcard modifiers `EXCLUDE`/`REPLACE`/`RENAME`, the `COLUMNS(…)` column-set selector,
+/// and the `PIVOT`/`UNPIVOT` operators (both the
 /// leading-keyword statement and the `FROM t PIVOT (…)` table factor, with their
 /// keyword reservations) are accepted, while the empty (bare `SELECT`) target list is
 /// rejected where PostgreSQL accepts it. The remaining DuckDB-specific grammar
-/// (`SELECT * EXCLUDE`, `//`, …) is owned by follow-up grammar-family tickets and not
+/// (`//`, `*COLUMNS(…)` unpacking, …) is owned by follow-up grammar-family tickets and not
 /// yet accepted here.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct DuckDb;
@@ -91,6 +88,48 @@ mod tests {
             assert!(
                 parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
                 "DuckDB parses {sql:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn duckdb_parses_optional_transaction_block_word_after_start() {
+        for (sql, rendered) in [
+            ("START", "START"),
+            ("START WORK", "START WORK"),
+            ("START TRANSACTION", "START TRANSACTION"),
+        ] {
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|err| panic!("DuckDB should parse {sql:?}: {err:?}"));
+            assert_eq!(parsed.to_sql(), rendered);
+        }
+
+        for sql in ["ABORT", "ABORT WORK", "END", "END TRANSACTION"] {
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|err| panic!("DuckDB should parse {sql:?}: {err:?}"));
+            assert_eq!(parsed.to_sql(), sql);
+        }
+
+        for sql in [
+            "SAVEPOINT s",
+            "RELEASE SAVEPOINT s",
+            "ROLLBACK TO SAVEPOINT s",
+            "SET TRANSACTION READ ONLY",
+            "START TRANSACTION ISOLATION LEVEL SERIALIZABLE",
+            "START TRANSACTION DEFERRABLE",
+            "START TRANSACTION READ ONLY, READ WRITE",
+            "COMMIT AND CHAIN",
+        ] {
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
+                "DuckDB rejects {sql:?}",
+            );
+        }
+
+        for sql in ["START", "START WORK"] {
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+                "PostgreSQL requires START TRANSACTION for {sql:?}",
             );
         }
     }

@@ -21,10 +21,8 @@ use super::{
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
     TypeNameSyntax, UtilitySyntax,
 };
-use crate::ast::{BinaryOperator, EqualsSpelling};
 use crate::precedence::{
-    Assoc, BindingPower, BindingPowerTable, STANDARD_BINDING_POWERS,
-    STANDARD_SET_OPERATION_BINDING_POWERS,
+    Assoc, BindingPower, BindingPowerTable, STANDARD_SET_OPERATION_BINDING_POWERS,
 };
 
 /// MySQL backtick-only identifier quoting. MySQL spells a quoted identifier
@@ -975,13 +973,48 @@ impl UtilitySyntax {
         // and `LINES`/`ROWS` spellings are interchangeable, and every clause parses under both
         // `DATA` and `XML` (the format restrictions are semantic, enforced post-parse).
         load_data: true,
-        // Spread-inheritance invariant: `UtilitySyntax::ANSI` is all-false,
-        // so every utility statement head not armed above (`do_statement`, `prepared_statements`,
-        // `load_extension`, `update_extensions`, `export_import_database`) inherits `false`
-        // here. This spread flows only falses today; a future ANSI utility flag armed `true`
-        // would silently arm it in MySQL too. That hazard is pinned by absolute value in
-        // head_contention's `statement_head_gate_values_are_pinned_per_preset`.
-        ..UtilitySyntax::ANSI
+        // Every remaining utility statement head is explicitly pinned below.
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: false,
+        commit_transaction_keyword: false,
+        rollback_transaction_keyword: false,
+        begin_transaction_modes: false,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: false,
+        start_transaction_isolation_mode: false,
+        start_transaction_deferrable_mode: false,
+        start_transaction_consistent_snapshot: true,
+        transaction_multiple_modes: true,
+        transaction_mode_comma_required: true,
+        transaction_modes_unique: true,
+        abort_transaction_alias: false,
+        end_transaction_alias: false,
+        transaction_release: true,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: false,
+        copy: false,
+        copy_into: false,
+        stage_references: false,
+        comment_on: false,
+        comment_if_exists: false,
+        pragma: false,
+        attach: false,
+        use_qualified_name: false,
+        prepared_statements: false,
+        prepare_typed_parameters: false,
+        load_extension: false,
+        load_bare_name: false,
+        reset_scope: false,
+        detach_if_exists: false,
+        do_statement: false,
+        begin_transaction_mode: false,
+        export_import_database: false,
+        update_extensions: false,
     };
 }
 
@@ -1012,7 +1045,10 @@ impl ShowSyntax {
         // sub-command is DATA on the `ShowTarget` axis, reached by one table-driven
         // dispatch. MySQL-only, off in every other preset (bar the Lenient superset).
         show_admin: true,
-        ..ShowSyntax::ANSI
+        describe_summarize: false,
+        session_statements: true,
+        show_functions: false,
+        show_verbose: false,
     };
 }
 
@@ -1024,11 +1060,14 @@ impl MaintenanceSyntax {
         // `TableMaintenanceKind` axis, reached by one table-driven dispatch. MySQL-only,
         // off in every other preset (bar the Lenient superset).
         table_maintenance: true,
-        // Spread-inheritance invariant: `MaintenanceSyntax::ANSI` is all-false, so the
-        // `vacuum` / `vacuum_analyze` / `analyze` maintenance heads inherit `false` here — this
-        // spread flows only falses, and a base flip would propagate silently. Pinned by value
-        // in head_contention's `statement_head_gate_values_are_pinned_per_preset`.
-        ..MaintenanceSyntax::ANSI
+        // The non-MySQL maintenance heads remain off.
+        vacuum: false,
+        vacuum_analyze: false,
+        reindex: false,
+        analyze: false,
+        analyze_columns: false,
+        checkpoint: false,
+        checkpoint_database: false,
     };
 }
 
@@ -1044,21 +1083,15 @@ impl AccessControlSyntax {
         // MySQL grants/revokes, but not the schema-scoped objects (`ON SCHEMA`/`ON
         // DATABASE`, `ON ALL … IN SCHEMA`) or the `{GRANT|ADMIN} OPTION FOR` prefix — all
         // engine-measured `ER_PARSE_ERROR` on mysql:8 (`SCHEMA`/`DATABASE` are reserved and
-        // cannot introduce a priv_level). Its `access_control` stays on (from `..ANSI`); only
-        // the extended object/prefix surface is off.
+        // cannot introduce a priv_level). Only the extended object/prefix surface is off.
         access_control_extended_objects: false,
         // MySQL owns the account-management DDL family this gate names.
         user_role_management: true,
         // MySQL routes GRANT/REVOKE through its account-based grammar (priv-level objects,
         // `user@host` grantees, PROXY grants, `AS … WITH ROLE`, `IF EXISTS`/`IGNORE UNKNOWN USER`).
         access_control_account_grants: true,
-        // Spread-inheritance invariant: unlike the utility/maintenance spreads, this one
-        // inherits a live `true` — ANSI's base `access_control` GRANT/REVOKE gate — alongside
-        // its all-false remainder (`access_control_extended_objects` is re-stamped `false`
-        // above). So "inherits only falses" does NOT hold here; the inherited `true` is
-        // load-bearing, and a base flip on any inherited gate propagates silently. Pinned by
-        // value in head_contention's `statement_head_gate_values_are_pinned_per_preset`.
-        ..AccessControlSyntax::ANSI
+        // GRANT and REVOKE remain enabled through the account-oriented grammar.
+        access_control: true,
     };
 }
 
@@ -1112,7 +1145,8 @@ impl TypeNameSyntax {
     };
 }
 
-/// MySQL binding powers: [`STANDARD_BINDING_POWERS`] with two documented deltas.
+/// MySQL binding powers, explicitly enumerated with the engine-measured comparison
+/// associativity and bitwise precedence rows.
 ///
 /// **Comparison associativity.** The comparison row (`= <> < <= > >=`, plus
 /// `RLIKE`/`REGEXP`, which fold onto it) is `Assoc::Left`, not `Assoc::NonAssoc`: real
@@ -1128,6 +1162,63 @@ impl TypeNameSyntax {
 /// confirm these ranks when one is available. `~` takes the tight [`prefix_sign`](crate::precedence::BindingPowerTable)
 /// rank (`80`), matching the manual's "unary minus / bit inversion" row.
 pub const MYSQL_BINDING_POWERS: BindingPowerTable = BindingPowerTable {
+    or: BindingPower {
+        left: 10,
+        right: 11,
+        assoc: Assoc::Left,
+    },
+    xor: BindingPower {
+        left: 15,
+        right: 16,
+        assoc: Assoc::Left,
+    },
+    and: BindingPower {
+        left: 20,
+        right: 21,
+        assoc: Assoc::Left,
+    },
+    comparison: BindingPower {
+        left: 40,
+        right: 41,
+        assoc: Assoc::Left,
+    },
+    range_predicate_override: None,
+    is_predicate_override: None,
+    double_equals: BindingPower {
+        left: 40,
+        right: 41,
+        assoc: Assoc::Left,
+    },
+    additive: BindingPower {
+        left: 50,
+        right: 51,
+        assoc: Assoc::Left,
+    },
+    multiplicative: BindingPower {
+        left: 60,
+        right: 61,
+        assoc: Assoc::Left,
+    },
+    exponent: BindingPower {
+        left: 65,
+        right: 66,
+        assoc: Assoc::Left,
+    },
+    string_concat: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    any_operator: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    json_get: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
     // `|` < `&` < `<< >>` < additive (`50`); `^` > multiplicative (`60`). Values chosen so
     // each pair's left rank orders correctly against its neighbours; all left-associative.
     bitwise_or: BindingPower {
@@ -1153,16 +1244,33 @@ pub const MYSQL_BINDING_POWERS: BindingPowerTable = BindingPowerTable {
     // MySQL groups unary `~` with unary minus (the tight sign rank), not the loose
     // PostgreSQL/DuckDB placement.
     prefix_bitwise_not: 80,
-    // The comparison-row associativity delta rides `with_binary` (the same single-delta
-    // form SQLite uses); the bitwise fields above then layer over it.
-    ..STANDARD_BINDING_POWERS.with_binary(
-        &BinaryOperator::Eq(EqualsSpelling::Single),
-        BindingPower {
-            left: 40,
-            right: 41,
-            assoc: Assoc::Left,
-        },
-    )
+    prefix_not: 30,
+    prefix_sign: 80,
+    at_time_zone: BindingPower {
+        left: 70,
+        right: 71,
+        assoc: Assoc::Left,
+    },
+    collate: BindingPower {
+        left: 74,
+        right: 75,
+        assoc: Assoc::Left,
+    },
+    subscript: BindingPower {
+        left: 84,
+        right: 85,
+        assoc: Assoc::Left,
+    },
+    typecast: BindingPower {
+        left: 88,
+        right: 89,
+        assoc: Assoc::Left,
+    },
+    field_selection: BindingPower {
+        left: 92,
+        right: 93,
+        assoc: Assoc::Left,
+    },
 };
 
 impl FeatureSet {
@@ -1307,8 +1415,8 @@ mod tests {
         RESERVED_TYPE_NAME,
     };
     use super::*;
-    use crate::ast::RegexpSpelling;
-    use crate::precedence::Side;
+    use crate::ast::{BinaryOperator, EqualsSpelling, RegexpSpelling};
+    use crate::precedence::{STANDARD_BINDING_POWERS, Side};
 
     #[test]
     fn mysql_reserved_sets_diverge_from_the_shared_sets_in_both_directions() {

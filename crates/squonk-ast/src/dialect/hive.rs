@@ -103,7 +103,15 @@ impl StringLiteralSyntax {
     /// deferred rather than guessed at (`backslash_escapes` stays off).
     pub const HIVE: Self = Self {
         double_quoted_strings: true,
-        ..StringLiteralSyntax::ANSI
+        escape_strings: false,
+        dollar_quoted_strings: false,
+        national_strings: false,
+        backslash_escapes: false,
+        unicode_strings: false,
+        bit_string_literals: false,
+        blob_literals: false,
+        charset_introducers: false,
+        same_line_adjacent_concat: false,
     };
 }
 
@@ -115,7 +123,21 @@ impl TableExpressionSyntax {
     /// bare-alias reservation modelling not done here. Every other table knob is conservatively
     /// ANSI.
     pub const HIVE: Self = Self {
-        ..TableExpressionSyntax::ANSI
+        only: false,
+        table_sample: false,
+        parenthesized_joins: true,
+        table_alias_column_lists: true,
+        join_using_alias: false,
+        index_hints: false,
+        table_hints: false,
+        partition_selection: false,
+        base_table_alias_column_lists: true,
+        string_literal_aliases: false,
+        aliased_parenthesized_join: true,
+        bare_table_alias_is_bare_label: false,
+        table_version: false,
+        table_json_path: false,
+        indexed_by: false,
     };
 }
 
@@ -123,14 +145,40 @@ impl JoinSyntax {
     /// The `HIVE` preset for join syntax.
     pub const HIVE: Self = Self {
         sided_semi_anti_join: true,
-        ..JoinSyntax::ANSI
+        stacked_join_qualifiers: true,
+        full_outer_join: true,
+        natural_cross_join: false,
+        straight_join: false,
+        asof_join: false,
+        positional_join: false,
+        semi_anti_join: false,
+        apply_join: false,
+        recursive_search_cycle: false,
+        recursive_union_rejects_order_limit: false,
+        recursive_using_key: false,
     };
 }
 
 impl TableFactorSyntax {
     /// The `HIVE` preset for table factor syntax.
     pub const HIVE: Self = Self {
-        ..TableFactorSyntax::ANSI
+        lateral: false,
+        table_functions: false,
+        rows_from: false,
+        unnest: false,
+        unnest_with_offset: false,
+        table_function_ordinality: false,
+        special_function_table_source: true,
+        pivot: false,
+        unpivot: false,
+        show_ref: false,
+        from_values: false,
+        json_table: false,
+        xml_table: false,
+        table_expr_factor: false,
+        pivot_value_sources: false,
+        match_recognize: false,
+        open_json: false,
     };
 }
 
@@ -141,7 +189,26 @@ impl SelectSyntax {
     /// clause under the preset. Every other SELECT knob is conservatively ANSI.
     pub const HIVE: Self = Self {
         lateral_view_clause: true,
-        ..SelectSyntax::ANSI
+        distinct_on: false,
+        select_into: false,
+        empty_target_list: false,
+        qualify: false,
+        alias_string_literals: false,
+        bare_alias_string_literals: false,
+        union_by_name: false,
+        wildcard_modifiers: false,
+        wildcard_replace: false,
+        intersect_all: true,
+        except_all: true,
+        qualified_wildcard_alias: false,
+        from_first: false,
+        parenthesized_query_operands: true,
+        values_rows_require_equal_arity: false,
+        values_row_constructor: true,
+        as_alias_rejects_reserved: false,
+        trailing_comma: false,
+        prefix_colon_alias: false,
+        connect_by_clause: false,
     };
 }
 

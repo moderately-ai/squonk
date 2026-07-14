@@ -649,6 +649,15 @@ pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     b"SELCT 1",
     b"SELECT 1 +",
     b"SELECT FROM",
+    // SQLite reports `near \"the same\": syntax error`; quoted input text must not
+    // match a semantic-stage diagnostic stem.
+    b"\"the same\"",
+    b"begin transaction",
+    b"end transaction",
+    b"savepoint s",
+    b"start transaction",
+    b"begin work",
+    b"set transaction read only",
     // Segmentation: `;`-separated statements both accept with agreeing counts, and the
     // separator-less abutment both reject — the statement-splitter surface.
     b"SELECT 1; SELECT 2",
@@ -757,6 +766,18 @@ pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     b"SELECT MAP {[1, 2]: {'k': []}}",
     b"SELECT 5 // 2",
     b"SELECT 1 == 1",
+    // DuckDB's transaction-start production permits the block word to be omitted.
+    b"start",
+    b"start work read only",
+    b"abort work",
+    b"end transaction",
+    // Transaction controls the engine rejects at parse time.
+    b"savepoint s",
+    b"set transaction read only",
+    b"start transaction isolation level serializable",
+    b"start transaction deferrable",
+    b"start transaction read only, read write",
+    b"commit and chain",
     // Reject boundary: syntactic errors both reject, including the unterminated
     // collection-literal brackets (`extract_statements` is parse-only, so an
     // unresolved *name* would instead read as an accept).
@@ -780,6 +801,9 @@ pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     b"\x0bSELECT 1",
     b"SELECT 1\x0b",
     b"SELECT\x0b1",
+    // Comments are content for DuckDB's boundary-trim rule: a vertical tab may sit
+    // outside one comment, but not between two comments in the same empty segment.
+    b";\x0b/**/\x0b/***/\n;\x0b",
     // Non-ASCII-swallow exemplars (duckdb-extract-nonascii-swallow-allowlist): DuckDB's
     // extractor drops bare unrecognized non-ASCII, yielding zero statements with no
     // error (indistinguishable from empty), while our parser rejects. Both minimized by
@@ -787,6 +811,7 @@ pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // 'ش'. Kept green by the target body's `duckdb_nonascii_swallow` pre-filter.
     &[0xc7, 0xa7],
     &[0xd8, 0xb4],
+    "--\r𑌬\u{d132c}".as_bytes(),
     // PG-style generalized operator spellings (duckdb-pg-operator-spelling-under-acceptance):
     // DuckDB inherits PostgreSQL's maximal-munch `Op`-class lexer and *parse*-accepts these
     // runs (bind-rejecting the ones with no backing function), while before the fix our DuckDb
@@ -1025,8 +1050,8 @@ mod tests {
 
     #[test]
     fn pg_differential_raw_bytes_replays_committed_inputs() {
-        // Every committed seed must be accept/reject-agreeing under the current
-        // allowlist; a diverging entry fails inside the body, pinning the regression.
+        // Every committed seed must agree with the PostgreSQL oracle; a diverging entry
+        // fails inside the body and pins the regression.
         for input in PG_DIFFERENTIAL_RAW_BYTES_REPLAYS {
             pg_differential_raw_bytes(input);
         }
@@ -1079,9 +1104,8 @@ mod tests {
     #[cfg(feature = "oracle-engines")]
     #[test]
     fn sqlite_differential_raw_bytes_replays_committed_inputs() {
-        // Every committed SQLite seed must be accept/reject-and-count agreeing under
-        // the current allowlist; a diverging entry fails inside the body, pinning the
-        // regression (mirrors the pg replay test).
+        // Every committed SQLite seed must agree on acceptance and statement count; a
+        // diverging entry fails inside the body and pins the regression.
         for input in SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS {
             sqlite_differential_raw_bytes(input);
         }

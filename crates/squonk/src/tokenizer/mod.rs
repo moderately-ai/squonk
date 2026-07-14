@@ -532,6 +532,16 @@ mod tests {
                 sqlite: false,
                 duckdb: true,
             },
+            // DuckDB treats comments as content for boundary trim: the middle `\v`
+            // lies between two comments and is therefore not at a segment edge.
+            Case {
+                input: ";\x0b/**/\x0b/***/\n;\x0b",
+                ansi: false,
+                postgres: true,
+                mysql: true,
+                sqlite: false,
+                duckdb: false,
+            },
             // Trailing `\v` after a `;`: a leading edge of the (empty) next statement.
             Case {
                 input: "SELECT 1;\x0b",

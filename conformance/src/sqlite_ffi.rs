@@ -148,6 +148,13 @@ pub fn segment(conn: &Connection, sql: &str) -> SqliteSegmentation {
 /// is never silently swallowed — see the module docs. Extend this list when the soak
 /// surfaces a new resolution message as a false divergence.
 fn is_resolution_error(msg: &str) -> bool {
+    // Tokenizer/parser diagnostics quote the offending input after `near`, so broad
+    // semantic stems must never classify their quoted text. For example, the syntax
+    // error for a bare `"the same"` contains that phrase even though no resolution
+    // stage was reached.
+    if msg.starts_with("near ") && msg.ends_with(": syntax error") {
+        return false;
+    }
     // Lower-cased once; SQLite's messages are stable lower-case English.
     const RESOLUTION_STEMS: &[&str] = &[
         "no such table",

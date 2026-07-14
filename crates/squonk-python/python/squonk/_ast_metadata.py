@@ -3028,9 +3028,11 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
         "modes": "TransactionMode[]",
     },
     "TransactionStatement.Commit": {
+        "syntax": "TransactionCommitKeyword",
         "block": "TransactionBlockKeyword",
     },
     "TransactionStatement.Rollback": {
+        "syntax": "TransactionRollbackKeyword",
         "block": "TransactionBlockKeyword",
         "to_savepoint": "Ident",
     },

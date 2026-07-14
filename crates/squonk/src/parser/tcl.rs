@@ -9,16 +9,16 @@
 //! [`super::query`] consults. As in the DDL/DML families, this vocabulary is matched
 //! as contextual words rather than by keyword tag — the full ANSI/PostgreSQL
 //! keyword inventory is a separate ticket, and none of these words are reserved.
-//! The forms are accepted dialect-agnostically (no `FeatureSet` gate), with one
-//! exception: SQLite's `BEGIN {DEFERRED | IMMEDIATE | EXCLUSIVE}` transaction-mode
-//! modifier is gated by `utility_syntax.begin_transaction_mode` (PostgreSQL's `BEGIN`
-//! takes its own, differently-shaped modifier vocabulary — the existing
-//! [`TransactionMode`] list — so the two surfaces do not collide).
+//! Statement availability, exact aliases, block words, mode kinds, and mode repetition
+//! are independent [`UtilitySyntax`](crate::ast::dialect::UtilitySyntax) decisions.
+//! SQLite's `BEGIN {DEFERRED | IMMEDIATE | EXCLUSIVE}` modifier remains a distinct
+//! grammar position from the standard [`TransactionMode`] list.
 
 use crate::ast::{
     Expr, IsolationLevel, Literal, Span, Statement, TransactionAccessMode, TransactionBlockKeyword,
-    TransactionMode, TransactionModeKind, TransactionStart, TransactionStatement, XaAssociation,
-    XaStartKeyword, XaStatement, XaSuspend, Xid, split_radix_prefix,
+    TransactionCommitKeyword, TransactionMode, TransactionModeKind, TransactionRollbackKeyword,
+    TransactionStart, TransactionStatement, XaAssociation, XaStartKeyword, XaStatement, XaSuspend,
+    Xid, split_radix_prefix,
 };
 use crate::error::ParseResult;
 use crate::tokenizer::{Punctuation, TokenKind};
@@ -28,6 +28,25 @@ use super::Dialect;
 use super::engine::Parser;
 use super::expr::number_literal_kind;
 
+fn same_transaction_mode_kind(left: &TransactionMode, right: &TransactionMode) -> bool {
+    matches!(
+        (left, right),
+        (
+            TransactionMode::IsolationLevel { .. },
+            TransactionMode::IsolationLevel { .. }
+        ) | (
+            TransactionMode::AccessMode { .. },
+            TransactionMode::AccessMode { .. }
+        ) | (
+            TransactionMode::Deferrable { .. },
+            TransactionMode::Deferrable { .. }
+        ) | (
+            TransactionMode::ConsistentSnapshot { .. },
+            TransactionMode::ConsistentSnapshot { .. }
+        )
+    )
+}
+
 impl<'a, D: Dialect> Parser<'a, D> {
     /// True if the current token begins a transaction-control statement.
     ///
@@ -36,13 +55,18 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// when `TRANSACTION` follows. The dispatcher must therefore test this before
     /// the session recognizer.
     pub(super) fn peek_starts_transaction_statement(&mut self) -> ParseResult<bool> {
+        let syntax = self.features().utility_syntax;
         Ok(self.peek_is_contextual_keyword("BEGIN")?
-            || self.peek_is_contextual_keyword("START")?
+            || (syntax.start_transaction && self.peek_is_contextual_keyword("START")?)
             || self.peek_is_contextual_keyword("COMMIT")?
+            || (syntax.end_transaction_alias && self.peek_is_contextual_keyword("END")?)
             || self.peek_is_contextual_keyword("ROLLBACK")?
-            || self.peek_is_contextual_keyword("SAVEPOINT")?
-            || self.peek_is_contextual_keyword("RELEASE")?
-            || (self.peek_is_contextual_keyword("SET")?
+            || (syntax.abort_transaction_alias && self.peek_is_contextual_keyword("ABORT")?)
+            || (syntax.transaction_savepoints
+                && (self.peek_is_contextual_keyword("SAVEPOINT")?
+                    || self.peek_is_contextual_keyword("RELEASE")?))
+            || (syntax.set_transaction
+                && self.peek_is_contextual_keyword("SET")?
                 && self.peek_nth_is_contextual_keyword(1, "TRANSACTION")?))
     }
 
@@ -64,8 +88,19 @@ impl<'a, D: Dialect> Parser<'a, D> {
     ) -> ParseResult<TransactionStatement> {
         if self.eat_contextual_keyword("BEGIN")? {
             let mode = self.parse_transaction_mode_kind()?;
-            let block = self.eat_transaction_block_keyword()?;
-            let modes = self.parse_transaction_modes()?;
+            let block = self.eat_transaction_block_keyword(
+                self.features().utility_syntax.begin_transaction_keyword,
+            )?;
+            let modes = if self.features().utility_syntax.begin_transaction_modes {
+                self.parse_transaction_modes_with(
+                    self.features().utility_syntax.transaction_isolation_mode,
+                    self.features().utility_syntax.transaction_access_mode,
+                    self.features().utility_syntax.transaction_deferrable_mode,
+                    false,
+                )?
+            } else {
+                ThinVec::new()
+            };
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Begin {
                 syntax: TransactionStart::Begin,
@@ -74,53 +109,101 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 modes,
                 meta,
             })
-        } else if self.eat_contextual_keyword("START")? {
-            self.expect_contextual_keyword("TRANSACTION")?;
-            let modes = self.parse_transaction_modes()?;
+        } else if self.features().utility_syntax.start_transaction
+            && self.eat_contextual_keyword("START")?
+        {
+            let block = if self
+                .features()
+                .utility_syntax
+                .start_transaction_block_optional
+            {
+                self.eat_transaction_block_keyword(true)?
+            } else {
+                self.expect_contextual_keyword("TRANSACTION")?;
+                Some(TransactionBlockKeyword::Transaction)
+            };
+            let modes = self.parse_transaction_modes_with(
+                self.features()
+                    .utility_syntax
+                    .start_transaction_isolation_mode,
+                self.features().utility_syntax.transaction_access_mode,
+                self.features()
+                    .utility_syntax
+                    .start_transaction_deferrable_mode,
+                self.features()
+                    .utility_syntax
+                    .start_transaction_consistent_snapshot,
+            )?;
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Begin {
                 syntax: TransactionStart::Start,
                 mode: None,
-                // The mandatory `TRANSACTION` is part of the `START TRANSACTION`
-                // keyword, not an optional block noise word.
-                block: None,
+                block,
                 modes,
                 meta,
             })
-        } else if self.eat_contextual_keyword("COMMIT")? {
-            let block = self.eat_transaction_block_keyword()?;
-            let chain = self.parse_transaction_chain()?;
+        } else if let Some(syntax) = self.eat_transaction_commit_keyword()? {
+            let block = self.eat_transaction_block_keyword(
+                self.features().utility_syntax.commit_transaction_keyword,
+            )?;
+            let (chain, release) = self.parse_transaction_completion()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
-            Ok(TransactionStatement::Commit { block, chain, meta })
-        } else if self.eat_contextual_keyword("ROLLBACK")? {
-            let block = self.eat_transaction_block_keyword()?;
-            let (savepoint_keyword, to_savepoint) = if self.eat_contextual_keyword("TO")? {
-                // The `SAVEPOINT` keyword is optional in `ROLLBACK TO [SAVEPOINT] <name>`.
-                let savepoint_keyword = self.eat_contextual_keyword("SAVEPOINT")?;
-                (savepoint_keyword, Some(self.parse_ident()?))
+            Ok(TransactionStatement::Commit {
+                syntax,
+                block,
+                chain,
+                release,
+                meta,
+            })
+        } else if let Some(syntax) = self.eat_transaction_rollback_keyword()? {
+            let block = self.eat_transaction_block_keyword(
+                self.features().utility_syntax.rollback_transaction_keyword,
+            )?;
+            let (savepoint_keyword, to_savepoint) =
+                if self.features().utility_syntax.transaction_savepoints
+                    && self.eat_contextual_keyword("TO")?
+                {
+                    // The `SAVEPOINT` keyword is optional in `ROLLBACK TO [SAVEPOINT] <name>`.
+                    let savepoint_keyword = self.eat_contextual_keyword("SAVEPOINT")?;
+                    (savepoint_keyword, Some(self.parse_ident()?))
+                } else {
+                    (false, None)
+                };
+            let (chain, release) = if to_savepoint.is_none() {
+                self.parse_transaction_completion()?
             } else {
-                (false, None)
-            };
-            let chain = if to_savepoint.is_none() {
-                self.parse_transaction_chain()?
-            } else {
-                None
+                (None, None)
             };
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Rollback {
+                syntax,
                 block,
                 savepoint_keyword,
                 to_savepoint,
                 chain,
+                release,
                 meta,
             })
-        } else if self.eat_contextual_keyword("SAVEPOINT")? {
+        } else if self.features().utility_syntax.transaction_savepoints
+            && self.eat_contextual_keyword("SAVEPOINT")?
+        {
             let name = self.parse_ident()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Savepoint { name, meta })
-        } else if self.eat_contextual_keyword("RELEASE")? {
+        } else if self.features().utility_syntax.transaction_savepoints
+            && self.eat_contextual_keyword("RELEASE")?
+        {
             // The `SAVEPOINT` keyword is optional in `RELEASE [SAVEPOINT] <name>`.
-            let savepoint_keyword = self.eat_contextual_keyword("SAVEPOINT")?;
+            let savepoint_keyword = if self
+                .features()
+                .utility_syntax
+                .release_savepoint_keyword_optional
+            {
+                self.eat_contextual_keyword("SAVEPOINT")?
+            } else {
+                self.expect_contextual_keyword("SAVEPOINT")?;
+                true
+            };
             let savepoint = self.parse_ident()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Release {
@@ -128,7 +211,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 savepoint,
                 meta,
             })
-        } else if self.eat_contextual_keyword("SET")? {
+        } else if self.features().utility_syntax.set_transaction
+            && self.eat_contextual_keyword("SET")?
+        {
             self.expect_contextual_keyword("TRANSACTION")?;
             let modes = self.parse_transaction_modes()?;
             if modes.is_empty() {
@@ -152,14 +237,64 @@ impl<'a, D: Dialect> Parser<'a, D> {
         Ok(Some(chain))
     }
 
+    fn parse_transaction_completion(&mut self) -> ParseResult<(Option<bool>, Option<bool>)> {
+        let chain = self.parse_transaction_chain()?;
+        if chain.is_some() || !self.features().utility_syntax.transaction_release {
+            return Ok((chain, None));
+        }
+        let release = if self.eat_contextual_keyword("RELEASE")? {
+            Some(true)
+        } else if self.peek_is_contextual_keyword("NO")?
+            && self.peek_nth_is_contextual_keyword(1, "RELEASE")?
+        {
+            self.expect_contextual_keyword("NO")?;
+            self.expect_contextual_keyword("RELEASE")?;
+            Some(false)
+        } else {
+            None
+        };
+        Ok((None, release))
+    }
+
+    fn eat_transaction_commit_keyword(&mut self) -> ParseResult<Option<TransactionCommitKeyword>> {
+        if self.eat_contextual_keyword("COMMIT")? {
+            Ok(Some(TransactionCommitKeyword::Commit))
+        } else if self.features().utility_syntax.end_transaction_alias
+            && self.eat_contextual_keyword("END")?
+        {
+            Ok(Some(TransactionCommitKeyword::End))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn eat_transaction_rollback_keyword(
+        &mut self,
+    ) -> ParseResult<Option<TransactionRollbackKeyword>> {
+        if self.eat_contextual_keyword("ROLLBACK")? {
+            Ok(Some(TransactionRollbackKeyword::Rollback))
+        } else if self.features().utility_syntax.abort_transaction_alias
+            && self.eat_contextual_keyword("ABORT")?
+        {
+            Ok(Some(TransactionRollbackKeyword::Abort))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Consume the interchangeable `WORK` / `TRANSACTION` block noise word that may
     /// follow `BEGIN`/`COMMIT`/`ROLLBACK`, returning which was written (or `None`).
     /// The two spellings carry no meaning; the tag lets a source-fidelity render
     /// replay the exact word.
-    fn eat_transaction_block_keyword(&mut self) -> ParseResult<Option<TransactionBlockKeyword>> {
-        if self.eat_contextual_keyword("WORK")? {
+    fn eat_transaction_block_keyword(
+        &mut self,
+        transaction_keyword: bool,
+    ) -> ParseResult<Option<TransactionBlockKeyword>> {
+        if self.features().utility_syntax.transaction_work_keyword
+            && self.eat_contextual_keyword("WORK")?
+        {
             Ok(Some(TransactionBlockKeyword::Work))
-        } else if self.eat_contextual_keyword("TRANSACTION")? {
+        } else if transaction_keyword && self.eat_contextual_keyword("TRANSACTION")? {
             Ok(Some(TransactionBlockKeyword::Transaction))
         } else {
             Ok(None)
@@ -190,25 +325,78 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// Parse a possibly-empty transaction mode list (`START`/`BEGIN`,
     /// `SET TRANSACTION`, and the session `SET SESSION CHARACTERISTICS`).
     pub(super) fn parse_transaction_modes(&mut self) -> ParseResult<ThinVec<TransactionMode>> {
+        self.parse_transaction_modes_with(
+            self.features().utility_syntax.transaction_isolation_mode,
+            self.features().utility_syntax.transaction_access_mode,
+            self.features().utility_syntax.transaction_deferrable_mode,
+            false,
+        )
+    }
+
+    fn parse_transaction_modes_with(
+        &mut self,
+        isolation: bool,
+        access: bool,
+        deferrable: bool,
+        consistent_snapshot: bool,
+    ) -> ParseResult<ThinVec<TransactionMode>> {
         let mut modes = ThinVec::new();
-        while let Some(mode) = self.parse_optional_transaction_mode()? {
+        let mut mode_required = false;
+        loop {
+            let Some(mode) = self.parse_optional_transaction_mode(
+                isolation,
+                access,
+                deferrable,
+                consistent_snapshot,
+            )?
+            else {
+                if mode_required {
+                    return Err(self.unexpected("a transaction mode after `,`"));
+                }
+                break;
+            };
+            if self.features().utility_syntax.transaction_modes_unique
+                && modes
+                    .iter()
+                    .any(|existing| same_transaction_mode_kind(existing, &mode))
+            {
+                return Err(self.unexpected("a transaction mode that has not already appeared"));
+            }
             modes.push(mode);
+            if !self.features().utility_syntax.transaction_multiple_modes {
+                break;
+            }
             // The mode separator is an optional comma: ANSI writes commas between
             // modes while PostgreSQL also allows bare juxtaposition. Consume one if
             // present; the loop ends when no further mode follows.
-            let _ = self.eat_punct(Punctuation::Comma)?;
+            let comma = self.eat_punct(Punctuation::Comma)?;
+            if self
+                .features()
+                .utility_syntax
+                .transaction_mode_comma_required
+                && !comma
+            {
+                break;
+            }
+            mode_required = comma;
         }
         Ok(modes)
     }
 
-    fn parse_optional_transaction_mode(&mut self) -> ParseResult<Option<TransactionMode>> {
+    fn parse_optional_transaction_mode(
+        &mut self,
+        isolation: bool,
+        access: bool,
+        deferrable: bool,
+        consistent_snapshot: bool,
+    ) -> ParseResult<Option<TransactionMode>> {
         let start = self.current_span()?;
-        if self.eat_contextual_keyword("ISOLATION")? {
+        if isolation && self.eat_contextual_keyword("ISOLATION")? {
             self.expect_contextual_keyword("LEVEL")?;
             let level = self.parse_isolation_level()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(Some(TransactionMode::IsolationLevel { level, meta }))
-        } else if self.eat_contextual_keyword("READ")? {
+        } else if access && self.eat_contextual_keyword("READ")? {
             let access = if self.eat_contextual_keyword("ONLY")? {
                 TransactionAccessMode::ReadOnly
             } else if self.eat_contextual_keyword("WRITE")? {
@@ -218,13 +406,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
             };
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(Some(TransactionMode::AccessMode { access, meta }))
-        } else if self.eat_contextual_keyword("DEFERRABLE")? {
+        } else if deferrable && self.eat_contextual_keyword("DEFERRABLE")? {
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(Some(TransactionMode::Deferrable {
                 deferrable: true,
                 meta,
             }))
-        } else if self.eat_contextual_keyword("NOT")? {
+        } else if deferrable && self.eat_contextual_keyword("NOT")? {
             // `NOT` opens only `NOT DEFERRABLE` in a transaction mode list.
             self.expect_contextual_keyword("DEFERRABLE")?;
             let meta = self.make_meta(start.union(self.preceding_span()));
@@ -232,6 +420,11 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 deferrable: false,
                 meta,
             }))
+        } else if consistent_snapshot && self.eat_contextual_keyword("WITH")? {
+            self.expect_contextual_keyword("CONSISTENT")?;
+            self.expect_contextual_keyword("SNAPSHOT")?;
+            let meta = self.make_meta(start.union(self.preceding_span()));
+            Ok(Some(TransactionMode::ConsistentSnapshot { meta }))
         } else {
             Ok(None)
         }

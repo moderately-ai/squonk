@@ -3053,9 +3053,65 @@ pub struct GroupingSyntax {
 /// crossed its 16-field line, so those axes live there rather than here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UtilitySyntax {
+    /// Accept the standard `START TRANSACTION` transaction opener. Some engines,
+    /// notably SQLite, expose only `BEGIN` and reject the `START` spelling.
+    pub start_transaction: bool,
+    /// Accept `START [TRANSACTION | WORK]` with the transaction block word omitted or
+    /// spelled `WORK`. When off, the standard `START TRANSACTION` spelling remains
+    /// mandatory. DuckDB accepts all three spellings; PostgreSQL requires
+    /// `TRANSACTION` after `START`.
+    pub start_transaction_block_optional: bool,
+    /// Accept `WORK` as the optional transaction block word on `BEGIN`, `COMMIT`, and
+    /// `ROLLBACK`. `START WORK` is controlled by
+    /// [`start_transaction_block_optional`](Self::start_transaction_block_optional).
+    pub transaction_work_keyword: bool,
+    /// Accept `TRANSACTION` as the optional block word after `BEGIN`.
+    pub begin_transaction_keyword: bool,
+    /// Accept `TRANSACTION` as the optional block word after `COMMIT`.
+    pub commit_transaction_keyword: bool,
+    /// Accept `TRANSACTION` as the optional block word after `ROLLBACK`.
+    pub rollback_transaction_keyword: bool,
+    /// Accept a standard transaction-mode list after `BEGIN [WORK | TRANSACTION]`.
+    pub begin_transaction_modes: bool,
+    /// Accept transaction savepoint statements: `SAVEPOINT`, `RELEASE`, and
+    /// `ROLLBACK TO`. This controls the complete savepoint statement family.
+    pub transaction_savepoints: bool,
+    /// Accept `SET TRANSACTION <mode> [, ...]`.
+    pub set_transaction: bool,
+    /// Accept `ISOLATION LEVEL <level>` in a transaction mode list.
+    pub transaction_isolation_mode: bool,
+    /// Accept `READ ONLY` / `READ WRITE` in a transaction mode list.
+    pub transaction_access_mode: bool,
+    /// Accept `DEFERRABLE` / `NOT DEFERRABLE` in a transaction mode list.
+    pub transaction_deferrable_mode: bool,
+    /// Accept `ISOLATION LEVEL <level>` after `START TRANSACTION`. When off, the
+    /// isolation form can remain available to `SET TRANSACTION`.
+    pub start_transaction_isolation_mode: bool,
+    /// Accept `[NOT] DEFERRABLE` after `START TRANSACTION`. When off, the form can
+    /// remain available to `SET TRANSACTION`.
+    pub start_transaction_deferrable_mode: bool,
+    /// Accept MySQL's `WITH CONSISTENT SNAPSHOT` `START TRANSACTION` characteristic.
+    pub start_transaction_consistent_snapshot: bool,
+    /// Accept more than one transaction mode, separated by an optional comma.
+    pub transaction_multiple_modes: bool,
+    /// Require a comma between adjacent transaction modes. PostgreSQL permits bare
+    /// whitespace; MySQL requires the comma.
+    pub transaction_mode_comma_required: bool,
+    /// Reject a repeated transaction-mode kind in one list. MySQL's grammar permits
+    /// each characteristic category at most once.
+    pub transaction_modes_unique: bool,
+    /// Accept `ABORT` as an exact `ROLLBACK` synonym.
+    pub abort_transaction_alias: bool,
+    /// Accept `END` as an exact `COMMIT` synonym.
+    pub end_transaction_alias: bool,
+    /// Accept MySQL's `COMMIT|ROLLBACK [NO] RELEASE` completion modifier.
+    pub transaction_release: bool,
     /// Accept `COMMIT AND [NO] CHAIN` and whole-transaction `ROLLBACK AND [NO] CHAIN`.
     /// PostgreSQL and SQL-standard transaction chaining; off where the engine grammar lacks it.
     pub transaction_chain: bool,
+    /// Accept `RELEASE <name>` without the `SAVEPOINT` keyword. When off,
+    /// `RELEASE SAVEPOINT <name>` remains available with transaction savepoints.
+    pub release_savepoint_keyword_optional: bool,
     /// Accept the PostgreSQL `COPY <table>|(<query>) {FROM|TO} <endpoint> ...` bulk
     /// data-transfer statement. PostgreSQL-only (also its generic/permissive supersets);
     /// off in ANSI and MySQL, which have no `COPY`, so there the leading `COPY` keyword

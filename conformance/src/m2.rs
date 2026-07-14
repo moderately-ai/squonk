@@ -405,7 +405,10 @@ fn strip_bare_context_nonascii(sql: &str) -> String {
             }
             State::LineComment => {
                 out.push(b);
-                if b == b'\n' {
+                // DuckDB's line-comment body ends at either newline byte. Ending at
+                // carriage return is essential here: a following bare non-ASCII token
+                // is swallowed by `extract_statements`, not protected comment text.
+                if b == b'\n' || b == b'\r' {
                     state = State::Normal;
                 }
             }
@@ -579,6 +582,13 @@ pub const DUCKDB_GRAMMAR_GAPS: &[&str] = &[];
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn duckdb_nonascii_strip_honours_carriage_return_comment_termination() {
+        assert_eq!(strip_bare_context_nonascii("--\r𑌬"), "--\r");
+        assert_eq!(strip_bare_context_nonascii("--\n𑌬"), "--\n");
+        assert_eq!(strip_bare_context_nonascii("--𑌬"), "--𑌬");
+    }
     use crate::oracle::accept_reject_divergence;
     use crate::pg::PgQueryOracle;
     use squonk::dialect::{DuckDb, Postgres, Sqlite};
@@ -1160,6 +1170,20 @@ mod tests {
         // Unreliable engine count: both accept, count mismatch tolerated (SQLite
         // resolution-truncation path).
         assert_eq!(raw_bytes_divergence("e", Some(1), true, 2, false), None);
+    }
+
+    #[test]
+    fn sqlite_syntax_error_text_cannot_match_a_resolution_stem() {
+        let conn = SqliteConnection::open_in_memory().unwrap();
+        assert!(matches!(
+            crate::sqlite_ffi::segment(&conn, "\"the same\""),
+            SqliteSegmentation::Reject(_),
+        ));
+        assert_eq!(
+            sqlite_raw_bytes_divergence(&conn, "\"the same\""),
+            None,
+            "both SQLite and the fitted dialect reject the bare quoted identifier",
+        );
     }
 
     #[test]

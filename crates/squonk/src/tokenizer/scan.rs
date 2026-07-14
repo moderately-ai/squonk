@@ -527,12 +527,17 @@ fn skip_trivia<S: TriviaSink>(
     // vertical tab): folded as whitespace below, but legal only as leading/trailing
     // statement trivia. `sweep_start` is where this trivia sweep began — the byte just
     // before it is the previous token's last byte (a `;` there means we are at a
-    // statement's leading edge). `boundary_at` is the offset of the first boundary byte
-    // folded in this sweep, so the interior-vs-edge guard can point the error at it.
+    // statement's leading edge). Comments count as content for this narrow rule: DuckDB
+    // accepts a boundary byte on either side of one comment, but rejects one between two
+    // comments. `pending_boundary` records a boundary byte with content on its left; a
+    // later comment or content token supplies the rejecting right side.
     // The whole mechanism is gated off for every dialect but DuckDB.
     let track_boundary = features.byte_classes.has_boundary_whitespace();
     let sweep_start = cursor.pos();
-    let mut boundary_at: Option<u32> = None;
+    let content_before_sweep =
+        sweep_start != 0 && cursor.src().as_bytes()[sweep_start as usize - 1] != b';';
+    let mut comment_seen = false;
+    let mut pending_boundary: Option<u32> = None;
     loop {
         let start = cursor.pos();
         let kind = match cursor.peek() {
@@ -543,11 +548,15 @@ fn skip_trivia<S: TriviaSink>(
                 cursor.eat_while(|b| {
                     features.has_byte_class(b, CLASS_WHITESPACE | CLASS_WHITESPACE_CONTINUE)
                 });
-                if track_boundary && boundary_at.is_none() {
-                    boundary_at = cursor.src().as_bytes()[start as usize..cursor.pos() as usize]
+                if track_boundary {
+                    let boundary_at = cursor.src().as_bytes()
+                        [start as usize..cursor.pos() as usize]
                         .iter()
                         .position(|&b| features.has_byte_class(b, CLASS_WHITESPACE_BOUNDARY))
                         .map(|i| start + i as u32);
+                    if pending_boundary.is_none() && (content_before_sweep || comment_seen) {
+                        pending_boundary = boundary_at;
+                    }
                 }
                 TriviaKind::Whitespace
             }
@@ -621,11 +630,9 @@ fn skip_trivia<S: TriviaSink>(
                 // error only when a content token both precedes and follows it in the same
                 // statement — a leading edge (sweep at input start, or just past a `;`) or
                 // a trailing edge (sweep ends at `;` or end of input) is legal.
-                if let Some(off) = boundary_at {
-                    let content_before = sweep_start != 0
-                        && cursor.src().as_bytes()[sweep_start as usize - 1] != b';';
+                if let Some(off) = pending_boundary {
                     let content_after = cursor.peek().is_some_and(|b| b != b';');
-                    if content_before && content_after {
+                    if content_after {
                         return Err(LexError::new(
                             LexErrorKind::StrayByte,
                             Span::new(off, off + 1),
@@ -635,6 +642,15 @@ fn skip_trivia<S: TriviaSink>(
                 return Ok(());
             }
         };
+        if matches!(kind, TriviaKind::LineComment | TriviaKind::BlockComment) {
+            if let Some(off) = pending_boundary {
+                return Err(LexError::new(
+                    LexErrorKind::StrayByte,
+                    Span::new(off, off + 1),
+                ));
+            }
+            comment_seen = true;
+        }
         // PG parity: reject a raw NUL byte (`0x00`) embedded in a comment. PostgreSQL
         // rejects a NUL anywhere in a query — a query reaches the server as a
         // NUL-terminated C string, so libpg_query's `CString::new` fails on any interior

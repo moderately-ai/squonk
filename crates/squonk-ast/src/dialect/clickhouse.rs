@@ -68,7 +68,27 @@ impl SelectSyntax {
     /// ANSI: ClickHouse's further SELECT extensions (e.g. `WITH FILL`, `ARRAY JOIN`,
     /// `SAMPLE`) have no modelled gate and are deferred to focused tickets.
     pub const CLICKHOUSE: Self = Self {
-        ..SelectSyntax::ANSI
+        distinct_on: false,
+        select_into: false,
+        empty_target_list: false,
+        qualify: false,
+        alias_string_literals: false,
+        bare_alias_string_literals: false,
+        union_by_name: false,
+        wildcard_modifiers: false,
+        wildcard_replace: false,
+        intersect_all: true,
+        except_all: true,
+        qualified_wildcard_alias: false,
+        from_first: false,
+        parenthesized_query_operands: true,
+        values_rows_require_equal_arity: false,
+        values_row_constructor: true,
+        as_alias_rejects_reserved: false,
+        trailing_comma: false,
+        prefix_colon_alias: false,
+        lateral_view_clause: false,
+        connect_by_clause: false,
     };
 }
 
@@ -78,14 +98,30 @@ impl QueryTailSyntax {
         limit_by_clause: true,
         settings_clause: true,
         format_clause: true,
-        ..QueryTailSyntax::ANSI
+        fetch_first: true,
+        limit_offset_comma: false,
+        locking_clauses: false,
+        key_lock_strengths: false,
+        stacked_locking_clauses: false,
+        using_sample: false,
+        leading_offset: true,
+        limit_expressions: true,
+        limit_percent: false,
+        with_ties_requires_order_by: false,
+        pipe_syntax: false,
+        for_xml_json_clause: false,
     };
 }
 
 impl GroupingSyntax {
     /// The `CLICKHOUSE` preset for grouping syntax.
     pub const CLICKHOUSE: Self = Self {
-        ..GroupingSyntax::ANSI
+        grouping_sets: true,
+        with_rollup: false,
+        order_by_using: false,
+        group_by_all: false,
+        group_by_set_quantifier: false,
+        order_by_all: false,
     };
 }
 
@@ -103,7 +139,20 @@ impl TypeNameSyntax {
         datetime64_type: true,
         nested_type: true,
         bit_width_integer_names: true,
-        ..TypeNameSyntax::ANSI
+        extended_scalar_type_names: false,
+        enum_type: false,
+        set_type: false,
+        numeric_modifiers: false,
+        integer_display_width: false,
+        composite_types: false,
+        varchar_requires_length: false,
+        zoned_temporal_types: true,
+        empty_type_parens: false,
+        character_set_annotation: false,
+        signed_type_modifier: false,
+        liberal_type_names: false,
+        string_type_modifiers: false,
+        angle_bracket_types: false,
     };
 }
 

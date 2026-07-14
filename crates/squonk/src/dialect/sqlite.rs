@@ -425,6 +425,47 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_transaction_control_matches_its_statement_vocabulary() {
+        for sql in [
+            "BEGIN",
+            "BEGIN TRANSACTION",
+            "COMMIT",
+            "COMMIT TRANSACTION",
+            "END",
+            "END TRANSACTION",
+            "ROLLBACK",
+            "ROLLBACK TRANSACTION",
+            "SAVEPOINT s",
+            "RELEASE s",
+            "RELEASE SAVEPOINT s",
+            "ROLLBACK TO s",
+            "ROLLBACK TO SAVEPOINT s",
+        ] {
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_ok(),
+                "SQLite parses {sql:?}",
+            );
+        }
+
+        for sql in [
+            "START TRANSACTION",
+            "BEGIN WORK",
+            "COMMIT WORK",
+            "ROLLBACK WORK",
+            "SET TRANSACTION READ ONLY",
+            "BEGIN READ ONLY",
+            "ABORT",
+        ] {
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Sqlite)).is_err(),
+                "SQLite rejects {sql:?}",
+            );
+        }
+
+        assert_eq!(sqlite_render("END TRANSACTION"), "END TRANSACTION");
+    }
+
+    #[test]
     fn sqlite_equality_spellings_round_trip_exactly() {
         // `==` and `=` fold onto the one canonical equality operator with an
         // `EqualsSpelling` tag (ADR-0011), so each spelling round-trips verbatim.

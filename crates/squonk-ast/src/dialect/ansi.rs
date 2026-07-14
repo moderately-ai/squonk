@@ -655,7 +655,29 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: true,
+        transaction_mode_comma_required: false,
+        transaction_modes_unique: false,
+        abort_transaction_alias: false,
+        end_transaction_alias: false,
+        transaction_release: false,
         transaction_chain: true,
+        release_savepoint_keyword_optional: true,
         copy: false,
         // `COPY INTO` is Snowflake-specific bulk load/unload — not standard SQL, so the
         // ANSI baseline leaves the surface off (MySQL and the other ANSI-derived presets

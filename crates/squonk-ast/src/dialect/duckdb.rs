@@ -3,15 +3,12 @@
 
 //! The DuckDB dialect preset (PostgreSQL-derived).
 //!
-//! DuckDB is PostgreSQL-dialect-compatible by design, so this preset is
-//! [`FeatureSet::POSTGRES`] with DuckDB deltas layered on top. This is the deliberate
-//! exception to the "never reference a gated sibling" rule: the `duckdb` cargo feature
-//! implies `postgres`, so sharing the PostgreSQL sub-presets records the real derivation
-//! without duplicating values.
+//! DuckDB is PostgreSQL-dialect-compatible by design, but every field is enumerated here.
+//! Values shared with PostgreSQL are repeated deliberately so either preset changing forces
+//! an explicit review of the other.
 //!
-//! Comments below are kept where a value is not an obvious inheritance/addition, such as
-//! a parse-time tightening, keyword reservation needed to disambiguate grammar, or the
-//! `->` precedence difference measured against the DuckDB oracle.
+//! Comments focus on syntax and oracle evidence: parse-time tightenings, keyword reservation
+//! needed to disambiguate grammar, and measured precedence differences.
 
 use super::{
     AccessControlSyntax, AggregateCallSyntax, CallSyntax, CaretOperator, Casing,
@@ -25,9 +22,8 @@ use super::{
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
     TypeNameSyntax, UtilitySyntax,
 };
-use crate::ast::{BinaryOperator, EqualsSpelling};
 use crate::precedence::{
-    Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON, STANDARD_BINDING_POWERS,
+    Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
     STANDARD_SET_OPERATION_BINDING_POWERS,
 };
 
@@ -140,17 +136,20 @@ impl PredicateSyntax {
     pub const DUCKDB: Self = Self {
         unparenthesized_in_list: true,
         // DuckDB rejects the SQL-standard `OVERLAPS` period predicate (engine-probed
-        // 1.5.4) — override the `..Self::POSTGRES` spread's `true`.
+        // 1.5.4).
         overlaps_period_predicate: false,
         // The PostgreSQL `LIKE/ILIKE ANY|ALL (array)` pattern-match quantifier is not a
-        // DuckDB construct — override the `..Self::POSTGRES` spread's `true`.
+        // DuckDB construct.
         pattern_match_quantifier: false,
         between_symmetric: false,
         is_normalized: false,
-        // DuckDB accepts the two-word `<expr> NOT NULL` postfix (engine-measured) — override
-        // the `..Self::POSTGRES` spread's `false`.
+        // DuckDB accepts the two-word `<expr> NOT NULL` postfix (engine-measured).
         null_test_two_word_postfix: true,
-        ..Self::POSTGRES
+        is_distinct_from: true,
+        like: true,
+        ilike: true,
+        similar_to: true,
+        empty_in_list: false,
     };
 }
 
@@ -168,32 +167,115 @@ impl PredicateSyntax {
 /// still folds as the JSON accessor, at this same DuckDB rank (one table
 /// drives parser and renderer, per dialect).
 pub const DUCKDB_BINDING_POWERS: BindingPowerTable = BindingPowerTable {
+    or: BindingPower {
+        left: 10,
+        right: 11,
+        assoc: Assoc::Left,
+    },
+    xor: BindingPower {
+        left: 15,
+        right: 16,
+        assoc: Assoc::Left,
+    },
+    and: BindingPower {
+        left: 20,
+        right: 21,
+        assoc: Assoc::Left,
+    },
+    comparison: BindingPower {
+        left: 40,
+        right: 41,
+        assoc: Assoc::NonAssoc,
+    },
+    range_predicate_override: None,
     // The `IS`-family predicates (`IS NULL`, `IS DISTINCT FROM`, `IS TRUE`, …) rank one tier
     // below comparison, so `a <> b IS NULL` groups `(a <> b) IS NULL` and `a IS DISTINCT FROM
     // b = c` groups `a IS DISTINCT FROM (b = c)` (measured on 1.5.4 via `json_serialize_sql`).
     is_predicate_override: Some(IS_PREDICATE_BELOW_COMPARISON),
-    ..STANDARD_BINDING_POWERS
-        .with_binary(
-            &BinaryOperator::JsonGet,
-            BindingPower {
-                left: 4,
-                right: 5,
-                assoc: Assoc::Left,
-            },
-        )
-        // DuckDB lexes `==` as a generic `%left Op`, not the `%nonassoc '='` comparison: it
-        // binds tighter than the comparisons and looser than additive, left-associative, so
-        // `a = b == c` is `a = (b == c)` and `a == b == c` is `((a = b) = c)` (measured on
-        // 1.5.4). This is the `any_operator` rank (45/46), the same `%left Op OPERATOR` slot
-        // `||`/`@>` occupy; splitting it off keeps the `=`/`<`/`>` comparisons non-associative.
-        .with_binary(
-            &BinaryOperator::Eq(EqualsSpelling::Double),
-            BindingPower {
-                left: 45,
-                right: 46,
-                assoc: Assoc::Left,
-            },
-        )
+    // DuckDB lexes `==` as a generic `%left Op`, not the `%nonassoc '='` comparison.
+    double_equals: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    additive: BindingPower {
+        left: 50,
+        right: 51,
+        assoc: Assoc::Left,
+    },
+    multiplicative: BindingPower {
+        left: 60,
+        right: 61,
+        assoc: Assoc::Left,
+    },
+    exponent: BindingPower {
+        left: 65,
+        right: 66,
+        assoc: Assoc::Left,
+    },
+    string_concat: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    any_operator: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    json_get: BindingPower {
+        left: 4,
+        right: 5,
+        assoc: Assoc::Left,
+    },
+    bitwise_or: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    bitwise_and: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    bitwise_shift: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    bitwise_xor: BindingPower {
+        left: 45,
+        right: 46,
+        assoc: Assoc::Left,
+    },
+    prefix_not: 30,
+    prefix_sign: 80,
+    prefix_bitwise_not: 46,
+    at_time_zone: BindingPower {
+        left: 70,
+        right: 71,
+        assoc: Assoc::Left,
+    },
+    collate: BindingPower {
+        left: 74,
+        right: 75,
+        assoc: Assoc::Left,
+    },
+    subscript: BindingPower {
+        left: 84,
+        right: 85,
+        assoc: Assoc::Left,
+    },
+    typecast: BindingPower {
+        left: 88,
+        right: 89,
+        assoc: Assoc::Left,
+    },
+    field_selection: BindingPower {
+        left: 92,
+        right: 93,
+        assoc: Assoc::Left,
+    },
 };
 
 impl SelectSyntax {
@@ -243,16 +325,24 @@ impl SelectSyntax {
         // top-level semi-structured `a:b` access, the one construct that would claim the
         // same `<ident> :` head. `duckdb-colon-alias`.
         prefix_colon_alias: true,
-        ..SelectSyntax::POSTGRES
+        distinct_on: true,
+        select_into: true,
+        wildcard_replace: false,
+        intersect_all: true,
+        except_all: true,
+        parenthesized_query_operands: true,
+        values_row_constructor: true,
+        as_alias_rejects_reserved: false,
+        lateral_view_clause: false,
+        connect_by_clause: false,
     };
 }
 
 impl QueryTailSyntax {
     /// The `DUCKDB` preset for query tail syntax.
     pub const DUCKDB: Self = Self {
-        // DuckDB has no `FOR UPDATE`/`FOR SHARE` row locking, so this diverges *below*
-        // the PostgreSQL base it otherwise spreads (like `empty_target_list`). The
-        // strength/stacking refinements ride the same base, so override them off too
+        // DuckDB has no `FOR UPDATE`/`FOR SHARE` row locking. The
+        // strength/stacking refinements stay off too
         // rather than inherit PostgreSQL's `true` for a dialect with no locking clause.
         locking_clauses: false,
         key_lock_strengths: false,
@@ -270,7 +360,15 @@ impl QueryTailSyntax {
         // PostgreSQL's raw-parse `WITH TIES` guards are not modelled for DuckDB (conservative
         // — DuckDB's own `WITH TIES` validity is unprobed here); keep the PG-only behaviour.
         with_ties_requires_order_by: false,
-        ..QueryTailSyntax::POSTGRES
+        fetch_first: true,
+        limit_offset_comma: false,
+        leading_offset: true,
+        limit_expressions: true,
+        pipe_syntax: false,
+        limit_by_clause: false,
+        settings_clause: false,
+        format_clause: false,
+        for_xml_json_clause: false,
     };
 }
 
@@ -283,7 +381,9 @@ impl GroupingSyntax {
         group_by_all: true,
         group_by_set_quantifier: false,
         order_by_all: true,
-        ..GroupingSyntax::POSTGRES
+        grouping_sets: true,
+        with_rollup: false,
+        order_by_using: true,
     };
 }
 
@@ -291,26 +391,33 @@ impl ExpressionSyntax {
     /// The `DUCKDB` preset for expression syntax.
     pub const DUCKDB: Self = Self {
         collection_literals: true,
-        // The three-bound `[lower:upper:step]` slice with its `-` open-upper placeholder —
-        // a DuckDB extension over the two-bound slice the POSTGRES spread carries.
+        // The three-bound `[lower:upper:step]` slice with its `-` open-upper placeholder.
         slice_step: true,
-        // The `#n` positional column reference — a DuckDB-only extension; `#` is a stray
-        // byte in every other preset, so this overrides the POSTGRES `false` spread.
+        // The `#n` positional column reference — a DuckDB-only extension.
         positional_column: true,
         lambda_keyword: true,
-        // DuckDB parses `(struct).field` (field_selection, from the POSTGRES spread) but
+        // DuckDB parses `(struct).field` but
         // has no `.*` value-expansion production — `(struct).*`, `ROW(t.*)`, `f(t.*)`,
         // `t.*::type` all parse-reject (engine-probed 1.5.4). Override the POSTGRES `true`.
         field_wildcard: false,
         // DuckDB reaches nested `ARRAY[[1,2],[3,4]]` through `collection_literals` (a
         // top-level `[…]` list is a value there, and levels may mix scalars and lists),
-        // so the PG multidim production stays off — override the POSTGRES `true` spread.
+        // so the multidimensional array production stays off.
         multidim_array_literals: false,
         semi_structured_access: false,
-        // The relaxed interval spellings (`INTERVAL 3 DAYS`, `INTERVAL (x) DAY`) — a
-        // DuckDB extension over the standard quoted form the POSTGRES spread carries.
+        // The relaxed interval spellings (`INTERVAL 3 DAYS`, `INTERVAL (x) DAY`).
         relaxed_interval_syntax: true,
-        ..ExpressionSyntax::POSTGRES
+        typecast_operator: true,
+        subscript: true,
+        collate: true,
+        at_time_zone: true,
+        array_constructor: true,
+        row_constructor: true,
+        struct_constructor: false,
+        field_selection: true,
+        typed_string_literals: true,
+        typed_interval_literal: true,
+        mysql_interval_operator: false,
     };
 }
 
@@ -373,9 +480,17 @@ impl OperatorSyntax {
         // operator knobs).
         null_test_postfix: true,
         // The PostgreSQL any-operator quantifier (`3 * ANY(list)`) is not a DuckDB
-        // construct — override the `..OperatorSyntax::POSTGRES` spread's `true`.
+        // construct.
         quantified_arbitrary_operator: false,
-        ..OperatorSyntax::POSTGRES
+        operator_construct: true,
+        containment_operators: true,
+        json_arrow_operators: true,
+        is_general_equality: false,
+        truth_value_tests: true,
+        null_safe_equals: false,
+        bitwise_operators: true,
+        quantified_comparisons: true,
+        quantified_comparison_lists: true,
     };
 }
 
@@ -401,7 +516,11 @@ impl CallSyntax {
         // the reserved keyword head stays the "no call form" reject (conservative — DuckDB's
         // MERGE surface is unprobed here).
         merge_action_function: false,
-        ..CallSyntax::POSTGRES
+        named_argument: true,
+        utc_special_functions: false,
+        extract_from_syntax: true,
+        restricted_cast_targets: false,
+        convert_function: false,
     };
 }
 
@@ -421,7 +540,18 @@ impl StringFuncForms {
         // DuckDB's `COLLATION FOR (<expr>)` surface is unprobed; override PostgreSQL's
         // `true` back to `false` (conservative — `COLLATION` stays an ordinary name head).
         collation_for_expression: false,
-        ..StringFuncForms::POSTGRES
+        substring_from_for: true,
+        substring_leading_for: true,
+        substring_plain_call_requires_2_or_3_args: false,
+        substr_from_for: false,
+        position_in: true,
+        position_asymmetric_operands: false,
+        overlay_placing: true,
+        trim_from: true,
+        trim_list_syntax: true,
+        ceil_to_field: false,
+        floor_to_field: false,
+        match_against: false,
     };
 }
 
@@ -432,7 +562,13 @@ impl AggregateCallSyntax {
         standalone_argument_order_by: true,
         // DuckDB accepts `FILTER (<predicate>)` without the standard `WHERE` (probed on 1.5.4).
         filter_optional_where: true,
-        ..AggregateCallSyntax::POSTGRES
+        group_concat_separator: false,
+        within_group: true,
+        aggregate_filter: true,
+        aggregate_args_require_adjacent_paren: false,
+        aggregate_calls_reject_empty_arguments: false,
+        over_requires_windowable_function: false,
+        window_function_tail: false,
     };
 }
 
@@ -451,7 +587,21 @@ impl TypeNameSyntax {
         // `GEOMETRY('OGC:CRS84')` and the general `type_name('constant', ...)` form (probed
         // on 1.5.4). `duckdb-geometry-type-and-overlaps-operator`.
         string_type_modifiers: true,
-        ..TypeNameSyntax::POSTGRES
+        extended_scalar_type_names: false,
+        set_type: false,
+        numeric_modifiers: false,
+        integer_display_width: false,
+        varchar_requires_length: false,
+        zoned_temporal_types: true,
+        character_set_annotation: false,
+        nullable_type: false,
+        low_cardinality_type: false,
+        fixed_string_type: false,
+        datetime64_type: false,
+        nested_type: false,
+        bit_width_integer_names: false,
+        liberal_type_names: false,
+        angle_bracket_types: false,
     };
 }
 
@@ -461,7 +611,20 @@ impl TableExpressionSyntax {
         // DuckDB's string-literal table alias (`FROM integers AS 't'('k')` / `t('k')`;
         // probed on 1.5.4). `duckdb-string-literal-table-alias`.
         string_literal_aliases: true,
-        ..TableExpressionSyntax::POSTGRES
+        only: true,
+        table_sample: true,
+        parenthesized_joins: true,
+        table_alias_column_lists: true,
+        join_using_alias: true,
+        index_hints: false,
+        table_hints: false,
+        partition_selection: false,
+        base_table_alias_column_lists: true,
+        aliased_parenthesized_join: true,
+        bare_table_alias_is_bare_label: false,
+        table_version: false,
+        table_json_path: false,
+        indexed_by: false,
     };
 }
 
@@ -489,7 +652,10 @@ impl JoinSyntax {
         // `AS` (stable since 1.3; probed accepting on 1.5.4), overriding the inherited
         // PostgreSQL off. `duckdb-with-using-key`.
         recursive_using_key: true,
-        ..JoinSyntax::POSTGRES
+        stacked_join_qualifiers: true,
+        full_outer_join: true,
+        natural_cross_join: false,
+        straight_join: false,
     };
 }
 
@@ -510,21 +676,54 @@ impl TableFactorSyntax {
         // surface off — the same `recursive_search_cycle` split above.
         json_table: false,
         xml_table: false,
-        ..TableFactorSyntax::POSTGRES
+        lateral: true,
+        table_functions: true,
+        rows_from: true,
+        unnest: true,
+        unnest_with_offset: false,
+        table_function_ordinality: true,
+        special_function_table_source: true,
+        table_expr_factor: false,
+        pivot_value_sources: false,
+        match_recognize: false,
+        open_json: false,
     };
 }
 
 impl UtilitySyntax {
     /// The `DUCKDB` preset for utility syntax.
     pub const DUCKDB: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: true,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        begin_transaction_modes: true,
+        transaction_savepoints: false,
+        set_transaction: false,
+        transaction_isolation_mode: false,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: false,
+        start_transaction_isolation_mode: false,
+        start_transaction_deferrable_mode: false,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: false,
+        transaction_mode_comma_required: false,
+        transaction_modes_unique: false,
+        abort_transaction_alias: true,
+        end_transaction_alias: true,
+        transaction_release: false,
+        transaction_chain: false,
+        release_savepoint_keyword_optional: true,
         pragma: true,
         use_statement: true,
         // DuckDB's `USE <catalog> . <schema>` admits the dotted two-part name (MySQL's
         // single-ident form is a subset); the deeper `USE a.b.c` is still parser-rejected.
         use_qualified_name: true,
         prepared_statements: true,
-        // Override the `..UtilitySyntax::POSTGRES` spread's `true`: DuckDB structurally
-        // rejects the PostgreSQL `PREPARE name(<type>, …)` typed parameter-type list
+        // DuckDB structurally rejects the PostgreSQL `PREPARE name(<type>, …)` typed
+        // parameter-type list
         // ("Prepared statement argument types are not supported, use CAST"; probed on
         // 1.5.4), so only the bare `PREPARE <name> AS <statement>` form is admitted.
         prepare_typed_parameters: false,
@@ -534,7 +733,7 @@ impl UtilitySyntax {
         // `IF EXISTS` guard (`detach_if_exists`), and adds the `[FORCE] CHECKPOINT [db]`
         // operands (`checkpoint_database`), the bare-identifier `LOAD tpch` argument
         // (`load_bare_name`), and the `RESET`-scope prefix (`reset_scope`) — all DuckDB
-        // extensions over the inherited PostgreSQL `checkpoint`/`load_extension` base.
+        // extensions alongside `CHECKPOINT` and extension loading.
         attach: true,
         load_bare_name: true,
         reset_scope: true,
@@ -544,19 +743,41 @@ impl UtilitySyntax {
         // undispatched and surfaces as an unknown statement.
         do_statement: false,
         // DuckDB's `EXPORT DATABASE`/`IMPORT DATABASE` catalogue round-trip — the pair is a
-        // DuckDB extension over the inherited PostgreSQL base (which has neither), gated as
-        // one unit.
+        // DuckDB extension gated as one unit.
         export_import_database: true,
         // DuckDB's `UPDATE EXTENSIONS [( <name>, ... )]` extension-refresh statement — a
-        // DuckDB extension over the inherited PostgreSQL base (which has no such statement).
+        // DuckDB extension with its own statement head.
         update_extensions: true,
-        // Spread-inheritance invariant: DuckDB is PostgreSQL-derived, so this
-        // spread inherits PostgreSQL's utility values for every gate not overridden above —
-        // including live `true`s (`prepared_statements`, `load_extension`). Inheritance is
-        // deliberate and load-bearing: "inherits only falses" does NOT hold here, and a
-        // PostgreSQL base flip propagates silently. The statement-head family is pinned by
-        // absolute value in head_contention's `statement_head_gate_values_are_pinned_per_preset`.
-        ..UtilitySyntax::POSTGRES
+        // Every remaining utility head is explicitly pinned below.
+        copy: true,
+        copy_into: false,
+        stage_references: false,
+        comment_on: true,
+        comment_if_exists: false,
+        kill: false,
+        handler_statements: false,
+        plugin_component_statements: false,
+        shutdown: false,
+        restart: false,
+        clone: false,
+        import_table: false,
+        help_statement: false,
+        binlog: false,
+        key_cache_statements: false,
+        prepared_statements_from: false,
+        call_bare_name: false,
+        load_extension: true,
+        load_data: false,
+        do_expression_list: false,
+        lock_tables: false,
+        lock_instance: false,
+        begin_transaction_mode: false,
+        xa_transactions: false,
+        rename_statement: false,
+        signal_diagnostics: false,
+        flush: false,
+        purge_binary_logs: false,
+        replication_statements: false,
     };
 }
 
@@ -571,7 +792,14 @@ impl ShowSyntax {
         // 1.5.4), which it desugars to `SELECT * FROM (SHOW_REF …)`; modelled as the typed
         // statement, distinct from the generic session `SHOW <var>` inherited from PG.
         show_tables: true,
-        ..ShowSyntax::POSTGRES
+        describe: false,
+        session_statements: true,
+        show_columns: false,
+        show_create_table: false,
+        show_functions: false,
+        show_routine_status: false,
+        show_verbose: false,
+        show_admin: false,
     };
 }
 
@@ -582,30 +810,30 @@ impl MaintenanceSyntax {
         // DuckDB's `VACUUM [ANALYZE] [<table> [(<cols>)]]` and `ANALYZE [<table>
         // [(<cols>)]]` statistics/compaction statements (both `PGVacuumStmt` in libpg_query;
         // engine-probed 1.5.4). The leading `VACUUM` dispatches under `vacuum_analyze` (a
-        // separate gate from SQLite's `INTO`-shaped `vacuum`, which stays off — inherited
-        // from PostgreSQL); the leading `ANALYZE` under `analyze`, with the DuckDB column
+        // separate gate from SQLite's `INTO`-shaped `vacuum`, which stays off); the leading
+        // `ANALYZE` under `analyze`, with the DuckDB column
         // list under `analyze_columns`. Only the `ANALYZE` vacuum option parses —
         // `FULL`/`FREEZE`/`VERBOSE`/`disable_page_skipping` throw in 1.5.4's transform.
         vacuum_analyze: true,
         analyze: true,
         analyze_columns: true,
-        // Spread-inheritance invariant: inherits PostgreSQL's maintenance values for
-        // every gate not armed above (`vacuum` / `table_maintenance` stay `false` from the
-        // base); a PostgreSQL base flip propagates silently. Pinned by value in
-        // head_contention's `statement_head_gate_values_are_pinned_per_preset`.
-        ..MaintenanceSyntax::POSTGRES
+        // The other maintenance statement heads stay off.
+        vacuum: false,
+        reindex: false,
+        checkpoint: true,
+        table_maintenance: false,
     };
 }
 
 impl AccessControlSyntax {
     /// The `DUCKDB` preset for access control syntax.
     pub const DUCKDB: Self = Self {
-        // Spread-inheritance invariant: DuckDB's access-control surface is exactly
-        // PostgreSQL's — it inherits every gate, including the live `true`s `access_control`
-        // and `access_control_extended_objects`, and re-stamps nothing. A PostgreSQL base flip
-        // propagates here silently; pinned by value in head_contention's
-        // `statement_head_gate_values_are_pinned_per_preset`.
-        ..AccessControlSyntax::POSTGRES
+        // DuckDB recognizes the PostgreSQL-shaped GRANT/REVOKE and ALTER ROLE forms.
+        alter_role_rename: true,
+        access_control: true,
+        access_control_extended_objects: true,
+        user_role_management: false,
+        access_control_account_grants: false,
     };
 }
 
@@ -641,7 +869,11 @@ impl FeatureSet {
         // still holds.
         parameters: ParameterSyntax {
             anonymous_question: true,
-            ..ParameterSyntax::POSTGRES
+            positional_dollar: true,
+            named_colon: false,
+            named_at: false,
+            named_dollar: false,
+            numbered_question: false,
         },
         session_variables: SessionVariableSyntax::ANSI,
         identifier_syntax: IdentifierSyntax::POSTGRES,
@@ -675,16 +907,14 @@ impl FeatureSet {
         comment_syntax: CommentSyntax::POSTGRES,
         mutation_syntax: MutationSyntax {
             // DuckDB parse-rejects a DML CTE body (`A CTE needs a SELECT`; INSERT,
-            // UPDATE, and DELETE bodies all probed on 1.5.4), so it must not inherit
-            // the POSTGRES `true` through the spread below. Everything else — MERGE
+            // UPDATE, and DELETE bodies all probed on 1.5.4). MERGE
             // (1.4+), MERGE … RETURNING, and the leading `WITH` before MERGE, all
             // probed accepted on 1.5.4 — is shared with PostgreSQL.
             data_modifying_ctes: false,
             // DuckDB rejects `OVERRIDING` *inside* MERGE (`syntax error at or near
             // "OVERRIDING"`, probed on 1.5.4) even though it accepts it on a top-level
-            // INSERT, so it splits from the POSTGRES spread in this one merge knob (the
-            // `WHEN NOT MATCHED BY SOURCE/TARGET` arms and `INSERT DEFAULT VALUES` — both
-            // probed accepted on 1.5.4 — stay inherited `true`).
+            // INSERT. The `WHEN NOT MATCHED BY SOURCE/TARGET` arms and
+            // `INSERT DEFAULT VALUES` are both accepted on 1.5.4.
             merge_insert_overriding: false,
             // DuckDB MERGE extensions (probed on 1.5.4): `UPDATE SET *`, `INSERT *` /
             // `INSERT BY NAME [*]`, and `THEN ERROR`.
@@ -699,7 +929,26 @@ impl FeatureSet {
             update_tuple_value_row_arity: true,
             // DuckDB rejects qualified SET targets (`UPDATE t SET t.i = 1` — probed 1.5.4).
             update_set_qualified_column: false,
-            ..MutationSyntax::POSTGRES
+            insert_ignore: false,
+            insert_overwrite: false,
+            returning: true,
+            on_conflict: true,
+            on_duplicate_key_update: false,
+            multi_column_assignment: true,
+            where_current_of: true,
+            merge: true,
+            replace_into: false,
+            insert_set: false,
+            update_delete_tails: false,
+            joined_update_delete: false,
+            delete_using: true,
+            update_from: true,
+            delete_using_target_alias: true,
+            cte_before_insert: true,
+            cte_before_merge: true,
+            merge_when_not_matched_by: true,
+            merge_insert_default_values: true,
+            merge_insert_multirow: false,
         },
         // PostgreSQL's schema-change surface plus DuckDB's live-body macro DDL
         // (`CREATE MACRO`/`CREATE FUNCTION … AS <expr>|TABLE <query>`), `CREATE OR REPLACE
@@ -708,22 +957,32 @@ impl FeatureSet {
             // DuckDB accepts the shared sequence option core but rejects PostgreSQL's
             // `CACHE` extension.
             create_sequence_cache: false,
+            colocation_groups: false,
+            materialized_view_to: false,
+            create_trigger: false,
             create_macro: true,
             create_secret: true,
             create_type: true,
+            create_virtual_table: false,
+            create_sequence: true,
             // DuckDB has no `CREATE DATABASE` (it uses `ATTACH`); the shared gate is off so
             // `DATABASE` after `CREATE` falls through as an unknown statement (probed
             // 1.5.4: "syntax error at or near \"DATABASE\"").
             databases: false,
-            // DuckDB rejects the SQL-standard embedded schema-element form that the
-            // POSTGRES spread turns on, so it is reset off here.
+            // DuckDB rejects the SQL-standard embedded schema-element form.
             schema_elements: false,
+            schemas: true,
+            drop_database: false,
+            materialized_views: true,
+            temporary_views: true,
+            routines: true,
+            or_replace: true,
             // DuckDB accepts `CREATE [OR REPLACE] [TEMP] RECURSIVE VIEW v (cols) AS …`
-            // (engine-measured on 1.5.4); the POSTGRES spread leaves it `false`.
+            // (engine-measured on 1.5.4).
             recursive_views: true,
+            compound_statements: false,
             // DuckDB manages extensions with `INSTALL`/`LOAD`, not the PostgreSQL
-            // `CREATE`/`ALTER EXTENSION` catalogue DDL, so it must clear the POSTGRES `true`
-            // rather than inherit it through the spread below.
+            // `CREATE`/`ALTER EXTENSION` catalogue DDL.
             extension_ddl: false,
             // DuckDB has no transform catalogue (`pg_transform` / `CREATE TRANSFORM` is
             // PostgreSQL-only), so it must clear the POSTGRES `true` rather than inherit it.
@@ -735,11 +994,9 @@ impl FeatureSet {
             tablespace_ddl: false,
             logfile_group_ddl: false,
             // DuckDB's `ALTER DATABASE … SET ALIAS TO`, `ALTER SEQUENCE …` option list, and
-            // `ALTER {TABLE|VIEW|SEQUENCE} … SET SCHEMA` forms (engine-measured on 1.5.4); the
-            // POSTGRES spread leaves them `false`, so they are set on explicitly here.
+            // `ALTER {TABLE|VIEW|SEQUENCE} … SET SCHEMA` forms (engine-measured on 1.5.4).
             alter_database: true,
-            // MySQL-only families (no DuckDB equivalent); the POSTGRES spread leaves them
-            // `false`, set explicitly for clarity.
+            // MySQL-only families have no DuckDB equivalent.
             alter_database_options: false,
             server_definition: false,
             alter_instance: false,
@@ -747,28 +1004,29 @@ impl FeatureSet {
             resource_group: false,
             alter_sequence: true,
             alter_object_set_schema: true,
-            // Spread-inheritance invariant: the statement-head DDL gates not armed above
-            // (`view_definition_options`, `drop_database`) inherit PostgreSQL's `false`; a base
-            // flip propagates silently. Pinned by value in head_contention's
-            // `statement_head_gate_values_are_pinned_per_preset`.
-            ..StatementDdlGates::POSTGRES
+            view_definition_options: false,
         },
         create_table_clause_syntax: CreateTableClauseSyntax {
             create_or_replace_table: true,
             // DuckDB has no PostgreSQL-style declarative partitioning (its `PARTITION_BY` is a
-            // COPY/export option, not a `CREATE TABLE` clause), so it must not inherit the
-            // POSTGRES `true` through the spread below.
+            // COPY/export option, not a `CREATE TABLE` clause).
             declarative_partitioning: false,
             // DuckDB has no table inheritance and (probed against libduckdb) rejects the
-            // PostgreSQL `(LIKE src …)` source-table element, so both must clear the POSTGRES
-            // `true` rather than inherit it through the spread below.
+            // PostgreSQL `(LIKE src …)` source-table element.
             table_inheritance: false,
             like_source_table: false,
             table_access_method: false,
             without_oids: false,
             typed_tables: false,
             create_table_as_execute: false,
-            ..CreateTableClauseSyntax::POSTGRES
+            table_options: false,
+            without_rowid_table_option: false,
+            strict_table_option: false,
+            storage_parameters: true,
+            on_commit: true,
+            create_table_as_with_data: true,
+            statement_level_table_like: false,
+            unlogged_tables: true,
         },
         column_definition_syntax: ColumnDefinitionSyntax {
             // The PostgreSQL `b_expr` column-default restriction is not modelled for DuckDB
@@ -776,8 +1034,8 @@ impl FeatureSet {
             // reads the default as a full `a_expr`, unchanged.
             column_default_requires_b_expr: false,
             // DuckDB (probed against libduckdb) accepts a per-column `COLLATE <name>` and the
-            // `UNLOGGED` persistence keyword — both inherit the POSTGRES `true` through the
-            // spread — but rejects the column STORAGE/COMPRESSION attributes, the table USING
+            // `UNLOGGED` persistence keyword, but rejects the column STORAGE/COMPRESSION
+            // attributes, the table USING
             // access method, WITHOUT OIDS, and typed `OF <type>` tables, so those four must
             // clear the POSTGRES `true` rather than inherit it.
             column_storage: false,
@@ -793,15 +1051,22 @@ impl FeatureSet {
             // parse error. A narrowing of the SQLite typeless rule, distinct from PostgreSQL's
             // type-required `false`, so it too must set rather than inherit.
             typeless_generated_columns: true,
-            ..ColumnDefinitionSyntax::POSTGRES
+            column_conflict_resolution_clause: false,
+            typeless_column_definitions: false,
+            joined_autoincrement_attribute: false,
+            inline_primary_key_ordering: false,
+            named_column_collate_constraint: false,
+            identity_columns: true,
+            compact_identity_columns: false,
+            default_expression_requires_parens: false,
+            column_collation: true,
         },
         constraint_syntax: ConstraintSyntax {
             // DuckDB (probed against libduckdb 1.5.4) rejects PostgreSQL's `EXCLUDE` exclusion
             // constraints, the `AS EXECUTE` CTAS form, and the `UNIQUE`/`PRIMARY KEY`
             // index-parameter decorations (`INCLUDE`/`NULLS NOT DISTINCT`/`USING INDEX
             // TABLESPACE`), so all three must clear the POSTGRES `true`. It *does* accept the
-            // `NO INHERIT` / `NOT VALID` constraint markers, which therefore inherit the POSTGRES
-            // `true` through the spread.
+            // `NO INHERIT` / `NOT VALID` constraint markers.
             exclusion_constraints: false,
             index_constraint_parameters: false,
             // DuckDB admits `ON DELETE`/`ON UPDATE` only for `RESTRICT`/`NO ACTION` —
@@ -809,7 +1074,11 @@ impl FeatureSet {
             referential_action_cascade_set: false,
             // DuckDB (and SQLite) parse-reject subqueries in `CHECK` (probed 1.5.4).
             check_constraint_subqueries: false,
-            ..ConstraintSyntax::POSTGRES
+            deferrable_constraints: true,
+            named_inline_non_check_constraints: true,
+            bare_constraint_name: false,
+            constraint_no_inherit_not_valid: true,
+            constraint_column_collate_order: false,
         },
         index_alter_syntax: IndexAlterSyntax {
             // DuckDB's extended ALTER surface is on (IF EXISTS, RENAME, ALTER COLUMN, …)
@@ -821,11 +1090,24 @@ impl FeatureSet {
             // parameters; option names and values remain binder concerns.
             alter_table_set_options: true,
             index_storage_parameters: true,
-            // Spread-inheritance invariant: the `index_drop_on_table` statement head
-            // inherits PostgreSQL's `false` through this spread; a base flip propagates
-            // silently. Pinned by value in head_contention's
-            // `statement_head_gate_values_are_pinned_per_preset`.
-            ..IndexAlterSyntax::POSTGRES
+            // Table-scoped `DROP INDEX` remains outside the grammar.
+            rename_constraint: true,
+            drop_primary_key: false,
+            alter_column_add_identity: false,
+            drop_behavior: true,
+            index_drop_on_table: false,
+            index_concurrently: true,
+            index_using_method: true,
+            partial_index: true,
+            index_if_not_exists: true,
+            index_nulls_order: true,
+            alter_table_extended: true,
+            alter_existence_guards: true,
+            alter_column_set_data_type: true,
+            routine_arg_types: true,
+            routine_arg_defaults: true,
+            routine_arg_modes: true,
+            routine_language_string: true,
         },
         existence_guards: ExistenceGuards::POSTGRES,
         select_syntax: SelectSyntax::DUCKDB,
@@ -873,6 +1155,8 @@ const _: () = assert!(FeatureSet::DUCKDB.has_no_grammar_conflict());
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::{BinaryOperator, EqualsSpelling};
+    use crate::precedence::STANDARD_BINDING_POWERS;
 
     #[test]
     fn duckdb_is_postgres_plus_the_measured_deltas() {
@@ -938,6 +1222,20 @@ mod tests {
                 // inherited unchanged from PostgreSQL, both on.
                 do_statement: false,
                 prepare_typed_parameters: false,
+                // DuckDB 1.5.4 accepts bare `START`, `START WORK`, and a single access
+                // mode, but has no savepoint, SET TRANSACTION, isolation/deferrable,
+                // repeated-mode, or transaction-chain grammar.
+                start_transaction_block_optional: true,
+                transaction_savepoints: false,
+                set_transaction: false,
+                transaction_isolation_mode: false,
+                transaction_deferrable_mode: false,
+                start_transaction_isolation_mode: false,
+                start_transaction_deferrable_mode: false,
+                transaction_multiple_modes: false,
+                abort_transaction_alias: true,
+                end_transaction_alias: true,
+                transaction_chain: false,
                 ..pg.utility_syntax
             },
         );

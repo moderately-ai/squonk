@@ -33,10 +33,10 @@ pub enum TransactionStatement {
         /// written between `BEGIN` and the optional `TRANSACTION` keyword. `None`
         /// when the dialect does not admit one (or the statement omits it).
         mode: Option<TransactionModeKind>,
-        /// The optional `TRANSACTION` / `WORK` block noise word after `BEGIN`. `None`
-        /// for a bare `BEGIN`. Irrelevant (and `None`) under
-        /// [`TransactionStart::Start`], whose mandatory `TRANSACTION` is part of the
-        /// `START TRANSACTION` keyword.
+        /// The optional `TRANSACTION` / `WORK` block noise word after `BEGIN` or
+        /// `START`. `None` for a bare keyword. Standard `START TRANSACTION` records
+        /// `Some(Transaction)`; dialect data controls whether `START` may omit the word
+        /// or use `WORK`.
         block: Option<TransactionBlockKeyword>,
         /// modes in source order.
         modes: ThinVec<TransactionMode>,
@@ -45,10 +45,14 @@ pub enum TransactionStatement {
     },
     /// A `COMMIT` statement.
     Commit {
+        /// Source spelling used for the commit operation.
+        syntax: TransactionCommitKeyword,
         /// The optional `TRANSACTION` / `WORK` block noise word after `COMMIT`.
         block: Option<TransactionBlockKeyword>,
         /// `Some(true)` for `AND CHAIN`, `Some(false)` for `AND NO CHAIN`.
         chain: Option<bool>,
+        /// `Some(true)` for `RELEASE`, `Some(false)` for `NO RELEASE`.
+        release: Option<bool>,
         /// Source location and node identity.
         meta: Meta,
     },
@@ -57,6 +61,8 @@ pub enum TransactionStatement {
     /// `to_savepoint` is `Some` for the savepoint-rewind form and `None` for a
     /// whole-transaction rollback.
     Rollback {
+        /// Source spelling used for the rollback operation.
+        syntax: TransactionRollbackKeyword,
         /// The optional `TRANSACTION` / `WORK` block noise word after `ROLLBACK`.
         block: Option<TransactionBlockKeyword>,
         /// Whether the optional `SAVEPOINT` keyword was written before the savepoint
@@ -68,6 +74,9 @@ pub enum TransactionStatement {
         /// `Some(true)` for `AND CHAIN`, `Some(false)` for `AND NO CHAIN`; only valid for a
         /// whole-transaction rollback.
         chain: Option<bool>,
+        /// `Some(true)` for `RELEASE`, `Some(false)` for `NO RELEASE`; only valid for a
+        /// whole-transaction rollback.
+        release: Option<bool>,
         /// Source location and node identity.
         meta: Meta,
     },
@@ -109,6 +118,28 @@ pub enum TransactionStart {
     Begin,
     /// `START TRANSACTION` — start a transaction (the standard spelling).
     Start,
+}
+
+/// Which exact synonym committed a transaction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
+pub enum TransactionCommitKeyword {
+    /// `COMMIT`.
+    Commit,
+    /// `END`.
+    End,
+}
+
+/// Which exact synonym rolled back a transaction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
+pub enum TransactionRollbackKeyword {
+    /// `ROLLBACK`.
+    Rollback,
+    /// `ABORT`.
+    Abort,
 }
 
 /// The optional block noise word written after `BEGIN` / `COMMIT` / `ROLLBACK`
@@ -169,6 +200,12 @@ pub enum TransactionMode {
     Deferrable {
         /// Whether the deferrable form was present in the source.
         deferrable: bool,
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// `WITH CONSISTENT SNAPSHOT`: establish a consistent read view when the
+    /// transaction starts (MySQL).
+    ConsistentSnapshot {
         /// Source location and node identity.
         meta: Meta,
     },

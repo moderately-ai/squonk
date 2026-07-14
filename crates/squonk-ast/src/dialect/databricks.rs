@@ -127,14 +127,46 @@ impl SelectSyntax {
         // derived-table `LATERAL` factor stays off, so `LATERAL` leads only this
         // clause under the preset.
         lateral_view_clause: true,
-        ..SelectSyntax::ANSI
+        distinct_on: false,
+        select_into: false,
+        empty_target_list: false,
+        alias_string_literals: false,
+        bare_alias_string_literals: false,
+        union_by_name: false,
+        wildcard_modifiers: false,
+        wildcard_replace: false,
+        intersect_all: true,
+        except_all: true,
+        qualified_wildcard_alias: false,
+        from_first: false,
+        parenthesized_query_operands: true,
+        values_rows_require_equal_arity: false,
+        values_row_constructor: true,
+        as_alias_rejects_reserved: false,
+        trailing_comma: false,
+        prefix_colon_alias: false,
+        connect_by_clause: false,
     };
 }
 
 impl QueryTailSyntax {
     /// The `DATABRICKS` preset for query tail syntax.
     pub const DATABRICKS: Self = Self {
-        ..QueryTailSyntax::ANSI
+        fetch_first: true,
+        limit_offset_comma: false,
+        locking_clauses: false,
+        key_lock_strengths: false,
+        stacked_locking_clauses: false,
+        using_sample: false,
+        leading_offset: true,
+        limit_expressions: true,
+        limit_percent: false,
+        with_ties_requires_order_by: false,
+        pipe_syntax: false,
+        limit_by_clause: false,
+        settings_clause: false,
+        format_clause: false,
+        for_xml_json_clause: false,
     };
 }
 
@@ -144,7 +176,9 @@ impl GroupingSyntax {
         group_by_all: true,
         group_by_set_quantifier: false,
         order_by_all: true,
-        ..GroupingSyntax::ANSI
+        grouping_sets: true,
+        with_rollup: false,
+        order_by_using: false,
     };
 }
 
@@ -154,7 +188,24 @@ impl ExpressionSyntax {
     /// expression knob is conservatively ANSI.
     pub const DATABRICKS: Self = Self {
         semi_structured_access: true,
-        ..ExpressionSyntax::ANSI
+        typecast_operator: false,
+        subscript: false,
+        slice_step: false,
+        collate: false,
+        at_time_zone: false,
+        array_constructor: false,
+        multidim_array_literals: false,
+        collection_literals: false,
+        row_constructor: false,
+        struct_constructor: false,
+        field_selection: false,
+        field_wildcard: false,
+        typed_string_literals: true,
+        typed_interval_literal: true,
+        relaxed_interval_syntax: false,
+        mysql_interval_operator: false,
+        positional_column: false,
+        lambda_keyword: false,
     };
 }
 
@@ -167,7 +218,20 @@ impl TableExpressionSyntax {
     pub const DATABRICKS: Self = Self {
         // `VERSION AS OF <n>` / `TIMESTAMP AS OF <ts>` — Delta Lake time travel.
         table_version: true,
-        ..TableExpressionSyntax::ANSI
+        only: false,
+        table_sample: false,
+        parenthesized_joins: true,
+        table_alias_column_lists: true,
+        join_using_alias: false,
+        index_hints: false,
+        table_hints: false,
+        partition_selection: false,
+        base_table_alias_column_lists: true,
+        string_literal_aliases: false,
+        aliased_parenthesized_join: true,
+        bare_table_alias_is_bare_label: false,
+        table_json_path: false,
+        indexed_by: false,
     };
 }
 
@@ -175,14 +239,40 @@ impl JoinSyntax {
     /// The `DATABRICKS` preset for join syntax.
     pub const DATABRICKS: Self = Self {
         sided_semi_anti_join: true,
-        ..JoinSyntax::ANSI
+        stacked_join_qualifiers: true,
+        full_outer_join: true,
+        natural_cross_join: false,
+        straight_join: false,
+        asof_join: false,
+        positional_join: false,
+        semi_anti_join: false,
+        apply_join: false,
+        recursive_search_cycle: false,
+        recursive_union_rejects_order_limit: false,
+        recursive_using_key: false,
     };
 }
 
 impl TableFactorSyntax {
     /// The `DATABRICKS` preset for table factor syntax.
     pub const DATABRICKS: Self = Self {
-        ..TableFactorSyntax::ANSI
+        lateral: false,
+        table_functions: false,
+        rows_from: false,
+        unnest: false,
+        unnest_with_offset: false,
+        table_function_ordinality: false,
+        special_function_table_source: true,
+        pivot: false,
+        unpivot: false,
+        show_ref: false,
+        from_values: false,
+        json_table: false,
+        xml_table: false,
+        table_expr_factor: false,
+        pivot_value_sources: false,
+        match_recognize: false,
+        open_json: false,
     };
 }
 
@@ -194,7 +284,71 @@ impl UtilitySyntax {
     /// tested parser gate, so it clears the preset's conservatism bar. Every other utility
     /// knob is conservatively ANSI.
     pub const DATABRICKS: Self = Self {
-        ..UtilitySyntax::ANSI
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: true,
+        transaction_mode_comma_required: false,
+        transaction_modes_unique: false,
+        abort_transaction_alias: false,
+        end_transaction_alias: false,
+        transaction_release: false,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: true,
+        copy: false,
+        copy_into: false,
+        stage_references: false,
+        comment_on: false,
+        comment_if_exists: false,
+        pragma: false,
+        attach: false,
+        kill: false,
+        handler_statements: false,
+        plugin_component_statements: false,
+        shutdown: false,
+        restart: false,
+        clone: false,
+        import_table: false,
+        help_statement: false,
+        binlog: false,
+        key_cache_statements: false,
+        use_statement: false,
+        use_qualified_name: false,
+        prepared_statements: false,
+        prepare_typed_parameters: false,
+        prepared_statements_from: false,
+        call: false,
+        call_bare_name: false,
+        load_extension: false,
+        load_bare_name: false,
+        load_data: false,
+        reset_scope: false,
+        detach_if_exists: false,
+        do_statement: false,
+        do_expression_list: false,
+        lock_tables: false,
+        lock_instance: false,
+        begin_transaction_mode: false,
+        xa_transactions: false,
+        rename_statement: false,
+        signal_diagnostics: false,
+        export_import_database: false,
+        update_extensions: false,
+        flush: false,
+        purge_binary_logs: false,
+        replication_statements: false,
     };
 }
 
@@ -202,21 +356,40 @@ impl ShowSyntax {
     /// The `DATABRICKS` preset for show syntax.
     pub const DATABRICKS: Self = Self {
         show_functions: true,
-        ..ShowSyntax::ANSI
+        describe: false,
+        describe_summarize: false,
+        session_statements: true,
+        show_tables: false,
+        show_columns: false,
+        show_create_table: false,
+        show_routine_status: false,
+        show_verbose: false,
+        show_admin: false,
     };
 }
 
 impl MaintenanceSyntax {
     /// The `DATABRICKS` preset for maintenance syntax.
     pub const DATABRICKS: Self = Self {
-        ..MaintenanceSyntax::ANSI
+        vacuum: false,
+        vacuum_analyze: false,
+        reindex: false,
+        analyze: false,
+        analyze_columns: false,
+        checkpoint: false,
+        checkpoint_database: false,
+        table_maintenance: false,
     };
 }
 
 impl AccessControlSyntax {
     /// The `DATABRICKS` preset for access control syntax.
     pub const DATABRICKS: Self = Self {
-        ..AccessControlSyntax::ANSI
+        alter_role_rename: false,
+        access_control: true,
+        access_control_extended_objects: true,
+        user_role_management: false,
+        access_control_account_grants: false,
     };
 }
 

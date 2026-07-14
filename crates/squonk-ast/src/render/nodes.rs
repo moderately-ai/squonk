@@ -118,18 +118,19 @@ use crate::ast::{
     TableMaintenanceStatement, TableOption, TableOptionValue, TableRename, TableSample,
     TableStorageParameter, TableVersion, TableWithJoins, TablespaceOption, TablespaceSizeOption,
     TemporaryTableKind, TextTypeName, TimeTypeName, TimeZone, TimestampTypeName, TlsOption,
-    TlsRequirement, TransactionAccessMode, TransactionBlockKeyword, TransactionMode,
-    TransactionModeKind, TransactionStart, TransactionStatement, TriggerEvent, TriggerOrder,
-    TriggerTiming, TrimSide, TruthValue, UnaryOperator, UndoTablespaceState, UninstallStatement,
-    UnlockTablesStatement, Unpivot, UnpivotColumn, UnpivotSpelling, Update, UpdateAssignment,
-    UpdateExtensionsStatement, UpdateTupleSource, UpdateValue, Upsert, UseStatement, UserAttribute,
-    UserRename, UserRoleList, UserRoleListKind, UserSpec, VacuumAnalyze, VacuumStatement, Values,
-    ValuesItem, VcpuRange, ViewAlgorithm, ViewCheckOption, ViewOptions, WhileStatement,
-    WildcardOptions, WildcardRename, WildcardReplace, WindowDefinition, WindowFrame,
-    WindowFrameBound, WindowFrameExclusion, WindowFrameUnits, WindowSpec, With, WithRoleSpec,
-    WrappedTypeKind, XaAssociation, XaStartKeyword, XaStatement, XaSuspend, Xid, XmlAttribute,
-    XmlDocumentOrContent, XmlFunc, XmlIndentOption, XmlNamespace, XmlPassingMechanism,
-    XmlStandalone, XmlTable, XmlTableColumn, XmlWhitespaceOption,
+    TlsRequirement, TransactionAccessMode, TransactionBlockKeyword, TransactionCommitKeyword,
+    TransactionMode, TransactionModeKind, TransactionRollbackKeyword, TransactionStart,
+    TransactionStatement, TriggerEvent, TriggerOrder, TriggerTiming, TrimSide, TruthValue,
+    UnaryOperator, UndoTablespaceState, UninstallStatement, UnlockTablesStatement, Unpivot,
+    UnpivotColumn, UnpivotSpelling, Update, UpdateAssignment, UpdateExtensionsStatement,
+    UpdateTupleSource, UpdateValue, Upsert, UseStatement, UserAttribute, UserRename, UserRoleList,
+    UserRoleListKind, UserSpec, VacuumAnalyze, VacuumStatement, Values, ValuesItem, VcpuRange,
+    ViewAlgorithm, ViewCheckOption, ViewOptions, WhileStatement, WildcardOptions, WildcardRename,
+    WildcardReplace, WindowDefinition, WindowFrame, WindowFrameBound, WindowFrameExclusion,
+    WindowFrameUnits, WindowSpec, With, WithRoleSpec, WrappedTypeKind, XaAssociation,
+    XaStartKeyword, XaStatement, XaSuspend, Xid, XmlAttribute, XmlDocumentOrContent, XmlFunc,
+    XmlIndentOption, XmlNamespace, XmlPassingMechanism, XmlStandalone, XmlTable, XmlTableColumn,
+    XmlWhitespaceOption,
 };
 use crate::dialect::TargetSpelling;
 use crate::precedence::{
@@ -203,7 +204,7 @@ const _: skeleton::RenderShapeFingerprint<0x957db431c4a1db51> = skeleton::CURREN
 const _: skeleton::RenderShapeFingerprint<0xfb50d22f049b4cc7> =
     skeleton::CURRENT_RENDER_SHAPE_STORED_PROGRAM;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0x316658eaf65c4c17> = skeleton::CURRENT_RENDER_SHAPE_TCL;
+const _: skeleton::RenderShapeFingerprint<0x53fc3a24d97e2ce3> = skeleton::CURRENT_RENDER_SHAPE_TCL;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0x03efd7c0644eb26a> = skeleton::CURRENT_RENDER_SHAPE_TY;
 #[cfg(test)]
@@ -3266,38 +3267,61 @@ impl Render for TransactionStatement {
                 modes,
                 ..
             } => {
-                f.write_str(match syntax {
-                    TransactionStart::Begin => "BEGIN",
-                    TransactionStart::Start => "START TRANSACTION",
-                })?;
+                match syntax {
+                    TransactionStart::Begin => f.write_str("BEGIN")?,
+                    TransactionStart::Start => {
+                        f.write_str("START")?;
+                        if honours_source_spelling(ctx) {
+                            render_transaction_block_keyword(*block, f)?;
+                        } else {
+                            f.write_str(" TRANSACTION")?;
+                        }
+                    }
+                }
                 if let Some(mode) = mode {
                     f.write_str(" ")?;
                     mode.render(ctx, f)?;
                 }
                 // The `TRANSACTION`/`WORK` block noise word is exact-synonym fidelity —
                 // replayed only by a source-fidelity render, dropped by a re-spell and
-                // the redacted fingerprint. Under `START TRANSACTION` the keyword is
-                // part of the `syntax` string, so the tag never applies there.
+                // the redacted fingerprint. The START spelling handles its block word
+                // above because its standard re-spell must restore `TRANSACTION`.
                 if *syntax == TransactionStart::Begin && honours_source_spelling(ctx) {
                     render_transaction_block_keyword(*block, f)?;
                 }
                 render_transaction_modes(modes, ctx, f)
             }
-            Self::Commit { block, chain, .. } => {
-                f.write_str("COMMIT")?;
+            Self::Commit {
+                syntax,
+                block,
+                chain,
+                release,
+                ..
+            } => {
+                if honours_source_spelling(ctx) && *syntax == TransactionCommitKeyword::End {
+                    f.write_str("END")?;
+                } else {
+                    f.write_str("COMMIT")?;
+                }
                 if honours_source_spelling(ctx) {
                     render_transaction_block_keyword(*block, f)?;
                 }
-                render_transaction_chain(*chain, f)
+                render_transaction_completion(*chain, *release, f)
             }
             Self::Rollback {
+                syntax,
                 block,
                 savepoint_keyword,
                 to_savepoint,
                 chain,
+                release,
                 ..
             } => {
-                f.write_str("ROLLBACK")?;
+                if honours_source_spelling(ctx) && *syntax == TransactionRollbackKeyword::Abort {
+                    f.write_str("ABORT")?;
+                } else {
+                    f.write_str("ROLLBACK")?;
+                }
                 if honours_source_spelling(ctx) {
                     render_transaction_block_keyword(*block, f)?;
                 }
@@ -3312,7 +3336,7 @@ impl Render for TransactionStatement {
                     }
                     name.render(ctx, f)?;
                 }
-                render_transaction_chain(*chain, f)
+                render_transaction_completion(*chain, *release, f)
             }
             Self::Savepoint { name, .. } => {
                 f.write_str("SAVEPOINT ")?;
@@ -3344,6 +3368,19 @@ fn render_transaction_chain(chain: Option<bool>, f: &mut fmt::Formatter<'_>) -> 
     match chain {
         Some(true) => f.write_str(" AND CHAIN"),
         Some(false) => f.write_str(" AND NO CHAIN"),
+        None => Ok(()),
+    }
+}
+
+fn render_transaction_completion(
+    chain: Option<bool>,
+    release: Option<bool>,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    render_transaction_chain(chain, f)?;
+    match release {
+        Some(true) => f.write_str(" RELEASE"),
+        Some(false) => f.write_str(" NO RELEASE"),
         None => Ok(()),
     }
 }
@@ -3396,6 +3433,7 @@ impl Render for TransactionMode {
             } else {
                 "NOT DEFERRABLE"
             }),
+            Self::ConsistentSnapshot { .. } => f.write_str("WITH CONSISTENT SNAPSHOT"),
         }
     }
 }

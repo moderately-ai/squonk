@@ -10,6 +10,7 @@
 //! adding a field or variant to a node without regenerating cannot pass tests.
 
 mod descent;
+mod dialect_presets;
 mod feature_set;
 mod keywords;
 mod license_header;
@@ -67,6 +68,7 @@ pub fn keyword_inventory() -> Vec<(String, String)> {
 
 /// Render every checked-in generated file in memory.
 pub fn generate_all() -> Vec<GeneratedFile> {
+    dialect_presets::assert_explicit();
     let schema = Schema::load();
     vec![
         GeneratedFile {

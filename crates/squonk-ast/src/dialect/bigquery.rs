@@ -145,7 +145,15 @@ impl StringLiteralSyntax {
     /// are deferred rather than guessed at (`backslash_escapes` stays off).
     pub const BIGQUERY: Self = Self {
         double_quoted_strings: true,
-        ..StringLiteralSyntax::ANSI
+        escape_strings: false,
+        dollar_quoted_strings: false,
+        national_strings: false,
+        backslash_escapes: false,
+        unicode_strings: false,
+        bit_string_literals: false,
+        blob_literals: false,
+        charset_introducers: false,
+        same_line_adjacent_concat: false,
     };
 }
 
@@ -156,13 +164,39 @@ impl TableExpressionSyntax {
     pub const BIGQUERY: Self = Self {
         // `FROM t FOR SYSTEM_TIME AS OF <ts>` — BigQuery's sole time-travel spelling.
         table_version: true,
-        ..TableExpressionSyntax::ANSI
+        only: false,
+        table_sample: false,
+        parenthesized_joins: true,
+        table_alias_column_lists: true,
+        join_using_alias: false,
+        index_hints: false,
+        table_hints: false,
+        partition_selection: false,
+        base_table_alias_column_lists: true,
+        string_literal_aliases: false,
+        aliased_parenthesized_join: true,
+        bare_table_alias_is_bare_label: false,
+        table_json_path: false,
+        indexed_by: false,
     };
 }
 
 impl JoinSyntax {
     /// The `BIGQUERY` preset for join syntax.
-    pub const BIGQUERY: Self = Self { ..JoinSyntax::ANSI };
+    pub const BIGQUERY: Self = Self {
+        stacked_join_qualifiers: true,
+        full_outer_join: true,
+        natural_cross_join: false,
+        straight_join: false,
+        asof_join: false,
+        positional_join: false,
+        semi_anti_join: false,
+        sided_semi_anti_join: false,
+        apply_join: false,
+        recursive_search_cycle: false,
+        recursive_union_rejects_order_limit: false,
+        recursive_using_key: false,
+    };
 }
 
 impl ExpressionSyntax {
@@ -172,7 +206,24 @@ impl ExpressionSyntax {
     /// conservatively ANSI.
     pub const BIGQUERY: Self = Self {
         struct_constructor: true,
-        ..ExpressionSyntax::ANSI
+        typecast_operator: false,
+        subscript: false,
+        slice_step: false,
+        collate: false,
+        at_time_zone: false,
+        semi_structured_access: false,
+        array_constructor: false,
+        multidim_array_literals: false,
+        collection_literals: false,
+        row_constructor: false,
+        field_selection: false,
+        field_wildcard: false,
+        typed_string_literals: true,
+        typed_interval_literal: true,
+        relaxed_interval_syntax: false,
+        mysql_interval_operator: false,
+        positional_column: false,
+        lambda_keyword: false,
     };
 }
 
@@ -188,7 +239,20 @@ impl TableFactorSyntax {
         // also admits `ANY`/subquery and `DEFAULT ON NULL` — over-acceptance that is
         // unmeasurable without an oracle.
         pivot_value_sources: true,
-        ..TableFactorSyntax::ANSI
+        lateral: false,
+        table_functions: false,
+        rows_from: false,
+        table_function_ordinality: false,
+        special_function_table_source: true,
+        pivot: false,
+        unpivot: false,
+        show_ref: false,
+        from_values: false,
+        json_table: false,
+        xml_table: false,
+        table_expr_factor: false,
+        match_recognize: false,
+        open_json: false,
     };
 }
 
@@ -196,7 +260,25 @@ impl TypeNameSyntax {
     /// BigQuery type names: ANSI baseline plus angle-bracket `STRUCT<>`/`ARRAY<>`.
     pub const BIGQUERY: Self = Self {
         angle_bracket_types: true,
-        ..TypeNameSyntax::ANSI
+        extended_scalar_type_names: false,
+        enum_type: false,
+        set_type: false,
+        numeric_modifiers: false,
+        integer_display_width: false,
+        composite_types: false,
+        varchar_requires_length: false,
+        zoned_temporal_types: true,
+        empty_type_parens: false,
+        character_set_annotation: false,
+        signed_type_modifier: false,
+        nullable_type: false,
+        low_cardinality_type: false,
+        fixed_string_type: false,
+        datetime64_type: false,
+        nested_type: false,
+        bit_width_integer_names: false,
+        liberal_type_names: false,
+        string_type_modifiers: false,
     };
 }
 

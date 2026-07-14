@@ -120,7 +120,20 @@ impl FeatureSet {
         // (`FROM src[0].a`) navigating a SUPER column, sqlparser-rs's `supports_partiql`.
         table_expressions: TableExpressionSyntax {
             table_json_path: true,
-            ..TableExpressionSyntax::ANSI
+            only: false,
+            table_sample: false,
+            parenthesized_joins: true,
+            table_alias_column_lists: true,
+            join_using_alias: false,
+            index_hints: false,
+            table_hints: false,
+            partition_selection: false,
+            base_table_alias_column_lists: true,
+            string_literal_aliases: false,
+            aliased_parenthesized_join: true,
+            bare_table_alias_is_bare_label: false,
+            table_version: false,
+            indexed_by: false,
         },
         join_syntax: JoinSyntax::ANSI,
         table_factor_syntax: TableFactorSyntax::ANSI,

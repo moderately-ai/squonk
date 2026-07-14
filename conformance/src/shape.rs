@@ -1280,7 +1280,8 @@ pub enum TransactionShape {
 
 /// One transaction mode, mirroring PostgreSQL's `DefElem` encoding: an isolation
 /// level (`transaction_isolation`), the read/write flag (`transaction_read_only`),
-/// or the deferrable flag (`transaction_deferrable`).
+/// the deferrable flag (`transaction_deferrable`), or MySQL's consistent-snapshot
+/// start characteristic.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransactionModeShape {
     IsolationLevel(IsolationLevelShape),
@@ -1288,6 +1289,7 @@ pub enum TransactionModeShape {
     ReadOnly(bool),
     /// `true` = `DEFERRABLE`, `false` = `NOT DEFERRABLE`.
     Deferrable(bool),
+    ConsistentSnapshot,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2462,6 +2464,7 @@ fn squonk_transaction_mode(mode: &TransactionMode) -> TransactionModeShape {
         TransactionMode::Deferrable { deferrable, .. } => {
             TransactionModeShape::Deferrable(*deferrable)
         }
+        TransactionMode::ConsistentSnapshot { .. } => TransactionModeShape::ConsistentSnapshot,
     }
 }
 

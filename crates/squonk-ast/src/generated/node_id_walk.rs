@@ -2068,6 +2068,7 @@ impl<'ast> Visit<'ast, NoExt> for NodeIdWalk {
             TransactionMode::IsolationLevel { meta, .. } => *meta,
             TransactionMode::AccessMode { meta, .. } => *meta,
             TransactionMode::Deferrable { meta, .. } => *meta,
+            TransactionMode::ConsistentSnapshot { meta, .. } => *meta,
         });
         visit::walk_transaction_mode(self, node);
     }

@@ -10069,8 +10069,10 @@ TransactionStatementBeginJson = TypedDict("TransactionStatementBeginJson", {
 })
 
 TransactionStatementCommitPayloadJson = TypedDict("TransactionStatementCommitPayloadJson", {
+    "syntax": "AstNodeJson",
     "block": "AstNodeJson | None",
     "chain": "bool | None",
+    "release": "bool | None",
     "meta": "MetaJson",
 })
 
@@ -10079,10 +10081,12 @@ TransactionStatementCommitJson = TypedDict("TransactionStatementCommitJson", {
 })
 
 TransactionStatementRollbackPayloadJson = TypedDict("TransactionStatementRollbackPayloadJson", {
+    "syntax": "AstNodeJson",
     "block": "AstNodeJson | None",
     "savepoint_keyword": "bool",
     "to_savepoint": "AstNodeJson | None",
     "chain": "bool | None",
+    "release": "bool | None",
     "meta": "MetaJson",
 })
 
@@ -10132,6 +10136,16 @@ TransactionStartJson: TypeAlias = Union[
     Literal["Start"],
 ]
 
+TransactionCommitKeywordJson: TypeAlias = Union[
+    Literal["Commit"],
+    Literal["End"],
+]
+
+TransactionRollbackKeywordJson: TypeAlias = Union[
+    Literal["Rollback"],
+    Literal["Abort"],
+]
+
 TransactionBlockKeywordJson: TypeAlias = Union[
     Literal["Transaction"],
     Literal["Work"],
@@ -10170,10 +10184,19 @@ TransactionModeDeferrableJson = TypedDict("TransactionModeDeferrableJson", {
     "Deferrable": "TransactionModeDeferrablePayloadJson",
 })
 
+TransactionModeConsistentSnapshotPayloadJson = TypedDict("TransactionModeConsistentSnapshotPayloadJson", {
+    "meta": "MetaJson",
+})
+
+TransactionModeConsistentSnapshotJson = TypedDict("TransactionModeConsistentSnapshotJson", {
+    "ConsistentSnapshot": "TransactionModeConsistentSnapshotPayloadJson",
+})
+
 TransactionModeJson: TypeAlias = Union[
     TransactionModeIsolationLevelJson,
     TransactionModeAccessModeJson,
     TransactionModeDeferrableJson,
+    TransactionModeConsistentSnapshotJson,
 ]
 
 IsolationLevelJson: TypeAlias = Union[

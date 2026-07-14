@@ -127,7 +127,15 @@ impl StringLiteralSyntax {
     /// string knob is conservatively ANSI.
     pub const MSSQL: Self = Self {
         national_strings: true,
-        ..StringLiteralSyntax::ANSI
+        escape_strings: false,
+        dollar_quoted_strings: false,
+        double_quoted_strings: false,
+        backslash_escapes: false,
+        unicode_strings: false,
+        bit_string_literals: false,
+        blob_literals: false,
+        charset_introducers: false,
+        same_line_adjacent_concat: false,
     };
 }
 
@@ -136,7 +144,12 @@ impl NumericLiteralSyntax {
     /// other numeric knob is conservatively ANSI.
     pub const MSSQL: Self = Self {
         money_literals: true,
-        ..NumericLiteralSyntax::ANSI
+        hex_integers: false,
+        octal_integers: false,
+        binary_integers: false,
+        underscore_separators: false,
+        radix_leading_underscore: false,
+        reject_trailing_junk: false,
     };
 }
 
@@ -148,7 +161,11 @@ impl ParameterSyntax {
     /// the lexical assert below.
     pub const MSSQL: Self = Self {
         named_at: true,
-        ..ParameterSyntax::ANSI
+        positional_dollar: false,
+        anonymous_question: false,
+        named_colon: false,
+        named_dollar: false,
+        numbered_question: false,
     };
 }
 
@@ -163,7 +180,19 @@ impl TableExpressionSyntax {
         // `FOR SYSTEM_TIME {AS OF | FROM..TO | BETWEEN..AND | CONTAINED IN | ALL}` — the
         // temporal-table query modifier.
         table_version: true,
-        ..TableExpressionSyntax::ANSI
+        only: false,
+        table_sample: false,
+        parenthesized_joins: true,
+        table_alias_column_lists: true,
+        join_using_alias: false,
+        index_hints: false,
+        partition_selection: false,
+        base_table_alias_column_lists: true,
+        string_literal_aliases: false,
+        aliased_parenthesized_join: true,
+        bare_table_alias_is_bare_label: false,
+        table_json_path: false,
+        indexed_by: false,
     };
 }
 
@@ -171,7 +200,17 @@ impl JoinSyntax {
     /// The `MSSQL` preset for join syntax.
     pub const MSSQL: Self = Self {
         apply_join: true,
-        ..JoinSyntax::ANSI
+        stacked_join_qualifiers: true,
+        full_outer_join: true,
+        natural_cross_join: false,
+        straight_join: false,
+        asof_join: false,
+        positional_join: false,
+        semi_anti_join: false,
+        sided_semi_anti_join: false,
+        recursive_search_cycle: false,
+        recursive_union_rejects_order_limit: false,
+        recursive_using_key: false,
     };
 }
 
@@ -183,7 +222,20 @@ impl QueryTailSyntax {
     /// result-shaping clause here.
     pub const MSSQL: Self = Self {
         for_xml_json_clause: true,
-        ..QueryTailSyntax::ANSI
+        fetch_first: true,
+        limit_offset_comma: false,
+        locking_clauses: false,
+        key_lock_strengths: false,
+        stacked_locking_clauses: false,
+        using_sample: false,
+        leading_offset: true,
+        limit_expressions: true,
+        limit_percent: false,
+        with_ties_requires_order_by: false,
+        pipe_syntax: false,
+        limit_by_clause: false,
+        settings_clause: false,
+        format_clause: false,
     };
 }
 
@@ -194,7 +246,22 @@ impl TableFactorSyntax {
         // the sole engine with this exact form (documented; no differential oracle here, so the
         // gate follows the grammar on this conservative preset, the `apply_join` precedent).
         open_json: true,
-        ..TableFactorSyntax::ANSI
+        lateral: false,
+        table_functions: false,
+        rows_from: false,
+        unnest: false,
+        unnest_with_offset: false,
+        table_function_ordinality: false,
+        special_function_table_source: true,
+        pivot: false,
+        unpivot: false,
+        show_ref: false,
+        from_values: false,
+        json_table: false,
+        xml_table: false,
+        table_expr_factor: false,
+        pivot_value_sources: false,
+        match_recognize: false,
     };
 }
 
