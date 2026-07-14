@@ -64,9 +64,14 @@ class PublicationTests(unittest.TestCase):
                 check=True,
             )
             self.assertGreater(output.stat().st_size, 10_000)
+            self.assertEqual(
+                output.read_bytes(),
+                (ROOT / "docs" / "assets" / "full-ast-throughput.png").read_bytes(),
+                "the committed graphic must be the exact generator output",
+            )
 
         result = json.loads(source.read_text())
-        with Image.open(ROOT / "docs" / "assets" / "performance-summary.png") as image:
+        with Image.open(ROOT / "docs" / "assets" / "full-ast-throughput.png") as image:
             self.assertEqual(
                 image.info.get("Benchmark-SHA256"),
                 hashlib.sha256(source.read_bytes()).hexdigest(),
@@ -77,6 +82,13 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(
                 image.info.get("Benchmark-X-Axis"), "median_mib_per_second"
             )
+
+        readme = (ROOT / "README.md").read_text()
+        performance = (ROOT / "docs" / "performance.md").read_text()
+        self.assertIn("./docs/assets/full-ast-throughput.png", readme)
+        self.assertIn("(assets/full-ast-throughput.png)", performance)
+        self.assertNotIn("performance-summary.png", readme)
+        self.assertNotIn("performance-summary.png", performance)
 
     def test_published_headline_values_match_result(self) -> None:
         result = json.loads((HERE / "results" / "headline.json").read_text())

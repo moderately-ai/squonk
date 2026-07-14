@@ -125,7 +125,7 @@ complete AST through each tool's public API. Results are compared within an ecos
 language-runtime costs are not mistaken for parser-core differences.
 
 <img
-  src="./docs/assets/performance-summary.png"
+  src="./docs/assets/full-ast-throughput.png"
   alt="Horizontal bars show actual full-AST throughput in MiB per second for Squonk and its direct Rust, Python, and Node peers. Squonk reaches 35.36, 27.70, and 20.96 MiB per second through those APIs."
   width="1200"
 />

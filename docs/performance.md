@@ -121,7 +121,7 @@ that deferred work is not part of this parse-only metric. The peer parsers retur
 normal runtime-native trees, so these remain public-product comparisons rather than
 measurements of the Rust parser core alone.
 
-![Actual full-AST throughput in MiB per second for each parser and ecosystem](assets/performance-summary.png)
+![Actual full-AST throughput in MiB per second for each parser and ecosystem](assets/full-ast-throughput.png)
 
 The chart's shared x-axis is actual median throughput, not a normalized multiplier. Ratio
 annotations remain pair-local because each ecosystem has a different direct peer.

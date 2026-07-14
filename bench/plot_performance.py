@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RESULT = ROOT / "bench" / "publication" / "results" / "headline.json"
-OUTPUT = ROOT / "docs" / "assets" / "performance-summary.png"
+OUTPUT = ROOT / "docs" / "assets" / "full-ast-throughput.png"
 INK = "#18212b"
 MUTED = "#68737d"
 GRID = "#d9dee3"
