@@ -1276,7 +1276,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
         &mut self,
         star_span: Span,
     ) -> ParseResult<Option<Box<WildcardOptions<D::Ext>>>> {
-        if !self.features().select_syntax.wildcard_modifiers {
+        if !self.features().select_syntax.wildcard_modifiers
+            && !self.features().select_syntax.wildcard_replace
+        {
             return Ok(None);
         }
         self.parse_wildcard_modifier_tail(star_span)
@@ -1342,17 +1344,19 @@ impl<'a, D: Dialect> Parser<'a, D> {
         &mut self,
         star_span: Span,
     ) -> ParseResult<Option<Box<WildcardOptions<D::Ext>>>> {
-        let exclude = if self.eat_keyword(Keyword::Exclude)? {
+        let modifiers = self.features().select_syntax.wildcard_modifiers;
+        let replace_only = self.features().select_syntax.wildcard_replace;
+        let exclude = if modifiers && self.eat_keyword(Keyword::Exclude)? {
             self.parse_wildcard_column_list()?
         } else {
             ThinVec::new()
         };
-        let replace = if self.eat_keyword(Keyword::Replace)? {
+        let replace = if (modifiers || replace_only) && self.eat_keyword(Keyword::Replace)? {
             self.parse_wildcard_parenthesizable(Self::parse_wildcard_replace_item)?
         } else {
             ThinVec::new()
         };
-        let rename = if self.eat_keyword(Keyword::Rename)? {
+        let rename = if modifiers && self.eat_keyword(Keyword::Rename)? {
             self.parse_wildcard_parenthesizable(Self::parse_wildcard_rename_item)?
         } else {
             ThinVec::new()

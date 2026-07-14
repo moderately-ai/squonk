@@ -414,6 +414,7 @@ mod tests {
     fn insert_of(source: InsertSource<NoExt>) -> Statement<NoExt> {
         statement_insert(Insert {
             verb: InsertVerb::Insert,
+            modifier: None,
             or_action: None,
             column_matching: None,
             with: None,
@@ -584,6 +585,7 @@ mod tests {
                     alias_spelling: AliasSpelling::As,
                     meta: meta(),
                 },
+                target_joins: ThinVec::new(),
                 assignments: thin_vec![UpdateAssignment::Single {
                     target: object_name(&[1]),
                     value: UpdateValue::Expr {
@@ -618,6 +620,8 @@ mod tests {
                     alias_spelling: AliasSpelling::As,
                     meta: meta(),
                 },
+                additional_targets: ThinVec::new(),
+                target_joins: ThinVec::new(),
                 using: ThinVec::new(),
                 selection: Some(DmlSelection::Where {
                     condition: binary(

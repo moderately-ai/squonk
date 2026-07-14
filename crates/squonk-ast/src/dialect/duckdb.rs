@@ -705,6 +705,9 @@ impl FeatureSet {
         // (`CREATE MACRO`/`CREATE FUNCTION … AS <expr>|TABLE <query>`), `CREATE OR REPLACE
         // TABLE`, and the `CREATE [PERSISTENT] SECRET` secrets statement.
         statement_ddl_gates: StatementDdlGates {
+            // DuckDB accepts the shared sequence option core but rejects PostgreSQL's
+            // `CACHE` extension.
+            create_sequence_cache: false,
             create_macro: true,
             create_secret: true,
             create_type: true,
@@ -814,6 +817,10 @@ impl FeatureSet {
             // probed 1.5.4).
             alter_table_multiple_actions: false,
             alter_nested_column_paths: true,
+            // DuckDB parses table-option assignment lists and standalone index storage
+            // parameters; option names and values remain binder concerns.
+            alter_table_set_options: true,
+            index_storage_parameters: true,
             // Spread-inheritance invariant: the `index_drop_on_table` statement head
             // inherits PostgreSQL's `false` through this spread; a base flip propagates
             // silently. Pinned by value in head_contention's
@@ -1114,6 +1121,8 @@ mod tests {
                 transform_ddl: true,
                 // DuckDB has no `ALTER SYSTEM` server-configuration DDL.
                 alter_system: true,
+                // PostgreSQL accepts the `CACHE` sequence option.
+                create_sequence_cache: true,
                 // MySQL's tablespace / logfile-group storage DDL is not a DuckDB statement.
                 tablespace_ddl: false,
                 logfile_group_ddl: false,

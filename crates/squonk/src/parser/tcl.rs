@@ -89,8 +89,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
             })
         } else if self.eat_contextual_keyword("COMMIT")? {
             let block = self.eat_transaction_block_keyword()?;
+            let chain = self.parse_transaction_chain()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
-            Ok(TransactionStatement::Commit { block, meta })
+            Ok(TransactionStatement::Commit { block, chain, meta })
         } else if self.eat_contextual_keyword("ROLLBACK")? {
             let block = self.eat_transaction_block_keyword()?;
             let (savepoint_keyword, to_savepoint) = if self.eat_contextual_keyword("TO")? {
@@ -100,11 +101,17 @@ impl<'a, D: Dialect> Parser<'a, D> {
             } else {
                 (false, None)
             };
+            let chain = if to_savepoint.is_none() {
+                self.parse_transaction_chain()?
+            } else {
+                None
+            };
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Rollback {
                 block,
                 savepoint_keyword,
                 to_savepoint,
+                chain,
                 meta,
             })
         } else if self.eat_contextual_keyword("SAVEPOINT")? {
@@ -132,6 +139,17 @@ impl<'a, D: Dialect> Parser<'a, D> {
         } else {
             Err(self.unexpected("a transaction-control statement"))
         }
+    }
+
+    fn parse_transaction_chain(&mut self) -> ParseResult<Option<bool>> {
+        if !self.features().utility_syntax.transaction_chain
+            || !self.eat_contextual_keyword("AND")?
+        {
+            return Ok(None);
+        }
+        let chain = !self.eat_contextual_keyword("NO")?;
+        self.expect_contextual_keyword("CHAIN")?;
+        Ok(Some(chain))
     }
 
     /// Consume the interchangeable `WORK` / `TRANSACTION` block noise word that may

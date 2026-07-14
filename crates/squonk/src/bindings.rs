@@ -39,7 +39,7 @@ use crate::ast::{Keyword, SourceStore, Span};
 /// The full rules and the one bump procedure shared by Rust, Python, and npm live
 /// in `docs/schema-contract.md`; the `wire_schema` integration test fails loudly
 /// on any unreviewed shape change and points there.
-pub const WIRE_SCHEMA_VERSION: u32 = 1;
+pub const WIRE_SCHEMA_VERSION: u32 = 2;
 use crate::ast::dialect::{SupportEvidence, SupportTier};
 use crate::dialect::BuiltinDialect;
 use crate::error::{Found, ParseError, ParseErrorKind};

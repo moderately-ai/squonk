@@ -45,6 +45,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = []
 postgres = []
+quiltdb = ["postgres"]
 mysql = []
 sqlite = []
 # DuckDB is PostgreSQL-derived: its preset (`dialect/duckdb.rs`) reuses the `::POSTGRES`
@@ -81,7 +82,7 @@ snowflake = []
 # would over-accept features Redshift never had (see `dialect/redshift.rs` module docs).
 redshift = []
 lenient = []
-full = ["postgres", "mysql", "sqlite", "duckdb", "bigquery", "hive", "clickhouse", "databricks", "mssql", "snowflake", "redshift", "lenient"]
+full = ["postgres", "quiltdb", "mysql", "sqlite", "duckdb", "bigquery", "hive", "clickhouse", "databricks", "mssql", "snowflake", "redshift", "lenient"]
 # Opt-in serialization features for the public AST node graph (ADR-0017 dep
 # discipline, mirroring the phf/lasso measured-but-not-default rule). Off by
 # default, so the default build pulls neither serde nor its derive macro. `serde`

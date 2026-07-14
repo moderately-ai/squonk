@@ -64,6 +64,7 @@ _DIALECTS = {
         "ansi": ("ansi", "generic"), "postgres": ("postgres", "postgresql", "pg"),
         "mysql": ("mysql", "mariadb"), "sqlite": ("sqlite", "sqlite3"),
         "duckdb": ("duckdb", "duck"), "bigquery": ("bigquery", "bq", "zetasql"),
+        "quiltdb": ("quiltdb", "quilt"),
         "hive": ("hive", "hiveql"), "clickhouse": ("clickhouse", "ch"),
         "databricks": ("databricks", "dbx"),
         "mssql": ("mssql", "tsql", "sqlserver"), "snowflake": ("snowflake", "sf"),

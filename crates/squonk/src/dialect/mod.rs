@@ -78,6 +78,8 @@ mod mssql;
 mod mysql;
 #[cfg(feature = "postgres")]
 mod postgres;
+#[cfg(feature = "quiltdb")]
+mod quiltdb;
 #[cfg(feature = "redshift")]
 mod redshift;
 #[cfg(feature = "snowflake")]
@@ -110,6 +112,8 @@ pub use mssql::Mssql;
 pub use mysql::MySql;
 #[cfg(feature = "postgres")]
 pub use postgres::Postgres;
+#[cfg(feature = "quiltdb")]
+pub use quiltdb::QuiltDb;
 #[cfg(feature = "redshift")]
 pub use redshift::Redshift;
 #[cfg(feature = "snowflake")]

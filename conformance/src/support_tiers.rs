@@ -151,8 +151,8 @@ mod tests {
     fn every_shipped_dialect_and_surface_is_tiered() {
         assert_eq!(
             BuiltinDialect::ALL.len(),
-            13,
-            "expected 13 shipped presets under `full`; update this gate and the tier table \
+            14,
+            "expected 14 shipped presets under `full`; update this gate and the tier table \
              when the shipped set changes",
         );
         assert_eq!(ProductSurface::ALL.len(), 4);

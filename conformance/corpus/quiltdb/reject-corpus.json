@@ -1,0 +1,20 @@
+{
+  "cases": [
+    { "id": "query-wildcard-exclude", "sql": "SELECT * EXCLUDE (id) FROM t" },
+    { "id": "query-wildcard-rename", "sql": "SELECT * RENAME (id AS other) FROM t" },
+    { "id": "query-ilike", "sql": "SELECT 'a' ILIKE 'A'" },
+    { "id": "query-is-distinct-from", "sql": "SELECT 1 IS DISTINCT FROM 2" },
+    { "id": "query-natural-cross", "sql": "SELECT * FROM a NATURAL CROSS JOIN b" },
+    { "id": "query-left-semi", "sql": "SELECT * FROM a LEFT SEMI JOIN b ON a.id = b.id" },
+    { "id": "query-left-anti", "sql": "SELECT * FROM a LEFT ANTI JOIN b ON a.id = b.id" },
+    { "id": "query-qualify", "sql": "SELECT 1 QUALIFY true" },
+    { "id": "query-tablesample", "sql": "SELECT * FROM t TABLESAMPLE SYSTEM (10)" },
+    { "id": "query-intersect-all", "sql": "SELECT 1 INTERSECT ALL SELECT 1" },
+    { "id": "query-except-all", "sql": "SELECT 1 EXCEPT ALL SELECT 1" },
+    { "id": "ddl-modify-column", "sql": "ALTER TABLE t MODIFY COLUMN c BIGINT" },
+    { "id": "ddl-change-column", "sql": "ALTER TABLE t CHANGE COLUMN c d BIGINT" },
+    { "id": "ddl-tblproperties", "sql": "ALTER TABLE t SET TBLPROPERTIES ('k' = 'v')" },
+    { "id": "ddl-alter-drop-index", "sql": "ALTER TABLE t DROP INDEX idx" },
+    { "id": "ddl-trailing-index-using", "sql": "CREATE INDEX idx ON t (c) USING btree" }
+  ]
+}

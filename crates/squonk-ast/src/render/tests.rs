@@ -2876,6 +2876,7 @@ fn create_view_renders_or_replace_columns_and_check_option() {
             query: Box::new(query_one(2)),
             check_option: Some(ViewCheckOption::Local),
             with_data: None,
+            to: None,
             meta: meta(0, 0),
         }),
         meta: meta(0, 0),
@@ -2902,6 +2903,7 @@ fn create_materialized_view_renders_guard_and_with_data() {
             query: Box::new(query_one(2)),
             check_option: None,
             with_data: Some(false),
+            to: None,
             meta: meta(0, 0),
         }),
         meta: meta(0, 0),
@@ -2928,6 +2930,7 @@ fn create_recursive_view_renders_keyword_before_view() {
             query: Box::new(query_one(2)),
             check_option: None,
             with_data: None,
+            to: None,
             meta: meta(0, 0),
         }),
         meta: meta(0, 0),
@@ -2962,6 +2965,7 @@ fn create_view_renders_mysql_algorithm_definer_and_sql_security_prefix() {
             query: Box::new(query_one(2)),
             check_option: None,
             with_data: None,
+            to: None,
             meta: meta(0, 0),
         }),
         meta: meta(0, 0),
@@ -3046,6 +3050,7 @@ fn create_index_renders_unique_concurrently_using_and_partial_where() {
                 },
             ],
             predicate: Some(Box::new(is_null(col(3)))),
+            with_params: ThinVec::new(),
             meta: meta(0, 0),
         }),
         meta: meta(0, 0),
@@ -3078,6 +3083,7 @@ fn update_and_delete_render_mutation_clauses() {
                 alias_spelling: AliasSpelling::As,
                 meta: meta(0, 0),
             },
+            target_joins: ThinVec::new(),
             assignments: thin_vec![
                 UpdateAssignment::Single {
                     target: name(3),
@@ -3140,6 +3146,8 @@ fn update_and_delete_render_mutation_clauses() {
                 alias_spelling: AliasSpelling::As,
                 meta: meta(0, 0),
             },
+            additional_targets: ThinVec::new(),
+            target_joins: ThinVec::new(),
             using,
             selection: Some(DmlSelection::Where {
                 condition: predicate,
@@ -3197,6 +3205,7 @@ fn update_and_delete_advanced_forms_render() {
                 alias_spelling: AliasSpelling::As,
                 meta: meta(0, 0),
             },
+            target_joins: ThinVec::new(),
             assignments: thin_vec![
                 UpdateAssignment::Tuple {
                     targets: thin_vec![name(2), name(3)],
@@ -3242,6 +3251,7 @@ fn update_and_delete_advanced_forms_render() {
                 alias_spelling: AliasSpelling::As,
                 meta: meta(0, 0),
             },
+            target_joins: ThinVec::new(),
             assignments: thin_vec![UpdateAssignment::Tuple {
                 targets: thin_vec![name(2), name(3)],
                 source: subquery_source,
@@ -3273,6 +3283,7 @@ fn update_and_delete_advanced_forms_render() {
                 alias_spelling: AliasSpelling::As,
                 meta: meta(0, 0),
             },
+            target_joins: ThinVec::new(),
             assignments: thin_vec![UpdateAssignment::Tuple {
                 targets: thin_vec![name(2), name(3)],
                 source: UpdateTupleSource::Default {
@@ -3316,6 +3327,7 @@ fn insert_returning_and_on_conflict_render() {
     let upsert: Statement = Statement::Insert {
         insert: Box::new(Insert {
             verb: InsertVerb::Insert,
+            modifier: None,
             or_action: None,
             with: None,
             column_matching: None,
@@ -3377,6 +3389,7 @@ fn insert_returning_and_on_conflict_render() {
     let do_nothing: Statement = Statement::Insert {
         insert: Box::new(Insert {
             verb: InsertVerb::Insert,
+            modifier: None,
             or_action: None,
             with: None,
             column_matching: None,
@@ -3410,6 +3423,7 @@ fn insert_returning_and_on_conflict_render() {
     let on_duplicate: Statement = Statement::Insert {
         insert: Box::new(Insert {
             verb: InsertVerb::Insert,
+            modifier: None,
             or_action: None,
             with: None,
             column_matching: None,

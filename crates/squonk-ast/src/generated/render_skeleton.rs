@@ -9,11 +9,11 @@
 
 use crate::ast::*;
 pub(crate) struct RenderShapeFingerprint<const VALUE: u64>;
-pub(crate) const CURRENT_RENDER_SHAPE_DCL: RenderShapeFingerprint<0x668c6569aa20f965> =
+pub(crate) const CURRENT_RENDER_SHAPE_DCL: RenderShapeFingerprint<0xc1598aa589abcdb4> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_DDL: RenderShapeFingerprint<0xea69d9b785020501> =
+pub(crate) const CURRENT_RENDER_SHAPE_DDL: RenderShapeFingerprint<0xb7fb9938befad896> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_DML: RenderShapeFingerprint<0xbc51c89e49732760> =
+pub(crate) const CURRENT_RENDER_SHAPE_DML: RenderShapeFingerprint<0x5bdcbbc8cc864aec> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_EXPR: RenderShapeFingerprint<0xbcc8a4346507a25c> =
     RenderShapeFingerprint;
@@ -33,11 +33,11 @@ pub(crate) const CURRENT_RENDER_SHAPE_QUERY: RenderShapeFingerprint<0x305c97c17f
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_REPLICATION: RenderShapeFingerprint<0xfa8b2915218d27ba> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_STMT: RenderShapeFingerprint<0x6f0ed6cfb3c83310> =
+pub(crate) const CURRENT_RENDER_SHAPE_STMT: RenderShapeFingerprint<0x957db431c4a1db51> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_STORED_PROGRAM: RenderShapeFingerprint<0xfb50d22f049b4cc7> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_TCL: RenderShapeFingerprint<0x0b580e5e0de8de03> =
+pub(crate) const CURRENT_RENDER_SHAPE_TCL: RenderShapeFingerprint<0x316658eaf65c4c17> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_TY: RenderShapeFingerprint<0x03efd7c0644eb26a> =
     RenderShapeFingerprint;
@@ -380,6 +380,15 @@ pub(crate) fn render_shape_access_control_statement<X: Extension>(
     node: &AccessControlStatement<X>,
 ) {
     match node {
+        AccessControlStatement::AlterRoleRename {
+            name,
+            new_name,
+            meta,
+        } => {
+            render_shape_ident(name);
+            render_shape_ident(new_name);
+            touch(meta);
+        }
         AccessControlStatement::Grant {
             privileges,
             object,
@@ -1800,6 +1809,28 @@ pub(crate) fn render_shape_create_table_option<X: Extension>(node: &CreateTableO
 }
 pub(crate) fn render_shape_create_table_option_kind<X: Extension>(node: &CreateTableOptionKind<X>) {
     match node {
+        CreateTableOptionKind::ColocateWith {
+            table,
+            columns,
+            meta,
+        } => {
+            render_shape_object_name(table);
+            for item in columns.iter() {
+                render_shape_ident(item);
+            }
+            touch(meta);
+        }
+        CreateTableOptionKind::InColocationGroup {
+            group,
+            columns,
+            meta,
+        } => {
+            render_shape_ident(group);
+            for item in columns.iter() {
+                render_shape_ident(item);
+            }
+            touch(meta);
+        }
         CreateTableOptionKind::With { params, meta } => {
             for item in params.iter() {
                 render_shape_table_storage_parameter(item);
@@ -1889,6 +1920,13 @@ pub(crate) fn render_shape_alter_column_target(node: &AlterColumnTarget) {
 }
 pub(crate) fn render_shape_alter_table_action<X: Extension>(node: &AlterTableAction<X>) {
     match node {
+        AlterTableAction::SetColocationGroup { group, meta } => {
+            render_shape_ident(group);
+            touch(meta);
+        }
+        AlterTableAction::DropColocationGroup { meta } => {
+            touch(meta);
+        }
         AlterTableAction::AddColumn {
             if_not_exists,
             column_keyword,
@@ -1947,6 +1985,18 @@ pub(crate) fn render_shape_alter_table_action<X: Extension>(node: &AlterTableAct
             }
             touch(meta);
         }
+        AlterTableAction::DropPrimaryKey { behavior, meta } => {
+            if let Some(item) = behavior.as_ref() {
+                render_shape_drop_behavior(item);
+            }
+            touch(meta);
+        }
+        AlterTableAction::SetOptions { params, meta } => {
+            for item in params.iter() {
+                render_shape_table_storage_parameter(item);
+            }
+            touch(meta);
+        }
         AlterTableAction::RenameColumn {
             column_keyword,
             name,
@@ -1955,6 +2005,15 @@ pub(crate) fn render_shape_alter_table_action<X: Extension>(node: &AlterTableAct
         } => {
             touch(column_keyword);
             render_shape_alter_column_target(name);
+            render_shape_ident(new_name);
+            touch(meta);
+        }
+        AlterTableAction::RenameConstraint {
+            name,
+            new_name,
+            meta,
+        } => {
+            render_shape_ident(name);
             render_shape_ident(new_name);
             touch(meta);
         }
@@ -2003,6 +2062,10 @@ pub(crate) fn render_shape_alter_column_action<X: Extension>(node: &AlterColumnA
             touch(meta);
         }
         AlterColumnAction::DropNotNull { meta } => {
+            touch(meta);
+        }
+        AlterColumnAction::AddIdentity { identity, meta } => {
+            render_shape_identity_column(identity);
             touch(meta);
         }
         AlterColumnAction::SetDataType {
@@ -2077,6 +2140,10 @@ pub(crate) fn render_shape_comment_target<X: Extension>(node: &CommentTarget<X>)
         CommentTarget::Table => {}
         CommentTarget::Column => {}
         CommentTarget::Database => {}
+        CommentTarget::View => {}
+        CommentTarget::MaterializedView => {}
+        CommentTarget::Index => {}
+        CommentTarget::Constraint => {}
         CommentTarget::Procedure { arg_types } => {
             if let Some(item) = arg_types.as_ref() {
                 for item1 in item.iter() {
@@ -2088,13 +2155,19 @@ pub(crate) fn render_shape_comment_target<X: Extension>(node: &CommentTarget<X>)
 }
 pub(crate) fn render_shape_comment_on_statement<X: Extension>(node: &CommentOnStatement<X>) {
     let CommentOnStatement {
+        if_exists,
         target,
         name,
+        constraint_table,
         comment,
         meta,
     } = node;
+    touch(if_exists);
     render_shape_comment_target(target);
     render_shape_object_name(name);
+    if let Some(item) = constraint_table.as_ref() {
+        render_shape_object_name(item);
+    }
     if let Some(item) = comment.as_ref() {
         render_shape_literal(item);
     }
@@ -2130,6 +2203,7 @@ pub(crate) fn render_shape_create_view<X: Extension>(node: &CreateView<X>) {
         if_not_exists,
         name,
         columns,
+        to,
         query,
         check_option,
         with_data,
@@ -2147,11 +2221,60 @@ pub(crate) fn render_shape_create_view<X: Extension>(node: &CreateView<X>) {
     for item in columns.iter() {
         render_shape_ident(item);
     }
+    if let Some(item) = to.as_ref() {
+        render_shape_object_name(item);
+    }
     render_shape_query(query);
     if let Some(item) = check_option.as_ref() {
         render_shape_view_check_option(item);
     }
     touch(with_data);
+    touch(meta);
+}
+pub(crate) fn render_shape_refresh_materialized_view(node: &RefreshMaterializedView) {
+    let RefreshMaterializedView {
+        concurrently,
+        name,
+        with_data,
+        meta,
+    } = node;
+    touch(concurrently);
+    render_shape_object_name(name);
+    touch(with_data);
+    touch(meta);
+}
+pub(crate) fn render_shape_colocation_partition_kind(node: &ColocationPartitionKind) {
+    match node {
+        ColocationPartitionKind::Hash => {}
+        ColocationPartitionKind::Range => {}
+    }
+}
+pub(crate) fn render_shape_create_colocation_group(node: &CreateColocationGroup) {
+    let CreateColocationGroup {
+        if_not_exists,
+        name,
+        partition,
+        columns,
+        shards,
+        meta,
+    } = node;
+    touch(if_not_exists);
+    render_shape_ident(name);
+    render_shape_colocation_partition_kind(partition);
+    for item in columns.iter() {
+        render_shape_ident(item);
+    }
+    render_shape_literal(shards);
+    touch(meta);
+}
+pub(crate) fn render_shape_drop_colocation_group(node: &DropColocationGroup) {
+    let DropColocationGroup {
+        if_exists,
+        name,
+        meta,
+    } = node;
+    touch(if_exists);
+    render_shape_ident(name);
     touch(meta);
 }
 pub(crate) fn render_shape_view_check_option(node: &ViewCheckOption) {
@@ -2279,6 +2402,7 @@ pub(crate) fn render_shape_create_index<X: Extension>(node: &CreateIndex<X>) {
         table,
         using,
         columns,
+        with_params,
         predicate,
         meta,
     } = node;
@@ -2294,6 +2418,9 @@ pub(crate) fn render_shape_create_index<X: Extension>(node: &CreateIndex<X>) {
     }
     for item in columns.iter() {
         render_shape_index_column(item);
+    }
+    for item in with_params.iter() {
+        render_shape_table_storage_parameter(item);
     }
     if let Some(item) = predicate.as_ref() {
         render_shape_expr(item);
@@ -3741,6 +3868,12 @@ pub(crate) fn render_shape_insert_verb(node: &InsertVerb) {
         InsertVerb::Replace => {}
     }
 }
+pub(crate) fn render_shape_insert_modifier(node: &InsertModifier) {
+    match node {
+        InsertModifier::Ignore => {}
+        InsertModifier::Overwrite => {}
+    }
+}
 pub(crate) fn render_shape_insert_column_matching(node: &InsertColumnMatching) {
     match node {
         InsertColumnMatching::ByName => {}
@@ -3759,6 +3892,7 @@ pub(crate) fn render_shape_conflict_resolution(node: &ConflictResolution) {
 pub(crate) fn render_shape_insert<X: Extension>(node: &Insert<X>) {
     let Insert {
         verb,
+        modifier,
         or_action,
         with,
         target,
@@ -3771,6 +3905,9 @@ pub(crate) fn render_shape_insert<X: Extension>(node: &Insert<X>) {
         meta,
     } = node;
     render_shape_insert_verb(verb);
+    if let Some(item) = modifier.as_ref() {
+        render_shape_insert_modifier(item);
+    }
     if let Some(item) = or_action.as_ref() {
         render_shape_conflict_resolution(item);
     }
@@ -3884,6 +4021,7 @@ pub(crate) fn render_shape_update<X: Extension>(node: &Update<X>) {
         with,
         or_action,
         target,
+        target_joins,
         assignments,
         from,
         selection,
@@ -3899,6 +4037,9 @@ pub(crate) fn render_shape_update<X: Extension>(node: &Update<X>) {
         render_shape_conflict_resolution(item);
     }
     render_shape_dml_target(target);
+    for item in target_joins.iter() {
+        render_shape_join(item);
+    }
     for item in assignments.iter() {
         render_shape_update_assignment(item);
     }
@@ -3982,6 +4123,8 @@ pub(crate) fn render_shape_delete<X: Extension>(node: &Delete<X>) {
     let Delete {
         with,
         target,
+        additional_targets,
+        target_joins,
         using,
         selection,
         order_by,
@@ -3993,6 +4136,12 @@ pub(crate) fn render_shape_delete<X: Extension>(node: &Delete<X>) {
         render_shape_with(item);
     }
     render_shape_dml_target(target);
+    for item in additional_targets.iter() {
+        render_shape_dml_target(item);
+    }
+    for item in target_joins.iter() {
+        render_shape_join(item);
+    }
     for item in using.iter() {
         render_shape_table_with_joins(item);
     }
@@ -4151,6 +4300,7 @@ pub(crate) fn render_shape_merge_action<X: Extension>(node: &MergeAction<X>) {
             columns,
             overriding,
             values,
+            additional_rows,
             meta,
         } => {
             for item in columns.iter() {
@@ -4161,6 +4311,11 @@ pub(crate) fn render_shape_merge_action<X: Extension>(node: &MergeAction<X>) {
             }
             for item in values.iter() {
                 render_shape_insert_value(item);
+            }
+            for item in additional_rows.iter() {
+                for item1 in item.iter() {
+                    render_shape_insert_value(item1);
+                }
             }
             touch(meta);
         }
@@ -8244,6 +8399,18 @@ pub(crate) fn render_shape_statement<X: Extension>(node: &Statement<X>) {
             render_shape_create_view(view);
             touch(meta);
         }
+        Statement::RefreshMaterializedView { refresh, meta } => {
+            render_shape_refresh_materialized_view(refresh);
+            touch(meta);
+        }
+        Statement::CreateColocationGroup { create, meta } => {
+            render_shape_create_colocation_group(create);
+            touch(meta);
+        }
+        Statement::DropColocationGroup { drop, meta } => {
+            render_shape_drop_colocation_group(drop);
+            touch(meta);
+        }
         Statement::AlterView { alter, meta } => {
             render_shape_alter_view(alter);
             touch(meta);
@@ -9187,16 +9354,18 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
             }
             touch(meta);
         }
-        TransactionStatement::Commit { block, meta } => {
+        TransactionStatement::Commit { block, chain, meta } => {
             if let Some(item) = block.as_ref() {
                 render_shape_transaction_block_keyword(item);
             }
+            touch(chain);
             touch(meta);
         }
         TransactionStatement::Rollback {
             block,
             savepoint_keyword,
             to_savepoint,
+            chain,
             meta,
         } => {
             if let Some(item) = block.as_ref() {
@@ -9206,6 +9375,7 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
             if let Some(item) = to_savepoint.as_ref() {
                 render_shape_ident(item);
             }
+            touch(chain);
             touch(meta);
         }
         TransactionStatement::Savepoint { name, meta } => {

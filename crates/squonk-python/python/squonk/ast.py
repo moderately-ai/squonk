@@ -483,6 +483,16 @@ AlterSystemActionJson: TypeAlias = Union[
     AlterSystemActionResetJson,
 ]
 
+AccessControlStatementAlterRoleRenamePayloadJson = TypedDict("AccessControlStatementAlterRoleRenamePayloadJson", {
+    "name": "AstNodeJson",
+    "new_name": "AstNodeJson",
+    "meta": "MetaJson",
+})
+
+AccessControlStatementAlterRoleRenameJson = TypedDict("AccessControlStatementAlterRoleRenameJson", {
+    "AlterRoleRename": "AccessControlStatementAlterRoleRenamePayloadJson",
+})
+
 AccessControlStatementGrantPayloadJson = TypedDict("AccessControlStatementGrantPayloadJson", {
     "privileges": "AstNodeJson",
     "object": "AstNodeJson",
@@ -620,6 +630,7 @@ AccessControlStatementAccountRevokeRoleJson = TypedDict("AccessControlStatementA
 })
 
 AccessControlStatementJson: TypeAlias = Union[
+    AccessControlStatementAlterRoleRenameJson,
     AccessControlStatementGrantJson,
     AccessControlStatementRevokeJson,
     AccessControlStatementGrantRoleJson,
@@ -2066,6 +2077,26 @@ CreateTableOptionJson = TypedDict("CreateTableOptionJson", {
     "meta": "MetaJson",
 })
 
+CreateTableOptionKindColocateWithPayloadJson = TypedDict("CreateTableOptionKindColocateWithPayloadJson", {
+    "table": "AstNodeJson",
+    "columns": "list[AstNodeJson]",
+    "meta": "MetaJson",
+})
+
+CreateTableOptionKindColocateWithJson = TypedDict("CreateTableOptionKindColocateWithJson", {
+    "ColocateWith": "CreateTableOptionKindColocateWithPayloadJson",
+})
+
+CreateTableOptionKindInColocationGroupPayloadJson = TypedDict("CreateTableOptionKindInColocationGroupPayloadJson", {
+    "group": "AstNodeJson",
+    "columns": "list[AstNodeJson]",
+    "meta": "MetaJson",
+})
+
+CreateTableOptionKindInColocationGroupJson = TypedDict("CreateTableOptionKindInColocationGroupJson", {
+    "InColocationGroup": "CreateTableOptionKindInColocationGroupPayloadJson",
+})
+
 CreateTableOptionKindWithPayloadJson = TypedDict("CreateTableOptionKindWithPayloadJson", {
     "params": "list[AstNodeJson]",
     "meta": "MetaJson",
@@ -2127,6 +2158,8 @@ CreateTableOptionKindWithoutOidsJson = TypedDict("CreateTableOptionKindWithoutOi
 })
 
 CreateTableOptionKindJson: TypeAlias = Union[
+    CreateTableOptionKindColocateWithJson,
+    CreateTableOptionKindInColocationGroupJson,
     CreateTableOptionKindWithJson,
     CreateTableOptionKindOnCommitJson,
     CreateTableOptionKindTablespaceJson,
@@ -2199,6 +2232,23 @@ AlterColumnTargetJson = TypedDict("AlterColumnTargetJson", {
     "meta": "MetaJson",
 })
 
+AlterTableActionSetColocationGroupPayloadJson = TypedDict("AlterTableActionSetColocationGroupPayloadJson", {
+    "group": "AstNodeJson",
+    "meta": "MetaJson",
+})
+
+AlterTableActionSetColocationGroupJson = TypedDict("AlterTableActionSetColocationGroupJson", {
+    "SetColocationGroup": "AlterTableActionSetColocationGroupPayloadJson",
+})
+
+AlterTableActionDropColocationGroupPayloadJson = TypedDict("AlterTableActionDropColocationGroupPayloadJson", {
+    "meta": "MetaJson",
+})
+
+AlterTableActionDropColocationGroupJson = TypedDict("AlterTableActionDropColocationGroupJson", {
+    "DropColocationGroup": "AlterTableActionDropColocationGroupPayloadJson",
+})
+
 AlterTableActionAddColumnPayloadJson = TypedDict("AlterTableActionAddColumnPayloadJson", {
     "if_not_exists": "bool",
     "column_keyword": "bool",
@@ -2254,6 +2304,24 @@ AlterTableActionDropConstraintJson = TypedDict("AlterTableActionDropConstraintJs
     "DropConstraint": "AlterTableActionDropConstraintPayloadJson",
 })
 
+AlterTableActionDropPrimaryKeyPayloadJson = TypedDict("AlterTableActionDropPrimaryKeyPayloadJson", {
+    "behavior": "AstNodeJson | None",
+    "meta": "MetaJson",
+})
+
+AlterTableActionDropPrimaryKeyJson = TypedDict("AlterTableActionDropPrimaryKeyJson", {
+    "DropPrimaryKey": "AlterTableActionDropPrimaryKeyPayloadJson",
+})
+
+AlterTableActionSetOptionsPayloadJson = TypedDict("AlterTableActionSetOptionsPayloadJson", {
+    "params": "list[AstNodeJson]",
+    "meta": "MetaJson",
+})
+
+AlterTableActionSetOptionsJson = TypedDict("AlterTableActionSetOptionsJson", {
+    "SetOptions": "AlterTableActionSetOptionsPayloadJson",
+})
+
 AlterTableActionRenameColumnPayloadJson = TypedDict("AlterTableActionRenameColumnPayloadJson", {
     "column_keyword": "bool",
     "name": "AstNodeJson",
@@ -2263,6 +2331,16 @@ AlterTableActionRenameColumnPayloadJson = TypedDict("AlterTableActionRenameColum
 
 AlterTableActionRenameColumnJson = TypedDict("AlterTableActionRenameColumnJson", {
     "RenameColumn": "AlterTableActionRenameColumnPayloadJson",
+})
+
+AlterTableActionRenameConstraintPayloadJson = TypedDict("AlterTableActionRenameConstraintPayloadJson", {
+    "name": "AstNodeJson",
+    "new_name": "AstNodeJson",
+    "meta": "MetaJson",
+})
+
+AlterTableActionRenameConstraintJson = TypedDict("AlterTableActionRenameConstraintJson", {
+    "RenameConstraint": "AlterTableActionRenameConstraintPayloadJson",
 })
 
 AlterTableActionRenameTablePayloadJson = TypedDict("AlterTableActionRenameTablePayloadJson", {
@@ -2295,12 +2373,17 @@ AlterTableActionDetachPartitionJson = TypedDict("AlterTableActionDetachPartition
 })
 
 AlterTableActionJson: TypeAlias = Union[
+    AlterTableActionSetColocationGroupJson,
+    AlterTableActionDropColocationGroupJson,
     AlterTableActionAddColumnJson,
     AlterTableActionDropColumnJson,
     AlterTableActionAlterColumnJson,
     AlterTableActionAddConstraintJson,
     AlterTableActionDropConstraintJson,
+    AlterTableActionDropPrimaryKeyJson,
+    AlterTableActionSetOptionsJson,
     AlterTableActionRenameColumnJson,
+    AlterTableActionRenameConstraintJson,
     AlterTableActionRenameTableJson,
     AlterTableActionAttachPartitionJson,
     AlterTableActionDetachPartitionJson,
@@ -2344,6 +2427,15 @@ AlterColumnActionDropNotNullJson = TypedDict("AlterColumnActionDropNotNullJson",
     "DropNotNull": "AlterColumnActionDropNotNullPayloadJson",
 })
 
+AlterColumnActionAddIdentityPayloadJson = TypedDict("AlterColumnActionAddIdentityPayloadJson", {
+    "identity": "AstNodeJson",
+    "meta": "MetaJson",
+})
+
+AlterColumnActionAddIdentityJson = TypedDict("AlterColumnActionAddIdentityJson", {
+    "AddIdentity": "AlterColumnActionAddIdentityPayloadJson",
+})
+
 AlterColumnActionSetDataTypePayloadJson = TypedDict("AlterColumnActionSetDataTypePayloadJson", {
     "set_data": "bool",
     "data_type": "AstNodeJson",
@@ -2360,6 +2452,7 @@ AlterColumnActionJson: TypeAlias = Union[
     AlterColumnActionDropDefaultJson,
     AlterColumnActionSetNotNullJson,
     AlterColumnActionDropNotNullJson,
+    AlterColumnActionAddIdentityJson,
     AlterColumnActionSetDataTypeJson,
 ]
 
@@ -2408,12 +2501,18 @@ CommentTargetJson: TypeAlias = Union[
     Literal["Table"],
     Literal["Column"],
     Literal["Database"],
+    Literal["View"],
+    Literal["MaterializedView"],
+    Literal["Index"],
+    Literal["Constraint"],
     CommentTargetProcedureJson,
 ]
 
 CommentOnStatementJson = TypedDict("CommentOnStatementJson", {
+    "if_exists": "bool",
     "target": "AstNodeJson",
     "name": "AstNodeJson",
+    "constraint_table": "AstNodeJson | None",
     "comment": "AstNodeJson | None",
     "meta": "MetaJson",
 })
@@ -2435,9 +2534,37 @@ CreateViewJson = TypedDict("CreateViewJson", {
     "if_not_exists": "bool",
     "name": "AstNodeJson",
     "columns": "list[AstNodeJson]",
+    "to": "AstNodeJson | None",
     "query": "AstNodeJson",
     "check_option": "AstNodeJson | None",
     "with_data": "bool | None",
+    "meta": "MetaJson",
+})
+
+RefreshMaterializedViewJson = TypedDict("RefreshMaterializedViewJson", {
+    "concurrently": "bool",
+    "name": "AstNodeJson",
+    "with_data": "bool | None",
+    "meta": "MetaJson",
+})
+
+ColocationPartitionKindJson: TypeAlias = Union[
+    Literal["Hash"],
+    Literal["Range"],
+]
+
+CreateColocationGroupJson = TypedDict("CreateColocationGroupJson", {
+    "if_not_exists": "bool",
+    "name": "AstNodeJson",
+    "partition": "AstNodeJson",
+    "columns": "list[AstNodeJson]",
+    "shards": "AstNodeJson",
+    "meta": "MetaJson",
+})
+
+DropColocationGroupJson = TypedDict("DropColocationGroupJson", {
+    "if_exists": "bool",
+    "name": "AstNodeJson",
     "meta": "MetaJson",
 })
 
@@ -2516,6 +2643,7 @@ CreateIndexJson = TypedDict("CreateIndexJson", {
     "table": "AstNodeJson",
     "using": "AstNodeJson | None",
     "columns": "list[AstNodeJson]",
+    "with_params": "list[AstNodeJson]",
     "predicate": "AstNodeJson | None",
     "meta": "MetaJson",
 })
@@ -3897,6 +4025,11 @@ InsertVerbJson: TypeAlias = Union[
     Literal["Replace"],
 ]
 
+InsertModifierJson: TypeAlias = Union[
+    Literal["Ignore"],
+    Literal["Overwrite"],
+]
+
 InsertColumnMatchingJson: TypeAlias = Union[
     Literal["ByName"],
     Literal["ByPosition"],
@@ -3912,6 +4045,7 @@ ConflictResolutionJson: TypeAlias = Union[
 
 InsertJson = TypedDict("InsertJson", {
     "verb": "AstNodeJson",
+    "modifier": "AstNodeJson | None",
     "or_action": "AstNodeJson | None",
     "with": "AstNodeJson | None",
     "target": "AstNodeJson",
@@ -4020,6 +4154,7 @@ UpdateJson = TypedDict("UpdateJson", {
     "with": "AstNodeJson | None",
     "or_action": "AstNodeJson | None",
     "target": "AstNodeJson",
+    "target_joins": "list[AstNodeJson]",
     "assignments": "list[AstNodeJson]",
     "from": "list[AstNodeJson]",
     "selection": "AstNodeJson | None",
@@ -4114,6 +4249,8 @@ UpdateTupleSourceJson: TypeAlias = Union[
 DeleteJson = TypedDict("DeleteJson", {
     "with": "AstNodeJson | None",
     "target": "AstNodeJson",
+    "additional_targets": "list[AstNodeJson]",
+    "target_joins": "list[AstNodeJson]",
     "using": "list[AstNodeJson]",
     "selection": "AstNodeJson | None",
     "order_by": "list[AstNodeJson]",
@@ -4257,6 +4394,7 @@ MergeActionInsertPayloadJson = TypedDict("MergeActionInsertPayloadJson", {
     "columns": "list[AstNodeJson]",
     "overriding": "AstNodeJson | None",
     "values": "list[AstNodeJson]",
+    "additional_rows": "list[list[AstNodeJson]]",
     "meta": "MetaJson",
 })
 
@@ -8326,6 +8464,33 @@ StatementCreateViewJson = TypedDict("StatementCreateViewJson", {
     "CreateView": "StatementCreateViewPayloadJson",
 })
 
+StatementRefreshMaterializedViewPayloadJson = TypedDict("StatementRefreshMaterializedViewPayloadJson", {
+    "refresh": "AstNodeJson",
+    "meta": "MetaJson",
+})
+
+StatementRefreshMaterializedViewJson = TypedDict("StatementRefreshMaterializedViewJson", {
+    "RefreshMaterializedView": "StatementRefreshMaterializedViewPayloadJson",
+})
+
+StatementCreateColocationGroupPayloadJson = TypedDict("StatementCreateColocationGroupPayloadJson", {
+    "create": "AstNodeJson",
+    "meta": "MetaJson",
+})
+
+StatementCreateColocationGroupJson = TypedDict("StatementCreateColocationGroupJson", {
+    "CreateColocationGroup": "StatementCreateColocationGroupPayloadJson",
+})
+
+StatementDropColocationGroupPayloadJson = TypedDict("StatementDropColocationGroupPayloadJson", {
+    "drop": "AstNodeJson",
+    "meta": "MetaJson",
+})
+
+StatementDropColocationGroupJson = TypedDict("StatementDropColocationGroupJson", {
+    "DropColocationGroup": "StatementDropColocationGroupPayloadJson",
+})
+
 StatementAlterViewPayloadJson = TypedDict("StatementAlterViewPayloadJson", {
     "alter": "AstNodeJson",
     "meta": "MetaJson",
@@ -9435,6 +9600,9 @@ StatementJson: TypeAlias = Union[
     StatementDropJson,
     StatementCreateSchemaJson,
     StatementCreateViewJson,
+    StatementRefreshMaterializedViewJson,
+    StatementCreateColocationGroupJson,
+    StatementDropColocationGroupJson,
     StatementAlterViewJson,
     StatementCreateIndexJson,
     StatementCreateFunctionJson,
@@ -9902,6 +10070,7 @@ TransactionStatementBeginJson = TypedDict("TransactionStatementBeginJson", {
 
 TransactionStatementCommitPayloadJson = TypedDict("TransactionStatementCommitPayloadJson", {
     "block": "AstNodeJson | None",
+    "chain": "bool | None",
     "meta": "MetaJson",
 })
 
@@ -9913,6 +10082,7 @@ TransactionStatementRollbackPayloadJson = TypedDict("TransactionStatementRollbac
     "block": "AstNodeJson | None",
     "savepoint_keyword": "bool",
     "to_savepoint": "AstNodeJson | None",
+    "chain": "bool | None",
     "meta": "MetaJson",
 })
 

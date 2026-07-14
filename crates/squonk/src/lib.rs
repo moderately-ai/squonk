@@ -17,7 +17,7 @@
 //! the [`Dialect`] system, and the owned [`Parsed`] root. Several dialects ship
 //! (`BuiltinDialect::ALL` is the selectable list) — `Ansi`, the always-compiled
 //! SQL-standard baseline `parse` defaults to, plus the feature-gated presets
-//! `Postgres`, `MySql`, `Sqlite`, `DuckDb`, `BigQuery`, `Hive`, `ClickHouse`,
+//! `Postgres`, `MySql`, `Sqlite`, `DuckDb`, `QuiltDb`, `BigQuery`, `Hive`, `ClickHouse`,
 //! `Databricks`, `Mssql`, `Snowflake`, `Redshift`, and the permissive `Lenient`,
 //! each carrying a release-contract support tier (`docs/support-tiers.md`);
 //! `full` turns them all on — over a query surface spanning the SELECT

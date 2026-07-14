@@ -122,6 +122,7 @@ export type AlterSystemAction =
   | { Reset: { target: ConfigParameter; meta: Meta; } };
 
 export type AccessControlStatement =
+  | { AlterRoleRename: { name: Ident; new_name: Ident; meta: Meta; } }
   | { Grant: { privileges: Privileges; object: GrantObject; grantees: Grantee[]; with_grant_option: boolean; granted_by: RoleSpec | null; meta: Meta; } }
   | { Revoke: { grant_option_for: boolean; privileges: Privileges; object: GrantObject; grantees: Grantee[]; granted_by: RoleSpec | null; behavior: DropBehavior | null; meta: Meta; } }
   | { GrantRole: { roles: Ident[]; grantees: Grantee[]; with_admin_option: boolean; granted_by: RoleSpec | null; meta: Meta; } }
@@ -579,6 +580,8 @@ export interface CreateTableOption {
 }
 
 export type CreateTableOptionKind =
+  | { ColocateWith: { table: ObjectName; columns: Ident[]; meta: Meta; } }
+  | { InColocationGroup: { group: Ident; columns: Ident[]; meta: Meta; } }
   | { With: { params: TableStorageParameter[]; meta: Meta; } }
   | { OnCommit: { action: OnCommitAction; meta: Meta; } }
   | { Tablespace: { tablespace: Ident; meta: Meta; } }
@@ -622,12 +625,17 @@ export interface AlterColumnTarget {
 }
 
 export type AlterTableAction =
+  | { SetColocationGroup: { group: Ident; meta: Meta; } }
+  | { DropColocationGroup: { meta: Meta; } }
   | { AddColumn: { if_not_exists: boolean; column_keyword: boolean; target: AlterColumnTarget | null; column: ColumnDef; meta: Meta; } }
   | { DropColumn: { if_exists: boolean; column_keyword: boolean; name: AlterColumnTarget; behavior: DropBehavior | null; meta: Meta; } }
   | { AlterColumn: { column_keyword: boolean; name: Ident; change: AlterColumnAction; meta: Meta; } }
   | { AddConstraint: { constraint: TableConstraintDef; meta: Meta; } }
   | { DropConstraint: { if_exists: boolean; name: Ident; behavior: DropBehavior | null; meta: Meta; } }
+  | { DropPrimaryKey: { behavior: DropBehavior | null; meta: Meta; } }
+  | { SetOptions: { params: TableStorageParameter[]; meta: Meta; } }
   | { RenameColumn: { column_keyword: boolean; name: AlterColumnTarget; new_name: Ident; meta: Meta; } }
+  | { RenameConstraint: { name: Ident; new_name: Ident; meta: Meta; } }
   | { RenameTable: { new_name: Ident; meta: Meta; } }
   | { AttachPartition: { partition: ObjectName; bound: PartitionBound; meta: Meta; } }
   | { DetachPartition: { partition: ObjectName; mode: DetachPartitionMode | null; meta: Meta; } };
@@ -641,6 +649,7 @@ export type AlterColumnAction =
   | { DropDefault: { meta: Meta; } }
   | { SetNotNull: { meta: Meta; } }
   | { DropNotNull: { meta: Meta; } }
+  | { AddIdentity: { identity: IdentityColumn; meta: Meta; } }
   | { SetDataType: { set_data: boolean; data_type: DataType; using: Expr | null; meta: Meta; } };
 
 export interface DropStatement {
@@ -678,11 +687,17 @@ export type CommentTarget =
   | "Table"
   | "Column"
   | "Database"
+  | "View"
+  | "MaterializedView"
+  | "Index"
+  | "Constraint"
   | { Procedure: { arg_types: DataType[] | null; } };
 
 export interface CommentOnStatement {
+  if_exists: boolean;
   target: CommentTarget;
   name: ObjectName;
+  constraint_table: ObjectName | null;
   comment: Literal | null;
   meta: Meta;
 }
@@ -704,9 +719,36 @@ export interface CreateView {
   if_not_exists: boolean;
   name: ObjectName;
   columns: Ident[];
+  to: ObjectName | null;
   query: Query;
   check_option: ViewCheckOption | null;
   with_data: boolean | null;
+  meta: Meta;
+}
+
+export interface RefreshMaterializedView {
+  concurrently: boolean;
+  name: ObjectName;
+  with_data: boolean | null;
+  meta: Meta;
+}
+
+export type ColocationPartitionKind =
+  | "Hash"
+  | "Range";
+
+export interface CreateColocationGroup {
+  if_not_exists: boolean;
+  name: Ident;
+  partition: ColocationPartitionKind;
+  columns: Ident[];
+  shards: Literal;
+  meta: Meta;
+}
+
+export interface DropColocationGroup {
+  if_exists: boolean;
+  name: Ident;
   meta: Meta;
 }
 
@@ -782,6 +824,7 @@ export interface CreateIndex {
   table: ObjectName;
   using: Ident | null;
   columns: IndexColumn[];
+  with_params: TableStorageParameter[];
   predicate: Expr | null;
   meta: Meta;
 }
@@ -1400,6 +1443,10 @@ export type InsertVerb =
   | "Insert"
   | "Replace";
 
+export type InsertModifier =
+  | "Ignore"
+  | "Overwrite";
+
 export type InsertColumnMatching =
   | "ByName"
   | "ByPosition";
@@ -1413,6 +1460,7 @@ export type ConflictResolution =
 
 export interface Insert {
   verb: InsertVerb;
+  modifier: InsertModifier | null;
   or_action: ConflictResolution | null;
   with: With | null;
   target: InsertTarget;
@@ -1464,6 +1512,7 @@ export interface Update {
   with: With | null;
   or_action: ConflictResolution | null;
   target: DmlTarget;
+  target_joins: Join[];
   assignments: UpdateAssignment[];
   from: TableWithJoins[];
   selection: DmlSelection | null;
@@ -1489,6 +1538,8 @@ export type UpdateTupleSource =
 export interface Delete {
   with: With | null;
   target: DmlTarget;
+  additional_targets: DmlTarget[];
+  target_joins: Join[];
   using: TableWithJoins[];
   selection: DmlSelection | null;
   order_by: OrderByExpr[];
@@ -1551,7 +1602,7 @@ export type MergeMatchKind =
   | "NotMatchedBySource";
 
 export type MergeAction =
-  | { Insert: { columns: Ident[]; overriding: InsertOverriding | null; values: InsertValue[]; meta: Meta; } }
+  | { Insert: { columns: Ident[]; overriding: InsertOverriding | null; values: InsertValue[]; additional_rows: InsertValue[][]; meta: Meta; } }
   | { InsertDefault: { default: DefaultValue; meta: Meta; } }
   | { Update: { assignments: UpdateAssignment[]; meta: Meta; } }
   | { UpdateStar: { meta: Meta; } }
@@ -3073,6 +3124,9 @@ export type Statement =
   | { Drop: { drop: DropStatement; meta: Meta; } }
   | { CreateSchema: { schema: CreateSchema; meta: Meta; } }
   | { CreateView: { view: CreateView; meta: Meta; } }
+  | { RefreshMaterializedView: { refresh: RefreshMaterializedView; meta: Meta; } }
+  | { CreateColocationGroup: { create: CreateColocationGroup; meta: Meta; } }
+  | { DropColocationGroup: { drop: DropColocationGroup; meta: Meta; } }
   | { AlterView: { alter: AlterView; meta: Meta; } }
   | { CreateIndex: { index: CreateIndex; meta: Meta; } }
   | { CreateFunction: { create: CreateFunction; meta: Meta; } }
@@ -3377,8 +3431,8 @@ export type ConditionInfoItemName =
 
 export type TransactionStatement =
   | { Begin: { syntax: TransactionStart; mode: TransactionModeKind | null; block: TransactionBlockKeyword | null; modes: TransactionMode[]; meta: Meta; } }
-  | { Commit: { block: TransactionBlockKeyword | null; meta: Meta; } }
-  | { Rollback: { block: TransactionBlockKeyword | null; savepoint_keyword: boolean; to_savepoint: Ident | null; meta: Meta; } }
+  | { Commit: { block: TransactionBlockKeyword | null; chain: boolean | null; meta: Meta; } }
+  | { Rollback: { block: TransactionBlockKeyword | null; savepoint_keyword: boolean; to_savepoint: Ident | null; chain: boolean | null; meta: Meta; } }
   | { Savepoint: { name: Ident; meta: Meta; } }
   | { Release: { savepoint_keyword: boolean; savepoint: Ident; meta: Meta; } }
   | { SetCharacteristics: { modes: TransactionMode[]; meta: Meta; } };
@@ -4464,6 +4518,10 @@ export type AstNode =
   | CommentOnStatement
   | CreateSchema
   | CreateView
+  | RefreshMaterializedView
+  | ColocationPartitionKind
+  | CreateColocationGroup
+  | DropColocationGroup
   | ViewCheckOption
   | ViewAlgorithm
   | ViewOptions
@@ -4567,6 +4625,7 @@ export type AstNode =
   | AlterLogfileGroup
   | DropLogfileGroup
   | InsertVerb
+  | InsertModifier
   | InsertColumnMatching
   | ConflictResolution
   | Insert

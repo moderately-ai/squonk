@@ -315,6 +315,8 @@ impl TableFactorSyntax {
 impl MutationSyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
+        insert_ignore: false,
+        insert_overwrite: false,
         returning: false,
         on_conflict: false,
         on_duplicate_key_update: false,
@@ -329,6 +331,7 @@ impl MutationSyntax {
         // The MySQL `UPDATE`/`DELETE ... ORDER BY ... LIMIT` tails are dialect
         // extensions; standard SQL row-limits neither statement.
         update_delete_tails: false,
+        joined_update_delete: false,
         // The SQLite `INSERT OR`/`UPDATE OR <action>` conflict prefix is a SQLite
         // extension; standard SQL has no such verb-level conflict resolution.
         or_conflict_action: false,
@@ -354,6 +357,7 @@ impl MutationSyntax {
         // The `<override clause>` on a merge insert *is* SQL:2016 standard surface, so
         // the ANSI baseline accepts it (DuckDB is the outlier that rejects it).
         merge_insert_overriding: true,
+        merge_insert_multirow: false,
         merge_update_set_star: false,
         merge_insert_star_by_name: false,
         merge_error_action: false,
@@ -364,6 +368,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
+        colocation_groups: false,
+        materialized_view_to: false,
         // `CREATE TRIGGER`'s only modelled body form is SQLite's, so the standard
         // baseline does not dispatch it.
         create_trigger: false,
@@ -378,6 +384,7 @@ impl StatementDdlGates {
         // T176 sequence generators are an *optional* standard feature modelled via the
         // PostgreSQL/DuckDB presets; the bare-standard baseline does not dispatch `SEQUENCE`.
         create_sequence: false,
+        create_sequence_cache: false,
         extension_ddl: false,
         transform_ddl: false,
         alter_system: false,
@@ -471,6 +478,7 @@ impl ColumnDefinitionSyntax {
         // baseline has no column COLLATE at all, so the named wrapper is off.
         named_column_collate_constraint: false,
         identity_columns: true,
+        compact_identity_columns: false,
         // The standard accepts a bare (unparenthesized) expression default and a
         // `CONSTRAINT <name>` prefix on any inline column constraint (MySQL restricts both).
         default_expression_requires_parens: false,
@@ -503,6 +511,11 @@ impl ConstraintSyntax {
 impl IndexAlterSyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
+        rename_constraint: false,
+        alter_table_set_options: false,
+        drop_primary_key: false,
+        alter_column_add_identity: false,
+        index_storage_parameters: false,
         drop_behavior: true,
         // ANSI has no MySQL `DROP INDEX … ON <table>` form.
         index_drop_on_table: false,
@@ -550,6 +563,9 @@ impl SelectSyntax {
         // SQL; `BY` after a set operator is a syntax error here.
         union_by_name: false,
         wildcard_modifiers: false,
+        wildcard_replace: false,
+        intersect_all: true,
+        except_all: true,
         // The standard's qualified asterisk is a non-aliasable `<all fields reference>`; a
         // trailing alias after `t.*` rejects (the ANSI-derived presets inherit this).
         qualified_wildcard_alias: false,
@@ -639,6 +655,7 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
+        transaction_chain: true,
         copy: false,
         // `COPY INTO` is Snowflake-specific bulk load/unload — not standard SQL, so the
         // ANSI baseline leaves the surface off (MySQL and the other ANSI-derived presets
@@ -646,6 +663,7 @@ impl UtilitySyntax {
         copy_into: false,
         stage_references: false,
         comment_on: false,
+        comment_if_exists: false,
         pragma: false,
         attach: false,
         kill: false,
@@ -764,6 +782,7 @@ impl MaintenanceSyntax {
 impl AccessControlSyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
+        alter_role_rename: false,
         access_control: true,
         // The standard admits the schema-scoped grant objects and the `OPTION FOR` prefix.
         access_control_extended_objects: true,
@@ -979,6 +998,7 @@ impl AggregateCallSyntax {
 impl PredicateSyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
+        is_distinct_from: true,
         like: true,
         ilike: false,
         similar_to: false,

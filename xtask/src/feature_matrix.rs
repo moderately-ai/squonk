@@ -148,6 +148,19 @@ const FEATURE_MATRIX: &[FeatureCombo] = &[
         ],
     },
     FeatureCombo {
+        name: "quiltdb",
+        args: &[
+            "check",
+            "-p",
+            "squonk",
+            "-p",
+            "squonk-ast",
+            "--no-default-features",
+            "--features",
+            "quiltdb",
+        ],
+    },
+    FeatureCombo {
         name: "bigquery",
         args: &[
             "check",
@@ -523,6 +536,7 @@ mod tests {
             "mysql",
             "sqlite",
             "duckdb",
+            "quiltdb",
             "bigquery",
             "hive",
             "clickhouse",

@@ -1015,7 +1015,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
         }
         if self.eat_keyword(Keyword::Is)? {
             let negated = self.eat_keyword(Keyword::Not)?;
-            if self.eat_keyword(Keyword::Distinct)? {
+            if self.features().predicate_syntax.is_distinct_from
+                && self.eat_keyword(Keyword::Distinct)?
+            {
                 self.expect_keyword(Keyword::From)?;
                 // Parse the right operand at the `IS`-family predicate's own right binding
                 // power (as the postfix members are climbed), so an equal/looser-precedence

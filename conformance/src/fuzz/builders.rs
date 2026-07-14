@@ -1955,6 +1955,7 @@ impl FuzzInsert {
             // The fuzzer only generates the standard `INSERT` spelling; the MySQL
             // `REPLACE` verb is outside the ANSI reparse round-trip subset.
             verb: InsertVerb::Insert,
+            modifier: None,
             // The SQLite `OR <action>` prefix is dialect-gated outside the ANSI reparse
             // path; quarantined as `None`.
             or_action: None,
@@ -2142,6 +2143,7 @@ impl FuzzUpdate {
             // path; quarantined as `None`.
             or_action: None,
             target: self.target.into_target(),
+            target_joins: ThinVec::new(),
             assignments,
             from,
             selection: self.selection.map(FuzzWhereSelection::into_selection),
@@ -2172,6 +2174,8 @@ impl FuzzDelete {
         Delete {
             with: self.with.map(FuzzWith::into_with),
             target: self.target.into_target(),
+            additional_targets: ThinVec::new(),
+            target_joins: ThinVec::new(),
             using,
             selection: self.selection.map(FuzzWhereSelection::into_selection),
             // The MySQL `ORDER BY`/`LIMIT` tails are dialect-gated outside the ANSI

@@ -9,6 +9,6 @@ parse_ansi_analytic_select: total_bytes=3788 max_bytes=3428
 parse_ansi_multi_statement: total_bytes=3410 max_bytes=3250
 parse_postgres_analytic_select: total_bytes=3788 max_bytes=3428
 parse_ansi_ddl_create_table: total_bytes=1142 max_bytes=1031
-parse_ansi_dml_insert: total_bytes=1144 max_bytes=964
-parse_ansi_dml_update: total_bytes=1120 max_bytes=1048
-parse_ansi_dml_delete: total_bytes=936 max_bytes=872
+parse_ansi_dml_insert: total_bytes=1152 max_bytes=972
+parse_ansi_dml_update: total_bytes=1128 max_bytes=1056
+parse_ansi_dml_delete: total_bytes=952 max_bytes=888

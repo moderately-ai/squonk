@@ -345,6 +345,7 @@ const ALTER_DROP_ACCEPT_CORPUS: &[&str] = &[
     "ALTER TABLE t ALTER COLUMN a DROP NOT NULL",
     "ALTER TABLE t ALTER COLUMN a SET DATA TYPE BIGINT",
     "ALTER TABLE t ALTER COLUMN a TYPE TEXT",
+    "ALTER TABLE t SET (fillfactor = 70, autovacuum_enabled = true)",
     "DROP TABLE t",
     "DROP TABLE IF EXISTS a, b CASCADE",
     "DROP VIEW v RESTRICT",

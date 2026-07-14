@@ -151,6 +151,8 @@ use squonk_ast::render::{RenderConfig, RenderCtx, RenderExt as _, RenderMode};
 pub mod fuzz;
 pub mod goldens;
 pub mod keyword_positions;
+#[cfg(test)]
+mod quiltdb_contract;
 // M2 SQLite + DuckDB accept/reject oracles (prod-dialect-m2-sqlite-duckdb-oracles).
 // Opt-in behind `oracle-engines` so the default build links no system libduckdb and
 // needs no env; the seam itself ([`oracle`]) and its M1 PostgreSQL implementation

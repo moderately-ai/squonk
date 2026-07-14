@@ -631,6 +631,15 @@ pub enum AlterSystemAction {
 #[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
 pub enum AccessControlStatement<X: Extension = NoExt> {
+    /// `ALTER ROLE <name> RENAME TO <new_name>`.
+    AlterRoleRename {
+        /// Existing role name.
+        name: Ident,
+        /// New role name.
+        new_name: Ident,
+        /// Source location and node identity.
+        meta: Meta,
+    },
     /// A `GRANT <privileges> ON <object> TO <grantees>` statement.
     Grant {
         /// The privileges granted/revoked; see [`Privileges`].

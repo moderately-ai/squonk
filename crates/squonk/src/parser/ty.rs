@@ -95,7 +95,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// shadow the generated-column parse (engine edge `x FOO GENERATED bar` is left an
     /// accepted gap, never over-accepted).
     fn peek_is_liberal_type_word(&mut self) -> ParseResult<bool> {
-        if self.peek_is_contextual_keyword("GENERATED")? {
+        if self.peek_is_contextual_keyword("GENERATED")?
+            || (self
+                .features()
+                .column_definition_syntax
+                .compact_identity_columns
+                && self.peek_is_contextual_keyword("IDENTITY")?)
+        {
             return Ok(false);
         }
         let reserved = self.features().reserved_type_name;

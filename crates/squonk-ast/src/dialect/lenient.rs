@@ -577,6 +577,7 @@ impl AggregateCallSyntax {
 impl PredicateSyntax {
     /// The `LENIENT` preset for predicate syntax.
     pub const LENIENT: Self = Self {
+        is_distinct_from: true,
         like: true,
         ilike: true,
         similar_to: true,
@@ -599,6 +600,8 @@ impl PredicateSyntax {
 impl MutationSyntax {
     /// The `LENIENT` preset for mutation syntax.
     pub const LENIENT: Self = Self {
+        insert_ignore: true,
+        insert_overwrite: true,
         returning: true,
         on_conflict: true,
         on_duplicate_key_update: true,
@@ -613,6 +616,7 @@ impl MutationSyntax {
         // The MySQL single-table `UPDATE`/`DELETE ... ORDER BY ... LIMIT` tails are
         // additive (trailing clauses in a distinct position), so the union accepts them.
         update_delete_tails: true,
+        joined_update_delete: true,
         // The SQLite `INSERT OR`/`UPDATE OR <action>` prefix is additive (a distinct `OR`
         // trigger after the verb), so the permissive union accepts it.
         or_conflict_action: true,
@@ -633,6 +637,7 @@ impl MutationSyntax {
         merge_when_not_matched_by: true,
         merge_insert_default_values: true,
         merge_insert_overriding: true,
+        merge_insert_multirow: true,
         merge_update_set_star: true,
         merge_insert_star_by_name: true,
         merge_error_action: true,
@@ -643,6 +648,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `LENIENT` preset for statement ddl gates.
     pub const LENIENT: Self = Self {
+        colocation_groups: true,
+        materialized_view_to: true,
         // The parse-anything union accepts the SQLite `CREATE TRIGGER` body form too.
         create_trigger: true,
         // …and the DuckDB `CREATE MACRO`/live-body `FUNCTION` macro DDL.
@@ -654,6 +661,7 @@ impl StatementDdlGates {
         create_virtual_table: true,
         // …and the PostgreSQL/DuckDB `CREATE`/`DROP SEQUENCE` T176 generator.
         create_sequence: true,
+        create_sequence_cache: true,
         extension_ddl: true,
         transform_ddl: true,
         alter_system: true,
@@ -747,6 +755,7 @@ impl ColumnDefinitionSyntax {
         // `COLLATE` too — additive over the bare column COLLATE surface.
         named_column_collate_constraint: true,
         identity_columns: true,
+        compact_identity_columns: true,
         // Accept a bare expression default and a `CONSTRAINT <name>` on any inline column
         // constraint — the permissive union never adds the MySQL restriction.
         default_expression_requires_parens: false,
@@ -776,6 +785,11 @@ impl ConstraintSyntax {
 impl IndexAlterSyntax {
     /// The `LENIENT` preset for index alter syntax.
     pub const LENIENT: Self = Self {
+        rename_constraint: true,
+        alter_table_set_options: true,
+        drop_primary_key: true,
+        alter_column_add_identity: true,
+        index_storage_parameters: true,
         drop_behavior: true,
         // Conflict resolution: `index_drop_on_table`'s mandatory-`ON` MySQL form would displace
         // the shared bare-name `DROP INDEX <name> [, …]`. LENIENT keeps the more permissive
@@ -834,6 +848,9 @@ impl SelectSyntax {
         // grammar, so admitting it shadows no existing reading.
         union_by_name: true,
         wildcard_modifiers: true,
+        wildcard_replace: true,
+        intersect_all: true,
+        except_all: true,
         // Pure-accept superset: admit the PostgreSQL/DuckDB qualified-wildcard alias too.
         qualified_wildcard_alias: true,
         // Accept DuckDB's FROM-first SELECT (`FROM t SELECT x`, bare `FROM t`) — a pure
@@ -948,6 +965,7 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `LENIENT` preset for utility syntax.
     pub const LENIENT: Self = Self {
+        transaction_chain: true,
         copy: true,
         // Snowflake's `COPY INTO` load/unload — a pure addition on top of the PostgreSQL
         // `COPY`, dispatched by the `INTO` after `COPY`, in keeping with the permissive
@@ -955,6 +973,7 @@ impl UtilitySyntax {
         copy_into: true,
         stage_references: false,
         comment_on: true,
+        comment_if_exists: true,
         pragma: true,
         attach: true,
         kill: true,
@@ -1097,6 +1116,7 @@ impl MaintenanceSyntax {
 impl AccessControlSyntax {
     /// The `LENIENT` preset for access control syntax.
     pub const LENIENT: Self = Self {
+        alter_role_rename: true,
         access_control: true,
         // A pure-acceptance superset admits the schema-scoped grant objects and the
         // `{GRANT|ADMIN} OPTION FOR` prefix.

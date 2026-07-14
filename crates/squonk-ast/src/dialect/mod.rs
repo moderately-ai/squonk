@@ -70,6 +70,8 @@ mod mssql;
 mod mysql;
 #[cfg(feature = "postgres")]
 mod postgres;
+#[cfg(feature = "quiltdb")]
+mod quiltdb;
 #[cfg(feature = "redshift")]
 mod redshift;
 #[cfg(feature = "snowflake")]
@@ -111,6 +113,8 @@ pub use mysql::{
 };
 #[cfg(feature = "postgres")]
 pub use postgres::POSTGRES;
+#[cfg(feature = "quiltdb")]
+pub use quiltdb::QUILTDB;
 #[cfg(feature = "redshift")]
 pub use redshift::REDSHIFT;
 #[cfg(feature = "snowflake")]
@@ -1325,6 +1329,10 @@ pub struct TableFactorSyntax {
 /// surfaces as a parse error, which is how ANSI rejects PostgreSQL upserts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MutationSyntax {
+    /// Accept the post-verb `INSERT IGNORE` modifier.
+    pub insert_ignore: bool,
+    /// Accept the post-verb `INSERT OVERWRITE` modifier.
+    pub insert_overwrite: bool,
     /// Accept a `RETURNING <output> [, ...]` clause on `INSERT`/`UPDATE`/`DELETE`
     /// (PostgreSQL; also Oracle/MariaDB/SQLite).
     pub returning: bool,
@@ -1374,6 +1382,9 @@ pub struct MutationSyntax {
     /// there the trailing `ORDER BY`/`LIMIT` is left unconsumed and surfaces as a clean
     /// parse error.
     pub update_delete_tails: bool,
+    /// Accept joins in the target position of `UPDATE`/`DELETE` and comma-separated
+    /// `DELETE FROM` targets.
+    pub joined_update_delete: bool,
     /// Accept the SQLite `INSERT OR <action>` / `UPDATE OR <action>` conflict-resolution
     /// prefix on the mutation verb, where `<action>` is `REPLACE`/`IGNORE`/`ABORT`/`FAIL`/
     /// `ROLLBACK` ([`ConflictResolution`](crate::ast::ConflictResolution), the [`Insert::or_action`](crate::ast::Insert)
@@ -1475,6 +1486,8 @@ pub struct MutationSyntax {
     /// `MERGE` at all (the dependency is
     /// [`FeatureDependencyViolation::MergeInsertOverridingWithoutMerge`]).
     pub merge_insert_overriding: bool,
+    /// Accept additional comma-separated value rows in a `MERGE ... THEN INSERT` action.
+    pub merge_insert_multirow: bool,
     /// Accept DuckDB `UPDATE SET *` in a MERGE WHEN MATCHED arm (column-wise copy
     /// from the source). Off in ANSI/PostgreSQL.
     pub merge_update_set_star: bool,
@@ -1502,6 +1515,8 @@ pub struct MutationSyntax {
 /// leading keyword is not dispatched and surfaces as an unknown statement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StatementDdlGates {
+    /// Accept `CREATE`/`DROP COLOCATION GROUP` and table membership clauses.
+    pub colocation_groups: bool,
     /// Accept the SQLite `CREATE [TEMP] TRIGGER [IF NOT EXISTS] <name> <timing>
     /// <event> ON <table> [FOR EACH ROW] [WHEN <expr>] BEGIN <stmt>; … END` statement.
     /// Like the other flags on this axis it gates the *whole* statement (the leading
@@ -1569,9 +1584,12 @@ pub struct StatementDdlGates {
     /// unexpected object kind. One flag gates both leading forms — a dialect with
     /// `CREATE SEQUENCE` has `DROP SEQUENCE`. The modelled tail is the shared standard option
     /// core both engines' parsers accept (`START [WITH]`, `INCREMENT [BY]`, `MIN`/`MAXVALUE`,
-    /// `NO MIN`/`MAXVALUE`, `CYCLE`/`NO CYCLE`); PostgreSQL's `CACHE`/`AS`/`OWNED BY` extensions
-    /// stay unmodelled so DuckDB (which rejects them) does not over-accept.
+    /// `NO MIN`/`MAXVALUE`, `CYCLE`/`NO CYCLE`). The independently gated PostgreSQL
+    /// `CACHE` extension is modelled by [`create_sequence_cache`](Self::create_sequence_cache);
+    /// `AS` and `OWNED BY` remain unmodelled.
     pub create_sequence: bool,
+    /// Accept `CACHE <n>` in the option list of `CREATE SEQUENCE`.
+    pub create_sequence_cache: bool,
     /// Accept the PostgreSQL extension-DDL statements `CREATE EXTENSION [IF NOT EXISTS]
     /// <name> [WITH] [SCHEMA s] [VERSION v] [CASCADE]` and `ALTER EXTENSION <name>
     /// {UPDATE [TO v] | ADD <member> | DROP <member>}`, dispatched to the
@@ -1698,6 +1716,8 @@ pub struct StatementDdlGates {
     /// unknown statement (a plain `CREATE VIEW` is unaffected — a separate always-accepted
     /// family).
     pub materialized_views: bool,
+    /// Accept a materialized-view storage target: `CREATE MATERIALIZED VIEW name TO target AS ...`.
+    pub materialized_view_to: bool,
     /// Accept the `TEMP`/`TEMPORARY` modifier on a plain `CREATE [OR REPLACE] VIEW`
     /// (PostgreSQL/SQLite/DuckDB spell session-local views). On for ANSI/PostgreSQL/SQLite/
     /// DuckDB/Lenient. MySQL has no temporary views (only temporary *tables*), so it is off;
@@ -2078,6 +2098,10 @@ pub struct ColumnDefinitionSyntax {
     /// surfaces as a clean parse error. Gates only the `AS IDENTITY` reading — the
     /// `GENERATED ALWAYS AS (<expr>)` computed column (which SQLite has) is unaffected.
     pub identity_columns: bool,
+    /// Accept the compact identity-column forms `<col> <type> IDENTITY` and
+    /// `<col> <type> IDENTITY(<seed>, <increment>)`. The two numeric arguments map to the
+    /// same start/increment identity options as the standard generated form.
+    pub compact_identity_columns: bool,
     /// Require a *parenthesized* `DEFAULT (expr)` for a functional / general-expression
     /// column default. On for MySQL: a column `DEFAULT` there admits only a literal, a
     /// signed literal, the `CURRENT_TIMESTAMP`/`NOW()`/`LOCALTIME`/`LOCALTIMESTAMP` temporal
@@ -2223,6 +2247,17 @@ pub struct ConstraintSyntax {
 /// grammar gate: when off the keyword is left unconsumed and rejects.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct IndexAlterSyntax {
+    /// Accept PostgreSQL `ALTER TABLE … RENAME CONSTRAINT <old> TO <new>`.
+    pub rename_constraint: bool,
+    /// Accept `ALTER TABLE … SET (<name> = <value>, …)` table options.
+    pub alter_table_set_options: bool,
+    /// Accept the unnamed `ALTER TABLE … DROP PRIMARY KEY` action.
+    pub drop_primary_key: bool,
+    /// Accept `ALTER TABLE … ALTER COLUMN <name> ADD GENERATED {ALWAYS | BY DEFAULT}
+    /// AS IDENTITY [(…)]`.
+    pub alter_column_add_identity: bool,
+    /// Accept `CREATE INDEX … (<keys>) WITH (<name> = <value>, …)` storage parameters.
+    pub index_storage_parameters: bool,
     /// Accept a trailing `CASCADE` / `RESTRICT` drop behaviour on `DROP` statements
     /// and `ALTER TABLE ... DROP` actions (the SQL standard `<drop behavior>`;
     /// PostgreSQL). A dialect that does not model dependency behaviour leaves it off.
@@ -2514,6 +2549,13 @@ pub struct SelectSyntax {
     /// `*` is left unconsumed and surfaces as a clean parse error — the over-acceptance
     /// guard the differential oracle relies on. On for DuckDB / Lenient, off elsewhere.
     pub wildcard_modifiers: bool,
+    /// Accept the `REPLACE (<expr> AS <column>, ...)` wildcard tail independently of
+    /// the `EXCLUDE` and `RENAME` modifier family.
+    pub wildcard_replace: bool,
+    /// Accept `INTERSECT ALL`.
+    pub intersect_all: bool,
+    /// Accept `EXCEPT ALL`.
+    pub except_all: bool,
     /// Accept a trailing `[AS] alias` on a *qualified* wildcard select item (`SELECT t.* x`,
     /// `SELECT t.* AS x`, `SELECT s.t.* x`), folding it onto the
     /// [`QualifiedWildcard`](crate::ast::SelectItem::QualifiedWildcard) item's `alias` slot
@@ -3011,6 +3053,9 @@ pub struct GroupingSyntax {
 /// crossed its 16-field line, so those axes live there rather than here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UtilitySyntax {
+    /// Accept `COMMIT AND [NO] CHAIN` and whole-transaction `ROLLBACK AND [NO] CHAIN`.
+    /// PostgreSQL and SQL-standard transaction chaining; off where the engine grammar lacks it.
+    pub transaction_chain: bool,
     /// Accept the PostgreSQL `COPY <table>|(<query>) {FROM|TO} <endpoint> ...` bulk
     /// data-transfer statement. PostgreSQL-only (also its generic/permissive supersets);
     /// off in ANSI and MySQL, which have no `COPY`, so there the leading `COPY` keyword
@@ -3034,6 +3079,8 @@ pub struct UtilitySyntax {
     /// which have no `COMMENT ON`, so there the leading `COMMENT` keyword is not
     /// dispatched and surfaces as an unknown statement.
     pub comment_on: bool,
+    /// Accept the front-position `COMMENT IF EXISTS ON ...` guard.
+    pub comment_if_exists: bool,
     /// Accept the SQLite `PRAGMA [<schema> .] <name> [= <value> | (<value>)]`
     /// configuration statement. SQLite-only (and the permissive superset); off in
     /// ANSI, PostgreSQL, and MySQL, which have no `PRAGMA`, so there the leading
@@ -3703,6 +3750,8 @@ pub struct MaintenanceSyntax {
 /// grammar rejects, as the dialect requires.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AccessControlSyntax {
+    /// Accept PostgreSQL `ALTER ROLE <name> RENAME TO <new_name>`.
+    pub alter_role_rename: bool,
     /// Accept the access-control statements `GRANT …` / `REVOKE …` (SQL:2016 E081;
     /// PostgreSQL/MySQL). On for ANSI/PostgreSQL/MySQL/DuckDB/Lenient. SQLite has no
     /// permission system, so it is off; the leading keyword is then not dispatched and
@@ -5085,6 +5134,8 @@ pub struct AggregateCallSyntax {
 /// clean parse error — the same reject mechanism the other syntax gates use.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PredicateSyntax {
+    /// Accept `<expr> IS [NOT] DISTINCT FROM <expr>`.
+    pub is_distinct_from: bool,
     /// Accept `<expr> [NOT] LIKE <pattern> [ESCAPE <c>]` (SQL-92 core E021-08). On in
     /// every dialect — this is the standard pattern-match predicate.
     pub like: bool,

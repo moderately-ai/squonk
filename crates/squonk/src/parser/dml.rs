@@ -9,11 +9,11 @@
 
 use crate::ast::{
     AliasSpelling, ConflictAction, ConflictResolution, ConflictTarget, DefaultValue, Delete,
-    DmlSelection, DmlTarget, FetchSpelling, Ident, Insert, InsertColumnMatching, InsertOverriding,
-    InsertSource, InsertTarget, InsertValue, InsertValues, InsertVerb, Keyword, Limit, LimitSyntax,
-    Merge, MergeAction, MergeMatchKind, MergeWhenClause, Meta, ObjectName, OnConflict, OnlySyntax,
-    OrderByExpr, RelationInheritance, Returning, SelectItem, Span, Spanned, Statement, TableAlias,
-    Update, UpdateAssignment, UpdateTupleSource, UpdateValue, Upsert, With,
+    DmlSelection, DmlTarget, FetchSpelling, Ident, Insert, InsertColumnMatching, InsertModifier,
+    InsertOverriding, InsertSource, InsertTarget, InsertValue, InsertValues, InsertVerb, Keyword,
+    Limit, LimitSyntax, Merge, MergeAction, MergeMatchKind, MergeWhenClause, Meta, ObjectName,
+    OnConflict, OnlySyntax, OrderByExpr, RelationInheritance, Returning, SelectItem, Span, Spanned,
+    Statement, TableAlias, Update, UpdateAssignment, UpdateTupleSource, UpdateValue, Upsert, With,
 };
 use crate::error::ParseResult;
 use crate::tokenizer::{Operator, Punctuation};
@@ -45,6 +45,17 @@ impl<'a, D: Dialect> Parser<'a, D> {
             ));
         }
         self.expect_keyword(Keyword::Insert)?;
+        let modifier = if self.features().mutation_syntax.insert_ignore
+            && self.eat_contextual_keyword("IGNORE")?
+        {
+            Some(InsertModifier::Ignore)
+        } else if self.features().mutation_syntax.insert_overwrite
+            && self.eat_contextual_keyword("OVERWRITE")?
+        {
+            Some(InsertModifier::Overwrite)
+        } else {
+            None
+        };
         let or_action = self.parse_or_action()?;
         self.expect_keyword(Keyword::Into)?;
         let target = self.parse_insert_target()?;
@@ -57,6 +68,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         self.finish_insert(
             start,
             InsertVerb::Insert,
+            modifier,
             or_action,
             with,
             target,
@@ -185,6 +197,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             InsertVerb::Replace,
             None,
             None,
+            None,
             target,
             None, // column_matching
             None,
@@ -204,6 +217,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         &mut self,
         start: Span,
         verb: InsertVerb,
+        modifier: Option<InsertModifier>,
         or_action: Option<ConflictResolution>,
         with: Option<With<D::Ext>>,
         target: InsertTarget,
@@ -228,6 +242,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         let span = start.union(self.preceding_span());
         let insert = Insert {
             verb,
+            modifier,
             or_action,
             with,
             target,
@@ -420,6 +435,12 @@ impl<'a, D: Dialect> Parser<'a, D> {
         self.expect_contextual_keyword("UPDATE")?;
         let or_action = self.parse_or_action()?;
         let target = self.parse_dml_target(&["SET"])?;
+        let mut target_joins = ThinVec::new();
+        if self.features().mutation_syntax.joined_update_delete {
+            while let Some(join) = self.parse_join()? {
+                target_joins.push(join);
+            }
+        }
         self.expect_contextual_keyword("SET")?;
         let assignments = self.parse_update_assignments()?;
         // MySQL has no `UPDATE … FROM` (its multi-table update lists the tables in the
@@ -440,6 +461,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             with,
             or_action,
             target,
+            target_joins,
             assignments,
             from,
             selection,
@@ -624,6 +646,16 @@ impl<'a, D: Dialect> Parser<'a, D> {
         self.expect_contextual_keyword("DELETE")?;
         self.expect_keyword(Keyword::From)?;
         let target = self.parse_dml_target(&["USING", "WHERE", "RETURNING"])?;
+        let mut additional_targets = ThinVec::new();
+        let mut target_joins = ThinVec::new();
+        if self.features().mutation_syntax.joined_update_delete {
+            while self.eat_punct(Punctuation::Comma)? {
+                additional_targets.push(self.parse_dml_target(&["USING", "WHERE", "RETURNING"])?);
+            }
+            while let Some(join) = self.parse_join()? {
+                target_joins.push(join);
+            }
+        }
         let using =
             if self.features().mutation_syntax.delete_using && self.eat_keyword(Keyword::Using)? {
                 self.parse_table_references()?
@@ -656,6 +688,8 @@ impl<'a, D: Dialect> Parser<'a, D> {
         let delete = Delete {
             with,
             target,
+            additional_targets,
+            target_joins,
             using,
             selection,
             order_by,
@@ -1218,11 +1252,18 @@ impl<'a, D: Dialect> Parser<'a, D> {
         };
         self.expect_keyword(Keyword::Values)?;
         let values = self.parse_insert_values_row()?;
+        let mut additional_rows = ThinVec::new();
+        if self.features().mutation_syntax.merge_insert_multirow {
+            while self.eat_punct(Punctuation::Comma)? {
+                additional_rows.push(self.parse_insert_values_row()?);
+            }
+        }
         let meta = self.make_meta(start.union(self.preceding_span()));
         Ok(MergeAction::Insert {
             columns,
             overriding,
             values,
+            additional_rows,
             meta,
         })
     }

@@ -927,6 +927,7 @@ pub enum AlterTableActionShape {
         name: String,
         cascade: bool,
     },
+    SetOptions(Vec<StorageParamShape>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -935,6 +936,10 @@ pub enum AlterColumnActionShape {
     DropDefault,
     SetNotNull,
     DropNotNull,
+    AddIdentity {
+        generation: IdentityGenerationShape,
+        options: Vec<IdentityOptionShape>,
+    },
     SetDataType {
         data_type: DataTypeShape,
         using: Option<ExprShape>,
@@ -1332,6 +1337,10 @@ pub enum SetValueShape {
 /// (ADR-0015).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AccessControlShape {
+    RoleRename {
+        name: String,
+        new_name: String,
+    },
     Privilege {
         is_grant: bool,
         /// `WITH GRANT OPTION` (grant) / `GRANT OPTION FOR` (revoke).
@@ -1908,6 +1917,10 @@ fn squonk_table_options_shape(
             // the protobuf carries no trace), so both sides erase it and the written and
             // omitted forms are representation-equivalent (ADR-0015).
             CreateTableOptionKind::WithoutOids { .. } => {}
+            // These productions are outside PostgreSQL grammar and cannot occur after
+            // both parsers accept the same input.
+            CreateTableOptionKind::ColocateWith { .. }
+            | CreateTableOptionKind::InColocationGroup { .. } => {}
         }
     }
     shape
@@ -1969,6 +1982,19 @@ fn squonk_alter_table_action_shape(
                 AlterColumnAction::DropDefault { .. } => AlterColumnActionShape::DropDefault,
                 AlterColumnAction::SetNotNull { .. } => AlterColumnActionShape::SetNotNull,
                 AlterColumnAction::DropNotNull { .. } => AlterColumnActionShape::DropNotNull,
+                AlterColumnAction::AddIdentity { identity, .. } => {
+                    AlterColumnActionShape::AddIdentity {
+                        generation: match identity.generation {
+                            IdentityGeneration::Always => IdentityGenerationShape::Always,
+                            IdentityGeneration::ByDefault => IdentityGenerationShape::ByDefault,
+                        },
+                        options: identity
+                            .options
+                            .iter()
+                            .map(|option| squonk_identity_option_shape(parsed, option))
+                            .collect(),
+                    }
+                }
                 AlterColumnAction::SetDataType {
                     data_type, using, ..
                 } => AlterColumnActionShape::SetDataType {
@@ -1994,7 +2020,9 @@ fn squonk_alter_table_action_shape(
         // node than the `AlterTableStmt` our AST folds them into, so they cannot reach
         // structural parity here; they surface as an explicit not-implemented
         // divergence (ADR-0015), covered by accept/reject parity instead.
-        AlterTableAction::RenameColumn { .. } | AlterTableAction::RenameTable { .. } => {
+        AlterTableAction::RenameColumn { .. }
+        | AlterTableAction::RenameConstraint { .. }
+        | AlterTableAction::RenameTable { .. } => {
             return Err(
                 "PostgreSQL structural shape mapping for ALTER TABLE RENAME is not implemented"
                     .to_owned(),
@@ -2008,6 +2036,32 @@ fn squonk_alter_table_action_shape(
                 "PostgreSQL structural shape mapping for ALTER TABLE {ATTACH|DETACH} PARTITION is not implemented"
                     .to_owned(),
             );
+        }
+        AlterTableAction::SetOptions { params, .. } => AlterTableActionShape::SetOptions(
+            params
+                .iter()
+                .map(|param| StorageParamShape {
+                    name: object_name_shape(parsed, &param.name),
+                    // PostgreSQL's raw tree stores option words, including TRUE/FALSE,
+                    // as strings. Normalize the typed literal to that raw-tree shape.
+                    value: param
+                        .value
+                        .as_ref()
+                        .map(|expr| match expr_shape(parsed, expr) {
+                            ExprShape::Literal(LiteralShape::Boolean(value)) => {
+                                ExprShape::Literal(LiteralShape::String(value.to_string()))
+                            }
+                            value => value,
+                        }),
+                })
+                .collect(),
+        ),
+        AlterTableAction::DropPrimaryKey { .. } => {
+            return Err("DROP PRIMARY KEY is not PostgreSQL grammar".to_owned());
+        }
+        AlterTableAction::SetColocationGroup { .. }
+        | AlterTableAction::DropColocationGroup { .. } => {
+            return Err("colocation actions are not PostgreSQL grammar".to_owned());
         }
     })
 }
@@ -2534,6 +2588,12 @@ fn squonk_access_control_shape(
     access: &AccessControlStatement,
 ) -> AccessControlShape {
     match access {
+        AccessControlStatement::AlterRoleRename { name, new_name, .. } => {
+            AccessControlShape::RoleRename {
+                name: ident_shape(parsed, name),
+                new_name: ident_shape(parsed, new_name),
+            }
+        }
         AccessControlStatement::Grant {
             privileges,
             object,

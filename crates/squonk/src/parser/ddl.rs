@@ -18,31 +18,33 @@
 //! the trailing clause surfaces as a parse error.
 
 use crate::ast::{
-    AccountName, AggregateArgs, AlterColumnAction, AlterColumnTarget, AlterDatabase,
-    AlterDatabaseAction, AlterDatabaseOption, AlterDatabaseOptions, AlterEvent, AlterExtension,
-    AlterExtensionAction, AlterInstance, AlterInstanceAction, AlterLogfileGroup,
+    AccessControlStatement, AccountName, AggregateArgs, AlterColumnAction, AlterColumnTarget,
+    AlterDatabase, AlterDatabaseAction, AlterDatabaseOption, AlterDatabaseOptions, AlterEvent,
+    AlterExtension, AlterExtensionAction, AlterInstance, AlterInstanceAction, AlterLogfileGroup,
     AlterObjectDepends, AlterObjectSchema, AlterResourceGroup, AlterRoutine, AlterSequence,
     AlterSequenceOption, AlterServer, AlterSystem, AlterSystemAction, AlterTable, AlterTableAction,
     AlterTablespace, AlterTablespaceAction, AlterView, AutoIncrementSpelling, CharsetKeyword,
-    CollateExpr, ColumnConstraint, ColumnDef, ColumnOption, CommentOnStatement, CommentTarget,
-    ConflictResolution, ConstraintCharacteristics, CreateDatabase, CreateEvent, CreateExtension,
-    CreateExtensionOption, CreateFunction, CreateIndex, CreateLogfileGroup, CreateMacro,
-    CreateProcedure, CreateResourceGroup, CreateSchema, CreateSecret, CreateSequence, CreateServer,
+    CollateExpr, ColocationPartitionKind, ColumnConstraint, ColumnDef, ColumnOption,
+    CommentOnStatement, CommentTarget, ConflictResolution, ConstraintCharacteristics,
+    CreateColocationGroup, CreateDatabase, CreateEvent, CreateExtension, CreateExtensionOption,
+    CreateFunction, CreateIndex, CreateLogfileGroup, CreateMacro, CreateProcedure,
+    CreateResourceGroup, CreateSchema, CreateSecret, CreateSequence, CreateServer,
     CreateSpatialReferenceSystem, CreateStoredTrigger, CreateTable, CreateTableBody,
     CreateTableOption, CreateTableOptionKind, CreateTablespace, CreateTrigger, CreateType,
     CreateTypeDefinition, CreateView, CreateVirtualTable, DataType, DatabaseKeyword, Definer,
-    DetachPartitionMode, DropBehavior, DropDatabase, DropEvent, DropIndexOnTable, DropLogfileGroup,
-    DropObjectKind, DropResourceGroup, DropSecretStmt, DropServer, DropSpatialReferenceSystem,
-    DropStatement, DropTablespace, DropTransform, EventOnCompletion, EventSchedule, EventStatus,
-    ExcludeConstraint, ExcludeElement, ExcludeOperator, Expr, ExtensionVersion, ForeignKeyMatch,
-    ForeignKeyRef, FunctionBody, FunctionNullBehavior, FunctionOption, FunctionParam,
-    FunctionParamDefault, FunctionParamDefaultSpelling, FunctionParamMode, GeneratedColumn,
-    GeneratedColumnSpelling, GeneratedColumnStorage, Ident, IdentityColumn, IdentityGeneration,
-    IdentityOption, IndexAlgorithm, IndexColumn, IndexLock, IndexLockAlgorithmOption,
-    IntervalFields, Keyword, KeywordSet, LanguageName, Literal, LiteralKind, MacroBody, MacroParam,
-    MacroSpelling, ModuleArg, NamedOperatorSpelling, ObjectName, ObjectRefKind, ObjectReference,
-    OnCommitAction, OperatorArgs, PartitionBound, PartitionElem, PartitionSpec, PartitionStrategy,
-    QuoteStyle, ReadOnlyValue, ReferentialAction, ReplicaSpelling, ResourceGroupState,
+    DetachPartitionMode, DropBehavior, DropColocationGroup, DropDatabase, DropEvent,
+    DropIndexOnTable, DropLogfileGroup, DropObjectKind, DropResourceGroup, DropSecretStmt,
+    DropServer, DropSpatialReferenceSystem, DropStatement, DropTablespace, DropTransform,
+    EventOnCompletion, EventSchedule, EventStatus, ExcludeConstraint, ExcludeElement,
+    ExcludeOperator, Expr, ExtensionVersion, ForeignKeyMatch, ForeignKeyRef, FunctionBody,
+    FunctionNullBehavior, FunctionOption, FunctionParam, FunctionParamDefault,
+    FunctionParamDefaultSpelling, FunctionParamMode, GeneratedColumn, GeneratedColumnSpelling,
+    GeneratedColumnStorage, Ident, IdentityColumn, IdentityGeneration, IdentityOption,
+    IndexAlgorithm, IndexColumn, IndexLock, IndexLockAlgorithmOption, IntervalFields, Keyword,
+    KeywordSet, LanguageName, Literal, LiteralKind, MacroBody, MacroParam, MacroSpelling,
+    ModuleArg, NamedOperatorSpelling, ObjectName, ObjectRefKind, ObjectReference, OnCommitAction,
+    OperatorArgs, PartitionBound, PartitionElem, PartitionSpec, PartitionStrategy, QuoteStyle,
+    ReadOnlyValue, ReferentialAction, RefreshMaterializedView, ReplicaSpelling, ResourceGroupState,
     ResourceGroupThreadPriority, ResourceGroupType, ResourceGroupVcpu, RoutineKind,
     RoutineObjectKind, RoutineSignature, SchemaRelocationObject, SecretOption, SecretPersistence,
     ServerOption, ServerOptionKind, SizeLiteral, SizeUnit, Span, Spanned, SqlDataAccess,
@@ -112,6 +114,82 @@ enum TsOptionCtx {
 }
 
 impl<'a, D: Dialect> Parser<'a, D> {
+    fn parse_create_colocation_group(&mut self, start: Span) -> ParseResult<Statement<D::Ext>> {
+        self.expect_contextual_keyword("GROUP")?;
+        let if_not_exists = self.parse_if_not_exists()?;
+        let name = self.parse_ident()?;
+        self.expect_contextual_keyword("PARTITION")?;
+        self.expect_contextual_keyword("BY")?;
+        let partition = if self.eat_contextual_keyword("HASH")? {
+            ColocationPartitionKind::Hash
+        } else if self.eat_contextual_keyword("RANGE")? {
+            ColocationPartitionKind::Range
+        } else {
+            return Err(self.unexpected("`HASH` or `RANGE`"));
+        };
+        let columns = self.parse_parenthesized_ident_list(
+            "`(` to open the colocation key",
+            "`)` to close the colocation key",
+        )?;
+        self.expect_contextual_keyword("SHARDS")?;
+        let shards = self.expect_unsigned_integer_literal("SHARDS")?;
+        let meta = self.make_meta(start.union(self.preceding_span()));
+        Ok(Statement::CreateColocationGroup {
+            create: Box::new(CreateColocationGroup {
+                if_not_exists,
+                name,
+                partition,
+                columns,
+                shards,
+                meta,
+            }),
+            meta,
+        })
+    }
+
+    fn parse_drop_colocation_group(&mut self, start: Span) -> ParseResult<Statement<D::Ext>> {
+        self.expect_contextual_keyword("GROUP")?;
+        let if_exists = self.parse_schema_change_if_exists()?;
+        let name = self.parse_ident()?;
+        let meta = self.make_meta(start.union(self.preceding_span()));
+        Ok(Statement::DropColocationGroup {
+            drop: Box::new(DropColocationGroup {
+                if_exists,
+                name,
+                meta,
+            }),
+            meta,
+        })
+    }
+
+    pub(super) fn parse_refresh_materialized_view_statement(
+        &mut self,
+    ) -> ParseResult<Statement<D::Ext>> {
+        let start = self.current_span()?;
+        self.expect_contextual_keyword("REFRESH")?;
+        self.expect_contextual_keyword("MATERIALIZED")?;
+        self.expect_contextual_keyword("VIEW")?;
+        let concurrently = self.eat_contextual_keyword("CONCURRENTLY")?;
+        let name = self.parse_object_name()?;
+        let with_data = if self.eat_contextual_keyword("WITH")? {
+            let data = !self.eat_contextual_keyword("NO")?;
+            self.expect_contextual_keyword("DATA")?;
+            Some(data)
+        } else {
+            None
+        };
+        let meta = self.make_meta(start.union(self.preceding_span()));
+        Ok(Statement::RefreshMaterializedView {
+            refresh: Box::new(RefreshMaterializedView {
+                concurrently,
+                name,
+                with_data,
+                meta,
+            }),
+            meta,
+        })
+    }
+
     /// Dispatch a `CREATE` statement on the object kind that follows.
     ///
     /// `SCHEMA`, `MATERIALIZED VIEW`, and `[UNIQUE] INDEX` take no
@@ -122,6 +200,11 @@ impl<'a, D: Dialect> Parser<'a, D> {
     pub(super) fn parse_create_statement(&mut self) -> ParseResult<Statement<D::Ext>> {
         let start = self.current_span()?;
         self.expect_keyword(Keyword::Create)?;
+        if self.features().statement_ddl_gates.colocation_groups
+            && self.eat_contextual_keyword("COLOCATION")?
+        {
+            return self.parse_create_colocation_group(start);
+        }
 
         // The object-kind gates below are whole-statement dispatch gates (like
         // `create_trigger`): each keyword is dispatched only under a dialect that models
@@ -1656,6 +1739,14 @@ impl<'a, D: Dialect> Parser<'a, D> {
         if prefix.recursive && columns.is_empty() {
             return Err(self.unexpected("a `(` to open the recursive view's required column list"));
         }
+        let to = if prefix.materialized
+            && self.features().statement_ddl_gates.materialized_view_to
+            && self.eat_contextual_keyword("TO")?
+        {
+            Some(self.parse_object_name()?)
+        } else {
+            None
+        };
         self.expect_keyword(Keyword::As)?;
         let query = self.parse_query()?;
 
@@ -1678,6 +1769,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             if_not_exists,
             name,
             columns,
+            to,
             query: Box::new(query),
             check_option,
             with_data,
@@ -1837,6 +1929,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
             None
         };
         let columns = self.parse_index_columns()?;
+        let with_params = if self.features().index_alter_syntax.index_storage_parameters
+            && self.eat_keyword(Keyword::With)?
+        {
+            self.parse_reloptions_list()?
+        } else {
+            ThinVec::new()
+        };
         let predicate = if self.features().index_alter_syntax.partial_index
             && self.eat_keyword(Keyword::Where)?
         {
@@ -1854,6 +1953,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             table,
             using,
             columns,
+            with_params,
             predicate,
             meta: index_meta,
         };
@@ -2150,6 +2250,23 @@ impl<'a, D: Dialect> Parser<'a, D> {
     pub(super) fn parse_alter_statement(&mut self) -> ParseResult<Statement<D::Ext>> {
         let start = self.current_span()?;
         self.expect_contextual_keyword("ALTER")?;
+        if self.features().access_control_syntax.alter_role_rename
+            && self.eat_contextual_keyword("ROLE")?
+        {
+            let name = self.parse_ident()?;
+            self.expect_contextual_keyword("RENAME")?;
+            self.expect_contextual_keyword("TO")?;
+            let new_name = self.parse_ident()?;
+            let meta = self.make_meta(start.union(self.preceding_span()));
+            return Ok(Statement::AccessControl {
+                access: Box::new(AccessControlStatement::AlterRoleRename {
+                    name,
+                    new_name,
+                    meta,
+                }),
+                meta,
+            });
+        }
         // `ALTER EXTENSION` (PostgreSQL) — a whole-statement gate, intercepted before the
         // `TABLE` expectation. Off elsewhere, where `EXTENSION` surfaces as the
         // "expected TABLE" parse error.
@@ -2413,6 +2530,17 @@ impl<'a, D: Dialect> Parser<'a, D> {
             actions.push(self.parse_alter_table_action()?);
             actions
         };
+        if actions.len() > 1
+            && actions.iter().any(|action| {
+                matches!(
+                    action,
+                    AlterTableAction::SetColocationGroup { .. }
+                        | AlterTableAction::DropColocationGroup { .. }
+                )
+            })
+        {
+            return Err(self.unexpected("a standalone colocation ALTER TABLE action"));
+        }
         let span = start.union(self.preceding_span());
         let alter_meta = self.make_meta(span);
         let alter = AlterTable {
@@ -4601,6 +4729,27 @@ impl<'a, D: Dialect> Parser<'a, D> {
 
     fn parse_alter_table_action(&mut self) -> ParseResult<AlterTableAction<D::Ext>> {
         let start = self.current_span()?;
+        if self.features().statement_ddl_gates.colocation_groups
+            && self.peek_is_contextual_keyword("SET")?
+            && self.peek_nth_is_contextual_keyword(1, "COLOCATION")?
+        {
+            self.advance()?;
+            self.advance()?;
+            self.expect_contextual_keyword("GROUP")?;
+            let group = self.parse_ident()?;
+            let meta = self.make_meta(start.union(self.preceding_span()));
+            return Ok(AlterTableAction::SetColocationGroup { group, meta });
+        }
+        if self.features().statement_ddl_gates.colocation_groups
+            && self.peek_is_contextual_keyword("DROP")?
+            && self.peek_nth_is_contextual_keyword(1, "COLOCATION")?
+        {
+            self.advance()?;
+            self.advance()?;
+            self.expect_contextual_keyword("GROUP")?;
+            let meta = self.make_meta(start.union(self.preceding_span()));
+            return Ok(AlterTableAction::DropColocationGroup { meta });
+        }
         if self.eat_contextual_keyword("ADD")? {
             return self.parse_alter_table_add(start);
         }
@@ -4622,6 +4771,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 meta,
             });
         }
+        if self.features().index_alter_syntax.alter_table_set_options
+            && self.eat_contextual_keyword("SET")?
+        {
+            let params = self.parse_reloptions_list()?;
+            let meta = self.make_meta(start.union(self.preceding_span()));
+            return Ok(AlterTableAction::SetOptions { params, meta });
+        }
         if self.eat_contextual_keyword("RENAME")? {
             return self.parse_alter_table_rename(start);
         }
@@ -4635,6 +4791,19 @@ impl<'a, D: Dialect> Parser<'a, D> {
             let new_name = self.parse_ident()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
             return Ok(AlterTableAction::RenameTable { new_name, meta });
+        }
+        if self.features().index_alter_syntax.rename_constraint
+            && self.eat_contextual_keyword("CONSTRAINT")?
+        {
+            let name = self.parse_ident()?;
+            self.expect_contextual_keyword("TO")?;
+            let new_name = self.parse_ident()?;
+            let meta = self.make_meta(start.union(self.preceding_span()));
+            return Ok(AlterTableAction::RenameConstraint {
+                name,
+                new_name,
+                meta,
+            });
         }
         let column_keyword = self.eat_contextual_keyword("COLUMN")?;
         let name = self.parse_alter_column_target(
@@ -4761,6 +4930,14 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // per-action `IF EXISTS` guard (`alter_existence_guards` off).
         let existence_guards =
             extended && self.features().index_alter_syntax.alter_existence_guards;
+        if self.features().index_alter_syntax.drop_primary_key
+            && self.eat_contextual_keyword("PRIMARY")?
+        {
+            self.expect_contextual_keyword("KEY")?;
+            let behavior = self.parse_drop_behavior()?;
+            let meta = self.make_meta(start.union(self.preceding_span()));
+            return Ok(AlterTableAction::DropPrimaryKey { behavior, meta });
+        }
         if self.eat_contextual_keyword("CONSTRAINT")? {
             let if_exists = existence_guards && self.parse_schema_change_if_exists()?;
             let name = self.parse_ident()?;
@@ -4812,6 +4989,32 @@ impl<'a, D: Dialect> Parser<'a, D> {
             .features()
             .index_alter_syntax
             .alter_column_set_data_type;
+        if self.features().index_alter_syntax.alter_column_add_identity
+            && self.eat_contextual_keyword("ADD")?
+        {
+            self.expect_contextual_keyword("GENERATED")?;
+            let generation = if self.eat_contextual_keyword("ALWAYS")? {
+                IdentityGeneration::Always
+            } else if self.eat_keyword(Keyword::By)? {
+                self.expect_contextual_keyword("DEFAULT")?;
+                IdentityGeneration::ByDefault
+            } else {
+                return Err(self.unexpected("`ALWAYS` or `BY DEFAULT`"));
+            };
+            self.expect_keyword(Keyword::As)?;
+            self.expect_contextual_keyword("IDENTITY")?;
+            let options = self.parse_identity_options()?;
+            let span = start.union(self.preceding_span());
+            let identity = IdentityColumn {
+                generation,
+                options,
+                meta: self.make_meta(span),
+            };
+            return Ok(AlterColumnAction::AddIdentity {
+                identity: Box::new(identity),
+                meta: self.make_meta(span),
+            });
+        }
         if self.eat_contextual_keyword("SET")? {
             if self.eat_contextual_keyword("DEFAULT")? {
                 let expr = self.parse_expr()?;
@@ -4893,6 +5096,11 @@ impl<'a, D: Dialect> Parser<'a, D> {
     pub(super) fn parse_drop_statement(&mut self) -> ParseResult<Statement<D::Ext>> {
         let start = self.current_span()?;
         self.expect_contextual_keyword("DROP")?;
+        if self.features().statement_ddl_gates.colocation_groups
+            && self.eat_contextual_keyword("COLOCATION")?
+        {
+            return self.parse_drop_colocation_group(start);
+        }
         if self.features().statement_ddl_gates.routines {
             if let Some(kind) = self.try_parse_routine_object_kind()? {
                 return self.parse_drop_routine(start, kind);
@@ -5081,27 +5289,44 @@ impl<'a, D: Dialect> Parser<'a, D> {
         })
     }
 
-    /// `COMMENT ON {TABLE | COLUMN | DATABASE | PROCEDURE} <name>[(<argtypes>)] IS
-    /// '<text>' | NULL` (PostgreSQL `CommentStmt`, gram.y). Only the datafusion-parity
-    /// object subset is modelled (see [`CommentTarget`]).
+    /// `COMMENT [IF EXISTS] ON <object> IS '<text>' | NULL`.
     pub(super) fn parse_comment_on_statement(&mut self) -> ParseResult<Statement<D::Ext>> {
         let start = self.current_span()?;
         self.expect_contextual_keyword("COMMENT")?;
+        let if_exists =
+            self.features().utility_syntax.comment_if_exists && self.eat_keyword(Keyword::If)?;
+        if if_exists {
+            self.expect_keyword(Keyword::Exists)?;
+        }
         self.expect_contextual_keyword("ON")?;
-        let (target, name) = if self.eat_contextual_keyword("TABLE")? {
-            (CommentTarget::Table, self.parse_object_name()?)
+        let (target, name, constraint_table) = if self.eat_contextual_keyword("TABLE")? {
+            (CommentTarget::Table, self.parse_object_name()?, None)
         } else if self.eat_contextual_keyword("COLUMN")? {
-            (CommentTarget::Column, self.parse_object_name()?)
+            (CommentTarget::Column, self.parse_object_name()?, None)
         } else if self.eat_contextual_keyword("DATABASE")? {
-            (CommentTarget::Database, self.parse_object_name()?)
+            (CommentTarget::Database, self.parse_object_name()?, None)
+        } else if self.eat_contextual_keyword("VIEW")? {
+            (CommentTarget::View, self.parse_object_name()?, None)
+        } else if self.eat_contextual_keyword("MATERIALIZED")? {
+            self.expect_contextual_keyword("VIEW")?;
+            (
+                CommentTarget::MaterializedView,
+                self.parse_object_name()?,
+                None,
+            )
+        } else if self.eat_contextual_keyword("INDEX")? {
+            (CommentTarget::Index, self.parse_object_name()?, None)
+        } else if self.eat_contextual_keyword("CONSTRAINT")? {
+            let name = self.parse_object_name()?;
+            self.expect_contextual_keyword("ON")?;
+            let table = self.parse_object_name()?;
+            (CommentTarget::Constraint, name, Some(table))
         } else if self.eat_contextual_keyword("PROCEDURE")? {
             let name = self.parse_object_name()?;
             let arg_types = self.parse_optional_routine_arg_types()?;
-            (CommentTarget::Procedure { arg_types }, name)
+            (CommentTarget::Procedure { arg_types }, name, None)
         } else {
-            return Err(
-                self.unexpected("a COMMENT ON object kind (TABLE, COLUMN, DATABASE, or PROCEDURE)")
-            );
+            return Err(self.unexpected("a supported COMMENT ON object kind"));
         };
         self.expect_keyword(Keyword::Is)?;
         let comment = self.parse_comment_value()?;
@@ -5109,8 +5334,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
         let meta = self.make_meta(span);
         Ok(Statement::CommentOn {
             comment: Box::new(CommentOnStatement {
+                if_exists,
                 target,
                 name,
+                constraint_table,
                 comment,
                 meta,
             }),
@@ -6368,6 +6595,45 @@ impl<'a, D: Dialect> Parser<'a, D> {
         if self.peek_is_contextual_keyword("GENERATED")? {
             return Ok(Some(self.parse_generated_or_identity_column()?));
         }
+        if self
+            .features()
+            .column_definition_syntax
+            .compact_identity_columns
+            && self.peek_is_contextual_keyword("IDENTITY")?
+        {
+            let start = self.current_span()?;
+            self.expect_contextual_keyword("IDENTITY")?;
+            let mut options = ThinVec::new();
+            if self.eat_punct(Punctuation::LParen)? {
+                let seed = self.parse_expr()?;
+                let seed_meta = self.make_meta(seed.span());
+                options.push(IdentityOption::StartWith {
+                    expr: seed,
+                    meta: seed_meta,
+                });
+                self.expect_punct(
+                    Punctuation::Comma,
+                    "`,` between identity seed and increment",
+                )?;
+                let increment = self.parse_expr()?;
+                let increment_meta = self.make_meta(increment.span());
+                options.push(IdentityOption::IncrementBy {
+                    expr: increment,
+                    meta: increment_meta,
+                });
+                self.expect_punct(Punctuation::RParen, "`)` after identity increment")?;
+            }
+            let span = start.union(self.preceding_span());
+            let identity = IdentityColumn {
+                generation: IdentityGeneration::ByDefault,
+                options,
+                meta: self.make_meta(span),
+            };
+            return Ok(Some(ColumnOption::Identity {
+                identity: Box::new(identity),
+                meta: self.make_meta(span),
+            }));
+        }
         // MySQL/SQLite keywordless generated-column shorthand `AS (<expr>) [STORED|
         // VIRTUAL]`, gated by dialect data. The `AS (` two-token lookahead is
         // unambiguous — a column definition has no other `AS (` continuation — so when
@@ -6674,10 +6940,8 @@ impl<'a, D: Dialect> Parser<'a, D> {
     }
 
     /// Parse one `START [WITH]` / `INCREMENT [BY]` / `MIN`·`MAXVALUE` (or `NO …`) / `CACHE` /
-    /// `CYCLE` sequence-generator option. Shared by the `GENERATED … AS IDENTITY` column form
-    /// (`allow_cache == true`) and `CREATE SEQUENCE` (`allow_cache == false`): DuckDB's
-    /// `CREATE SEQUENCE` grammar rejects `CACHE` (engine-measured), so the caller suppresses
-    /// that one branch to avoid over-accepting, while the identity form keeps it.
+    /// `CYCLE` sequence-generator option. Shared by identity-column and sequence statements;
+    /// callers select whether the independently gated `CACHE` branch is available.
     fn parse_identity_option(&mut self, allow_cache: bool) -> ParseResult<IdentityOption<D::Ext>> {
         if self.peek_is_contextual_keyword("START")? {
             let start = self.current_span()?;
@@ -6788,21 +7052,22 @@ impl<'a, D: Dialect> Parser<'a, D> {
     ///
     /// Unlike the parenthesized identity-column option list, the options simply follow the
     /// name; the loop stops at the first token that is not an option lead. Each option reuses
-    /// the shared [`parse_identity_option`](Self::parse_identity_option) with `CACHE`
-    /// suppressed — DuckDB's `CREATE SEQUENCE` grammar rejects `CACHE`, so admitting it here
-    /// would over-accept.
+    /// the shared [`parse_identity_option`](Self::parse_identity_option). `CACHE` is admitted
+    /// only when the dialect's dedicated sequence-cache gate is enabled.
     fn parse_sequence_options(&mut self) -> ParseResult<ThinVec<IdentityOption<D::Ext>>> {
         let mut options = ThinVec::new();
-        while self.peek_is_sequence_option()? {
-            options.push(self.parse_identity_option(false)?);
+        let allow_cache = self.features().statement_ddl_gates.create_sequence_cache;
+        while self.peek_is_sequence_option()?
+            || (allow_cache && self.peek_is_contextual_keyword("CACHE")?)
+        {
+            options.push(self.parse_identity_option(allow_cache)?);
         }
         Ok(options)
     }
 
     /// Whether the cursor sits on a `CREATE SEQUENCE` option lead — `START`, `INCREMENT`,
-    /// `MINVALUE`, `MAXVALUE`, `CYCLE`, or the `NO` of `NO MIN`/`MAXVALUE`/`CYCLE`. `CACHE` is
-    /// deliberately excluded (unmodelled here — see
-    /// [`parse_sequence_options`](Self::parse_sequence_options)).
+    /// `MINVALUE`, `MAXVALUE`, `CYCLE`, or the `NO` of `NO MIN`/`MAXVALUE`/`CYCLE`.
+    /// `CACHE` is checked separately against its dialect gate.
     fn peek_is_sequence_option(&mut self) -> ParseResult<bool> {
         Ok(self.peek_is_contextual_keyword("START")?
             || self.peek_is_contextual_keyword("INCREMENT")?
@@ -7518,6 +7783,39 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 self.advance()?;
             }
         }
+        let has_with = options
+            .iter()
+            .any(|option| matches!(option.kind, CreateTableOptionKind::With { .. }));
+        let colocate_count = options
+            .iter()
+            .filter(|option| {
+                matches!(
+                    option.kind,
+                    CreateTableOptionKind::ColocateWith { .. }
+                        | CreateTableOptionKind::InColocationGroup { .. }
+                )
+            })
+            .count();
+        if colocate_count > 1 {
+            return Err(self.unexpected("only one CREATE TABLE colocation clause"));
+        }
+        if options
+            .iter()
+            .any(|option| matches!(option.kind, CreateTableOptionKind::ColocateWith { .. }))
+            && has_with
+        {
+            return Err(self.unexpected("no WITH storage options with COLOCATE WITH"));
+        }
+        if let Some(columns) = options.iter().find_map(|option| match &option.kind {
+            CreateTableOptionKind::InColocationGroup { columns, .. } => Some(columns),
+            _ => None,
+        }) {
+            if columns.is_empty() != has_with {
+                return Err(self.unexpected(
+                    "exactly one of ON (<columns>) or WITH storage options for IN COLOCATION GROUP",
+                ));
+            }
+        }
         Ok(options)
     }
 
@@ -7559,6 +7857,12 @@ impl<'a, D: Dialect> Parser<'a, D> {
     }
 
     fn parse_create_table_option(&mut self) -> ParseResult<Option<CreateTableOption<D::Ext>>> {
+        if self.features().statement_ddl_gates.colocation_groups
+            && (self.peek_is_contextual_keyword("COLOCATE")?
+                || self.peek_is_contextual_keyword("IN")?)
+        {
+            return Ok(Some(self.parse_colocation_table_option()?));
+        }
         if self
             .features()
             .create_table_clause_syntax
@@ -7637,6 +7941,46 @@ impl<'a, D: Dialect> Parser<'a, D> {
             }
         }
         Ok(None)
+    }
+
+    fn parse_colocation_table_option(&mut self) -> ParseResult<CreateTableOption<D::Ext>> {
+        let start = self.current_span()?;
+        let kind = if self.eat_contextual_keyword("COLOCATE")? {
+            self.expect_keyword(Keyword::With)?;
+            let table = self.parse_target_relation_name()?;
+            self.expect_keyword(Keyword::On)?;
+            let columns = self.parse_parenthesized_ident_list(
+                "`(` to open the colocation key",
+                "`)` to close the colocation key",
+            )?;
+            let meta = self.make_meta(start.union(self.preceding_span()));
+            CreateTableOptionKind::ColocateWith {
+                table,
+                columns,
+                meta,
+            }
+        } else {
+            self.expect_contextual_keyword("IN")?;
+            self.expect_contextual_keyword("COLOCATION")?;
+            self.expect_contextual_keyword("GROUP")?;
+            let group = self.parse_ident()?;
+            let columns = if self.eat_keyword(Keyword::On)? {
+                self.parse_parenthesized_ident_list(
+                    "`(` to open the colocation key",
+                    "`)` to close the colocation key",
+                )?
+            } else {
+                ThinVec::new()
+            };
+            let meta = self.make_meta(start.union(self.preceding_span()));
+            CreateTableOptionKind::InColocationGroup {
+                group,
+                columns,
+                meta,
+            }
+        };
+        let meta = self.make_meta(start.union(self.preceding_span()));
+        Ok(CreateTableOption { kind, meta })
     }
 
     /// Parse one MySQL trailing table option: `[DEFAULT] <name> [=] <value>`.

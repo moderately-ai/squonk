@@ -47,7 +47,10 @@ fn portable_publication_corpus_is_accepted_by_stable_engine_oracles() {
     let sqlite = SqliteOracle::with_schema(&setup).expect("SQLite oracle");
     let duckdb = DuckDbOracle::with_schema(&setup).expect("DuckDB oracle");
     let mysql = MySqlOracle::with_schema(&format!(
-        "CREATE DATABASE IF NOT EXISTS squonk_oracle; USE squonk_oracle; {setup}"
+        "DROP DATABASE IF EXISTS squonk_publication_oracle; \
+         CREATE DATABASE squonk_publication_oracle; \
+         USE squonk_publication_oracle; \
+         {setup}"
     ))
     .expect("MySQL oracle");
 

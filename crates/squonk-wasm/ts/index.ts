@@ -12,7 +12,7 @@ const api = createNodeSquonk(
   {
     defaultDialect: "ansi",
     supportedDialects: [
-      "ansi", "postgres", "mysql", "sqlite", "duckdb", "bigquery", "hive",
+      "ansi", "postgres", "mysql", "sqlite", "duckdb", "quiltdb", "bigquery", "hive",
       "clickhouse", "databricks", "mssql", "snowflake", "redshift", "lenient",
     ] as const,
   },

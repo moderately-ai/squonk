@@ -5639,6 +5639,10 @@ mod tests {
             open_json: _,
         } = TableFactorSyntax::POSTGRES;
         let MutationSyntax {
+            insert_ignore: _,
+            insert_overwrite: _,
+            joined_update_delete: _,
+            merge_insert_multirow: _,
             returning: _,
             on_conflict: _,
             on_duplicate_key_update: _,
@@ -5668,12 +5672,15 @@ mod tests {
         // Every `StatementDdlGates` field is a toggleable statement-head gate with a
         // flip-verified LabeledCase, so the `_` bindings carry no exemption.
         let StatementDdlGates {
+            colocation_groups: _,
+            materialized_view_to: _,
             create_trigger: _,
             create_macro: _,
             create_secret: _,
             create_type: _,
             create_virtual_table: _,
             create_sequence: _,
+            create_sequence_cache: _,
             extension_ddl: _,
             transform_ddl: _,
             alter_system: _,
@@ -5726,6 +5733,7 @@ mod tests {
             inline_primary_key_ordering: _,
             named_column_collate_constraint: _,
             identity_columns: _,
+            compact_identity_columns: _,
             default_expression_requires_parens: _,
             column_default_requires_b_expr: _,
             column_collation: _,
@@ -5746,6 +5754,11 @@ mod tests {
         // dispatch), now a flip-verified toggle. The remaining `_` bindings are
         // `CREATE INDEX` / `ALTER TABLE` clause decorations, outside the statement-head pass.
         let IndexAlterSyntax {
+            rename_constraint: _,
+            alter_table_set_options: _,
+            drop_primary_key: _,
+            alter_column_add_identity: _,
+            index_storage_parameters: _,
             drop_behavior: _,
             index_drop_on_table: _,
             index_concurrently: _,
@@ -5855,6 +5868,7 @@ mod tests {
             standalone_argument_order_by: _,
         } = AggregateCallSyntax::POSTGRES;
         let PredicateSyntax {
+            is_distinct_from: _,
             like: _,
             ilike: _,
             similar_to: _,
@@ -5867,6 +5881,9 @@ mod tests {
             null_test_two_word_postfix: _,
         } = PredicateSyntax::POSTGRES;
         let SelectSyntax {
+            wildcard_replace: _,
+            intersect_all: _,
+            except_all: _,
             distinct_on: _,
             select_into: _,
             empty_target_list: _,
@@ -5912,6 +5929,8 @@ mod tests {
             order_by_all: _,
         } = GroupingSyntax::POSTGRES;
         let UtilitySyntax {
+            comment_if_exists: _,
+            transaction_chain: _,
             copy: _,
             copy_into: _,
             comment_on: _,
@@ -5977,6 +5996,7 @@ mod tests {
             table_maintenance: _,
         } = MaintenanceSyntax::POSTGRES;
         let AccessControlSyntax {
+            alter_role_rename: _,
             access_control: _,
             access_control_extended_objects: _,
             user_role_management: _,

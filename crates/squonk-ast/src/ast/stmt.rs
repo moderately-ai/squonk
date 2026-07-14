@@ -9,26 +9,26 @@ use super::{
     AlterRoutine, AlterSequence, AlterServer, AlterSystem, AlterTable, AlterTablespace, AlterUser,
     AlterView, AnalyzeStatement, AttachStatement, BinlogStatement, CacheIndexStatement,
     CallStatement, CaseStatement, CheckpointStatement, CloneStatement, CloseCursorStatement,
-    CommentOnStatement, CompoundStatement, CopyIntoStatement, CopyStatement, CreateDatabase,
-    CreateEvent, CreateExtension, CreateFunction, CreateIndex, CreateLogfileGroup, CreateMacro,
-    CreateProcedure, CreateResourceGroup, CreateSchema, CreateSecret, CreateSequence, CreateServer,
-    CreateSpatialReferenceSystem, CreateStoredTrigger, CreateTable, CreateTablespace,
+    CommentOnStatement, CompoundStatement, CopyIntoStatement, CopyStatement, CreateColocationGroup,
+    CreateDatabase, CreateEvent, CreateExtension, CreateFunction, CreateIndex, CreateLogfileGroup,
+    CreateMacro, CreateProcedure, CreateResourceGroup, CreateSchema, CreateSecret, CreateSequence,
+    CreateServer, CreateSpatialReferenceSystem, CreateStoredTrigger, CreateTable, CreateTablespace,
     CreateTrigger, CreateType, CreateUser, CreateView, CreateVirtualTable, DeallocateStatement,
     Delete, DescribeStatement, DetachStatement, DoExpressionsStatement, DoStatement, DropBehavior,
-    DropDatabase, DropEvent, DropIndexOnTable, DropLogfileGroup, DropResourceGroup, DropSecretStmt,
-    DropServer, DropSpatialReferenceSystem, DropStatement, DropTablespace, DropTransform,
-    ExecuteStatement, ExecuteUsingStatement, ExplainStatement, ExportStatement, Extension,
-    FetchCursorStatement, FlushStatement, GetDiagnosticsStatement, HandlerStatement, HelpStatement,
-    IfStatement, ImportStatement, ImportTableStatement, Insert, InstallStatement,
-    InstanceLockStatement, IterateStatement, KillStatement, LeaveStatement, LoadDataStatement,
-    LoadIndexStatement, LoadStatement, LockTablesStatement, LoopStatement, Merge, NoExt,
-    ObjectName, OpenCursorStatement, Pivot, PragmaStatement, PrepareFromStatement,
-    PrepareStatement, PurgeStatement, Query, ReindexStatement, RenameStatement, RepeatStatement,
-    ReplicationStatement, ReturnStatement, RoutineObjectKind, RoutineSignature, SessionStatement,
-    ShowRef, ShowStatement, SignalStatement, TableMaintenanceStatement, ThinVec,
-    TransactionStatement, UninstallStatement, UnlockTablesStatement, Unpivot, Update,
-    UpdateExtensionsStatement, UseStatement, UserRoleList, VacuumStatement, WhileStatement,
-    XaStatement,
+    DropColocationGroup, DropDatabase, DropEvent, DropIndexOnTable, DropLogfileGroup,
+    DropResourceGroup, DropSecretStmt, DropServer, DropSpatialReferenceSystem, DropStatement,
+    DropTablespace, DropTransform, ExecuteStatement, ExecuteUsingStatement, ExplainStatement,
+    ExportStatement, Extension, FetchCursorStatement, FlushStatement, GetDiagnosticsStatement,
+    HandlerStatement, HelpStatement, IfStatement, ImportStatement, ImportTableStatement, Insert,
+    InstallStatement, InstanceLockStatement, IterateStatement, KillStatement, LeaveStatement,
+    LoadDataStatement, LoadIndexStatement, LoadStatement, LockTablesStatement, LoopStatement,
+    Merge, NoExt, ObjectName, OpenCursorStatement, Pivot, PragmaStatement, PrepareFromStatement,
+    PrepareStatement, PurgeStatement, Query, RefreshMaterializedView, ReindexStatement,
+    RenameStatement, RepeatStatement, ReplicationStatement, ReturnStatement, RoutineObjectKind,
+    RoutineSignature, SessionStatement, ShowRef, ShowStatement, SignalStatement,
+    TableMaintenanceStatement, ThinVec, TransactionStatement, UninstallStatement,
+    UnlockTablesStatement, Unpivot, Update, UpdateExtensionsStatement, UseStatement, UserRoleList,
+    VacuumStatement, WhileStatement, XaStatement,
 };
 use crate::vocab::Meta;
 
@@ -77,6 +77,27 @@ pub enum Statement<X: Extension = NoExt> {
     CreateView {
         /// The `CREATE VIEW` details; see [`CreateView`].
         view: Box<CreateView<X>>,
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// Refresh a materialized view, including PostgreSQL's optional execution modifiers.
+    RefreshMaterializedView {
+        /// Refresh details.
+        refresh: Box<RefreshMaterializedView>,
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// Create a colocation group.
+    CreateColocationGroup {
+        /// Statement details.
+        create: Box<CreateColocationGroup>,
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// Drop a colocation group.
+    DropColocationGroup {
+        /// Statement details.
+        drop: Box<DropColocationGroup>,
         /// Source location and node identity.
         meta: Meta,
     },
@@ -1308,6 +1329,9 @@ impl<X: Extension> Statement<X> {
             | Self::Drop { .. }
             | Self::CreateSchema { .. }
             | Self::CreateView { .. }
+            | Self::RefreshMaterializedView { .. }
+            | Self::CreateColocationGroup { .. }
+            | Self::DropColocationGroup { .. }
             | Self::AlterView { .. }
             | Self::CreateIndex { .. }
             | Self::CreateFunction { .. }

@@ -49,6 +49,6 @@ grouping_syntax            | stable   | baseline | diverges | diverges | diverge
 utility_syntax             | stable   | baseline | diverges | diverges | diverges | diverges | postgres_utility_syntax_accepts_copy                         | ansi_utility_syntax_rejects_copy
 show_syntax                | stable   | baseline | baseline | diverges | diverges | diverges | duckdb_show_syntax_accepts_describe_summarize_statement      | ansi_show_syntax_rejects_describe_summarize
 maintenance_syntax         | stable   | baseline | diverges | diverges | diverges | diverges | sqlite_maintenance_syntax_accepts_vacuum_reindex_and_analyze | ansi_and_postgres_maintenance_syntax_reject_vacuum_reindex_and_analyze
-access_control_syntax      | stable   | baseline | baseline | diverges | diverges | baseline | postgres_access_control_syntax_accepts_grant                 | sqlite_access_control_syntax_rejects_grant
+access_control_syntax      | stable   | baseline | diverges | diverges | diverges | diverges | postgres_access_control_syntax_accepts_grant                 | sqlite_access_control_syntax_rejects_grant
 type_name_syntax           | stable   | baseline | diverges | diverges | diverges | diverges | mysql_type_name_syntax_accepts_extended_type_names           | ansi_type_name_syntax_rejects_value_list_types
 target_spelling            | stable   | baseline | diverges | baseline | baseline | diverges | ansi_target_spelling_renders_standard_types                  | postgres_target_spelling_renders_pg_types

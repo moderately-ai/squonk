@@ -147,7 +147,7 @@ pub enum HookResult<T> {
 /// use squonk::error::ParseResult;
 /// use squonk::parser::{Dialect, Parser};
 /// use squonk::tokenizer::{Operator, Token, TokenKind};
-/// use squonk::parse_with;
+/// use squonk::{ParseConfig, parse_with};
 ///
 /// // A left-associative `^` "match" operator.
 /// const MATCH_BP: BindingPower = BindingPower { left: 64, right: 65, assoc: Assoc::Left };
@@ -204,7 +204,7 @@ pub enum HookResult<T> {
 /// }
 ///
 /// // `^` parses and round-trips through the custom node's Render impl.
-/// let parsed = parse_with("SELECT a ^ b", crate::ParseConfig::new(MatchDialect)).expect("custom operator parses");
+/// let parsed = parse_with("SELECT a ^ b", ParseConfig::new(MatchDialect)).expect("custom operator parses");
 /// assert_eq!(parsed.to_string(), "SELECT a ^ b");
 /// ```
 pub trait Dialect {

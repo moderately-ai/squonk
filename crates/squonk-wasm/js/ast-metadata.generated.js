@@ -110,6 +110,10 @@ export const AST_FIELD_TYPES = Object.freeze({
   "AlterSystemAction.Reset": Object.freeze({
     "target": "ConfigParameter",
   }),
+  "AccessControlStatement.AlterRoleRename": Object.freeze({
+    "name": "Ident",
+    "new_name": "Ident",
+  }),
   "AccessControlStatement.Grant": Object.freeze({
     "privileges": "Privileges",
     "object": "GrantObject",
@@ -511,6 +515,14 @@ export const AST_FIELD_TYPES = Object.freeze({
   "CreateTableOption": Object.freeze({
     "kind": "CreateTableOptionKind",
   }),
+  "CreateTableOptionKind.ColocateWith": Object.freeze({
+    "table": "ObjectName",
+    "columns": "Ident[]",
+  }),
+  "CreateTableOptionKind.InColocationGroup": Object.freeze({
+    "group": "Ident",
+    "columns": "Ident[]",
+  }),
   "CreateTableOptionKind.With": Object.freeze({
     "params": "TableStorageParameter[]",
   }),
@@ -547,6 +559,9 @@ export const AST_FIELD_TYPES = Object.freeze({
   "AlterColumnTarget": Object.freeze({
     "parts": "Ident[]",
   }),
+  "AlterTableAction.SetColocationGroup": Object.freeze({
+    "group": "Ident",
+  }),
   "AlterTableAction.AddColumn": Object.freeze({
     "target": "AlterColumnTarget",
     "column": "ColumnDef",
@@ -566,8 +581,18 @@ export const AST_FIELD_TYPES = Object.freeze({
     "name": "Ident",
     "behavior": "DropBehavior",
   }),
+  "AlterTableAction.DropPrimaryKey": Object.freeze({
+    "behavior": "DropBehavior",
+  }),
+  "AlterTableAction.SetOptions": Object.freeze({
+    "params": "TableStorageParameter[]",
+  }),
   "AlterTableAction.RenameColumn": Object.freeze({
     "name": "AlterColumnTarget",
+    "new_name": "Ident",
+  }),
+  "AlterTableAction.RenameConstraint": Object.freeze({
+    "name": "Ident",
     "new_name": "Ident",
   }),
   "AlterTableAction.RenameTable": Object.freeze({
@@ -583,6 +608,9 @@ export const AST_FIELD_TYPES = Object.freeze({
   }),
   "AlterColumnAction.SetDefault": Object.freeze({
     "expr": "Expr",
+  }),
+  "AlterColumnAction.AddIdentity": Object.freeze({
+    "identity": "IdentityColumn",
   }),
   "AlterColumnAction.SetDataType": Object.freeze({
     "data_type": "DataType",
@@ -603,6 +631,7 @@ export const AST_FIELD_TYPES = Object.freeze({
   "CommentOnStatement": Object.freeze({
     "target": "CommentTarget",
     "name": "ObjectName",
+    "constraint_table": "ObjectName",
     "comment": "Literal",
   }),
   "CreateSchema": Object.freeze({
@@ -615,8 +644,21 @@ export const AST_FIELD_TYPES = Object.freeze({
     "temporary": "TemporaryTableKind",
     "name": "ObjectName",
     "columns": "Ident[]",
+    "to": "ObjectName",
     "query": "Query",
     "check_option": "ViewCheckOption",
+  }),
+  "RefreshMaterializedView": Object.freeze({
+    "name": "ObjectName",
+  }),
+  "CreateColocationGroup": Object.freeze({
+    "name": "Ident",
+    "partition": "ColocationPartitionKind",
+    "columns": "Ident[]",
+    "shards": "Literal",
+  }),
+  "DropColocationGroup": Object.freeze({
+    "name": "Ident",
   }),
   "ViewOptions": Object.freeze({
     "algorithm": "ViewAlgorithm",
@@ -653,6 +695,7 @@ export const AST_FIELD_TYPES = Object.freeze({
     "table": "ObjectName",
     "using": "Ident",
     "columns": "IndexColumn[]",
+    "with_params": "TableStorageParameter[]",
     "predicate": "Expr",
   }),
   "IndexColumn": Object.freeze({
@@ -1091,6 +1134,7 @@ export const AST_FIELD_TYPES = Object.freeze({
   }),
   "Insert": Object.freeze({
     "verb": "InsertVerb",
+    "modifier": "InsertModifier",
     "or_action": "ConflictResolution",
     "with": "With",
     "target": "InsertTarget",
@@ -1138,6 +1182,7 @@ export const AST_FIELD_TYPES = Object.freeze({
     "with": "With",
     "or_action": "ConflictResolution",
     "target": "DmlTarget",
+    "target_joins": "Join[]",
     "assignments": "UpdateAssignment[]",
     "from": "TableWithJoins[]",
     "selection": "DmlSelection",
@@ -1171,6 +1216,8 @@ export const AST_FIELD_TYPES = Object.freeze({
   "Delete": Object.freeze({
     "with": "With",
     "target": "DmlTarget",
+    "additional_targets": "DmlTarget[]",
+    "target_joins": "Join[]",
     "using": "TableWithJoins[]",
     "selection": "DmlSelection",
     "order_by": "OrderByExpr[]",
@@ -1224,6 +1271,7 @@ export const AST_FIELD_TYPES = Object.freeze({
     "columns": "Ident[]",
     "overriding": "InsertOverriding",
     "values": "InsertValue[]",
+    "additional_rows": "InsertValue[][]",
   }),
   "MergeAction.InsertDefault": Object.freeze({
     "default": "DefaultValue",
@@ -2480,6 +2528,15 @@ export const AST_FIELD_TYPES = Object.freeze({
   }),
   "Statement.CreateView": Object.freeze({
     "view": "CreateView",
+  }),
+  "Statement.RefreshMaterializedView": Object.freeze({
+    "refresh": "RefreshMaterializedView",
+  }),
+  "Statement.CreateColocationGroup": Object.freeze({
+    "create": "CreateColocationGroup",
+  }),
+  "Statement.DropColocationGroup": Object.freeze({
+    "drop": "DropColocationGroup",
   }),
   "Statement.AlterView": Object.freeze({
     "alter": "AlterView",

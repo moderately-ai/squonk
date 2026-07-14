@@ -523,6 +523,8 @@ impl AggregateCallSyntax {
 impl MutationSyntax {
     /// The `SQLITE` preset for mutation syntax.
     pub const SQLITE: Self = Self {
+        insert_ignore: false,
+        insert_overwrite: false,
         returning: true,
         on_conflict: true,
         on_duplicate_key_update: false,
@@ -536,6 +538,7 @@ impl MutationSyntax {
         // SQLite's own (compile-time `SQLITE_ENABLE_UPDATE_DELETE_LIMIT`) form is off by
         // default and out of this preset's scope.
         update_delete_tails: false,
+        joined_update_delete: false,
         // SQLite's `INSERT OR <action>` / `UPDATE OR <action>` conflict-resolution prefix.
         or_conflict_action: true,
         insert_column_matching: false,
@@ -556,6 +559,7 @@ impl MutationSyntax {
         merge_when_not_matched_by: false,
         merge_insert_default_values: false,
         merge_insert_overriding: false,
+        merge_insert_multirow: false,
         merge_update_set_star: false,
         merge_insert_star_by_name: false,
         merge_error_action: false,
@@ -566,6 +570,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `SQLITE` preset for statement ddl gates.
     pub const SQLITE: Self = Self {
+        colocation_groups: false,
+        materialized_view_to: false,
         // SQLite's `CREATE TRIGGER … BEGIN … END` compound-statement body.
         create_trigger: true,
         // SQLite has no `CREATE MACRO` (its functions are C-registered).
@@ -578,6 +584,7 @@ impl StatementDdlGates {
         // SQLite has no sequence generators (it uses AUTOINCREMENT rowids); `CREATE SEQUENCE`
         // rejects — the `SEQUENCE` keyword falls through to the `CREATE TABLE` expectation.
         create_sequence: false,
+        create_sequence_cache: false,
         extension_ddl: false,
         transform_ddl: false,
         alter_system: false,
@@ -668,6 +675,7 @@ impl ColumnDefinitionSyntax {
         // SQLite has no IDENTITY column, WITH (storage params), ON COMMIT action, or
         // extended ALTER surface (its ALTER is RENAME/ADD/DROP COLUMN only).
         identity_columns: false,
+        compact_identity_columns: false,
         // SQLite accepts a bare expression default and a `CONSTRAINT <name>` on any inline
         // column constraint.
         default_expression_requires_parens: false,
@@ -704,6 +712,11 @@ impl ConstraintSyntax {
 impl IndexAlterSyntax {
     /// The `SQLITE` preset for index alter syntax.
     pub const SQLITE: Self = Self {
+        rename_constraint: false,
+        alter_table_set_options: false,
+        drop_primary_key: false,
+        alter_column_add_identity: false,
+        index_storage_parameters: false,
         drop_behavior: false,
         // SQLite's `DROP INDEX` is the shared name-list drop, not the MySQL `ON <table>` form.
         index_drop_on_table: false,
@@ -764,6 +777,9 @@ impl SelectSyntax {
         // extension); `BY` after a set operator is a syntax error there.
         union_by_name: false,
         wildcard_modifiers: false,
+        wildcard_replace: false,
+        intersect_all: false,
+        except_all: false,
         // SQLite's `table.*` result-column is a non-aliasable production; a trailing alias
         // rejects (measured Reject on rusqlite with the table provisioned).
         qualified_wildcard_alias: false,
@@ -850,11 +866,13 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `SQLITE` preset for utility syntax.
     pub const SQLITE: Self = Self {
+        transaction_chain: false,
         copy: false,
         // `COPY INTO` is Snowflake bulk load/unload; SQLite has no such statement.
         copy_into: false,
         stage_references: false,
         comment_on: false,
+        comment_if_exists: false,
         pragma: true,
         attach: true,
         // `KILL` and the MySQL `DESCRIBE`/`DESC` overloads are MySQL-only; SQLite's own
@@ -969,6 +987,7 @@ impl MaintenanceSyntax {
 impl AccessControlSyntax {
     /// The `SQLITE` preset for access control syntax.
     pub const SQLITE: Self = Self {
+        alter_role_rename: false,
         access_control: false,
         // Moot: SQLite has no permission system, so `access_control` is already off.
         access_control_extended_objects: false,

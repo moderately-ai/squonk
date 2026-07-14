@@ -213,6 +213,8 @@ impl TableFactorSyntax {
 impl MutationSyntax {
     /// The `POSTGRES` preset for mutation syntax.
     pub const POSTGRES: Self = Self {
+        insert_ignore: false,
+        insert_overwrite: false,
         returning: true,
         on_conflict: true,
         on_duplicate_key_update: false,
@@ -227,6 +229,7 @@ impl MutationSyntax {
         // PostgreSQL row-limits neither `UPDATE` nor `DELETE`, so the MySQL
         // `ORDER BY ... LIMIT` tails are rejected.
         update_delete_tails: false,
+        joined_update_delete: false,
         // PostgreSQL spells conflict resolution `ON CONFLICT`, not the SQLite verb-level
         // `INSERT OR`/`UPDATE OR <action>` prefix, so it is rejected.
         or_conflict_action: false,
@@ -248,6 +251,7 @@ impl MutationSyntax {
         merge_when_not_matched_by: true,
         merge_insert_default_values: true,
         merge_insert_overriding: true,
+        merge_insert_multirow: false,
         merge_update_set_star: false,
         merge_insert_star_by_name: false,
         merge_error_action: false,
@@ -258,6 +262,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `POSTGRES` preset for statement ddl gates.
     pub const POSTGRES: Self = Self {
+        colocation_groups: false,
+        materialized_view_to: false,
         // PostgreSQL's `CREATE TRIGGER` uses an `EXECUTE FUNCTION` body, not the
         // modelled SQLite `BEGIN … END` form, so it is not dispatched here.
         create_trigger: false,
@@ -272,6 +278,7 @@ impl StatementDdlGates {
         // PostgreSQL and DuckDB both have the SQL:2003 T176 sequence generator; DuckDB
         // inherits this `true` through the POSTGRES spread.
         create_sequence: true,
+        create_sequence_cache: true,
         extension_ddl: true,
         transform_ddl: true,
         // PostgreSQL is the only shipped dialect with `ALTER SYSTEM` server-configuration
@@ -377,6 +384,7 @@ impl ColumnDefinitionSyntax {
         // engine-measured reject. DuckDB inherits this `false` through its POSTGRES spread.
         named_column_collate_constraint: false,
         identity_columns: true,
+        compact_identity_columns: false,
         // PostgreSQL accepts a bare expression default and a `CONSTRAINT <name>` on any
         // inline column constraint.
         default_expression_requires_parens: false,
@@ -413,6 +421,11 @@ impl ConstraintSyntax {
 impl IndexAlterSyntax {
     /// The `POSTGRES` preset for index alter syntax.
     pub const POSTGRES: Self = Self {
+        rename_constraint: true,
+        alter_table_set_options: true,
+        drop_primary_key: false,
+        alter_column_add_identity: false,
+        index_storage_parameters: true,
         drop_behavior: true,
         // PostgreSQL's `DROP INDEX` is the shared name-list drop, not the MySQL `ON <table>` form.
         index_drop_on_table: false,
@@ -462,6 +475,9 @@ impl SelectSyntax {
         // set operation, so `BY` after a set operator is a syntax error there.
         union_by_name: false,
         wildcard_modifiers: false,
+        wildcard_replace: false,
+        intersect_all: true,
+        except_all: true,
         // PostgreSQL parses `t.*` as an ordinary columnref, so it takes the standard
         // `[AS] alias` projection alias (`SELECT t.* x` / `SELECT t.* AS x`); libpg_query-measured.
         qualified_wildcard_alias: true,
@@ -553,6 +569,7 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `POSTGRES` preset for utility syntax.
     pub const POSTGRES: Self = Self {
+        transaction_chain: true,
         copy: true,
         // PostgreSQL's `COPY` is the `{FROM | TO}` transfer (the `copy` gate above);
         // Snowflake's `COPY INTO` load/unload is a different statement PostgreSQL has no
@@ -560,6 +577,7 @@ impl UtilitySyntax {
         copy_into: false,
         stage_references: false,
         comment_on: true,
+        comment_if_exists: false,
         pragma: false,
         attach: false,
         // `KILL` and the MySQL `DESCRIBE`/`DESC` synonyms + table-metadata overload are
@@ -690,6 +708,7 @@ impl MaintenanceSyntax {
 impl AccessControlSyntax {
     /// The `POSTGRES` preset for access control syntax.
     pub const POSTGRES: Self = Self {
+        alter_role_rename: true,
         access_control: true,
         // PostgreSQL admits the schema-scoped grant objects (`ON SCHEMA`, `ON ALL … IN
         // SCHEMA`) and the `{GRANT|ADMIN} OPTION FOR` `REVOKE` prefix.
@@ -893,6 +912,7 @@ impl AggregateCallSyntax {
 impl PredicateSyntax {
     /// The `POSTGRES` preset for predicate syntax.
     pub const POSTGRES: Self = Self {
+        is_distinct_from: true,
         like: true,
         ilike: true,
         similar_to: true,

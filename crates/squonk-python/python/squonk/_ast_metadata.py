@@ -112,6 +112,10 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
     "AlterSystemAction.Reset": {
         "target": "ConfigParameter",
     },
+    "AccessControlStatement.AlterRoleRename": {
+        "name": "Ident",
+        "new_name": "Ident",
+    },
     "AccessControlStatement.Grant": {
         "privileges": "Privileges",
         "object": "GrantObject",
@@ -513,6 +517,14 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
     "CreateTableOption": {
         "kind": "CreateTableOptionKind",
     },
+    "CreateTableOptionKind.ColocateWith": {
+        "table": "ObjectName",
+        "columns": "Ident[]",
+    },
+    "CreateTableOptionKind.InColocationGroup": {
+        "group": "Ident",
+        "columns": "Ident[]",
+    },
     "CreateTableOptionKind.With": {
         "params": "TableStorageParameter[]",
     },
@@ -549,6 +561,9 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
     "AlterColumnTarget": {
         "parts": "Ident[]",
     },
+    "AlterTableAction.SetColocationGroup": {
+        "group": "Ident",
+    },
     "AlterTableAction.AddColumn": {
         "target": "AlterColumnTarget",
         "column": "ColumnDef",
@@ -568,8 +583,18 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
         "name": "Ident",
         "behavior": "DropBehavior",
     },
+    "AlterTableAction.DropPrimaryKey": {
+        "behavior": "DropBehavior",
+    },
+    "AlterTableAction.SetOptions": {
+        "params": "TableStorageParameter[]",
+    },
     "AlterTableAction.RenameColumn": {
         "name": "AlterColumnTarget",
+        "new_name": "Ident",
+    },
+    "AlterTableAction.RenameConstraint": {
+        "name": "Ident",
         "new_name": "Ident",
     },
     "AlterTableAction.RenameTable": {
@@ -585,6 +610,9 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
     },
     "AlterColumnAction.SetDefault": {
         "expr": "Expr",
+    },
+    "AlterColumnAction.AddIdentity": {
+        "identity": "IdentityColumn",
     },
     "AlterColumnAction.SetDataType": {
         "data_type": "DataType",
@@ -605,6 +633,7 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
     "CommentOnStatement": {
         "target": "CommentTarget",
         "name": "ObjectName",
+        "constraint_table": "ObjectName",
         "comment": "Literal",
     },
     "CreateSchema": {
@@ -617,8 +646,21 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
         "temporary": "TemporaryTableKind",
         "name": "ObjectName",
         "columns": "Ident[]",
+        "to": "ObjectName",
         "query": "Query",
         "check_option": "ViewCheckOption",
+    },
+    "RefreshMaterializedView": {
+        "name": "ObjectName",
+    },
+    "CreateColocationGroup": {
+        "name": "Ident",
+        "partition": "ColocationPartitionKind",
+        "columns": "Ident[]",
+        "shards": "Literal",
+    },
+    "DropColocationGroup": {
+        "name": "Ident",
     },
     "ViewOptions": {
         "algorithm": "ViewAlgorithm",
@@ -655,6 +697,7 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
         "table": "ObjectName",
         "using": "Ident",
         "columns": "IndexColumn[]",
+        "with_params": "TableStorageParameter[]",
         "predicate": "Expr",
     },
     "IndexColumn": {
@@ -1093,6 +1136,7 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
     },
     "Insert": {
         "verb": "InsertVerb",
+        "modifier": "InsertModifier",
         "or_action": "ConflictResolution",
         "with": "With",
         "target": "InsertTarget",
@@ -1140,6 +1184,7 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
         "with": "With",
         "or_action": "ConflictResolution",
         "target": "DmlTarget",
+        "target_joins": "Join[]",
         "assignments": "UpdateAssignment[]",
         "from": "TableWithJoins[]",
         "selection": "DmlSelection",
@@ -1173,6 +1218,8 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
     "Delete": {
         "with": "With",
         "target": "DmlTarget",
+        "additional_targets": "DmlTarget[]",
+        "target_joins": "Join[]",
         "using": "TableWithJoins[]",
         "selection": "DmlSelection",
         "order_by": "OrderByExpr[]",
@@ -1226,6 +1273,7 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
         "columns": "Ident[]",
         "overriding": "InsertOverriding",
         "values": "InsertValue[]",
+        "additional_rows": "InsertValue[][]",
     },
     "MergeAction.InsertDefault": {
         "default": "DefaultValue",
@@ -2482,6 +2530,15 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
     },
     "Statement.CreateView": {
         "view": "CreateView",
+    },
+    "Statement.RefreshMaterializedView": {
+        "refresh": "RefreshMaterializedView",
+    },
+    "Statement.CreateColocationGroup": {
+        "create": "CreateColocationGroup",
+    },
+    "Statement.DropColocationGroup": {
+        "drop": "DropColocationGroup",
     },
     "Statement.AlterView": {
         "alter": "AlterView",

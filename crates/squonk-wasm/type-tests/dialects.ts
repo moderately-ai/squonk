@@ -57,7 +57,7 @@ expectTypeOf(parseAll("select 1", { dialect: "dbx" }).dialect).toEqualTypeOf<"da
 expectTypeOf(parseAll("select 1", { dialect: "sf" }).dialect).toEqualTypeOf<"snowflake">();
 expectTypeOf(parseAll("select 1", { dialect: "amazonredshift" }).dialect).toEqualTypeOf<"redshift">();
 expectTypeOf(canonicalDialectName("SQLSERVER")).toEqualTypeOf<
-  | "ansi" | "postgres" | "mysql" | "sqlite" | "duckdb" | "bigquery" | "hive"
+  | "ansi" | "postgres" | "mysql" | "sqlite" | "duckdb" | "quiltdb" | "bigquery" | "hive"
   | "clickhouse" | "databricks" | "mssql" | "snowflake" | "redshift" | "lenient" | null
 >();
 

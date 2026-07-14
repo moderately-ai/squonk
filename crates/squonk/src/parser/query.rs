@@ -123,6 +123,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
             // dialect (PostgreSQL, ANSI, Lenient, and MySQL all have `TRUNCATE TABLE`),
             // so unlike `COPY`/`COMMENT ON` it carries no FeatureSet gate.
             self.parse_truncate_statement()
+        } else if self.features().statement_ddl_gates.materialized_views
+            && self.peek_is_contextual_keyword("REFRESH")?
+        {
+            self.parse_refresh_materialized_view_statement()
         } else if self.peek_is_keyword(Keyword::Insert)? {
             let start = self.current_span()?;
             self.parse_insert_statement_with(start, None)
@@ -1684,7 +1688,20 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 break;
             }
             self.advance()?; // the set-operator keyword (UNION / INTERSECT / EXCEPT)
-            let all = self.eat_keyword(Keyword::All)?;
+            let all = if self.peek_is_keyword(Keyword::All)? {
+                let allowed = match op {
+                    SetOperator::Intersect => self.features().select_syntax.intersect_all,
+                    SetOperator::Except => self.features().select_syntax.except_all,
+                    SetOperator::Union => true,
+                };
+                if !allowed {
+                    return Err(self.unexpected("a set-operation modifier allowed by the dialect"));
+                }
+                self.advance()?;
+                true
+            } else {
+                false
+            };
             // DuckDB's name-matched `UNION [ALL] BY NAME` (columns paired by name, not
             // position). UNION-only: `INTERSECT BY NAME` / `EXCEPT BY NAME` are DuckDB
             // syntax errors (probed on 1.5.4), so after a non-`UNION` operator `BY` is

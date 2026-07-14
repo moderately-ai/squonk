@@ -8,6 +8,7 @@ declare const DIALECT_ALIASES: {
     readonly mysql: readonly ["mysql", "mariadb"];
     readonly sqlite: readonly ["sqlite", "sqlite3"];
     readonly duckdb: readonly ["duckdb", "duck"];
+    readonly quiltdb: readonly ["quiltdb", "quilt"];
     readonly bigquery: readonly ["bigquery", "bq", "zetasql"];
     readonly hive: readonly ["hive", "hiveql"];
     readonly clickhouse: readonly ["clickhouse", "ch"];

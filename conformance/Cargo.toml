@@ -42,7 +42,7 @@ libduckdb-sys = { version = "1", default-features = false, optional = true }
 # serde_json parses DuckDB's `json_serialize_sql` parse-tree dump for the structural
 # oracle (duckdb-structural-oracle-select). Optional + gated behind `oracle-engines`
 # so the default build stays as-is; already a workspace dep (dev/serde round-trip).
-serde_json = { workspace = true, optional = true }
+serde_json = { workspace = true }
 # m3 differential oracle (external MySQL/MariaDB server), opt-in via `oracle-mysql`.
 # `mysql` (rust-mysql-simple) is dual MIT/Apache-2.0 and pure Rust — verified on
 # crates.io. It speaks the wire protocol to a real `mysqld`/`mariadbd` running as an
@@ -55,7 +55,7 @@ mysql = { version = "26", default-features = false, features = ["minimal-rust"],
 [features]
 # Build the SQLite + DuckDB accept/reject oracles (prod-dialect-m2-sqlite-duckdb-oracles).
 # Off by default → the standard `cargo nextest run` is unaffected + needs no system lib.
-oracle-engines = ["dep:rusqlite", "dep:libduckdb-sys", "dep:serde_json"]
+oracle-engines = ["dep:rusqlite", "dep:libduckdb-sys"]
 # Build the external-server MySQL accept/reject oracle (mysql-differential-oracle-no-daemon).
 # Independent of `oracle-engines` on purpose: a sqlite/duckdb user must not be forced to
 # compile the `mysql` crate. Off by default → no server dependency in the standard build.

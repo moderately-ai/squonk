@@ -70,6 +70,9 @@ fn pg_node_shape(node: &pgpb::Node) -> Result<StatementShape, String> {
         Some(NodeEnum::GrantRoleStmt(grant)) => {
             pg_grant_role_shape(grant).map(StatementShape::AccessControl)
         }
+        Some(NodeEnum::RenameStmt(rename)) => {
+            pg_role_rename_shape(rename).map(StatementShape::AccessControl)
+        }
         Some(NodeEnum::ExplainStmt(explain)) => {
             pg_explain_shape(explain).map(StatementShape::Explain)
         }
@@ -81,6 +84,28 @@ fn pg_node_shape(node: &pgpb::Node) -> Result<StatementShape, String> {
         }
         other => Err(format!("unmapped top-level PostgreSQL node: {other:?}")),
     }
+}
+
+fn pg_role_rename_shape(rename: &pgpb::RenameStmt) -> Result<AccessControlShape, String> {
+    if pgpb::ObjectType::try_from(rename.rename_type).unwrap_or(pgpb::ObjectType::Undefined)
+        != pgpb::ObjectType::ObjectRole
+    {
+        return Err("unsupported PostgreSQL RENAME object".to_string());
+    }
+    let object = rename
+        .object
+        .as_deref()
+        .ok_or_else(|| "PostgreSQL ALTER ROLE RENAME has no role".to_string())?;
+    let name = match object.node.as_ref() {
+        Some(NodeEnum::RoleSpec(role)) => role.rolename.clone(),
+        Some(NodeEnum::String(value)) => value.sval.clone(),
+        Some(NodeEnum::List(list)) => pg_string_list(&list.items)?.join("."),
+        other => return Err(format!("unsupported PostgreSQL role name node: {other:?}")),
+    };
+    Ok(AccessControlShape::RoleRename {
+        name,
+        new_name: rename.newname.clone(),
+    })
 }
 
 // ---- PostgreSQL protobuf -> statement shape --------------------------------
@@ -559,6 +584,20 @@ fn pg_alter_table_action_shape(node: &pgpb::Node) -> Result<AlterTableActionShap
                 name: cmd.name.clone(),
                 change: AlterColumnActionShape::SetDataType { data_type, using },
             })
+        }
+        pgpb::AlterTableType::AtSetRelOptions => {
+            let Some(NodeEnum::List(options)) =
+                cmd.def.as_deref().and_then(|node| node.node.as_ref())
+            else {
+                return Err("PostgreSQL ALTER TABLE SET has no option list".to_string());
+            };
+            Ok(AlterTableActionShape::SetOptions(
+                options
+                    .items
+                    .iter()
+                    .map(pg_storage_param_shape)
+                    .collect::<Result<_, _>>()?,
+            ))
         }
         other => Err(format!(
             "unsupported PostgreSQL ALTER TABLE command: {other:?}"

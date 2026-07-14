@@ -30,6 +30,7 @@ dialect-postgres = ["squonk/postgres"]
 dialect-mysql = ["squonk/mysql"]
 dialect-sqlite = ["squonk/sqlite"]
 dialect-duckdb = ["squonk/duckdb"]
+dialect-quiltdb = ["squonk/quiltdb"]
 dialect-bigquery = ["squonk/bigquery"]
 dialect-hive = ["squonk/hive"]
 dialect-clickhouse = ["squonk/clickhouse"]
@@ -43,6 +44,7 @@ dialects-full = [
   "dialect-mysql",
   "dialect-sqlite",
   "dialect-duckdb",
+  "dialect-quiltdb",
   "dialect-bigquery",
   "dialect-hive",
   "dialect-clickhouse",

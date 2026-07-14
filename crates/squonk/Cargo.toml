@@ -45,6 +45,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = []
 postgres = ["squonk-ast/postgres"]
+quiltdb = ["squonk-ast/quiltdb"]
 mysql = ["squonk-ast/mysql"]
 sqlite = ["squonk-ast/sqlite"]
 # The DuckDb dialect data. Pure-Rust preset (ADR-0009/0011) — distinct from the
@@ -75,7 +76,7 @@ snowflake = ["squonk-ast/snowflake"]
 # from ANSI, not `postgres`, despite Redshift's PostgreSQL-8 ancestry (see the preset module docs).
 redshift = ["squonk-ast/redshift"]
 lenient = ["squonk-ast/lenient"]
-full = ["postgres", "mysql", "sqlite", "duckdb", "bigquery", "hive", "clickhouse", "databricks", "mssql", "snowflake", "redshift", "lenient"]
+full = ["postgres", "quiltdb", "mysql", "sqlite", "duckdb", "bigquery", "hive", "clickhouse", "databricks", "mssql", "snowflake", "redshift", "lenient"]
 # Pass-through to AST serde plus the parse-root (`Parsed`) serde impl this crate
 # owns. Off by default (ADR-0017): the default build stays zero-dep. `serde` is the
 # umbrella that turns on both halves (`serde-serialize` + `serde-deserialize`) for

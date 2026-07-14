@@ -118,6 +118,7 @@ impl Spanned for AlterSystemAction {
 impl<X: Extension> Spanned for AccessControlStatement<X> {
     fn span(&self) -> Span {
         match self {
+            AccessControlStatement::AlterRoleRename { meta, .. } => meta.span,
             AccessControlStatement::Grant { meta, .. } => meta.span,
             AccessControlStatement::Revoke { meta, .. } => meta.span,
             AccessControlStatement::GrantRole { meta, .. } => meta.span,
@@ -476,6 +477,8 @@ impl<X: Extension> Spanned for CreateTableOption<X> {
 impl<X: Extension> Spanned for CreateTableOptionKind<X> {
     fn span(&self) -> Span {
         match self {
+            CreateTableOptionKind::ColocateWith { meta, .. } => meta.span,
+            CreateTableOptionKind::InColocationGroup { meta, .. } => meta.span,
             CreateTableOptionKind::With { meta, .. } => meta.span,
             CreateTableOptionKind::OnCommit { meta, .. } => meta.span,
             CreateTableOptionKind::Tablespace { meta, .. } => meta.span,
@@ -518,12 +521,17 @@ impl Spanned for AlterColumnTarget {
 impl<X: Extension> Spanned for AlterTableAction<X> {
     fn span(&self) -> Span {
         match self {
+            AlterTableAction::SetColocationGroup { meta, .. } => meta.span,
+            AlterTableAction::DropColocationGroup { meta, .. } => meta.span,
             AlterTableAction::AddColumn { meta, .. } => meta.span,
             AlterTableAction::DropColumn { meta, .. } => meta.span,
             AlterTableAction::AlterColumn { meta, .. } => meta.span,
             AlterTableAction::AddConstraint { meta, .. } => meta.span,
             AlterTableAction::DropConstraint { meta, .. } => meta.span,
+            AlterTableAction::DropPrimaryKey { meta, .. } => meta.span,
+            AlterTableAction::SetOptions { meta, .. } => meta.span,
             AlterTableAction::RenameColumn { meta, .. } => meta.span,
+            AlterTableAction::RenameConstraint { meta, .. } => meta.span,
             AlterTableAction::RenameTable { meta, .. } => meta.span,
             AlterTableAction::AttachPartition { meta, .. } => meta.span,
             AlterTableAction::DetachPartition { meta, .. } => meta.span,
@@ -537,6 +545,7 @@ impl<X: Extension> Spanned for AlterColumnAction<X> {
             AlterColumnAction::DropDefault { meta, .. } => meta.span,
             AlterColumnAction::SetNotNull { meta, .. } => meta.span,
             AlterColumnAction::DropNotNull { meta, .. } => meta.span,
+            AlterColumnAction::AddIdentity { meta, .. } => meta.span,
             AlterColumnAction::SetDataType { meta, .. } => meta.span,
         }
     }
@@ -562,6 +571,21 @@ impl<X: Extension> Spanned for CreateSchema<X> {
     }
 }
 impl<X: Extension> Spanned for CreateView<X> {
+    fn span(&self) -> Span {
+        self.meta.span
+    }
+}
+impl Spanned for RefreshMaterializedView {
+    fn span(&self) -> Span {
+        self.meta.span
+    }
+}
+impl Spanned for CreateColocationGroup {
+    fn span(&self) -> Span {
+        self.meta.span
+    }
+}
+impl Spanned for DropColocationGroup {
     fn span(&self) -> Span {
         self.meta.span
     }
@@ -2067,6 +2091,9 @@ impl<X: Extension> Spanned for Statement<X> {
             Statement::Drop { meta, .. } => meta.span,
             Statement::CreateSchema { meta, .. } => meta.span,
             Statement::CreateView { meta, .. } => meta.span,
+            Statement::RefreshMaterializedView { meta, .. } => meta.span,
+            Statement::CreateColocationGroup { meta, .. } => meta.span,
+            Statement::DropColocationGroup { meta, .. } => meta.span,
             Statement::AlterView { meta, .. } => meta.span,
             Statement::CreateIndex { meta, .. } => meta.span,
             Statement::CreateFunction { meta, .. } => meta.span,

@@ -123,6 +123,7 @@ impl<'ast> Visit<'ast, NoExt> for NodeIdWalk {
     }
     fn visit_access_control_statement(&mut self, node: &'ast AccessControlStatement<NoExt>) {
         self.metas.push(match node {
+            AccessControlStatement::AlterRoleRename { meta, .. } => *meta,
             AccessControlStatement::Grant { meta, .. } => *meta,
             AccessControlStatement::Revoke { meta, .. } => *meta,
             AccessControlStatement::GrantRole { meta, .. } => *meta,
@@ -437,6 +438,8 @@ impl<'ast> Visit<'ast, NoExt> for NodeIdWalk {
     }
     fn visit_create_table_option_kind(&mut self, node: &'ast CreateTableOptionKind<NoExt>) {
         self.metas.push(match node {
+            CreateTableOptionKind::ColocateWith { meta, .. } => *meta,
+            CreateTableOptionKind::InColocationGroup { meta, .. } => *meta,
             CreateTableOptionKind::With { meta, .. } => *meta,
             CreateTableOptionKind::OnCommit { meta, .. } => *meta,
             CreateTableOptionKind::Tablespace { meta, .. } => *meta,
@@ -473,12 +476,17 @@ impl<'ast> Visit<'ast, NoExt> for NodeIdWalk {
     }
     fn visit_alter_table_action(&mut self, node: &'ast AlterTableAction<NoExt>) {
         self.metas.push(match node {
+            AlterTableAction::SetColocationGroup { meta, .. } => *meta,
+            AlterTableAction::DropColocationGroup { meta, .. } => *meta,
             AlterTableAction::AddColumn { meta, .. } => *meta,
             AlterTableAction::DropColumn { meta, .. } => *meta,
             AlterTableAction::AlterColumn { meta, .. } => *meta,
             AlterTableAction::AddConstraint { meta, .. } => *meta,
             AlterTableAction::DropConstraint { meta, .. } => *meta,
+            AlterTableAction::DropPrimaryKey { meta, .. } => *meta,
+            AlterTableAction::SetOptions { meta, .. } => *meta,
             AlterTableAction::RenameColumn { meta, .. } => *meta,
+            AlterTableAction::RenameConstraint { meta, .. } => *meta,
             AlterTableAction::RenameTable { meta, .. } => *meta,
             AlterTableAction::AttachPartition { meta, .. } => *meta,
             AlterTableAction::DetachPartition { meta, .. } => *meta,
@@ -491,6 +499,7 @@ impl<'ast> Visit<'ast, NoExt> for NodeIdWalk {
             AlterColumnAction::DropDefault { meta, .. } => *meta,
             AlterColumnAction::SetNotNull { meta, .. } => *meta,
             AlterColumnAction::DropNotNull { meta, .. } => *meta,
+            AlterColumnAction::AddIdentity { meta, .. } => *meta,
             AlterColumnAction::SetDataType { meta, .. } => *meta,
         });
         visit::walk_alter_column_action(self, node);
@@ -514,6 +523,18 @@ impl<'ast> Visit<'ast, NoExt> for NodeIdWalk {
     fn visit_create_view(&mut self, node: &'ast CreateView<NoExt>) {
         self.metas.push(node.meta);
         visit::walk_create_view(self, node);
+    }
+    fn visit_refresh_materialized_view(&mut self, node: &'ast RefreshMaterializedView) {
+        self.metas.push(node.meta);
+        visit::walk_refresh_materialized_view(self, node);
+    }
+    fn visit_create_colocation_group(&mut self, node: &'ast CreateColocationGroup) {
+        self.metas.push(node.meta);
+        visit::walk_create_colocation_group(self, node);
+    }
+    fn visit_drop_colocation_group(&mut self, node: &'ast DropColocationGroup) {
+        self.metas.push(node.meta);
+        visit::walk_drop_colocation_group(self, node);
     }
     fn visit_alter_view(&mut self, node: &'ast AlterView<NoExt>) {
         self.metas.push(node.meta);
@@ -1796,6 +1817,9 @@ impl<'ast> Visit<'ast, NoExt> for NodeIdWalk {
             Statement::Drop { meta, .. } => *meta,
             Statement::CreateSchema { meta, .. } => *meta,
             Statement::CreateView { meta, .. } => *meta,
+            Statement::RefreshMaterializedView { meta, .. } => *meta,
+            Statement::CreateColocationGroup { meta, .. } => *meta,
+            Statement::DropColocationGroup { meta, .. } => *meta,
             Statement::AlterView { meta, .. } => *meta,
             Statement::CreateIndex { meta, .. } => *meta,
             Statement::CreateFunction { meta, .. } => *meta,

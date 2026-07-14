@@ -400,6 +400,22 @@ pub trait Visit<'ast, X: Extension = NoExt> {
     fn visit_create_view(&mut self, node: &'ast CreateView<X>) {
         walk_create_view(self, node);
     }
+    ///Visit a [`RefreshMaterializedView`] node and recursively walk its children.
+    fn visit_refresh_materialized_view(&mut self, node: &'ast RefreshMaterializedView) {
+        walk_refresh_materialized_view(self, node);
+    }
+    ///Visit a [`ColocationPartitionKind`] node and recursively walk its children.
+    fn visit_colocation_partition_kind(&mut self, node: &'ast ColocationPartitionKind) {
+        walk_colocation_partition_kind(self, node);
+    }
+    ///Visit a [`CreateColocationGroup`] node and recursively walk its children.
+    fn visit_create_colocation_group(&mut self, node: &'ast CreateColocationGroup) {
+        walk_create_colocation_group(self, node);
+    }
+    ///Visit a [`DropColocationGroup`] node and recursively walk its children.
+    fn visit_drop_colocation_group(&mut self, node: &'ast DropColocationGroup) {
+        walk_drop_colocation_group(self, node);
+    }
     ///Visit a [`ViewCheckOption`] node and recursively walk its children.
     fn visit_view_check_option(&mut self, node: &'ast ViewCheckOption) {
         walk_view_check_option(self, node);
@@ -811,6 +827,10 @@ pub trait Visit<'ast, X: Extension = NoExt> {
     ///Visit a [`InsertVerb`] node and recursively walk its children.
     fn visit_insert_verb(&mut self, node: &'ast InsertVerb) {
         walk_insert_verb(self, node);
+    }
+    ///Visit a [`InsertModifier`] node and recursively walk its children.
+    fn visit_insert_modifier(&mut self, node: &'ast InsertModifier) {
+        walk_insert_modifier(self, node);
     }
     ///Visit a [`InsertColumnMatching`] node and recursively walk its children.
     fn visit_insert_column_matching(&mut self, node: &'ast InsertColumnMatching) {
@@ -3002,6 +3022,15 @@ pub fn walk_access_control_statement<'ast, V, X>(
 {
     let _ = &mut *visitor;
     match node {
+        AccessControlStatement::AlterRoleRename {
+            name,
+            new_name,
+            meta,
+        } => {
+            visitor.visit_ident(name);
+            visitor.visit_ident(new_name);
+            let _ = meta;
+        }
         AccessControlStatement::Grant {
             privileges,
             object,
@@ -4790,6 +4819,28 @@ pub fn walk_create_table_option_kind<'ast, V, X>(
 {
     let _ = &mut *visitor;
     match node {
+        CreateTableOptionKind::ColocateWith {
+            table,
+            columns,
+            meta,
+        } => {
+            visitor.visit_object_name(table);
+            for item in columns.iter() {
+                visitor.visit_ident(item);
+            }
+            let _ = meta;
+        }
+        CreateTableOptionKind::InColocationGroup {
+            group,
+            columns,
+            meta,
+        } => {
+            visitor.visit_ident(group);
+            for item in columns.iter() {
+                visitor.visit_ident(item);
+            }
+            let _ = meta;
+        }
         CreateTableOptionKind::With { params, meta } => {
             for item in params.iter() {
                 visitor.visit_table_storage_parameter(item);
@@ -4923,6 +4974,13 @@ where
 {
     let _ = &mut *visitor;
     match node {
+        AlterTableAction::SetColocationGroup { group, meta } => {
+            visitor.visit_ident(group);
+            let _ = meta;
+        }
+        AlterTableAction::DropColocationGroup { meta } => {
+            let _ = meta;
+        }
         AlterTableAction::AddColumn {
             if_not_exists,
             column_keyword,
@@ -4981,6 +5039,18 @@ where
             }
             let _ = meta;
         }
+        AlterTableAction::DropPrimaryKey { behavior, meta } => {
+            if let Some(item) = behavior.as_ref() {
+                visitor.visit_drop_behavior(item);
+            }
+            let _ = meta;
+        }
+        AlterTableAction::SetOptions { params, meta } => {
+            for item in params.iter() {
+                visitor.visit_table_storage_parameter(item);
+            }
+            let _ = meta;
+        }
         AlterTableAction::RenameColumn {
             column_keyword,
             name,
@@ -4989,6 +5059,15 @@ where
         } => {
             let _ = column_keyword;
             visitor.visit_alter_column_target(name);
+            visitor.visit_ident(new_name);
+            let _ = meta;
+        }
+        AlterTableAction::RenameConstraint {
+            name,
+            new_name,
+            meta,
+        } => {
+            visitor.visit_ident(name);
             visitor.visit_ident(new_name);
             let _ = meta;
         }
@@ -5049,6 +5128,10 @@ where
             let _ = meta;
         }
         AlterColumnAction::DropNotNull { meta } => {
+            let _ = meta;
+        }
+        AlterColumnAction::AddIdentity { identity, meta } => {
+            visitor.visit_identity_column(identity);
             let _ = meta;
         }
         AlterColumnAction::SetDataType {
@@ -5153,6 +5236,10 @@ where
         CommentTarget::Table => {}
         CommentTarget::Column => {}
         CommentTarget::Database => {}
+        CommentTarget::View => {}
+        CommentTarget::MaterializedView => {}
+        CommentTarget::Index => {}
+        CommentTarget::Constraint => {}
         CommentTarget::Procedure { arg_types } => {
             if let Some(item) = arg_types.as_ref() {
                 for item1 in item.iter() {
@@ -5170,13 +5257,19 @@ where
 {
     let _ = &mut *visitor;
     let CommentOnStatement {
+        if_exists,
         target,
         name,
+        constraint_table,
         comment,
         meta,
     } = node;
+    let _ = if_exists;
     visitor.visit_comment_target(target);
     visitor.visit_object_name(name);
+    if let Some(item) = constraint_table.as_ref() {
+        visitor.visit_object_name(item);
+    }
     if let Some(item) = comment.as_ref() {
         visitor.visit_literal(item);
     }
@@ -5224,6 +5317,7 @@ where
         if_not_exists,
         name,
         columns,
+        to,
         query,
         check_option,
         with_data,
@@ -5241,11 +5335,88 @@ where
     for item in columns.iter() {
         visitor.visit_ident(item);
     }
+    if let Some(item) = to.as_ref() {
+        visitor.visit_object_name(item);
+    }
     visitor.visit_query(query);
     if let Some(item) = check_option.as_ref() {
         visitor.visit_view_check_option(item);
     }
     let _ = with_data;
+    let _ = meta;
+}
+///Walk the immediate children of a [`RefreshMaterializedView`] node.
+pub fn walk_refresh_materialized_view<'ast, V, X>(
+    visitor: &mut V,
+    node: &'ast RefreshMaterializedView,
+) where
+    V: Visit<'ast, X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    let RefreshMaterializedView {
+        concurrently,
+        name,
+        with_data,
+        meta,
+    } = node;
+    let _ = concurrently;
+    visitor.visit_object_name(name);
+    let _ = with_data;
+    let _ = meta;
+}
+///Walk the immediate children of a [`ColocationPartitionKind`] node.
+pub fn walk_colocation_partition_kind<'ast, V, X>(
+    visitor: &mut V,
+    node: &'ast ColocationPartitionKind,
+) where
+    V: Visit<'ast, X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    match node {
+        ColocationPartitionKind::Hash => {}
+        ColocationPartitionKind::Range => {}
+    }
+}
+///Walk the immediate children of a [`CreateColocationGroup`] node.
+pub fn walk_create_colocation_group<'ast, V, X>(visitor: &mut V, node: &'ast CreateColocationGroup)
+where
+    V: Visit<'ast, X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    let CreateColocationGroup {
+        if_not_exists,
+        name,
+        partition,
+        columns,
+        shards,
+        meta,
+    } = node;
+    let _ = if_not_exists;
+    visitor.visit_ident(name);
+    visitor.visit_colocation_partition_kind(partition);
+    for item in columns.iter() {
+        visitor.visit_ident(item);
+    }
+    visitor.visit_literal(shards);
+    let _ = meta;
+}
+///Walk the immediate children of a [`DropColocationGroup`] node.
+pub fn walk_drop_colocation_group<'ast, V, X>(visitor: &mut V, node: &'ast DropColocationGroup)
+where
+    V: Visit<'ast, X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    let DropColocationGroup {
+        if_exists,
+        name,
+        meta,
+    } = node;
+    let _ = if_exists;
+    visitor.visit_ident(name);
     let _ = meta;
 }
 ///Walk the immediate children of a [`ViewCheckOption`] node.
@@ -5439,6 +5610,7 @@ where
         table,
         using,
         columns,
+        with_params,
         predicate,
         meta,
     } = node;
@@ -5454,6 +5626,9 @@ where
     }
     for item in columns.iter() {
         visitor.visit_index_column(item);
+    }
+    for item in with_params.iter() {
+        visitor.visit_table_storage_parameter(item);
     }
     if let Some(item) = predicate.as_ref() {
         visitor.visit_expr(item);
@@ -7465,6 +7640,18 @@ where
         InsertVerb::Replace => {}
     }
 }
+///Walk the immediate children of a [`InsertModifier`] node.
+pub fn walk_insert_modifier<'ast, V, X>(visitor: &mut V, node: &'ast InsertModifier)
+where
+    V: Visit<'ast, X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    match node {
+        InsertModifier::Ignore => {}
+        InsertModifier::Overwrite => {}
+    }
+}
 ///Walk the immediate children of a [`InsertColumnMatching`] node.
 pub fn walk_insert_column_matching<'ast, V, X>(visitor: &mut V, node: &'ast InsertColumnMatching)
 where
@@ -7501,6 +7688,7 @@ where
     let _ = &mut *visitor;
     let Insert {
         verb,
+        modifier,
         or_action,
         with,
         target,
@@ -7513,6 +7701,9 @@ where
         meta,
     } = node;
     visitor.visit_insert_verb(verb);
+    if let Some(item) = modifier.as_ref() {
+        visitor.visit_insert_modifier(item);
+    }
     if let Some(item) = or_action.as_ref() {
         visitor.visit_conflict_resolution(item);
     }
@@ -7668,6 +7859,7 @@ where
         with,
         or_action,
         target,
+        target_joins,
         assignments,
         from,
         selection,
@@ -7683,6 +7875,9 @@ where
         visitor.visit_conflict_resolution(item);
     }
     visitor.visit_dml_target(target);
+    for item in target_joins.iter() {
+        visitor.visit_join(item);
+    }
     for item in assignments.iter() {
         visitor.visit_update_assignment(item);
     }
@@ -7790,6 +7985,8 @@ where
     let Delete {
         with,
         target,
+        additional_targets,
+        target_joins,
         using,
         selection,
         order_by,
@@ -7801,6 +7998,12 @@ where
         visitor.visit_with(item);
     }
     visitor.visit_dml_target(target);
+    for item in additional_targets.iter() {
+        visitor.visit_dml_target(item);
+    }
+    for item in target_joins.iter() {
+        visitor.visit_join(item);
+    }
     for item in using.iter() {
         visitor.visit_table_with_joins(item);
     }
@@ -8025,6 +8228,7 @@ where
             columns,
             overriding,
             values,
+            additional_rows,
             meta,
         } => {
             for item in columns.iter() {
@@ -8035,6 +8239,11 @@ where
             }
             for item in values.iter() {
                 visitor.visit_insert_value(item);
+            }
+            for item in additional_rows.iter() {
+                for item1 in item.iter() {
+                    visitor.visit_insert_value(item1);
+                }
             }
             let _ = meta;
         }
@@ -13422,6 +13631,18 @@ where
             visitor.visit_create_view(view);
             let _ = meta;
         }
+        Statement::RefreshMaterializedView { refresh, meta } => {
+            visitor.visit_refresh_materialized_view(refresh);
+            let _ = meta;
+        }
+        Statement::CreateColocationGroup { create, meta } => {
+            visitor.visit_create_colocation_group(create);
+            let _ = meta;
+        }
+        Statement::DropColocationGroup { drop, meta } => {
+            visitor.visit_drop_colocation_group(drop);
+            let _ = meta;
+        }
         Statement::AlterView { alter, meta } => {
             visitor.visit_alter_view(alter);
             let _ = meta;
@@ -14533,16 +14754,18 @@ where
             }
             let _ = meta;
         }
-        TransactionStatement::Commit { block, meta } => {
+        TransactionStatement::Commit { block, chain, meta } => {
             if let Some(item) = block.as_ref() {
                 visitor.visit_transaction_block_keyword(item);
             }
+            let _ = chain;
             let _ = meta;
         }
         TransactionStatement::Rollback {
             block,
             savepoint_keyword,
             to_savepoint,
+            chain,
             meta,
         } => {
             if let Some(item) = block.as_ref() {
@@ -14552,6 +14775,7 @@ where
             if let Some(item) = to_savepoint.as_ref() {
                 visitor.visit_ident(item);
             }
+            let _ = chain;
             let _ = meta;
         }
         TransactionStatement::Savepoint { name, meta } => {
@@ -18397,6 +18621,22 @@ pub trait VisitMut<X: Extension = NoExt> {
     fn visit_create_view_mut(&mut self, node: &mut CreateView<X>) {
         walk_create_view_mut(self, node);
     }
+    ///Visit a mutable [`RefreshMaterializedView`] node and recursively walk its children.
+    fn visit_refresh_materialized_view_mut(&mut self, node: &mut RefreshMaterializedView) {
+        walk_refresh_materialized_view_mut(self, node);
+    }
+    ///Visit a mutable [`ColocationPartitionKind`] node and recursively walk its children.
+    fn visit_colocation_partition_kind_mut(&mut self, node: &mut ColocationPartitionKind) {
+        walk_colocation_partition_kind_mut(self, node);
+    }
+    ///Visit a mutable [`CreateColocationGroup`] node and recursively walk its children.
+    fn visit_create_colocation_group_mut(&mut self, node: &mut CreateColocationGroup) {
+        walk_create_colocation_group_mut(self, node);
+    }
+    ///Visit a mutable [`DropColocationGroup`] node and recursively walk its children.
+    fn visit_drop_colocation_group_mut(&mut self, node: &mut DropColocationGroup) {
+        walk_drop_colocation_group_mut(self, node);
+    }
     ///Visit a mutable [`ViewCheckOption`] node and recursively walk its children.
     fn visit_view_check_option_mut(&mut self, node: &mut ViewCheckOption) {
         walk_view_check_option_mut(self, node);
@@ -18814,6 +19054,10 @@ pub trait VisitMut<X: Extension = NoExt> {
     ///Visit a mutable [`InsertVerb`] node and recursively walk its children.
     fn visit_insert_verb_mut(&mut self, node: &mut InsertVerb) {
         walk_insert_verb_mut(self, node);
+    }
+    ///Visit a mutable [`InsertModifier`] node and recursively walk its children.
+    fn visit_insert_modifier_mut(&mut self, node: &mut InsertModifier) {
+        walk_insert_modifier_mut(self, node);
     }
     ///Visit a mutable [`InsertColumnMatching`] node and recursively walk its children.
     fn visit_insert_column_matching_mut(&mut self, node: &mut InsertColumnMatching) {
@@ -21006,6 +21250,15 @@ pub fn walk_access_control_statement_mut<V, X>(
 {
     let _ = &mut *visitor;
     match node {
+        AccessControlStatement::AlterRoleRename {
+            name,
+            new_name,
+            meta,
+        } => {
+            visitor.visit_ident_mut(name);
+            visitor.visit_ident_mut(new_name);
+            let _ = meta;
+        }
         AccessControlStatement::Grant {
             privileges,
             object,
@@ -22788,6 +23041,28 @@ where
 {
     let _ = &mut *visitor;
     match node {
+        CreateTableOptionKind::ColocateWith {
+            table,
+            columns,
+            meta,
+        } => {
+            visitor.visit_object_name_mut(table);
+            for item in columns.iter_mut() {
+                visitor.visit_ident_mut(item);
+            }
+            let _ = meta;
+        }
+        CreateTableOptionKind::InColocationGroup {
+            group,
+            columns,
+            meta,
+        } => {
+            visitor.visit_ident_mut(group);
+            for item in columns.iter_mut() {
+                visitor.visit_ident_mut(item);
+            }
+            let _ = meta;
+        }
         CreateTableOptionKind::With { params, meta } => {
             for item in params.iter_mut() {
                 visitor.visit_table_storage_parameter_mut(item);
@@ -22919,6 +23194,13 @@ where
 {
     let _ = &mut *visitor;
     match node {
+        AlterTableAction::SetColocationGroup { group, meta } => {
+            visitor.visit_ident_mut(group);
+            let _ = meta;
+        }
+        AlterTableAction::DropColocationGroup { meta } => {
+            let _ = meta;
+        }
         AlterTableAction::AddColumn {
             if_not_exists,
             column_keyword,
@@ -22977,6 +23259,18 @@ where
             }
             let _ = meta;
         }
+        AlterTableAction::DropPrimaryKey { behavior, meta } => {
+            if let Some(item) = behavior.as_mut() {
+                visitor.visit_drop_behavior_mut(item);
+            }
+            let _ = meta;
+        }
+        AlterTableAction::SetOptions { params, meta } => {
+            for item in params.iter_mut() {
+                visitor.visit_table_storage_parameter_mut(item);
+            }
+            let _ = meta;
+        }
         AlterTableAction::RenameColumn {
             column_keyword,
             name,
@@ -22985,6 +23279,15 @@ where
         } => {
             let _ = column_keyword;
             visitor.visit_alter_column_target_mut(name);
+            visitor.visit_ident_mut(new_name);
+            let _ = meta;
+        }
+        AlterTableAction::RenameConstraint {
+            name,
+            new_name,
+            meta,
+        } => {
+            visitor.visit_ident_mut(name);
             visitor.visit_ident_mut(new_name);
             let _ = meta;
         }
@@ -23045,6 +23348,10 @@ where
             let _ = meta;
         }
         AlterColumnAction::DropNotNull { meta } => {
+            let _ = meta;
+        }
+        AlterColumnAction::AddIdentity { identity, meta } => {
+            visitor.visit_identity_column_mut(identity);
             let _ = meta;
         }
         AlterColumnAction::SetDataType {
@@ -23149,6 +23456,10 @@ where
         CommentTarget::Table => {}
         CommentTarget::Column => {}
         CommentTarget::Database => {}
+        CommentTarget::View => {}
+        CommentTarget::MaterializedView => {}
+        CommentTarget::Index => {}
+        CommentTarget::Constraint => {}
         CommentTarget::Procedure { arg_types } => {
             if let Some(item) = arg_types.as_mut() {
                 for item1 in item.iter_mut() {
@@ -23166,13 +23477,19 @@ where
 {
     let _ = &mut *visitor;
     let CommentOnStatement {
+        if_exists,
         target,
         name,
+        constraint_table,
         comment,
         meta,
     } = node;
+    let _ = if_exists;
     visitor.visit_comment_target_mut(target);
     visitor.visit_object_name_mut(name);
+    if let Some(item) = constraint_table.as_mut() {
+        visitor.visit_object_name_mut(item);
+    }
     if let Some(item) = comment.as_mut() {
         visitor.visit_literal_mut(item);
     }
@@ -23220,6 +23537,7 @@ where
         if_not_exists,
         name,
         columns,
+        to,
         query,
         check_option,
         with_data,
@@ -23237,11 +23555,84 @@ where
     for item in columns.iter_mut() {
         visitor.visit_ident_mut(item);
     }
+    if let Some(item) = to.as_mut() {
+        visitor.visit_object_name_mut(item);
+    }
     visitor.visit_query_mut(query);
     if let Some(item) = check_option.as_mut() {
         visitor.visit_view_check_option_mut(item);
     }
     let _ = with_data;
+    let _ = meta;
+}
+///Walk the immediate children of a mutable [`RefreshMaterializedView`] node.
+pub fn walk_refresh_materialized_view_mut<V, X>(visitor: &mut V, node: &mut RefreshMaterializedView)
+where
+    V: VisitMut<X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    let RefreshMaterializedView {
+        concurrently,
+        name,
+        with_data,
+        meta,
+    } = node;
+    let _ = concurrently;
+    visitor.visit_object_name_mut(name);
+    let _ = with_data;
+    let _ = meta;
+}
+///Walk the immediate children of a mutable [`ColocationPartitionKind`] node.
+pub fn walk_colocation_partition_kind_mut<V, X>(visitor: &mut V, node: &mut ColocationPartitionKind)
+where
+    V: VisitMut<X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    match node {
+        ColocationPartitionKind::Hash => {}
+        ColocationPartitionKind::Range => {}
+    }
+}
+///Walk the immediate children of a mutable [`CreateColocationGroup`] node.
+pub fn walk_create_colocation_group_mut<V, X>(visitor: &mut V, node: &mut CreateColocationGroup)
+where
+    V: VisitMut<X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    let CreateColocationGroup {
+        if_not_exists,
+        name,
+        partition,
+        columns,
+        shards,
+        meta,
+    } = node;
+    let _ = if_not_exists;
+    visitor.visit_ident_mut(name);
+    visitor.visit_colocation_partition_kind_mut(partition);
+    for item in columns.iter_mut() {
+        visitor.visit_ident_mut(item);
+    }
+    visitor.visit_literal_mut(shards);
+    let _ = meta;
+}
+///Walk the immediate children of a mutable [`DropColocationGroup`] node.
+pub fn walk_drop_colocation_group_mut<V, X>(visitor: &mut V, node: &mut DropColocationGroup)
+where
+    V: VisitMut<X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    let DropColocationGroup {
+        if_exists,
+        name,
+        meta,
+    } = node;
+    let _ = if_exists;
+    visitor.visit_ident_mut(name);
     let _ = meta;
 }
 ///Walk the immediate children of a mutable [`ViewCheckOption`] node.
@@ -23435,6 +23826,7 @@ where
         table,
         using,
         columns,
+        with_params,
         predicate,
         meta,
     } = node;
@@ -23450,6 +23842,9 @@ where
     }
     for item in columns.iter_mut() {
         visitor.visit_index_column_mut(item);
+    }
+    for item in with_params.iter_mut() {
+        visitor.visit_table_storage_parameter_mut(item);
     }
     if let Some(item) = predicate.as_mut() {
         visitor.visit_expr_mut(item);
@@ -25459,6 +25854,18 @@ where
         InsertVerb::Replace => {}
     }
 }
+///Walk the immediate children of a mutable [`InsertModifier`] node.
+pub fn walk_insert_modifier_mut<V, X>(visitor: &mut V, node: &mut InsertModifier)
+where
+    V: VisitMut<X> + ?Sized,
+    X: Extension,
+{
+    let _ = &mut *visitor;
+    match node {
+        InsertModifier::Ignore => {}
+        InsertModifier::Overwrite => {}
+    }
+}
 ///Walk the immediate children of a mutable [`InsertColumnMatching`] node.
 pub fn walk_insert_column_matching_mut<V, X>(visitor: &mut V, node: &mut InsertColumnMatching)
 where
@@ -25495,6 +25902,7 @@ where
     let _ = &mut *visitor;
     let Insert {
         verb,
+        modifier,
         or_action,
         with,
         target,
@@ -25507,6 +25915,9 @@ where
         meta,
     } = node;
     visitor.visit_insert_verb_mut(verb);
+    if let Some(item) = modifier.as_mut() {
+        visitor.visit_insert_modifier_mut(item);
+    }
     if let Some(item) = or_action.as_mut() {
         visitor.visit_conflict_resolution_mut(item);
     }
@@ -25662,6 +26073,7 @@ where
         with,
         or_action,
         target,
+        target_joins,
         assignments,
         from,
         selection,
@@ -25677,6 +26089,9 @@ where
         visitor.visit_conflict_resolution_mut(item);
     }
     visitor.visit_dml_target_mut(target);
+    for item in target_joins.iter_mut() {
+        visitor.visit_join_mut(item);
+    }
     for item in assignments.iter_mut() {
         visitor.visit_update_assignment_mut(item);
     }
@@ -25784,6 +26199,8 @@ where
     let Delete {
         with,
         target,
+        additional_targets,
+        target_joins,
         using,
         selection,
         order_by,
@@ -25795,6 +26212,12 @@ where
         visitor.visit_with_mut(item);
     }
     visitor.visit_dml_target_mut(target);
+    for item in additional_targets.iter_mut() {
+        visitor.visit_dml_target_mut(item);
+    }
+    for item in target_joins.iter_mut() {
+        visitor.visit_join_mut(item);
+    }
     for item in using.iter_mut() {
         visitor.visit_table_with_joins_mut(item);
     }
@@ -26019,6 +26442,7 @@ where
             columns,
             overriding,
             values,
+            additional_rows,
             meta,
         } => {
             for item in columns.iter_mut() {
@@ -26029,6 +26453,11 @@ where
             }
             for item in values.iter_mut() {
                 visitor.visit_insert_value_mut(item);
+            }
+            for item in additional_rows.iter_mut() {
+                for item1 in item.iter_mut() {
+                    visitor.visit_insert_value_mut(item1);
+                }
             }
             let _ = meta;
         }
@@ -31406,6 +31835,18 @@ where
             visitor.visit_create_view_mut(view);
             let _ = meta;
         }
+        Statement::RefreshMaterializedView { refresh, meta } => {
+            visitor.visit_refresh_materialized_view_mut(refresh);
+            let _ = meta;
+        }
+        Statement::CreateColocationGroup { create, meta } => {
+            visitor.visit_create_colocation_group_mut(create);
+            let _ = meta;
+        }
+        Statement::DropColocationGroup { drop, meta } => {
+            visitor.visit_drop_colocation_group_mut(drop);
+            let _ = meta;
+        }
         Statement::AlterView { alter, meta } => {
             visitor.visit_alter_view_mut(alter);
             let _ = meta;
@@ -32517,16 +32958,18 @@ where
             }
             let _ = meta;
         }
-        TransactionStatement::Commit { block, meta } => {
+        TransactionStatement::Commit { block, chain, meta } => {
             if let Some(item) = block.as_mut() {
                 visitor.visit_transaction_block_keyword_mut(item);
             }
+            let _ = chain;
             let _ = meta;
         }
         TransactionStatement::Rollback {
             block,
             savepoint_keyword,
             to_savepoint,
+            chain,
             meta,
         } => {
             if let Some(item) = block.as_mut() {
@@ -32536,6 +32979,7 @@ where
             if let Some(item) = to_savepoint.as_mut() {
                 visitor.visit_ident_mut(item);
             }
+            let _ = chain;
             let _ = meta;
         }
         TransactionStatement::Savepoint { name, meta } => {

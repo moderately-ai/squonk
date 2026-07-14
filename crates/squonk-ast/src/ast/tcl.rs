@@ -47,6 +47,8 @@ pub enum TransactionStatement {
     Commit {
         /// The optional `TRANSACTION` / `WORK` block noise word after `COMMIT`.
         block: Option<TransactionBlockKeyword>,
+        /// `Some(true)` for `AND CHAIN`, `Some(false)` for `AND NO CHAIN`.
+        chain: Option<bool>,
         /// Source location and node identity.
         meta: Meta,
     },
@@ -63,6 +65,9 @@ pub enum TransactionStatement {
         savepoint_keyword: bool,
         /// Optional to savepoint for this syntax.
         to_savepoint: Option<Ident>,
+        /// `Some(true)` for `AND CHAIN`, `Some(false)` for `AND NO CHAIN`; only valid for a
+        /// whole-transaction rollback.
+        chain: Option<bool>,
         /// Source location and node identity.
         meta: Meta,
     },

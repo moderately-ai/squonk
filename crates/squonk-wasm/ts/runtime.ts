@@ -14,6 +14,7 @@ const DIALECT_ALIASES = {
   mysql: ["mysql", "mariadb"],
   sqlite: ["sqlite", "sqlite3"],
   duckdb: ["duckdb", "duck"],
+  quiltdb: ["quiltdb", "quilt"],
   bigquery: ["bigquery", "bq", "zetasql"],
   hive: ["hive", "hiveql"],
   clickhouse: ["clickhouse", "ch"],

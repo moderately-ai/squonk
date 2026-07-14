@@ -1674,6 +1674,7 @@ fn arb_insert() -> impl Strategy<Value = Insert<NoExt>> {
                 // The round-trip generators only emit standard `INSERT` (the MySQL
                 // `REPLACE` spelling is outside the ANSI reparse subset).
                 verb: InsertVerb::Insert,
+                modifier: None,
                 // The SQLite `OR <action>` prefix is dialect-gated outside the ANSI
                 // reparse path; quarantined as `None`.
                 or_action: None,
@@ -1782,6 +1783,7 @@ fn arb_update() -> impl Strategy<Value = Update<NoExt>> {
             // path; quarantined as `None`.
             or_action: None,
             target,
+            target_joins: ThinVec::new(),
             assignments: assignments.into_iter().collect(),
             from: from.into_iter().collect(),
             selection,
@@ -1805,6 +1807,8 @@ fn arb_delete() -> impl Strategy<Value = Delete<NoExt>> {
         .prop_map(|(with, target, using, selection)| Delete {
             with,
             target,
+            additional_targets: ThinVec::new(),
+            target_joins: ThinVec::new(),
             using: using.into_iter().collect(),
             selection,
             // The MySQL `ORDER BY`/`LIMIT` tails are dialect-gated outside the ANSI

@@ -1475,6 +1475,7 @@ mod tests {
                 access_control_extended_objects: true,
                 user_role_management: false,
                 access_control_account_grants: false,
+                alter_role_rename: false,
             },
         ));
         assert_eq!(
@@ -1487,6 +1488,7 @@ mod tests {
                 access_control_extended_objects: false,
                 user_role_management: false,
                 access_control_account_grants: true,
+                alter_role_rename: false,
             },
         ));
         assert_eq!(

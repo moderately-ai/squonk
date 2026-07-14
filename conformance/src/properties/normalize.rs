@@ -519,6 +519,10 @@ fn normalize_create_table_option_kind(
         CreateTableOptionKind::WithoutOids { .. } => {
             unreachable!("the property generators do not produce WITHOUT OIDS")
         }
+        CreateTableOptionKind::ColocateWith { .. }
+        | CreateTableOptionKind::InColocationGroup { .. } => {
+            unreachable!("the property generators do not produce colocation clauses")
+        }
     }
 }
 

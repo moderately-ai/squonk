@@ -1,0 +1,17 @@
+{
+  "dialect": "quiltdb",
+  "tier": "stable",
+  "source": "QuiltDB quiltdb-harness SQLLogicTest and integration-test exports",
+  "source_commit": "61baa778",
+  "case_count": 1670,
+  "parse_ok": 1654,
+  "parse_err": 16,
+  "corpus_sha256": "26c0c0faa59840d65fa587999c3201a1430b83348ca9b65b6aacf0204124d25b",
+  "integration_fixture": "integration-corpus.json",
+  "integration_case_count": 1356,
+  "integration_parse_ok": 1346,
+  "integration_parse_err": 10,
+  "integration_sha256": "0f1567a741441259b635083606de60e035d8c691b0b647a2667efbf466883682",
+  "reject_fixture": "reject-corpus.json",
+  "contract": "Stable IDs plus explicit parse_ok/parse_err verdicts across the SQLLogicTest and integration-test fixtures, with a curated grammar-reject fixture enforced by squonk-conformance; accepted cases run canonical and parenthesized structural round trips."
+}

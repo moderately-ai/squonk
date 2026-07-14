@@ -521,6 +521,9 @@ impl<X: Extension + Render> FragmentRender for Statement<X> {
             | Statement::Drop { meta, .. }
             | Statement::CreateSchema { meta, .. }
             | Statement::CreateView { meta, .. }
+            | Statement::RefreshMaterializedView { meta, .. }
+            | Statement::CreateColocationGroup { meta, .. }
+            | Statement::DropColocationGroup { meta, .. }
             | Statement::AlterView { meta, .. }
             | Statement::CreateIndex { meta, .. }
             | Statement::CreateFunction { meta, .. }

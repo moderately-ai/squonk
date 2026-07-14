@@ -107,12 +107,17 @@ impl<'ast> Visit<'ast> for Counter {
     fn visit_alter_table_action(&mut self, node: &'ast AlterTableAction) {
         self.bump("AlterTableAction");
         self.bump(match node {
+            AlterTableAction::SetColocationGroup { .. } => "AlterTableAction::SetColocationGroup",
+            AlterTableAction::DropColocationGroup { .. } => "AlterTableAction::DropColocationGroup",
             AlterTableAction::AddColumn { .. } => "AlterTableAction::AddColumn",
             AlterTableAction::DropColumn { .. } => "AlterTableAction::DropColumn",
             AlterTableAction::AlterColumn { .. } => "AlterTableAction::AlterColumn",
             AlterTableAction::AddConstraint { .. } => "AlterTableAction::AddConstraint",
             AlterTableAction::DropConstraint { .. } => "AlterTableAction::DropConstraint",
+            AlterTableAction::DropPrimaryKey { .. } => "AlterTableAction::DropPrimaryKey",
+            AlterTableAction::SetOptions { .. } => "AlterTableAction::SetOptions",
             AlterTableAction::RenameColumn { .. } => "AlterTableAction::RenameColumn",
+            AlterTableAction::RenameConstraint { .. } => "AlterTableAction::RenameConstraint",
             AlterTableAction::RenameTable { .. } => "AlterTableAction::RenameTable",
             AlterTableAction::AttachPartition { .. } => "AlterTableAction::AttachPartition",
             AlterTableAction::DetachPartition { .. } => "AlterTableAction::DetachPartition",

@@ -1801,7 +1801,7 @@ mod oracle_sweep {
     // bind/runtime counts in over_accept_binding/over_accept_other, the net-conserved
     // binding-noise classes.
     const TRANCHE2_REJECT_QUADRANT: (usize, usize, usize, usize, usize, usize, usize) =
-        (607, 46, 19, 475, 70, 75, 27);
+        (609, 44, 19, 476, 71, 75, 25);
     // 85 of 1429 source files' DDL cannot provision on a fresh in-memory DB (ATTACH'd /
     // encrypted / file-backed / extension-typed sources — far more than tranche 1's 6, as
     // expected for copy/storage/attach). Degraded to the bare comparison, a counted

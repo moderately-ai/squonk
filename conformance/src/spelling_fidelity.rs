@@ -539,7 +539,7 @@ const CORPUS_PINS: &[(&str, usize, usize, usize, usize)] = &[
     // The `U&"…" [UESCAPE 'c']` identifier form carries a `QuoteStyle::UnicodeDouble`
     // spelling the canonical (`PreserveSource`) render replays verbatim, so statements whose
     // only lossy hunk was a decoded `U&"…"` -> `"…"` identifier round-trip exactly.
-    ("pg_regress", 29519, 14719, 14126, 674),
+    ("pg_regress", 29671, 14823, 14174, 674),
     ("sqlglot_complex", 232, 137, 46, 49),
     ("sqlglot_identity", 514, 479, 2, 33),
     // +4 accepted / +4 exact: `parse-mysql-trigger-ddl` added the shared name-only

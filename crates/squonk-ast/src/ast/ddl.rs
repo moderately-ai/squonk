@@ -1140,6 +1140,24 @@ pub struct CreateTableOption<X: Extension = NoExt> {
 #[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
 /// The SQL create table option kind forms represented by the AST.
 pub enum CreateTableOptionKind<X: Extension = NoExt> {
+    /// `COLOCATE WITH <anchor> ON (<columns>)`.
+    ColocateWith {
+        /// Anchor table.
+        table: ObjectName,
+        /// This table's colocation-key columns.
+        columns: ThinVec<Ident>,
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// `IN COLOCATION GROUP <group> [ON (<columns>)]`.
+    InColocationGroup {
+        /// Group name.
+        group: Ident,
+        /// Optional member-key columns; omission is valid with explicit table storage options.
+        columns: ThinVec<Ident>,
+        /// Source location and node identity.
+        meta: Meta,
+    },
     /// A `WITH (<param> = <value>, …)` storage-parameter clause.
     With {
         /// params in source order.
@@ -1350,6 +1368,18 @@ pub struct AlterColumnTarget {
 #[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
 pub enum AlterTableAction<X: Extension = NoExt> {
+    /// `SET COLOCATION GROUP <group>`.
+    SetColocationGroup {
+        /// Destination group.
+        group: Ident,
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// `DROP COLOCATION GROUP`.
+    DropColocationGroup {
+        /// Source location and node identity.
+        meta: Meta,
+    },
     /// `ADD [COLUMN] <col> <type> …` — add a column to the table.
     AddColumn {
         /// Whether the if not exists form was present in the source.
@@ -1408,6 +1438,20 @@ pub enum AlterTableAction<X: Extension = NoExt> {
         /// Source location and node identity.
         meta: Meta,
     },
+    /// `DROP PRIMARY KEY` — remove the table's unnamed primary key.
+    DropPrimaryKey {
+        /// Optional drop behavior.
+        behavior: Option<DropBehavior>,
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// `SET (<name> = <value>, …)` — replace table storage/property options.
+    SetOptions {
+        /// Options in source order.
+        params: ThinVec<TableStorageParameter<X>>,
+        /// Source location and node identity.
+        meta: Meta,
+    },
     /// `RENAME [COLUMN] <name> TO <new_name>`.
     ///
     /// PostgreSQL parses the rename forms as a distinct `RenameStmt`, not the
@@ -1423,6 +1467,15 @@ pub enum AlterTableAction<X: Extension = NoExt> {
         /// Name referenced by this syntax.
         name: AlterColumnTarget,
         /// The column's new name.
+        new_name: Ident,
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// `RENAME CONSTRAINT <name> TO <new_name>`.
+    RenameConstraint {
+        /// Existing constraint name.
+        name: Ident,
+        /// Replacement constraint name.
         new_name: Ident,
         /// Source location and node identity.
         meta: Meta,
@@ -1505,6 +1558,14 @@ pub enum AlterColumnAction<X: Extension = NoExt> {
     },
     /// `DROP NOT NULL` — remove the column's not-null constraint.
     DropNotNull {
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// `ADD GENERATED {ALWAYS | BY DEFAULT} AS IDENTITY [(…)]` — add identity generation
+    /// to an existing column.
+    AddIdentity {
+        /// Identity generation mode and sequence options.
+        identity: Box<IdentityColumn<X>>,
         /// Source location and node identity.
         meta: Meta,
     },
@@ -1658,13 +1719,8 @@ pub struct DropTransform<X: Extension = NoExt> {
 
 /// The object kind a [`Statement::CommentOn`] targets.
 ///
-/// PostgreSQL's `COMMENT ON` object list is large (tables, columns, functions, types,
-/// operators, extensions, roles, …). This models only the deliberate subset the
-/// datafusion-parity corpus needs — `TABLE`, `COLUMN`, `DATABASE`, and `PROCEDURE` —
-/// and is `#[non_exhaustive]` so the remaining object kinds can be added later without
-/// a breaking change. The object's name rides
-/// [`Statement::CommentOn::name`](super::Statement::CommentOn); only a procedure adds
-/// per-target data (its argument-type signature).
+/// The object's name rides [`Statement::CommentOn::name`](super::Statement::CommentOn).
+/// Targets with additional grammar carry that data in their variant.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
@@ -1676,6 +1732,14 @@ pub enum CommentTarget<X: Extension = NoExt> {
     Column,
     /// `COMMENT ON DATABASE <name>`.
     Database,
+    /// `COMMENT ON VIEW <name>`.
+    View,
+    /// `COMMENT ON MATERIALIZED VIEW <name>`.
+    MaterializedView,
+    /// `COMMENT ON INDEX <name>`.
+    Index,
+    /// `COMMENT ON CONSTRAINT <name> ON <table>`.
+    Constraint,
     /// `COMMENT ON PROCEDURE <name>[(<arg types>)]`. The argument-type list
     /// disambiguates overloaded procedures; `None` is an unspecified signature
     /// (bare `PROCEDURE foo`), `Some` a written list — possibly empty (`foo()`) —
@@ -1696,10 +1760,14 @@ pub enum CommentTarget<X: Extension = NoExt> {
 #[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
 pub struct CommentOnStatement<X: Extension = NoExt> {
+    /// Whether the front-position `IF EXISTS` guard was present.
+    pub if_exists: bool,
     /// Object targeted by this syntax.
     pub target: CommentTarget<X>,
     /// Name referenced by this syntax.
     pub name: ObjectName,
+    /// Relation owning a `CONSTRAINT` target; absent for every other target.
+    pub constraint_table: Option<ObjectName>,
     /// Optional comment for this syntax.
     pub comment: Option<Literal>,
     /// Source location and node identity.
@@ -1787,12 +1855,75 @@ pub struct CreateView<X: Extension = NoExt> {
     pub name: ObjectName,
     /// Columns in source order.
     pub columns: ThinVec<Ident>,
+    /// Optional `TO <target>` storage relation for dialects that expose one.
+    pub to: Option<ObjectName>,
     /// Query governed by this node.
     pub query: Box<Query<X>>,
     /// Optional check option for this syntax.
     pub check_option: Option<ViewCheckOption>,
     /// Whether the with data form was present in the source.
     pub with_data: Option<bool>,
+    /// Source location and node identity.
+    pub meta: Meta,
+}
+
+/// `REFRESH MATERIALIZED VIEW [CONCURRENTLY] <name> [WITH [NO] DATA]`.
+///
+/// The modifier fields are retained even when a downstream engine chooses to reject them
+/// semantically; parsing them prevents an accepted spelling from being silently discarded.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
+pub struct RefreshMaterializedView {
+    /// Whether `CONCURRENTLY` was written.
+    pub concurrently: bool,
+    /// Materialized view being refreshed.
+    pub name: ObjectName,
+    /// `Some(true)` for `WITH DATA`, `Some(false)` for `WITH NO DATA`, and `None` when omitted.
+    pub with_data: Option<bool>,
+    /// Source location and node identity.
+    pub meta: Meta,
+}
+
+/// Partition function declared by a colocation group.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
+pub enum ColocationPartitionKind {
+    /// Hash partitioning.
+    Hash,
+    /// Range partitioning.
+    Range,
+}
+
+/// `CREATE COLOCATION GROUP [IF NOT EXISTS] ...`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
+pub struct CreateColocationGroup {
+    /// Whether `IF NOT EXISTS` was written.
+    pub if_not_exists: bool,
+    /// Group name.
+    pub name: Ident,
+    /// Partition function.
+    pub partition: ColocationPartitionKind,
+    /// Partition-key columns.
+    pub columns: ThinVec<Ident>,
+    /// Shard count, preserved as the parsed integer literal for downstream range validation.
+    pub shards: Literal,
+    /// Source location and node identity.
+    pub meta: Meta,
+}
+
+/// `DROP COLOCATION GROUP [IF EXISTS] <name>`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
+pub struct DropColocationGroup {
+    /// Whether `IF EXISTS` was written.
+    pub if_exists: bool,
+    /// Group name.
+    pub name: Ident,
     /// Source location and node identity.
     pub meta: Meta,
 }
@@ -2052,6 +2183,8 @@ pub struct CreateIndex<X: Extension = NoExt> {
     pub using: Option<Ident>,
     /// Columns in source order.
     pub columns: ThinVec<IndexColumn<X>>,
+    /// `WITH (<name> = <value>, …)` index storage parameters.
+    pub with_params: ThinVec<TableStorageParameter<X>>,
     /// Predicate that controls this clause.
     pub predicate: Option<Box<Expr<X>>>,
     /// Source location and node identity.

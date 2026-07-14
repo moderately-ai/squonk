@@ -35,6 +35,8 @@ use crate::dialect::Mssql;
 use crate::dialect::MySql;
 #[cfg(feature = "postgres")]
 use crate::dialect::Postgres;
+#[cfg(feature = "quiltdb")]
+use crate::dialect::QuiltDb;
 #[cfg(feature = "redshift")]
 use crate::dialect::Redshift;
 #[cfg(feature = "snowflake")]
@@ -79,6 +81,9 @@ pub enum BuiltinDialect {
     /// PostgreSQL ([`Postgres`]); present only with the `postgres` feature.
     #[cfg(feature = "postgres")]
     Postgres,
+    /// QuiltDB ([`QuiltDb`]); present only with the `quiltdb` feature.
+    #[cfg(feature = "quiltdb")]
+    QuiltDb,
     /// MySQL ([`MySql`]); present only with the `mysql` feature.
     #[cfg(feature = "mysql")]
     MySql,
@@ -125,6 +130,8 @@ impl BuiltinDialect {
         BuiltinDialect::Ansi,
         #[cfg(feature = "postgres")]
         BuiltinDialect::Postgres,
+        #[cfg(feature = "quiltdb")]
+        BuiltinDialect::QuiltDb,
         #[cfg(feature = "mysql")]
         BuiltinDialect::MySql,
         #[cfg(feature = "sqlite")]
@@ -175,6 +182,10 @@ impl BuiltinDialect {
             || name.eq_ignore_ascii_case("pg")
         {
             return Some(Self::Postgres);
+        }
+        #[cfg(feature = "quiltdb")]
+        if name.eq_ignore_ascii_case("quiltdb") || name.eq_ignore_ascii_case("quilt") {
+            return Some(Self::QuiltDb);
         }
         #[cfg(feature = "mysql")]
         if name.eq_ignore_ascii_case("mysql") || name.eq_ignore_ascii_case("mariadb") {
@@ -239,6 +250,8 @@ impl BuiltinDialect {
             Self::Ansi => "ansi",
             #[cfg(feature = "postgres")]
             Self::Postgres => "postgres",
+            #[cfg(feature = "quiltdb")]
+            Self::QuiltDb => "quiltdb",
             #[cfg(feature = "mysql")]
             Self::MySql => "mysql",
             #[cfg(feature = "sqlite")]
@@ -271,6 +284,8 @@ impl BuiltinDialect {
             Self::Ansi => &["ansi", "generic"],
             #[cfg(feature = "postgres")]
             Self::Postgres => &["postgres", "postgresql", "pg"],
+            #[cfg(feature = "quiltdb")]
+            Self::QuiltDb => &["quiltdb", "quilt"],
             #[cfg(feature = "mysql")]
             Self::MySql => &["mysql", "mariadb"],
             #[cfg(feature = "sqlite")]
@@ -304,6 +319,8 @@ impl BuiltinDialect {
             Self::Ansi => &FeatureSet::ANSI,
             #[cfg(feature = "postgres")]
             Self::Postgres => &FeatureSet::POSTGRES,
+            #[cfg(feature = "quiltdb")]
+            Self::QuiltDb => &FeatureSet::QUILTDB,
             #[cfg(feature = "mysql")]
             Self::MySql => &FeatureSet::MYSQL,
             #[cfg(feature = "sqlite")]
@@ -433,6 +450,8 @@ pub fn parse_builtin_with(src: &str, config: ParseConfig<BuiltinDialect>) -> Par
         BuiltinDialect::Ansi => parse_with(src, config.dialect(Ansi)),
         #[cfg(feature = "postgres")]
         BuiltinDialect::Postgres => parse_with(src, config.dialect(Postgres)),
+        #[cfg(feature = "quiltdb")]
+        BuiltinDialect::QuiltDb => parse_with(src, config.dialect(QuiltDb)),
         #[cfg(feature = "mysql")]
         BuiltinDialect::MySql => parse_with(src, config.dialect(MySql)),
         #[cfg(feature = "sqlite")]
@@ -474,6 +493,8 @@ pub fn parse_recovering_builtin_with(
         BuiltinDialect::Ansi => parse_recovering_with(src, config.dialect(Ansi)),
         #[cfg(feature = "postgres")]
         BuiltinDialect::Postgres => parse_recovering_with(src, config.dialect(Postgres)),
+        #[cfg(feature = "quiltdb")]
+        BuiltinDialect::QuiltDb => parse_recovering_with(src, config.dialect(QuiltDb)),
         #[cfg(feature = "mysql")]
         BuiltinDialect::MySql => parse_recovering_with(src, config.dialect(MySql)),
         #[cfg(feature = "sqlite")]

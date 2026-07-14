@@ -852,7 +852,7 @@ fn pg_unexercised_statement_productions_have_permanent_oracle_probes() {
 // rejects (e.g. `RESET SESSION AUTHORIZATION`, `CREATE INDEX ... INCLUDE (...)`) rather than
 // mis-splitting an unconsumed tail into further statements — a pre-existing under-consumption
 // tracked in its own follow-ups, not an over-acceptance.
-const PG_REGRESS_QUADRANT: (usize, usize, usize, usize) = (29519, 5560, 0, 262);
+const PG_REGRESS_QUADRANT: (usize, usize, usize, usize) = (29671, 5408, 0, 262);
 
 /// Per-family coverage-gap counts (PG accepts / we reject), ranked by statement head
 /// (object kind appended for CREATE/ALTER/DROP). Families below
@@ -863,11 +863,11 @@ const PG_REGRESS_QUADRANT: (usize, usize, usize, usize) = (29519, 5560, 0, 262);
 /// two-phase-commit statement sharing the `PREPARE` head, not modelled here. `CREATE FUNCTION`'s
 /// residual gap counts against the mode-bearing and other routine forms not yet covered.
 const PG_REGRESS_GAP_FAMILIES: &[(&str, usize)] = &[
-    ("ALTER TABLE", 409),
+    ("ALTER TABLE", 355),
     ("CREATE TRIGGER", 322),
     ("CREATE FUNCTION", 262),
-    ("CREATE INDEX", 184),
     ("ANALYZE", 161),
+    ("CREATE INDEX", 159),
     ("DROP ROLE", 155),
     ("CREATE TYPE", 151),
     ("CREATE ROLE", 149),
@@ -881,7 +881,6 @@ const PG_REGRESS_GAP_FAMILIES: &[(&str, usize)] = &[
     ("CREATE STATISTICS", 100),
     ("DECLARE", 91),
     ("ALTER TYPE", 90),
-    ("COMMENT", 89),
     ("ALTER INDEX", 84),
     ("UPDATE", 80),
     ("DROP TRIGGER", 78),
@@ -891,15 +890,16 @@ const PG_REGRESS_GAP_FAMILIES: &[(&str, usize)] = &[
     ("DROP DOMAIN", 71),
     ("CREATE POLICY", 63),
     ("INSERT", 61),
+    ("COMMENT", 56),
     ("CREATE OPERATOR", 56),
     ("ALTER OPERATOR FAMILY", 55),
     ("DROP USER", 55),
     ("CREATE COLLATION", 53),
     ("CREATE USER", 53),
-    ("ALTER ROLE", 45),
     ("ALTER SUBSCRIPTION", 45),
     ("ALTER TEXT SEARCH", 45),
     ("CREATE VIEW", 41),
+    ("ALTER ROLE", 40),
     ("LOCK", 40),
     ("ALTER DOMAIN", 39),
     ("REVOKE", 39),
@@ -908,7 +908,6 @@ const PG_REGRESS_GAP_FAMILIES: &[(&str, usize)] = &[
     ("CALL", 36),
     ("DROP FUNCTION", 35),
     ("CREATE SUBSCRIPTION", 31),
-    ("REFRESH", 31),
     ("ALTER SEQUENCE", 30),
     ("CREATE PROCEDURE", 30),
     ("CLOSE", 29),
@@ -926,9 +925,9 @@ const PG_REGRESS_GAP_FAMILIES: &[(&str, usize)] = &[
     ("CREATE CAST", 23),
     ("CREATE SERVER", 23),
     ("CREATE USER MAPPING", 23),
-    ("CREATE SEQUENCE", 21),
     ("DROP OPERATOR FAMILY", 20),
     ("CREATE FOREIGN DATA", 19),
+    ("CREATE SEQUENCE", 19),
     ("DROP RULE", 19),
     ("EXPLAIN", 19),
     ("CREATE OPERATOR FAMILY", 18),
@@ -954,7 +953,7 @@ const PG_REGRESS_GAP_FAMILIES: &[(&str, usize)] = &[
     ("ALTER USER MAPPING", 10),
     ("DROP CAST", 10),
     ("DROP USER MAPPING", 10),
-    ("(<tail: 53 families>)", 237),
+    ("(<tail: 53 families>)", 235),
 ];
 
 /// Per-family over-acceptance counts (we accept / PG rejects), ranked and pinned

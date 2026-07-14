@@ -29,26 +29,26 @@ use crate::ast::{
     CaseExpr, CaseStatement, CastSyntax, CeilSpelling, ChangeReplicationSourceOption,
     ChangeReplicationSourceOptionValue, CharacterSetKeyword, CharacterTypeName, Charset,
     CharsetAnnotation, CharsetKeyword, CheckTableOption, CheckpointStatement, ChecksumTableOption,
-    CloneDataDirectory, CloneSsl, CloneStatement, CloseCursorStatement, ColumnConstraint,
-    ColumnDef, ColumnOption, ColumnsSpelling, CommentOnStatement, CommentTarget, CompoundStatement,
-    ComprehensionSource, ConditionInfoItem, ConditionInfoItemName, ConditionValue,
-    ConditionalBranch, ConfigParameter, ConflictAction, ConflictResolution, ConflictTarget,
-    ConstraintCharacteristics, ConstraintCheckTime, ConstraintsTarget, CopyDirection,
-    CopyIntoSource, CopyIntoStatement, CopyIntoTarget, CopyOption, CopyOptionValue, CopySource,
-    CopyStatement, CopyTarget, CreateDatabase, CreateEvent, CreateExtension, CreateExtensionOption,
-    CreateFunction, CreateIndex, CreateLogfileGroup, CreateMacro, CreateProcedure,
-    CreateResourceGroup, CreateSchema, CreateSecret, CreateSequence, CreateServer,
-    CreateSpatialReferenceSystem, CreateStoredTrigger, CreateTable, CreateTableBody,
+    CloneDataDirectory, CloneSsl, CloneStatement, CloseCursorStatement, ColocationPartitionKind,
+    ColumnConstraint, ColumnDef, ColumnOption, ColumnsSpelling, CommentOnStatement, CommentTarget,
+    CompoundStatement, ComprehensionSource, ConditionInfoItem, ConditionInfoItemName,
+    ConditionValue, ConditionalBranch, ConfigParameter, ConflictAction, ConflictResolution,
+    ConflictTarget, ConstraintCharacteristics, ConstraintCheckTime, ConstraintsTarget,
+    CopyDirection, CopyIntoSource, CopyIntoStatement, CopyIntoTarget, CopyOption, CopyOptionValue,
+    CopySource, CopyStatement, CopyTarget, CreateColocationGroup, CreateDatabase, CreateEvent,
+    CreateExtension, CreateExtensionOption, CreateFunction, CreateIndex, CreateLogfileGroup,
+    CreateMacro, CreateProcedure, CreateResourceGroup, CreateSchema, CreateSecret, CreateSequence,
+    CreateServer, CreateSpatialReferenceSystem, CreateStoredTrigger, CreateTable, CreateTableBody,
     CreateTableOption, CreateTableOptionKind, CreateTablespace, CreateTrigger, CreateType,
     CreateTypeDefinition, CreateUser, CreateView, CreateVirtualTable, Cte, CteBody, CteCycleClause,
     CteCycleMark, CteSearchClause, DataType, DatabaseKeyword, DeallocateKeyword,
     DeallocateStatement, DecimalTypeName, Declaration, DefaultRoleTarget, DefaultValue, Definer,
     Delete, DerivedSpelling, DescribeColumn, DescribeStatement, DetachPartitionMode,
     DetachStatement, DiagnosticsArea, DiagnosticsInfo, DmlSelection, DmlTarget, DoArg,
-    DoExpressionsStatement, DoStatement, DoubleTypeName, DropBehavior, DropDatabase, DropEvent,
-    DropIndexOnTable, DropLogfileGroup, DropObjectKind, DropResourceGroup, DropSecretStmt,
-    DropServer, DropSpatialReferenceSystem, DropStatement, DropTablespace, DropTransform,
-    EmptyMatchesMode, EqualsSpelling, EventOnCompletion, EventSchedule, EventStatus,
+    DoExpressionsStatement, DoStatement, DoubleTypeName, DropBehavior, DropColocationGroup,
+    DropDatabase, DropEvent, DropIndexOnTable, DropLogfileGroup, DropObjectKind, DropResourceGroup,
+    DropSecretStmt, DropServer, DropSpatialReferenceSystem, DropStatement, DropTablespace,
+    DropTransform, EmptyMatchesMode, EqualsSpelling, EventOnCompletion, EventSchedule, EventStatus,
     ExcludeConstraint, ExcludeElement, ExcludeOperator, ExecuteStatement, ExecuteUsingStatement,
     ExplainFormat, ExplainKeyword, ExplainOption, ExplainStatement, ExportStatement, Expr,
     Extension, ExtensionVersion, ExtractExpr, FetchCursorStatement, FetchSpelling, FieldSelector,
@@ -63,23 +63,23 @@ use crate::ast::{
     HandlerStatement, HelpStatement, HierarchicalClause, Ident, IdentityColumn, IdentityGeneration,
     IdentityOption, IfStatement, ImportStatement, ImportTableStatement, IndexAlgorithm,
     IndexColumn, IndexHint, IndexHintAction, IndexHintKeyword, IndexHintScope, IndexLock,
-    IndexLockAlgorithmOption, IndexedBy, Insert, InsertColumnMatching, InsertOverriding,
-    InsertSource, InsertTarget, InsertValue, InsertValues, InsertVerb, InstallComponentSetElement,
-    InstallComponentSetScope, InstallComponentSetValue, InstallStatement, InstanceLockStatement,
-    IntWidth, IntegerDivideSpelling, IntegerTypeName, IntervalFields, IntoTarget, IoThreadKeyword,
-    IsDistinctFromSpelling, IsJsonExpr, IsNotDistinctFromSpelling, IsolationLevel,
-    IterateStatement, Join, JoinConstraint, JoinOperator, JsonAggregateBody, JsonAggregateExpr,
-    JsonArrayBody, JsonArrayExpr, JsonBehavior, JsonBehaviorKind, JsonConstructorExpr,
-    JsonConstructorKind, JsonEncoding, JsonFormat, JsonFuncExpr, JsonFuncKind, JsonItemType,
-    JsonKeyValue, JsonKeyValueSpelling, JsonNullClause, JsonObjectExpr, JsonPassingArg,
-    JsonQuotesBehavior, JsonReturning, JsonTable, JsonTableColumn, JsonValueExpr,
-    JsonWrapperBehavior, KeyCacheName, KillStatement, KillTarget, LambdaParamSpelling,
-    LanguageName, LateralView, LeaveStatement, LikeSpelling, Limit, LimitBy, LimitPercent,
-    LimitSyntax, Literal, LiteralKind, LoadDataConcurrency, LoadDataDuplicate, LoadDataEnclosed,
-    LoadDataFieldOrVar, LoadDataFields, LoadDataFormat, LoadDataIgnoreRows, LoadDataIgnoreUnit,
-    LoadDataLines, LoadDataStatement, LoadFieldsSpelling, LoadIndexStatement, LoadIndexTable,
-    LoadIndexTargets, LoadStatement, LoadTarget, LockStrength, LockTablesStatement, LockWait,
-    LockingClause, LockingSpelling, LoopStatement, MacroBody, MacroParam, MacroSpelling,
+    IndexLockAlgorithmOption, IndexedBy, Insert, InsertColumnMatching, InsertModifier,
+    InsertOverriding, InsertSource, InsertTarget, InsertValue, InsertValues, InsertVerb,
+    InstallComponentSetElement, InstallComponentSetScope, InstallComponentSetValue,
+    InstallStatement, InstanceLockStatement, IntWidth, IntegerDivideSpelling, IntegerTypeName,
+    IntervalFields, IntoTarget, IoThreadKeyword, IsDistinctFromSpelling, IsJsonExpr,
+    IsNotDistinctFromSpelling, IsolationLevel, IterateStatement, Join, JoinConstraint,
+    JoinOperator, JsonAggregateBody, JsonAggregateExpr, JsonArrayBody, JsonArrayExpr, JsonBehavior,
+    JsonBehaviorKind, JsonConstructorExpr, JsonConstructorKind, JsonEncoding, JsonFormat,
+    JsonFuncExpr, JsonFuncKind, JsonItemType, JsonKeyValue, JsonKeyValueSpelling, JsonNullClause,
+    JsonObjectExpr, JsonPassingArg, JsonQuotesBehavior, JsonReturning, JsonTable, JsonTableColumn,
+    JsonValueExpr, JsonWrapperBehavior, KeyCacheName, KillStatement, KillTarget,
+    LambdaParamSpelling, LanguageName, LateralView, LeaveStatement, LikeSpelling, Limit, LimitBy,
+    LimitPercent, LimitSyntax, Literal, LiteralKind, LoadDataConcurrency, LoadDataDuplicate,
+    LoadDataEnclosed, LoadDataFieldOrVar, LoadDataFields, LoadDataFormat, LoadDataIgnoreRows,
+    LoadDataIgnoreUnit, LoadDataLines, LoadDataStatement, LoadFieldsSpelling, LoadIndexStatement,
+    LoadIndexTable, LoadIndexTargets, LoadStatement, LoadTarget, LockStrength, LockTablesStatement,
+    LockWait, LockingClause, LockingSpelling, LoopStatement, MacroBody, MacroParam, MacroSpelling,
     MatchRecognize, MatchRecognizePattern, MatchSearchModifier, Measure, Merge, MergeAction,
     MergeMatchKind, MergeWhenClause, ModuleArg, ModuloSpelling, NamedObjectKind,
     NamedOperatorSpelling, NamedWindow, NoExt, NoWriteToBinlog, NormalizationForm, NotEqSpelling,
@@ -91,22 +91,23 @@ use crate::ast::{
     PivotExpr, PivotSpelling, PivotValueSource, PragmaStatement, PrepareFromStatement,
     PrepareSource, PrepareStatement, Privilege, PrivilegeKind, PrivilegeLevel,
     PrivilegeLevelObject, PrivilegeObjectType, Privileges, PurgeStatement, PurgeTarget, Quantifier,
-    Query, QuoteStyle, ReadOnlyValue, ReferentialAction, RegexpSpelling, ReindexStatement,
-    RelationInheritance, RenameStatement, RepairTableOption, RepeatStatement, RepetitionQuantifier,
-    ReplicaSpelling, ReplicaThreadOption, ReplicaUntilCondition, ReplicationFilterRule,
-    ReplicationStatement, RequirePrimaryKeyCheck, ResourceGroupState, ResourceGroupThreadPriority,
-    ResourceGroupType, ResourceGroupVcpu, ResourceLimit, ReturnStatement, Returning, RewriteDbPair,
-    RoleSpec, RollupSpelling, RoutineKind, RoutineObjectKind, RoutineSignature, RowsFromItem,
-    RowsPerMatch, SampleClause, SampleUnit, SchemaObjectKind, SchemaRelocationObject, SecretOption,
-    SecretPersistence, Select, SelectDistinct, SelectItem, SelectSpelling, SemiAntiSide,
-    SemiStructuredAccessExpr, SemiStructuredPathSegment, ServerOption, ServerOptionKind,
-    SessionStatement, SessionVariableKind, SetAssignment, SetCharacterSetValue, SetExpr,
-    SetNamesValue, SetOperator, SetParameterValue, SetQuantifier, SetScope, SetValue,
-    SetVariableAssignment, SetVariableKeyword, SetVariableValue, Setting, ShowBare,
-    ShowColumnsSpelling, ShowCreateKind, ShowDiagnosticKind, ShowEngineArtifact, ShowFilter,
-    ShowFrom, ShowFromKeyword, ShowFunctionsFilter, ShowFunctionsScope, ShowIndexSpelling,
-    ShowLimit, ShowListing, ShowProfileType, ShowRef, ShowRefKind, ShowRefTarget, ShowRoutineKind,
-    ShowScope, ShowStatement, ShowTarget, SignalItem, SignalItemName, SignalStatement, Signedness,
+    Query, QuoteStyle, ReadOnlyValue, ReferentialAction, RefreshMaterializedView, RegexpSpelling,
+    ReindexStatement, RelationInheritance, RenameStatement, RepairTableOption, RepeatStatement,
+    RepetitionQuantifier, ReplicaSpelling, ReplicaThreadOption, ReplicaUntilCondition,
+    ReplicationFilterRule, ReplicationStatement, RequirePrimaryKeyCheck, ResourceGroupState,
+    ResourceGroupThreadPriority, ResourceGroupType, ResourceGroupVcpu, ResourceLimit,
+    ReturnStatement, Returning, RewriteDbPair, RoleSpec, RollupSpelling, RoutineKind,
+    RoutineObjectKind, RoutineSignature, RowsFromItem, RowsPerMatch, SampleClause, SampleUnit,
+    SchemaObjectKind, SchemaRelocationObject, SecretOption, SecretPersistence, Select,
+    SelectDistinct, SelectItem, SelectSpelling, SemiAntiSide, SemiStructuredAccessExpr,
+    SemiStructuredPathSegment, ServerOption, ServerOptionKind, SessionStatement,
+    SessionVariableKind, SetAssignment, SetCharacterSetValue, SetExpr, SetNamesValue, SetOperator,
+    SetParameterValue, SetQuantifier, SetScope, SetValue, SetVariableAssignment,
+    SetVariableKeyword, SetVariableValue, Setting, ShowBare, ShowColumnsSpelling, ShowCreateKind,
+    ShowDiagnosticKind, ShowEngineArtifact, ShowFilter, ShowFrom, ShowFromKeyword,
+    ShowFunctionsFilter, ShowFunctionsScope, ShowIndexSpelling, ShowLimit, ShowListing,
+    ShowProfileType, ShowRef, ShowRefKind, ShowRefTarget, ShowRoutineKind, ShowScope,
+    ShowStatement, ShowTarget, SignalItem, SignalItemName, SignalStatement, Signedness,
     SizeLiteral, SizeUnit, SpecialFunctionKeyword, SpecialSetValue, SqlDataAccess,
     SqlSecurityContext, SrsAttribute, Statement, StatementInfoItem, StatementInfoItemName,
     StringFunc, StructConstructorArg, StructConstructorField, StructField, StructKeySpelling,
@@ -169,11 +170,11 @@ use thin_vec::ThinVec;
 #[cfg(test)]
 use crate::generated::render_skeleton as skeleton;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0x668c6569aa20f965> = skeleton::CURRENT_RENDER_SHAPE_DCL;
+const _: skeleton::RenderShapeFingerprint<0xc1598aa589abcdb4> = skeleton::CURRENT_RENDER_SHAPE_DCL;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0xea69d9b785020501> = skeleton::CURRENT_RENDER_SHAPE_DDL;
+const _: skeleton::RenderShapeFingerprint<0xb7fb9938befad896> = skeleton::CURRENT_RENDER_SHAPE_DDL;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0xbc51c89e49732760> = skeleton::CURRENT_RENDER_SHAPE_DML;
+const _: skeleton::RenderShapeFingerprint<0x5bdcbbc8cc864aec> = skeleton::CURRENT_RENDER_SHAPE_DML;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0xbcc8a4346507a25c> = skeleton::CURRENT_RENDER_SHAPE_EXPR;
 #[cfg(test)]
@@ -197,12 +198,12 @@ const _: skeleton::RenderShapeFingerprint<0xd3444362d3f03fe8> =
 const _: skeleton::RenderShapeFingerprint<0x305c97c17f4b1723> =
     skeleton::CURRENT_RENDER_SHAPE_QUERY;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0x6f0ed6cfb3c83310> = skeleton::CURRENT_RENDER_SHAPE_STMT;
+const _: skeleton::RenderShapeFingerprint<0x957db431c4a1db51> = skeleton::CURRENT_RENDER_SHAPE_STMT;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0xfb50d22f049b4cc7> =
     skeleton::CURRENT_RENDER_SHAPE_STORED_PROGRAM;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0x0b580e5e0de8de03> = skeleton::CURRENT_RENDER_SHAPE_TCL;
+const _: skeleton::RenderShapeFingerprint<0x316658eaf65c4c17> = skeleton::CURRENT_RENDER_SHAPE_TCL;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0x03efd7c0644eb26a> = skeleton::CURRENT_RENDER_SHAPE_TY;
 #[cfg(test)]
@@ -2507,6 +2508,9 @@ impl<X: Extension + Render> Render for Statement<X> {
             Statement::Drop { drop, .. } => drop.render(ctx, f),
             Statement::CreateSchema { schema, .. } => schema.render(ctx, f),
             Statement::CreateView { view, .. } => view.render(ctx, f),
+            Statement::RefreshMaterializedView { refresh, .. } => refresh.render(ctx, f),
+            Statement::CreateColocationGroup { create, .. } => create.render(ctx, f),
+            Statement::DropColocationGroup { drop, .. } => drop.render(ctx, f),
             Statement::AlterView { alter, .. } => alter.render(ctx, f),
             Statement::CreateIndex { index, .. } => index.render(ctx, f),
             Statement::CreateFunction { create, .. } => create.render(ctx, f),
@@ -2559,19 +2563,33 @@ impl<X: Extension + Render> Render for Statement<X> {
             }
             Statement::CommentOn { comment, .. } => {
                 let CommentOnStatement {
+                    if_exists,
                     target,
                     name,
+                    constraint_table,
                     comment,
                     ..
                 } = comment.as_ref();
-                f.write_str("COMMENT ON ")?;
+                f.write_str("COMMENT ")?;
+                if *if_exists {
+                    f.write_str("IF EXISTS ")?;
+                }
+                f.write_str("ON ")?;
                 f.write_str(match target {
                     CommentTarget::Table => "TABLE ",
                     CommentTarget::Column => "COLUMN ",
                     CommentTarget::Database => "DATABASE ",
+                    CommentTarget::View => "VIEW ",
+                    CommentTarget::MaterializedView => "MATERIALIZED VIEW ",
+                    CommentTarget::Index => "INDEX ",
+                    CommentTarget::Constraint => "CONSTRAINT ",
                     CommentTarget::Procedure { .. } => "PROCEDURE ",
                 })?;
                 name.render(ctx, f)?;
+                if let Some(table) = constraint_table {
+                    f.write_str(" ON ")?;
+                    table.render(ctx, f)?;
+                }
                 if let CommentTarget::Procedure {
                     arg_types: Some(arg_types),
                 } = target
@@ -2711,6 +2729,51 @@ impl<X: Extension + Render> Render for Statement<X> {
     }
 }
 
+impl Render for RefreshMaterializedView {
+    fn render(&self, ctx: &RenderCtx<'_>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("REFRESH MATERIALIZED VIEW")?;
+        if self.concurrently {
+            f.write_str(" CONCURRENTLY")?;
+        }
+        f.write_str(" ")?;
+        self.name.render(ctx, f)?;
+        match self.with_data {
+            Some(true) => f.write_str(" WITH DATA"),
+            Some(false) => f.write_str(" WITH NO DATA"),
+            None => Ok(()),
+        }
+    }
+}
+
+impl Render for CreateColocationGroup {
+    fn render(&self, ctx: &RenderCtx<'_>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("CREATE COLOCATION GROUP")?;
+        if self.if_not_exists {
+            f.write_str(" IF NOT EXISTS")?;
+        }
+        f.write_str(" ")?;
+        self.name.render(ctx, f)?;
+        f.write_str(match self.partition {
+            ColocationPartitionKind::Hash => " PARTITION BY HASH (",
+            ColocationPartitionKind::Range => " PARTITION BY RANGE (",
+        })?;
+        render_ident_list(&self.columns, ctx, f)?;
+        f.write_str(") SHARDS ")?;
+        self.shards.render(ctx, f)
+    }
+}
+
+impl Render for DropColocationGroup {
+    fn render(&self, ctx: &RenderCtx<'_>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("DROP COLOCATION GROUP")?;
+        if self.if_exists {
+            f.write_str(" IF EXISTS")?;
+        }
+        f.write_str(" ")?;
+        self.name.render(ctx, f)
+    }
+}
+
 impl<X: Extension + Render> Render for Insert<X> {
     fn render(&self, ctx: &RenderCtx<'_>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(with) = &self.with {
@@ -2726,6 +2789,12 @@ impl<X: Extension + Render> Render for Insert<X> {
             InsertVerb::Insert => "INSERT",
             InsertVerb::Replace => "REPLACE",
         })?;
+        if let Some(modifier) = self.modifier {
+            f.write_str(match modifier {
+                InsertModifier::Ignore => " IGNORE",
+                InsertModifier::Overwrite => " OVERWRITE",
+            })?;
+        }
         if let Some(or_action) = self.or_action {
             f.write_str(" OR ")?;
             or_action.render(ctx, f)?;
@@ -2849,6 +2918,10 @@ impl<X: Extension + Render> Render for Update<X> {
         }
         f.write_str(" ")?;
         self.target.render(ctx, f)?;
+        for join in &self.target_joins {
+            f.write_str(" ")?;
+            join.render(ctx, f)?;
+        }
         f.write_str(" SET ")?;
         render_update_assignments(&self.assignments, ctx, f)?;
         if !self.from.is_empty() {
@@ -2918,6 +2991,14 @@ impl<X: Extension + Render> Render for Delete<X> {
         }
         f.write_str("DELETE FROM ")?;
         self.target.render(ctx, f)?;
+        for target in &self.additional_targets {
+            f.write_str(", ")?;
+            target.render(ctx, f)?;
+        }
+        for join in &self.target_joins {
+            f.write_str(" ")?;
+            join.render(ctx, f)?;
+        }
         if !self.using.is_empty() {
             f.write_str(" USING ")?;
             render_comma_separated(&self.using, ctx, f)?;
@@ -3127,6 +3208,7 @@ impl<X: Extension + Render> Render for MergeAction<X> {
                 columns,
                 overriding,
                 values,
+                additional_rows,
                 ..
             } => {
                 f.write_str("INSERT")?;
@@ -3141,7 +3223,13 @@ impl<X: Extension + Render> Render for MergeAction<X> {
                 }
                 f.write_str(" VALUES (")?;
                 render_comma_separated(values, ctx, f)?;
-                f.write_str(")")
+                f.write_str(")")?;
+                for row in additional_rows {
+                    f.write_str(", (")?;
+                    render_comma_separated(row, ctx, f)?;
+                    f.write_str(")")?;
+                }
+                Ok(())
             }
             MergeAction::InsertDefault { default, .. } => {
                 f.write_str("INSERT ")?;
@@ -3195,17 +3283,18 @@ impl Render for TransactionStatement {
                 }
                 render_transaction_modes(modes, ctx, f)
             }
-            Self::Commit { block, .. } => {
+            Self::Commit { block, chain, .. } => {
                 f.write_str("COMMIT")?;
                 if honours_source_spelling(ctx) {
                     render_transaction_block_keyword(*block, f)?;
                 }
-                Ok(())
+                render_transaction_chain(*chain, f)
             }
             Self::Rollback {
                 block,
                 savepoint_keyword,
                 to_savepoint,
+                chain,
                 ..
             } => {
                 f.write_str("ROLLBACK")?;
@@ -3223,7 +3312,7 @@ impl Render for TransactionStatement {
                     }
                     name.render(ctx, f)?;
                 }
-                Ok(())
+                render_transaction_chain(*chain, f)
             }
             Self::Savepoint { name, .. } => {
                 f.write_str("SAVEPOINT ")?;
@@ -3248,6 +3337,14 @@ impl Render for TransactionStatement {
                 render_transaction_modes(modes, ctx, f)
             }
         }
+    }
+}
+
+fn render_transaction_chain(chain: Option<bool>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match chain {
+        Some(true) => f.write_str(" AND CHAIN"),
+        Some(false) => f.write_str(" AND NO CHAIN"),
+        None => Ok(()),
     }
 }
 
@@ -4196,6 +4293,12 @@ impl Render for ConfigParameter {
 impl<X: Extension + Render> Render for AccessControlStatement<X> {
     fn render(&self, ctx: &RenderCtx<'_>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::AlterRoleRename { name, new_name, .. } => {
+                f.write_str("ALTER ROLE ")?;
+                name.render(ctx, f)?;
+                f.write_str(" RENAME TO ")?;
+                new_name.render(ctx, f)
+            }
             Self::Grant {
                 privileges,
                 object,
@@ -8621,6 +8724,23 @@ impl<X: Extension + Render> Render for CreateTableOption<X> {
 impl<X: Extension + Render> Render for CreateTableOptionKind<X> {
     fn render(&self, ctx: &RenderCtx<'_>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::ColocateWith { table, columns, .. } => {
+                f.write_str("COLOCATE WITH ")?;
+                table.render(ctx, f)?;
+                f.write_str(" ON (")?;
+                render_ident_list(columns, ctx, f)?;
+                f.write_str(")")
+            }
+            Self::InColocationGroup { group, columns, .. } => {
+                f.write_str("IN COLOCATION GROUP ")?;
+                group.render(ctx, f)?;
+                if !columns.is_empty() {
+                    f.write_str(" ON (")?;
+                    render_ident_list(columns, ctx, f)?;
+                    f.write_str(")")?;
+                }
+                Ok(())
+            }
             Self::With { params, .. } => {
                 f.write_str("WITH (")?;
                 render_comma_separated(params, ctx, f)?;
@@ -8749,6 +8869,11 @@ fn render_column_def_tail<X: Extension + Render>(
 impl<X: Extension + Render> Render for AlterTableAction<X> {
     fn render(&self, ctx: &RenderCtx<'_>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::SetColocationGroup { group, .. } => {
+                f.write_str("SET COLOCATION GROUP ")?;
+                group.render(ctx, f)
+            }
+            Self::DropColocationGroup { .. } => f.write_str("DROP COLOCATION GROUP"),
             // The optional `COLUMN` noise word is exact-synonym fidelity: the canonical
             // render emits it, a source-fidelity render drops it when the source did.
             Self::AddColumn {
@@ -8818,6 +8943,15 @@ impl<X: Extension + Render> Render for AlterTableAction<X> {
                 name.render(ctx, f)?;
                 render_drop_behavior(*behavior, ctx, f)
             }
+            Self::DropPrimaryKey { behavior, .. } => {
+                f.write_str("DROP PRIMARY KEY")?;
+                render_drop_behavior(*behavior, ctx, f)
+            }
+            Self::SetOptions { params, .. } => {
+                f.write_str("SET (")?;
+                render_comma_separated(params, ctx, f)?;
+                f.write_str(")")
+            }
             Self::RenameColumn {
                 column_keyword,
                 name,
@@ -8827,6 +8961,12 @@ impl<X: Extension + Render> Render for AlterTableAction<X> {
                 f.write_str("RENAME")?;
                 render_optional_column_keyword(*column_keyword, ctx, f)?;
                 f.write_str(" ")?;
+                name.render(ctx, f)?;
+                f.write_str(" TO ")?;
+                new_name.render(ctx, f)
+            }
+            Self::RenameConstraint { name, new_name, .. } => {
+                f.write_str("RENAME CONSTRAINT ")?;
                 name.render(ctx, f)?;
                 f.write_str(" TO ")?;
                 new_name.render(ctx, f)
@@ -8868,6 +9008,10 @@ impl<X: Extension + Render> Render for AlterColumnAction<X> {
             Self::DropDefault { .. } => f.write_str("DROP DEFAULT"),
             Self::SetNotNull { .. } => f.write_str("SET NOT NULL"),
             Self::DropNotNull { .. } => f.write_str("DROP NOT NULL"),
+            Self::AddIdentity { identity, .. } => {
+                f.write_str("ADD ")?;
+                identity.render(ctx, f)
+            }
             // The ANSI `SET DATA TYPE` spelling is canonical; a source-fidelity render
             // replays the bare PostgreSQL `TYPE` when the source wrote it.
             Self::SetDataType {
@@ -9002,6 +9146,10 @@ impl<X: Extension + Render> Render for CreateView<X> {
             f.write_str(" (")?;
             render_ident_list(&self.columns, ctx, f)?;
             f.write_str(")")?;
+        }
+        if let Some(to) = &self.to {
+            f.write_str(" TO ")?;
+            to.render(ctx, f)?;
         }
         f.write_str(" AS ")?;
         self.query.render(ctx, f)?;
@@ -9705,6 +9853,11 @@ impl<X: Extension + Render> Render for CreateIndex<X> {
         f.write_str(" (")?;
         render_comma_separated(&self.columns, ctx, f)?;
         f.write_str(")")?;
+        if !self.with_params.is_empty() {
+            f.write_str(" WITH (")?;
+            render_comma_separated(&self.with_params, ctx, f)?;
+            f.write_str(")")?;
+        }
         if let Some(predicate) = &self.predicate {
             f.write_str(" WHERE ")?;
             predicate.render(ctx, f)?;

@@ -16,6 +16,7 @@ Every shipped dialect preset and optional product surface carries a release-cont
 | --- | --- | --- |
 | ansi | stable | standard_reference — ISO/IEC 9075:2016 baseline, held by the structural round-trip property (parse(render(x)) == x), the sqllogictest accept corpus, and a documented PostgreSQL nearest-engine delta ledger (oracle-parity-ansi) |
 | postgres | stable | engine_differential — libpg_query pg_query 6.1.1 (PostgreSQL 17); raw-parse-tree differential over the vendored corpus (ParseOnly) |
+| quiltdb | stable | contract_gate — conformance/corpus/quiltdb/manifest.json; first-party QuiltDB parser contract: vendored stable-ID SQLLogicTest and integration-test corpora plus explicit accept/reject and structural round-trip gates |
 | mysql | stable | engine_differential — mysql 8.4.10; live-server prepare + parse differential (oracle-mysql) |
 | sqlite | stable | engine_differential — sqlite rusqlite 0.40 (bundled SQLite); in-process prepare differential (oracle-engines) |
 | duckdb | stable | engine_differential — libduckdb 1.5.4; in-process extract_statements differential (oracle-engines) |
@@ -33,6 +34,6 @@ Every shipped dialect preset and optional product surface carries a release-cont
 | Surface | Tier | Source of truth |
 | --- | --- | --- |
 | document-render | preview | constructed — documented v1 preview: parse-back + spelling fidelity guaranteed and pinned by the format::coverage fixtures; full-fidelity layout remains future work (see the format module docs) |
-| serde-ast-schema | stable | contract_gate — release/schema/wire-schema.v1.json; wire schema v1, drift-gated by the wire_schema test and a frozen compat baseline (docs/schema-contract.md) |
-| wasm-bindings | preview | constructed — published npm v1 packages wrap the stable parser and wire schema v1; binding-specific compatibility remains preview |
-| python-bindings | preview | constructed — published PyPI v1 wheels wrap the stable parser and wire schema v1; binding-specific compatibility remains preview |
+| serde-ast-schema | stable | contract_gate — release/schema/wire-schema.v2.json; wire schema v2, drift-gated by the wire_schema test with the published v1 snapshot and compatibility baseline retained (docs/schema-contract.md) |
+| wasm-bindings | preview | constructed — npm v2 packages wrap the stable parser and wire schema v2; binding-specific compatibility remains preview |
+| python-bindings | preview | constructed — PyPI v2 wheels wrap the stable parser and wire schema v2; binding-specific compatibility remains preview |

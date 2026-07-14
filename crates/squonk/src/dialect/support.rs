@@ -40,6 +40,8 @@ impl BuiltinDialect {
             // Engine-differential parity at bar A, held by the nightly oracle guard.
             #[cfg(feature = "postgres")]
             Self::Postgres => SupportTier::Stable,
+            #[cfg(feature = "quiltdb")]
+            Self::QuiltDb => SupportTier::Stable,
             #[cfg(feature = "mysql")]
             Self::MySql => SupportTier::Stable,
             #[cfg(feature = "sqlite")]
@@ -83,6 +85,11 @@ impl BuiltinDialect {
                 engine: "libpg_query",
                 version: "pg_query 6.1.1 (PostgreSQL 17)",
                 method: "raw-parse-tree differential over the vendored corpus (ParseOnly)",
+            },
+            #[cfg(feature = "quiltdb")]
+            Self::QuiltDb => SupportEvidence::ContractGate {
+                artifact: "conformance/corpus/quiltdb/manifest.json",
+                note: "first-party QuiltDB parser contract: vendored stable-ID SQLLogicTest and integration-test corpora plus explicit accept/reject and structural round-trip gates",
             },
             #[cfg(feature = "mysql")]
             Self::MySql => SupportEvidence::EngineDifferential {
@@ -207,16 +214,16 @@ impl ProductSurface {
                        work (see the format module docs)",
             },
             Self::SerdeAstSchema => SupportEvidence::ContractGate {
-                artifact: "release/schema/wire-schema.v1.json",
-                note: "wire schema v1, drift-gated by the wire_schema test and a frozen compat \
-                       baseline (docs/schema-contract.md)",
+                artifact: "release/schema/wire-schema.v2.json",
+                note: "wire schema v2, drift-gated by the wire_schema test with the published v1 \
+                       snapshot and compatibility baseline retained (docs/schema-contract.md)",
             },
             Self::WasmBindings => SupportEvidence::Constructed {
-                note: "published npm v1 packages wrap the stable parser and wire schema v1; \
+                note: "npm v2 packages wrap the stable parser and wire schema v2; \
                        binding-specific compatibility remains preview",
             },
             Self::PythonBindings => SupportEvidence::Constructed {
-                note: "published PyPI v1 wheels wrap the stable parser and wire schema v1; \
+                note: "PyPI v2 wheels wrap the stable parser and wire schema v2; \
                        binding-specific compatibility remains preview",
             },
         }

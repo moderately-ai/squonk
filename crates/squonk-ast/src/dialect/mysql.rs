@@ -322,6 +322,8 @@ impl TableFactorSyntax {
 impl MutationSyntax {
     /// The `MYSQL` preset for mutation syntax.
     pub const MYSQL: Self = Self {
+        insert_ignore: true,
+        insert_overwrite: false,
         returning: false,
         on_conflict: false,
         on_duplicate_key_update: true,
@@ -333,6 +335,7 @@ impl MutationSyntax {
         insert_set: true,
         // MySQL admits the single-table `UPDATE`/`DELETE ... ORDER BY ... LIMIT` tails.
         update_delete_tails: true,
+        joined_update_delete: true,
         // The SQLite `INSERT OR <action>` prefix is not MySQL: MySQL's own conflict
         // shorthand is a bare post-verb `INSERT IGNORE` (no `OR`), a different surface
         // not modelled here, so the `OR`-prefixed form stays off.
@@ -359,6 +362,7 @@ impl MutationSyntax {
         merge_when_not_matched_by: false,
         merge_insert_default_values: false,
         merge_insert_overriding: false,
+        merge_insert_multirow: false,
         merge_update_set_star: false,
         merge_insert_star_by_name: false,
         merge_error_action: false,
@@ -369,6 +373,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `MYSQL` preset for statement ddl gates.
     pub const MYSQL: Self = Self {
+        colocation_groups: false,
+        materialized_view_to: false,
         // MySQL's `CREATE TRIGGER` body is not the modelled SQLite `BEGIN … END` form.
         create_trigger: false,
         // The macro DDL is DuckDB-specific; MySQL has no `CREATE MACRO`.
@@ -379,6 +385,7 @@ impl StatementDdlGates {
         create_virtual_table: false,
         // MySQL has no sequence generators (it uses AUTO_INCREMENT); `CREATE SEQUENCE` rejects.
         create_sequence: false,
+        create_sequence_cache: false,
         extension_ddl: false,
         transform_ddl: false,
         alter_system: false,
@@ -493,6 +500,7 @@ impl ColumnDefinitionSyntax {
         // auto-numbering with the `AUTO_INCREMENT` attribute (which rides `table_options`),
         // so the `IDENTITY` clause is off (engine-measured-rejected on mysql:8).
         identity_columns: false,
+        compact_identity_columns: false,
         // MySQL requires a functional column default to be parenthesized: `DEFAULT UUID()` /
         // `DEFAULT 1 + 2` are `ER_PARSE_ERROR` on mysql:8, while `DEFAULT (UUID())` and the
         // literal / `CURRENT_TIMESTAMP`/`NOW()` forms parse.
@@ -531,6 +539,11 @@ impl ConstraintSyntax {
 impl IndexAlterSyntax {
     /// The `MYSQL` preset for index alter syntax.
     pub const MYSQL: Self = Self {
+        rename_constraint: false,
+        alter_table_set_options: false,
+        drop_primary_key: true,
+        alter_column_add_identity: false,
+        index_storage_parameters: false,
         drop_behavior: true,
         // MySQL's `DROP INDEX <name> ON <table> [ALGORITHM …] [LOCK …]` — mandatory ON,
         // online-DDL execution hints.
@@ -778,6 +791,9 @@ impl SelectSyntax {
         // operation, so `BY` after a set operator is a syntax error there.
         union_by_name: false,
         wildcard_modifiers: false,
+        wildcard_replace: false,
+        intersect_all: true,
+        except_all: true,
         // MySQL's `table_wild` (`t.*`) is a non-aliasable select-item production; a trailing
         // alias rejects (measured Reject on mysql:8 with the table provisioned).
         qualified_wildcard_alias: false,
@@ -1019,6 +1035,7 @@ impl MaintenanceSyntax {
 impl AccessControlSyntax {
     /// The `MYSQL` preset for access control syntax.
     pub const MYSQL: Self = Self {
+        alter_role_rename: false,
         // `show_functions` stays off (from `..ANSI`): MySQL has no bare `SHOW FUNCTIONS`
         // listing. Its `SHOW FUNCTION STATUS [LIKE | WHERE]` is a *different* routine
         // catalogue over `mysql.proc`, carried by the `show_routine_status` gate on

@@ -4,7 +4,7 @@
 //! DML statement AST nodes: INSERT, UPDATE, DELETE, and MERGE.
 
 use super::{
-    AliasSpelling, Expr, Extension, Ident, Limit, NoExt, ObjectName, OrderByExpr, Query,
+    AliasSpelling, Expr, Extension, Ident, Join, Limit, NoExt, ObjectName, OrderByExpr, Query,
     RelationInheritance, SelectItem, TableAlias, TableWithJoins, With,
 };
 use crate::vocab::Meta;
@@ -27,6 +27,17 @@ pub enum InsertVerb {
     Insert,
     /// `REPLACE` — MySQL's insert-or-replace (delete then insert on a duplicate key).
     Replace,
+}
+
+/// A post-`INSERT` execution modifier retained for downstream typed validation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
+pub enum InsertModifier {
+    /// `INSERT IGNORE`.
+    Ignore,
+    /// `INSERT OVERWRITE`.
+    Overwrite,
 }
 
 /// DuckDB column-matching mode on `INSERT`: `BY NAME` or `BY POSITION`.
@@ -85,6 +96,8 @@ pub struct Insert<X: Extension = NoExt> {
     /// Whether this was spelled `INSERT` or MySQL `REPLACE` (a surface tag over one
     /// shape; see [`InsertVerb`]).
     pub verb: InsertVerb,
+    /// Optional post-verb modifier.
+    pub modifier: Option<InsertModifier>,
     /// The SQLite `INSERT OR <action>` conflict-resolution algorithm on the verb, gated
     /// by [`MutationSyntax::or_conflict_action`](crate::dialect::MutationSyntax); `None`
     /// when unwritten (and always `None` on the [`InsertVerb::Replace`] spelling, which
@@ -260,6 +273,8 @@ pub struct Update<X: Extension = NoExt> {
     pub or_action: Option<ConflictResolution>,
     /// Object targeted by this syntax.
     pub target: DmlTarget,
+    /// Joins attached directly to the update target.
+    pub target_joins: ThinVec<Join<X>>,
     /// assignments in source order.
     pub assignments: ThinVec<UpdateAssignment<X>>,
     /// from in source order.
@@ -380,6 +395,10 @@ pub struct Delete<X: Extension = NoExt> {
     pub with: Option<With<X>>,
     /// Object targeted by this syntax.
     pub target: DmlTarget,
+    /// Additional comma-separated delete targets.
+    pub additional_targets: ThinVec<DmlTarget>,
+    /// Joins attached directly to the first delete target.
+    pub target_joins: ThinVec<Join<X>>,
     /// using in source order.
     pub using: ThinVec<TableWithJoins<X>>,
     /// Predicate that filters input rows.
@@ -683,6 +702,8 @@ pub enum MergeAction<X: Extension = NoExt> {
         overriding: Option<InsertOverriding>,
         /// Values in source order.
         values: ThinVec<InsertValue<X>>,
+        /// Additional value rows in source order; empty for the standard single-row form.
+        additional_rows: ThinVec<ThinVec<InsertValue<X>>>,
         /// Source location and node identity.
         meta: Meta,
     },

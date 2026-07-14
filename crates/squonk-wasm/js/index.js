@@ -7,7 +7,7 @@ import { createNodeSquonk } from "./node.js";
 const api = createNodeSquonk(initSync, wasm, new URL("../pkg-all/squonk_wasm_bg.wasm", import.meta.url), {
     defaultDialect: "ansi",
     supportedDialects: [
-        "ansi", "postgres", "mysql", "sqlite", "duckdb", "bigquery", "hive",
+        "ansi", "postgres", "mysql", "sqlite", "duckdb", "quiltdb", "bigquery", "hive",
         "clickhouse", "databricks", "mssql", "snowflake", "redshift", "lenient",
     ],
 });
