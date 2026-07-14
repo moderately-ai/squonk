@@ -103,21 +103,23 @@ across process medians is no greater than 5%.
 
 | Ecosystem | Parser | Median MiB/s | 95% bootstrap interval | Process CV | Relative to peer |
 | --- | --- | ---: | ---: | ---: | ---: |
-| Rust | Squonk | 35.99 | 35.81–36.05 | 0.45% | **2.37×** |
-| Rust | datafusion-sqlparser-rs | 15.16 | 15.06–15.30 | 1.03% | 1.00× |
-| Python | Squonk | 0.39 | 0.385–0.393 | 3.86% | **0.61×** |
-| Python | sqlglot | 0.64 | 0.621–0.649 | 3.19% | 1.00× |
-| Node | Squonk | 0.38 | 0.376–0.384 | 1.33% | **0.25×** |
-| Node | node-sql-parser | 1.53 | 1.526–1.543 | 0.85% | 1.00× |
+| Rust | Squonk | 35.36 | 35.26–35.45 | 0.27% | **2.33×** |
+| Rust | datafusion-sqlparser-rs | 15.21 | 14.89–15.27 | 1.73% | 1.00× |
+| Python | Squonk | 27.70 | 27.447–27.891 | 0.78% | **43.43×** |
+| Python | sqlglot | 0.64 | 0.628–0.650 | 2.23% | 1.00× |
+| Node | Squonk | 20.96 | 20.920–21.045 | 0.38% | **13.63×** |
+| Node | node-sql-parser | 1.54 | 1.528–1.545 | 0.69% | 1.00× |
 
 The result supports a narrow claim: on this workload and host, the Rust library processed
-input 2.37 times as quickly as its direct Rust peer. The Python and Node Squonk packages had
-lower warm throughput than their direct peers.
+input 2.33 times as quickly as its direct Rust peer. The native Python and Node packages
+processed input 43.43 and 13.63 times as quickly as their respective direct peers.
 
-Squonk's binding results include construction of documents that carry source text, byte
-spans, stable node IDs, and the cross-language representation. The comparison does not
-subtract that work because users pay for it. It also means the Python and Node ratios must
-not be presented as measurements of the Rust parser core alone.
+Squonk's binding results include construction of native documents that retain the complete
+AST, source text, byte spans, and stable node IDs. Python and JavaScript views materialize
+the cross-language object representation lazily when callers traverse or request raw data;
+that deferred work is not part of this parse-only metric. The peer parsers return their
+normal runtime-native trees, so these remain public-product comparisons rather than
+measurements of the Rust parser core alone.
 
 ![Full-AST throughput relative to each ecosystem peer](assets/performance-summary.png)
 
@@ -139,12 +141,12 @@ descriptive because starting a native executable, CPython, and Node are differen
 
 | Ecosystem | Parser | Median ms | 95% bootstrap interval |
 | --- | --- | ---: | ---: |
-| Rust | Squonk | 2.35 | 2.29–2.57 |
-| Rust | datafusion-sqlparser-rs | 2.44 | 2.41–2.47 |
-| Python | Squonk | **36.30** | 36.17–36.51 |
-| Python | sqlglot | 75.57 | 75.34–76.29 |
-| Node | Squonk | **45.93** | 45.78–46.61 |
-| Node | node-sql-parser | 112.59 | 112.30–114.08 |
+| Rust | Squonk | **2.35** | 2.31–2.38 |
+| Rust | datafusion-sqlparser-rs | 2.51 | 2.44–2.55 |
+| Python | Squonk | **35.99** | 35.65–36.24 |
+| Python | sqlglot | 75.83 | 75.41–76.08 |
+| Node | Squonk | **26.16** | 25.85–26.56 |
+| Node | node-sql-parser | 117.00 | 116.62–117.43 |
 
 Rust startup was similar for the two parsers. The Squonk packages started and completed a
 first parse sooner than their Python and Node peers on this host. This does not offset or
@@ -179,18 +181,18 @@ Results are reportable when slope CV is no greater than 10% and every fit has R�
 
 | Ecosystem | Parser | Documents/MiB | Slope CV | Minimum R² | Conclusion |
 | --- | --- | ---: | ---: | ---: | --- |
-| Rust | Squonk | **470.37** | 1.27% | 0.995 | Linear estimate supported |
-| Rust | datafusion-sqlparser-rs | 47.42 | 0.09% | 1.000 | Linear estimate supported |
-| Python | Squonk | 3.55 | 0.14% | 0.999 | Linear estimate supported |
-| Python | sqlglot | **94.29** | 0.12% | 1.000 | Linear estimate supported |
-| Node | Squonk | — | 0.18% | 0.952 | Linear estimate not supported |
-| Node | node-sql-parser | — | 0.49% | 0.870 | Linear estimate not supported |
+| Rust | Squonk | **470.85** | 0.92% | 0.994 | Linear estimate supported |
+| Rust | datafusion-sqlparser-rs | 47.40 | 0.03% | 1.000 | Linear estimate supported |
+| Python | Squonk | — | 0.31% | 0.954 | Linear estimate not supported |
+| Python | sqlglot | **94.38** | 0.14% | 1.000 | Linear estimate supported |
+| Node | Squonk | — | 1.64% | 0.947 | Linear estimate not supported |
+| Node | node-sql-parser | — | 0.87% | 0.862 | Linear estimate not supported |
 
 The Rust result estimates roughly 9.9 times as many retained Squonk documents per MiB as
-`datafusion-sqlparser-rs` documents for this corpus. The Python Squonk document graph is
-substantially larger than sqlglot's. Neither Node series supports a linear per-document RSS
-claim under this experiment, so no Node slope is reported and memory is not used in the
-README summary graphic.
+`datafusion-sqlparser-rs` documents for this corpus. Python Squonk and both Node series fail
+the minimum-R² reporting rule, so their slopes are not reported. Python sqlglot remains
+linear, but without a reportable Squonk slope there is no Python product-memory ratio. Memory
+is therefore not used in the README summary graphic.
 
 ## Specialized Rust measurements
 

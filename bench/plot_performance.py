@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -44,7 +45,8 @@ def main() -> None:
     parser.add_argument("--input", type=Path, default=DEFAULT_RESULT)
     parser.add_argument("--output", type=Path, default=OUTPUT)
     args = parser.parse_args()
-    result = json.loads(args.input.read_text())
+    result_bytes = args.input.read_bytes()
+    result = json.loads(result_bytes)
     if result["schema"] != "squonk.publication-benchmark/1":
         raise ValueError("unsupported publication result schema")
 
@@ -151,7 +153,16 @@ def main() -> None:
             f"performance figure contains overlapping data labels: {collisions}"
         )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(args.output, dpi=190, bbox_inches="tight", facecolor="white")
+    fig.savefig(
+        args.output,
+        dpi=190,
+        bbox_inches="tight",
+        facecolor="white",
+        metadata={
+            "Benchmark-SHA256": hashlib.sha256(result_bytes).hexdigest(),
+            "Benchmark-Source-Commit": result["source_commit"],
+        },
+    )
     plt.close(fig)
 
 

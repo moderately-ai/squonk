@@ -3,12 +3,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+
+from PIL import Image
 
 
 HERE = Path(__file__).resolve().parent
@@ -61,6 +64,42 @@ class PublicationTests(unittest.TestCase):
                 check=True,
             )
             self.assertGreater(output.stat().st_size, 10_000)
+
+        result = json.loads(source.read_text())
+        with Image.open(ROOT / "docs" / "assets" / "performance-summary.png") as image:
+            self.assertEqual(
+                image.info.get("Benchmark-SHA256"),
+                hashlib.sha256(source.read_bytes()).hexdigest(),
+            )
+            self.assertEqual(
+                image.info.get("Benchmark-Source-Commit"), result["source_commit"]
+            )
+
+    def test_published_headline_values_match_result(self) -> None:
+        result = json.loads((HERE / "results" / "headline.json").read_text())
+        tools = {
+            (tool["ecosystem"], tool["tool"]): tool for tool in result["tools"]
+        }
+        ratios = {
+            ecosystem: tools[(ecosystem, "squonk")]["timing"][
+                "median_mib_per_second"
+            ]
+            / next(
+                tool["timing"]["median_mib_per_second"]
+                for (candidate_ecosystem, name), tool in tools.items()
+                if candidate_ecosystem == ecosystem and name != "squonk"
+            )
+            for ecosystem in ("rust", "python", "node")
+        }
+        readme = (ROOT / "README.md").read_text()
+        performance = (ROOT / "docs" / "performance.md").read_text()
+        for ecosystem, ratio in ratios.items():
+            formatted = f"{ratio:.2f}×"
+            self.assertIn(formatted, readme, ecosystem)
+            self.assertIn(formatted, performance, ecosystem)
+        for tool in result["tools"]:
+            median = tool["timing"]["median_mib_per_second"]
+            self.assertIn(f"{median:.2f}", performance, tool["tool"])
 
 
 if __name__ == "__main__":

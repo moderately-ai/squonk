@@ -112,7 +112,7 @@ Additional coverage includes:
 * cross-dialect fuzzing
 * round-trip checks requiring parse, render, and reparse operations to produce the same structure
 
-Dialects without a full engine oracle—such as Snowflake, Databricks, and Redshift—use deliberately conservative presets. Every enabled feature must cite the engine’s documentation rather than rely on optimistic guesswork.
+Dialects without a full engine oracle—such as Snowflake, Databricks, and Redshift—use deliberately conservative presets. QuiltDB is held to its frozen parser-verdict corpus and curated reject fixture. Every enabled feature must cite an engine, standard, or first-party contract rather than rely on optimistic guesswork.
 
 Partial or comparison-based oracles are labelled clearly. ClickHouse is checked with `clickhouse local`, while BigQuery is cross-checked against sqlglot.
 
@@ -126,15 +126,14 @@ language-runtime costs are not mistaken for parser-core differences.
 
 <img
   src="./docs/assets/performance-summary.png"
-  alt="Horizontal bars compare Squonk's full-AST throughput with a direct Rust, Python, and Node peer. Rust Squonk is 2.37 times its peer; the Python and Node bindings are 0.61 and 0.25 times their peers."
+  alt="Horizontal bars compare Squonk's full-AST throughput with a direct Rust, Python, and Node peer. Squonk is 2.33, 43.43, and 13.63 times its Rust, Python, and Node peers."
   width="1200"
 />
 
-On the controlled Linux snapshot, Rust Squonk delivered **2.37×** the full-AST throughput
-of `datafusion-sqlparser-rs`. Through the Python and Node APIs it delivered **0.61×** and
-**0.25×** the throughput of sqlglot and `node-sql-parser`, respectively. Those binding
-measurements include materializing Squonk documents with source spans and node IDs; they are
-product costs, not Rust-core measurements.
+On the controlled Linux snapshot, Squonk delivered **2.33×**, **43.43×**, and **13.63×**
+the full-AST throughput of its direct Rust, Python, and Node peers, respectively. The binding
+measurements exercise the public document APIs, including their native object construction;
+they are product measurements rather than Rust-core-only results.
 
 Why this metric is useful, which comparisons are valid, cold-start and retained-memory
 results, uncertainty, limitations, and the raw observations are documented in
@@ -144,7 +143,7 @@ results, uncertainty, limitations, and the raw observations are documented in
 
 The default build includes only ANSI and depends on `thin-vec`. Everything else is opt-in:
 
-* `postgres`, `mysql`, `sqlite`, `duckdb` — engine-verified dialects
+* `postgres`, `mysql`, `sqlite`, `duckdb`, `quiltdb` — stable, conformance-gated dialects
 * `bigquery`, `clickhouse`, `databricks`, `hive`, `mssql`, `redshift`, `snowflake` — documentation-backed or partially verified presets; see [support tiers](./docs/support-tiers.md)
 * `lenient` — a permissive union dialect for parse-almost-anything workloads
 * `full` — all dialect features listed above
