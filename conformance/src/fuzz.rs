@@ -765,6 +765,12 @@ pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
 /// for the segmentation half.
 #[cfg(feature = "oracle-engines")]
 pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // A nested block comment closes before the trailing non-ASCII code point, which
+    // DuckDB's extraction API discards as bare-context input.
+    b"/*;/**/\";*/\xd8\x9a",
+    // DuckDB's maintenance target may use its single-quoted name spelling, including
+    // an empty name and no trivia after the statement head.
+    b"VACUUM''",
     // `GRANT` is unreserved in DuckDB and can name a FROM relation; the second
     // unreserved word is its alias.
     b"FROM grant sm8",

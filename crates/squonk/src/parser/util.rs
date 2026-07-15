@@ -69,7 +69,7 @@ use crate::ast::{
 };
 use crate::error::ParseResult;
 use crate::tokenizer::{Operator, Punctuation, TokenKind};
-use thin_vec::ThinVec;
+use thin_vec::{ThinVec, thin_vec};
 
 use super::Dialect;
 use super::engine::Parser;
@@ -2633,20 +2633,28 @@ impl<'a, D: Dialect> Parser<'a, D> {
         } else {
             None
         };
-        // The optional name operand: DuckDB's qualified table or SQLite's single-ident
-        // (non-dotted) schema. `VACUUM main.t` is a SQLite syntax error, so the SQLite
-        // branch reads a bare [`parse_ident`](Self::parse_ident); DuckDB reads a dotted
-        // [`parse_object_name`](Self::parse_object_name).
-        let (schema, table) =
-            if !self.peek_is_contextual_keyword("INTO")? && self.peek_can_start_column_name()? {
-                if duck {
-                    (None, Some(self.parse_object_name()?))
-                } else {
-                    (Some(self.parse_ident()?), None)
-                }
+        // The optional name operand: DuckDB's qualified table (or single-quoted table
+        // name) or SQLite's single-ident schema. `VACUUM main.t` is a SQLite syntax
+        // error, so the SQLite branch reads a bare [`parse_ident`](Self::parse_ident);
+        // DuckDB reads either a dotted [`parse_object_name`](Self::parse_object_name)
+        // or one string-spelled identifier.
+        let string_table = duck && self.peek_is_string()?;
+        let (schema, table) = if !self.peek_is_contextual_keyword("INTO")?
+            && (self.peek_can_start_column_name()? || string_table)
+        {
+            if string_table {
+                let ident = self
+                    .parse_string_alias_ident()?
+                    .expect("string_table confirms a plain string token");
+                (None, Some(ObjectName(thin_vec![ident])))
+            } else if duck {
+                (None, Some(self.parse_object_name()?))
             } else {
-                (None, None)
-            };
+                (Some(self.parse_ident()?), None)
+            }
+        } else {
+            (None, None)
+        };
         // DuckDB column list, only alongside a table (`VACUUM t (a, b)`).
         let columns = if duck && table.is_some() {
             self.parse_optional_maintenance_column_list()?
@@ -2730,11 +2738,19 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// Parse an `ANALYZE [<schema> | [<schema> .] <table-or-index>]` statement into
     /// [`Statement::Analyze`], reached under
     /// [`MaintenanceSyntax::analyze`](crate::ast::dialect::UtilitySyntax). The optional
-    /// target mirrors [`parse_reindex_statement`](Self::parse_reindex_statement).
+    /// target mirrors [`parse_reindex_statement`](Self::parse_reindex_statement), with
+    /// DuckDB's single-quoted table-name spelling alongside its column-list form.
     pub(super) fn parse_analyze_statement(&mut self) -> ParseResult<Statement<D::Ext>> {
         let start = self.current_span()?;
         self.expect_contextual_keyword("ANALYZE")?;
-        let target = if self.peek_can_start_column_name()? {
+        let string_target =
+            self.features().maintenance_syntax.analyze_columns && self.peek_is_string()?;
+        let target = if string_target {
+            let ident = self
+                .parse_string_alias_ident()?
+                .expect("string_target confirms a plain string token");
+            Some(ObjectName(thin_vec![ident]))
+        } else if self.peek_can_start_column_name()? {
             Some(self.parse_object_name()?)
         } else {
             None
@@ -6243,9 +6259,8 @@ mod tests {
     fn duckdb_vacuum_analyze_parse_and_round_trip() {
         // The forms DuckDB 1.5.4 admits (measured on the live `duckdb` v1.5.4 oracle): the
         // bare statements, the `VACUUM ANALYZE` option in both its bare-keyword and
-        // parenthesized-list spellings, a *qualified* table (`VACUUM db.t` — DuckDB, unlike
-        // SQLite, accepts a dotted name), and the parenthesized column list. Each
-        // round-trips through the fitted `DuckDb` renderer.
+        // parenthesized-list spellings, a qualified or single-quoted table name, and the
+        // parenthesized column list. Each round-trips through the fitted `DuckDb` renderer.
         for sql in [
             "VACUUM",
             "VACUUM ANALYZE",
@@ -6256,10 +6271,15 @@ mod tests {
             "VACUUM ANALYZE t (a, b)",
             "VACUUM (ANALYZE) t (a, b)",
             "VACUUM t (a)",
+            "VACUUM ''",
+            "VACUUM 'table name'",
+            "VACUUM ANALYZE 'table name'",
+            "VACUUM (ANALYZE) 'table name'",
             "ANALYZE",
             "ANALYZE t4",
             "ANALYZE main.t",
             "ANALYZE t (a, b)",
+            "ANALYZE 'table name'",
         ] {
             let parsed = parse_with(sql, crate::ParseConfig::new(DUCKDB_RENDER))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));

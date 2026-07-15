@@ -1334,9 +1334,9 @@ pub struct VacuumStatement<X: Extension = NoExt> {
     /// parenthesized `VACUUM (ANALYZE)`), the one vacuum option 1.5.4 admits; `None` when
     /// absent. See [`VacuumAnalyze`]. Always `None` under SQLite.
     pub analyze: Option<VacuumAnalyze>,
-    /// DuckDB: the *qualified* table to vacuum (`VACUUM db.t`); `None` when absent. A
-    /// dotted [`ObjectName`], unlike SQLite's single-ident [`schema`](Self::schema).
-    /// Always `None` under SQLite.
+    /// DuckDB: the table to vacuum (`VACUUM db.t` or `VACUUM 'table name'`); `None`
+    /// when absent. A possibly dotted [`ObjectName`], unlike SQLite's single-ident
+    /// [`schema`](Self::schema). Always `None` under SQLite.
     pub table: Option<ObjectName>,
     /// DuckDB: the parenthesized column list restricting the vacuum/analyze; `None` when
     /// the clause is absent. Present only alongside [`table`](Self::table), and always

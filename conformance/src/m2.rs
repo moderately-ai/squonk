@@ -353,6 +353,7 @@ fn strip_bare_context_nonascii(sql: &str) -> String {
     let bytes = sql.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut state = State::Normal;
+    let mut block_depth = 0_u32;
     let mut i = 0;
     while i < bytes.len() {
         let b = bytes[i];
@@ -372,6 +373,7 @@ fn strip_bare_context_nonascii(sql: &str) -> String {
                     continue;
                 } else if b == b'/' && bytes.get(i + 1) == Some(&b'*') {
                     state = State::BlockComment;
+                    block_depth = 1;
                     out.push(b);
                     out.push(b'*');
                     i += 2;
@@ -414,9 +416,20 @@ fn strip_bare_context_nonascii(sql: &str) -> String {
             }
             State::BlockComment => {
                 out.push(b);
+                if b == b'/' && bytes.get(i + 1) == Some(&b'*') {
+                    out.push(b'*');
+                    block_depth = block_depth
+                        .checked_add(1)
+                        .expect("block-comment nesting depth exceeds u32::MAX");
+                    i += 2;
+                    continue;
+                }
                 if b == b'*' && bytes.get(i + 1) == Some(&b'/') {
                     out.push(b'/');
-                    state = State::Normal;
+                    block_depth -= 1;
+                    if block_depth == 0 {
+                        state = State::Normal;
+                    }
                     i += 2;
                     continue;
                 }
@@ -588,6 +601,7 @@ mod tests {
         assert_eq!(strip_bare_context_nonascii("--\r𑌬"), "--\r");
         assert_eq!(strip_bare_context_nonascii("--\n𑌬"), "--\n");
         assert_eq!(strip_bare_context_nonascii("--𑌬"), "--𑌬");
+        assert_eq!(strip_bare_context_nonascii("/*;/**/\";*/ؚ"), "/*;/**/\";*/",);
     }
     use crate::oracle::accept_reject_divergence;
     use crate::pg::PgQueryOracle;
