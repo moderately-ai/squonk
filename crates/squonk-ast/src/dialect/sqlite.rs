@@ -851,6 +851,7 @@ impl SelectSyntax {
         // FROM-first SELECT is a DuckDB extension; SQLite rejects a statement-position
         // `FROM`.
         from_first: false,
+        explicit_table: false,
         // SQLite rejects a ragged VALUES constructor at parse — engine-measured via
         // rusqlite `prepare`: "all VALUES must have the same number of terms" — so the
         // preset enforces equal row arity, matching DuckDB (the shared parse-time gate

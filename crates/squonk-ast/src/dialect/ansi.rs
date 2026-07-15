@@ -580,6 +580,7 @@ impl SelectSyntax {
         // FROM-first SELECT (`FROM t SELECT x`, bare `FROM t`) is a DuckDB extension; a
         // leading `FROM` is never a statement start in standard SQL.
         from_first: false,
+        explicit_table: true,
         // Standard SQL admits a parenthesized query as a compound operand
         // (`(SELECT …) UNION (SELECT …)`, PostgreSQL `select_with_parens`).
         parenthesized_query_operands: true,

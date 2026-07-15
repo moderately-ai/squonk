@@ -207,7 +207,15 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// so the factor must not also carry its own trailing alias — `FROM b : a AS c` /
     /// `FROM b : a c` reject, matching the engine's mutual exclusion.
     fn parse_prefix_colon_aliased_factor(&mut self) -> ParseResult<TableFactor<D::Ext>> {
-        let name = self.parse_bare_alias_ident()?;
+        // The prefix alias is a bare ColLabel, or under `string_literal_table_names` a
+        // single-part Sconst (`FROM '' : t`).
+        let name = if self.features().identifier_syntax.string_literal_table_names
+            && self.peek_is_name_sconst()?
+        {
+            self.parse_name_sconst_ident("a prefix table alias")?
+        } else {
+            self.parse_bare_alias_ident()?
+        };
         let alias_meta = self.make_meta(name.span());
         self.expect_punct(Punctuation::Colon, "`:` after a prefix table alias")?;
         let alias = Box::new(TableAlias {

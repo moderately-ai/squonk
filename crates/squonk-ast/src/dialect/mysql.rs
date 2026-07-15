@@ -801,6 +801,7 @@ impl SelectSyntax {
         // FROM-first SELECT is a DuckDB extension; MySQL rejects a statement-position
         // `FROM`.
         from_first: false,
+        explicit_table: true,
         parenthesized_query_operands: true,
         // MySQL accepts a ragged VALUES constructor at parse and rejects it later; the
         // parse-time equal-arity check is a DuckDB-only tightening, so it is off here.

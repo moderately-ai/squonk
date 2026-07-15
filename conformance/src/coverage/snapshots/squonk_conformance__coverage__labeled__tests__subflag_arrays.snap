@@ -266,6 +266,7 @@ select_syntax
   bare_alias_string_literals
   union_by_name
   from_first
+  explicit_table
   wildcard_modifiers
   qualified_wildcard_alias
   parenthesized_query_operands

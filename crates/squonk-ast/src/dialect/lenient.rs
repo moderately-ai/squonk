@@ -861,6 +861,7 @@ impl SelectSyntax {
         // acceptance addition, conflict-free because `FROM` is reserved in the ANSI model
         // rule 5 keeps, so a leading `FROM` can never be a bare column/alias.
         from_first: true,
+        explicit_table: true,
         parenthesized_query_operands: true,
         // `LENIENT` is a pure-acceptance superset, so it does *not* enforce DuckDB's
         // parse-time equal-arity reject — a ragged VALUES constructor stays accepted here.

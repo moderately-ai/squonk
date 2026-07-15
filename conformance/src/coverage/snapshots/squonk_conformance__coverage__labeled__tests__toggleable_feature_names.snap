@@ -183,6 +183,7 @@ select_syntax::as_alias_rejects_reserved
 select_syntax::bare_alias_string_literals
 select_syntax::distinct_on
 select_syntax::empty_target_list
+select_syntax::explicit_table
 select_syntax::from_first
 select_syntax::parenthesized_query_operands
 select_syntax::qualified_wildcard_alias

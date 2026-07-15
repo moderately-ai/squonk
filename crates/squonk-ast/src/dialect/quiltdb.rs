@@ -88,6 +88,7 @@ impl SelectSyntax {
         union_by_name: false,
         qualified_wildcard_alias: true,
         from_first: false,
+        explicit_table: true,
         parenthesized_query_operands: true,
         values_rows_require_equal_arity: false,
         values_row_constructor: true,

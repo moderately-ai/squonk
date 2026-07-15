@@ -115,6 +115,9 @@ pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // joined segment so `e''''\\r'c…\\t…` tokenizes (libpg_query accepts).
     b"--k?\ndo''''\r'c'''''e''e''''''''''e''e''''\r'c''''''\\\t\\''e''e''''''''''e''e''''''''e''e''''",
     b"SELECT e''''\r'c''''''\\\t\\''",
+    // SET var_value admits Sconst only — bit-string `b''` is a parse reject.
+    b"set pd='',b''",
+    b"set\x0cpd=''\x0c\x0c,b''\x0c",
     // PostgreSQL's scanner accepts digit runs beyond u32 and materializes them via
     // its C `atol` -> parser-int path; Squonk retains the spelling and mirrors that
     // value only in the structural oracle projection.
@@ -652,6 +655,9 @@ pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     b"rollback to'+'",
     // Leading form-feed / vertical-tab whitespace before a string savepoint name.
     b"\x0c\x0brollback to'+'",
+    // SQLite syntax-rejects the SQL `<explicit table>` form (`TABLE t`).
+    b"table tab",
+    b"\x0c\x0c;table\x0ctab",
     // A transaction-state prepare failure must be retried in an active transaction
     // so SQLite exposes and rejects the otherwise-hidden invalid tail.
     b"EnD\ntrAnsaction--\nE",
@@ -800,6 +806,9 @@ pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // DuckDB admits a single-part Sconst table name in FROM (`from''`).
     b"from''",
     b"FROM 't'",
+    // DuckDB prefix colon alias with string names (`FROM '' : ''`).
+    b"from'':''",
+    b"from''\n\n:''",
     // `GRANT` is unreserved in DuckDB and can name a FROM relation; the second
     // unreserved word is its alias.
     b"FROM grant sm8",

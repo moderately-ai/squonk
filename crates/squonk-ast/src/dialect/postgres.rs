@@ -483,6 +483,7 @@ impl SelectSyntax {
         // FROM-first SELECT is a DuckDB extension; PostgreSQL rejects a statement-position
         // `FROM` (`FROM t SELECT x` is a syntax error there — a required over-accept guard).
         from_first: false,
+        explicit_table: true,
         parenthesized_query_operands: true,
         // libpg_query's raw grammar accepts a ragged VALUES constructor (`VALUES (1,2),(3)`);
         // PostgreSQL defers the equal-length check to parse-analysis, past parse-level

@@ -36,7 +36,7 @@ use thin_vec::{ThinVec, thin_vec};
 
 use super::Dialect;
 use super::engine::Parser;
-use super::expr::number_literal_kind;
+use super::expr::{number_literal_kind, string_literal_is_sconst};
 
 /// One element of the leading comma list shared by privilege and role-membership
 /// grants — a privilege/role word with its built-in classification (if any) and an
@@ -961,6 +961,15 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 Ok(SetParameterValue::Literal { literal, meta })
             }
             Some(token) if token.kind == TokenKind::String => {
+                // PostgreSQL's `var_value` admits only an `Sconst` — plain / `E'…'` /
+                // dollar-quoted / `U&'…'`. A bit/hex constant (`b''`, `x'ab'`) is a
+                // distinct `BCONST`/`XCONST` and is a syntax error here (engine-measured
+                // on libpg_query: `set a='',b''` rejects at `b''`).
+                if !string_literal_is_sconst(self.span_text(token.span)) {
+                    return Err(
+                        self.unexpected("a string constant, number, or name in a SET value")
+                    );
+                }
                 self.advance()?;
                 let literal = Literal {
                     kind: LiteralKind::String,

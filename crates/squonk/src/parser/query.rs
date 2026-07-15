@@ -689,7 +689,8 @@ impl<'a, D: Dialect> Parser<'a, D> {
             return self.parse_unpivot_statement(start, Some(with));
         }
         if self.peek_is_keyword(Keyword::Select)?
-            || self.peek_is_keyword(Keyword::Table)?
+            || (self.features().select_syntax.explicit_table
+                && self.peek_is_keyword(Keyword::Table)?)
             || self.peek_is_keyword(Keyword::Values)?
             || self.peek_is_punct(Punctuation::LParen)?
             || (self.features().select_syntax.from_first && self.peek_is_keyword(Keyword::From)?)
@@ -1748,10 +1749,14 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 select: Box::new(select),
                 meta,
             })
-        } else if self.peek_is_keyword(Keyword::Table)? {
+        } else if self.features().select_syntax.explicit_table
+            && self.peek_is_keyword(Keyword::Table)?
+        {
             // `TABLE name` is `SELECT * FROM name` (SQL `<explicit table>`), so it
             // canonicalizes to a `Select` operand and composes in set operations
-            // (`TABLE a UNION TABLE b`) exactly as a bare `SELECT` does.
+            // (`TABLE a UNION TABLE b`) exactly as a bare `SELECT` does. Gated by
+            // [`SelectSyntax::explicit_table`]: off for SQLite, which syntax-rejects a
+            // leading `TABLE` (engine-measured on rusqlite).
             let select = self.parse_table_command()?;
             let meta = self.make_meta(select.span());
             Ok(SetExpr::Select {
@@ -2222,7 +2227,8 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// parse error in the other dialects (the over-acceptance guard).
     pub(super) fn peek_starts_query(&mut self) -> ParseResult<bool> {
         Ok(self.peek_is_keyword(Keyword::Select)?
-            || self.peek_is_keyword(Keyword::Table)?
+            || (self.features().select_syntax.explicit_table
+                && self.peek_is_keyword(Keyword::Table)?)
             || self.peek_is_keyword(Keyword::Values)?
             || self.peek_is_keyword(Keyword::With)?
             || (self.features().select_syntax.from_first && self.peek_is_keyword(Keyword::From)?))
@@ -3262,9 +3268,16 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// A `::` typecast lexes as [`Punctuation::DoubleColon`], not `Colon`, so `x :: int`
     /// never matches; the flag is checked first so the peeks are skipped when off.
     pub(super) fn peek_starts_prefix_colon_alias(&mut self) -> ParseResult<bool> {
-        Ok(self.features().select_syntax.prefix_colon_alias
-            && self.peek_can_start_bare_alias()?
-            && self.peek_nth_is_punct(1, Punctuation::Colon)?)
+        if !self.features().select_syntax.prefix_colon_alias {
+            return Ok(false);
+        }
+        // DuckDB admits a single-part Sconst as the prefix alias too (`FROM '' : t`,
+        // `FROM '' : ''`; engine-measured on libduckdb 1.5.4), so a name-Sconst head
+        // followed by `:` opens the same form as a bare-alias identifier.
+        let head_ok = self.peek_can_start_bare_alias()?
+            || (self.features().identifier_syntax.string_literal_table_names
+                && self.peek_is_name_sconst()?);
+        Ok(head_ok && self.peek_nth_is_punct(1, Punctuation::Colon)?)
     }
 
     /// True if the current token is the punctuation `punct`.

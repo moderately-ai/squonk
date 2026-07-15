@@ -2546,6 +2546,13 @@ pub struct SelectSyntax {
     /// derived table), so the one flag composes everywhere. On for DuckDB / Lenient, off
     /// elsewhere.
     pub from_first: bool,
+    /// Accept SQL's `<explicit table>` form `TABLE <name>` (equivalent to
+    /// `SELECT * FROM <name>`). On for ANSI / PostgreSQL / DuckDB / MySQL / Lenient
+    /// (engine-measured: libpg_query and libduckdb accept; mysql:8 accepts). Off for
+    /// SQLite, which syntax-rejects a leading `TABLE` (engine-measured on rusqlite:
+    /// `near "TABLE": syntax error`). When off, a leading `TABLE` is left undispatched
+    /// and surfaces as an unknown statement.
+    pub explicit_table: bool,
     /// Accept DuckDB's `UNION [ALL] BY NAME` name-matched set operation: pair the two
     /// inputs' columns by name (padding missing columns with NULL) instead of by
     /// position ([`SetExpr::SetOperation::by_name`](crate::ast::SetExpr) — a flag on

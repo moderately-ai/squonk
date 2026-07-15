@@ -234,6 +234,7 @@ const SELECT_SUBFLAGS: &[&str] = &[
     "bare_alias_string_literals",
     "union_by_name",
     "from_first",
+    "explicit_table",
     "wildcard_modifiers",
     "qualified_wildcard_alias",
     "parenthesized_query_operands",
@@ -892,6 +893,7 @@ toggleable_features! {
     (DESCRIBE_SUMMARIZE, "describe_summarize", ShowSyntax, show_syntax, ShowSyntax, describe_summarize),
     (INDEX_DROP_ON_TABLE, "index_drop_on_table", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, index_drop_on_table),
     (FROM_FIRST, "from_first", SelectSyntax, select_syntax, SelectSyntax, from_first),
+    (EXPLICIT_TABLE, "explicit_table", SelectSyntax, select_syntax, SelectSyntax, explicit_table),
     (WILDCARD_MODIFIERS, "wildcard_modifiers", SelectSyntax, select_syntax, SelectSyntax, wildcard_modifiers),
     (QUALIFIED_WILDCARD_ALIAS, "qualified_wildcard_alias", SelectSyntax, select_syntax, SelectSyntax, qualified_wildcard_alias),
     (LEADING_OFFSET, "leading_offset", QueryTailSyntax, query_tail_syntax, QueryTailSyntax, leading_offset),
@@ -1585,6 +1587,7 @@ const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &KEY_LOCK_STRENGTHS,
     &STACKED_LOCKING_CLAUSES,
     &FROM_FIRST,
+    &EXPLICIT_TABLE,
     &WILDCARD_MODIFIERS,
     &QUALIFIED_WILDCARD_ALIAS,
     &LEADING_OFFSET,
@@ -4575,6 +4578,15 @@ const LABELED_CASES: &[LabeledCase] = &[
         required: &[&FROM_FIRST],
         forbidden: &[],
     },
+    // SQL `<explicit table>` form `TABLE <name>`. On for ANSI/PostgreSQL/DuckDB/MySQL;
+    // off for SQLite (engine-measured reject). A genuine accept/reject flip: with the
+    // gate off a leading `TABLE` is not a query start.
+    LabeledCase {
+        sql: "TABLE t",
+        expect: Expect::Accept,
+        required: &[&EXPLICIT_TABLE],
+        forbidden: &[],
+    },
     // BigQuery/ZetaSQL query pipe syntax — the framework-level gate for the
     // `planner-parity-pipe-*` operators. A genuine accept/reject flip: the gate is shared
     // by the tokenizer, so with it off `|>` never lexes (the bytes stay `|` then `>`),
@@ -6127,6 +6139,7 @@ mod tests {
             bare_alias_string_literals: _,
             union_by_name: _,
             from_first: _,
+            explicit_table: _,
             wildcard_modifiers: _,
             qualified_wildcard_alias: _,
             parenthesized_query_operands: _,

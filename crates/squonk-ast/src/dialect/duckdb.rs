@@ -337,6 +337,7 @@ impl SelectSyntax {
         // `FROM`. `FROM` is reserved under the shared model, so the leading-`FROM` primary
         // can never shadow an identifier read (`duckdb-from-first-select`).
         from_first: true,
+        explicit_table: true,
         // DuckDB's `*`/`t.*` wildcard modifiers `EXCLUDE`/`REPLACE`/`RENAME` (probed on
         // 1.5.4) — an additive grammar delta over the PostgreSQL base, which has no
         // wildcard tail. `duckdb-select-star-modifiers`.
@@ -1986,6 +1987,7 @@ mod tests {
                 empty_target_list: false,
                 qualify: true,
                 from_first: true,
+                explicit_table: true,
                 union_by_name: true,
                 wildcard_modifiers: true,
                 values_rows_require_equal_arity: true,
