@@ -15,6 +15,7 @@
 //! and the special-cased subforms (`TIME ZONE`, `ROLE`, `SESSION AUTHORIZATION`,
 //! `CONSTRAINTS`, `NAMES`, and `SESSION CHARACTERISTICS`).
 
+use crate::ast::dialect::KeywordSet;
 use crate::ast::{
     AccessControlStatement, AccountName, AlterUser, AlterUserSpec, AuthOption, CharacterSetKeyword,
     ConfigParameter, ConstraintCheckTime, ConstraintsTarget, CreateUser, DefaultRoleTarget,
@@ -968,14 +969,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 let meta = self.make_meta(start.union(self.preceding_span()));
                 Ok(SetParameterValue::Literal { literal, meta })
             }
-            Some(token) if matches!(token.kind, TokenKind::Word | TokenKind::Keyword(_)) => {
-                self.advance()?;
-                let sym = self.intern_identifier(token);
-                let name = Ident {
-                    sym,
-                    quote: QuoteStyle::None,
-                    meta: self.make_meta(token.span),
-                };
+            Some(token)
+                if matches!(
+                    token.kind,
+                    TokenKind::Word | TokenKind::Keyword(_) | TokenKind::QuotedIdent
+                ) =>
+            {
+                let name = self.parse_ident_admitting(KeywordSet::EMPTY, "a SET value")?;
                 let meta = self.make_meta(start.union(self.preceding_span()));
                 Ok(SetParameterValue::Name { name, meta })
             }
@@ -2688,6 +2688,19 @@ mod tests {
         assert!(parse_with("SET o = on", crate::ParseConfig::new(DuckDb)).is_err());
         assert!(parse_with("SET o = null", crate::ParseConfig::new(Postgres)).is_err());
         assert!(parse_with("SET o = null", crate::ParseConfig::new(DuckDb)).is_ok());
+    }
+
+    #[test]
+    fn quoted_identifier_set_value_parses_and_renders() {
+        let sql = r#"SET """" = """""#;
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres))
+            .expect("a quoted parameter and quoted identifier value parse");
+        let rendered = Renderer::new(Postgres)
+            .render_parsed(&parsed)
+            .expect("the parsed SET statement renders");
+        assert_eq!(rendered, r#"SET """" TO """""#);
+        parse_with(&rendered, crate::ParseConfig::new(Postgres))
+            .expect("the canonical rendering parses again");
     }
 
     #[test]

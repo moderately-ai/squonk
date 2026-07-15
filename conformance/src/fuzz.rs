@@ -111,6 +111,9 @@ pub const DIFFERENTIAL_REPLAYS: &[&[u8]] = &[
 /// shapes around them (accepted or rejected by both) that give the mutator productive
 /// starting points for the actual over-acceptance hunt.
 pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // A quoted identifier is a `var_value` name, including an identifier whose
+    // materialized value is a double quote.
+    br#"SET """" = """""#,
     // PostgreSQL's `var_value` admits non-reserved words plus its explicit boolean
     // keywords; `DO` remains a reserved-word parse rejection.
     b"set\to=do",
@@ -762,6 +765,9 @@ pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
 /// for the segmentation half.
 #[cfg(feature = "oracle-engines")]
 pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // `GRANT` is unreserved in DuckDB and can name a FROM relation; the second
+    // unreserved word is its alias.
+    b"FROM grant sm8",
     // Schema-independent both-accept singles (curated M2 corpus shapes).
     b"SELECT 1",
     b"SELECT 1 + 2 * 3",

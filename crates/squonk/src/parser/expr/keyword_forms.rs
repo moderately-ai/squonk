@@ -177,6 +177,28 @@ impl<'a, D: Dialect> Parser<'a, D> {
             }
             Keyword::Exists => self.parse_exists_or_column(token),
             Keyword::Nullif => self.parse_nullif_or_column(token),
+            // An ordinary-identifier spelling followed by `(` is a regular call. This
+            // branch is reachable only when the dialect's function-name reservation
+            // data admits the spelling; PostgreSQL keeps these words reserved, while
+            // DuckDB classifies them as ordinary identifiers.
+            Keyword::CurrentCatalog
+            | Keyword::CurrentDate
+            | Keyword::CurrentRole
+            | Keyword::CurrentSchema
+            | Keyword::CurrentTime
+            | Keyword::CurrentTimestamp
+            | Keyword::CurrentUser
+            | Keyword::Localtime
+            | Keyword::Localtimestamp
+            | Keyword::SessionUser
+            | Keyword::SystemUser
+            | Keyword::User
+                if self.peek_nth_is_punct(1, Punctuation::LParen)?
+                    && self.token_admissible(token, self.features().reserved_function_name)
+                    && self.token_admissible(token, self.features().reserved_column_name) =>
+            {
+                self.parse_word_prefix(token)
+            }
             // SQL special value functions (PostgreSQL `SQLValueFunction`): a nullary
             // keyword or, for the four temporal forms, an optional precision.
             Keyword::CurrentCatalog

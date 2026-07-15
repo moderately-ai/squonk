@@ -76,9 +76,39 @@ pub const DUCKDB_NONSTANDARD_JOIN_RESERVATION: KeywordSet =
 pub const DUCKDB_SEMI_ANTI_JOIN_RESERVATION: KeywordSet =
     KeywordSet::from_keywords(&[Keyword::Semi, Keyword::Anti]);
 
+/// PostgreSQL-reserved words that DuckDB 1.5.4 classifies as `unreserved`.
+/// Both words are valid as a column/table name, function name, type name, and
+/// generic `SET` value. They remain rejected as bare projection aliases.
+pub const DUCKDB_UNRESERVED_CARVEOUT: KeywordSet =
+    KeywordSet::from_keywords(&[Keyword::Grant, Keyword::User]);
+
+/// PostgreSQL special-value keywords that are ordinary identifiers in DuckDB's
+/// keyword inventory. They remain available as built-in names, including call
+/// spellings, but carry no identifier-position reservation.
+pub const DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES: KeywordSet = KeywordSet::from_keywords(&[
+    Keyword::CurrentCatalog,
+    Keyword::CurrentDate,
+    Keyword::CurrentRole,
+    Keyword::CurrentSchema,
+    Keyword::CurrentTime,
+    Keyword::CurrentTimestamp,
+    Keyword::CurrentUser,
+    Keyword::Localtime,
+    Keyword::Localtimestamp,
+    Keyword::SessionUser,
+    Keyword::SystemUser,
+]);
+
+/// DuckDB's unreserved `GRANT` and `USER` words are not valid bare projection
+/// aliases, although they are valid identifiers in the other positions above.
+pub const DUCKDB_UNRESERVED_BARE_ALIAS_RESERVATION: KeywordSet =
+    KeywordSet::from_keywords(&[Keyword::Grant, Keyword::User]);
+
 /// DuckDB `ColId` reject set: the shared model plus `QUALIFY`, the `PIVOT`/`UNPIVOT`
 /// operators, and the nonstandard-join / semi-anti-join keywords.
 pub const DUCKDB_RESERVED_COLUMN_NAME: KeywordSet = RESERVED_COLUMN_NAME
+    .difference(DUCKDB_UNRESERVED_CARVEOUT)
+    .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
     .union(DUCKDB_QUALIFY_RESERVATION)
     .union(DUCKDB_PIVOT_RESERVATION)
     .union(DUCKDB_NONSTANDARD_JOIN_RESERVATION)
@@ -91,6 +121,8 @@ pub const DUCKDB_RESERVED_COLUMN_NAME: KeywordSet = RESERVED_COLUMN_NAME
 /// The `ASOF`/`POSITIONAL` words are *not* here: their `type_function` class admits
 /// `asof(1)` / `positional(1)` as calls, matching the engine.
 pub const DUCKDB_RESERVED_FUNCTION_NAME: KeywordSet = RESERVED_FUNCTION_NAME
+    .difference(DUCKDB_UNRESERVED_CARVEOUT)
+    .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
     .union(DUCKDB_QUALIFY_RESERVATION)
     .union(DUCKDB_PIVOT_RESERVATION)
     .union(DUCKDB_SEMI_ANTI_JOIN_RESERVATION);
@@ -100,12 +132,16 @@ pub const DUCKDB_RESERVED_FUNCTION_NAME: KeywordSet = RESERVED_FUNCTION_NAME
 /// semi-anti-join words are *not* here: `CAST(1 AS asof)` and `CAST(1 AS semi)` parse in
 /// the engine (the type position admits any non-`reserved` word).
 pub const DUCKDB_RESERVED_TYPE_NAME: KeywordSet = RESERVED_TYPE_NAME
+    .difference(DUCKDB_UNRESERVED_CARVEOUT)
+    .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
     .union(DUCKDB_QUALIFY_RESERVATION)
     .union(DUCKDB_PIVOT_RESERVATION);
 
 /// Fully reserved words rejected in a DuckDB generic `SET` value. The PostgreSQL-derived
 /// base is extended by DuckDB's own `reserved` keyword additions.
 pub const DUCKDB_RESERVED_SET_VALUE_WORDS: KeywordSet = RESERVED_SET_VALUE_WORDS
+    .difference(DUCKDB_UNRESERVED_CARVEOUT)
+    .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
     .union(DUCKDB_QUALIFY_RESERVATION)
     .union(DUCKDB_PIVOT_RESERVATION);
 
@@ -117,6 +153,8 @@ pub const DUCKDB_RESERVED_SET_VALUE_WORDS: KeywordSet = RESERVED_SET_VALUE_WORDS
 /// bare projection label (`SELECT 1 asof` / `SELECT 1 semi` syntax-error while
 /// `SELECT 1 AS asof` / `SELECT 1 AS semi` parse).
 pub const DUCKDB_RESERVED_BARE_ALIAS: KeywordSet = RESERVED_BARE_ALIAS
+    .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
+    .union(DUCKDB_UNRESERVED_BARE_ALIAS_RESERVATION)
     .union(DUCKDB_QUALIFY_RESERVATION)
     .union(DUCKDB_PIVOT_RESERVATION)
     .union(DUCKDB_NONSTANDARD_JOIN_RESERVATION)
@@ -1577,6 +1615,8 @@ mod tests {
         assert_eq!(
             DUCKDB_RESERVED_FUNCTION_NAME,
             RESERVED_FUNCTION_NAME
+                .difference(DUCKDB_UNRESERVED_CARVEOUT)
+                .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
                 .union(DUCKDB_QUALIFY_RESERVATION)
                 .union(DUCKDB_PIVOT_RESERVATION)
                 .union(DUCKDB_SEMI_ANTI_JOIN_RESERVATION)
@@ -1584,9 +1624,47 @@ mod tests {
         assert_eq!(
             DUCKDB_RESERVED_TYPE_NAME,
             RESERVED_TYPE_NAME
+                .difference(DUCKDB_UNRESERVED_CARVEOUT)
+                .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
                 .union(DUCKDB_QUALIFY_RESERVATION)
                 .union(DUCKDB_PIVOT_RESERVATION)
         );
+    }
+
+    #[test]
+    fn duckdb_carves_its_unreserved_words_out_of_postgres_reservation() {
+        for keyword in [Keyword::Grant, Keyword::User] {
+            assert!(DUCKDB_UNRESERVED_CARVEOUT.contains(keyword));
+            assert!(!DUCKDB_RESERVED_COLUMN_NAME.contains(keyword));
+            assert!(!DUCKDB_RESERVED_FUNCTION_NAME.contains(keyword));
+            assert!(!DUCKDB_RESERVED_TYPE_NAME.contains(keyword));
+            assert!(!DUCKDB_RESERVED_SET_VALUE_WORDS.contains(keyword));
+            assert!(DUCKDB_RESERVED_BARE_ALIAS.contains(keyword));
+        }
+    }
+
+    #[test]
+    fn duckdb_special_value_names_are_ordinary_identifiers() {
+        for keyword in [
+            Keyword::CurrentCatalog,
+            Keyword::CurrentDate,
+            Keyword::CurrentRole,
+            Keyword::CurrentSchema,
+            Keyword::CurrentTime,
+            Keyword::CurrentTimestamp,
+            Keyword::CurrentUser,
+            Keyword::Localtime,
+            Keyword::Localtimestamp,
+            Keyword::SessionUser,
+            Keyword::SystemUser,
+        ] {
+            assert!(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES.contains(keyword));
+            assert!(!DUCKDB_RESERVED_COLUMN_NAME.contains(keyword));
+            assert!(!DUCKDB_RESERVED_FUNCTION_NAME.contains(keyword));
+            assert!(!DUCKDB_RESERVED_TYPE_NAME.contains(keyword));
+            assert!(!DUCKDB_RESERVED_BARE_ALIAS.contains(keyword));
+            assert!(!DUCKDB_RESERVED_SET_VALUE_WORDS.contains(keyword));
+        }
     }
 
     #[test]
@@ -1633,6 +1711,8 @@ mod tests {
         assert_eq!(
             DUCKDB_RESERVED_COLUMN_NAME,
             RESERVED_COLUMN_NAME
+                .difference(DUCKDB_UNRESERVED_CARVEOUT)
+                .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
                 .union(DUCKDB_QUALIFY_RESERVATION)
                 .union(DUCKDB_PIVOT_RESERVATION)
                 .union(DUCKDB_NONSTANDARD_JOIN_RESERVATION)
@@ -1641,6 +1721,8 @@ mod tests {
         assert_eq!(
             DUCKDB_RESERVED_BARE_ALIAS,
             RESERVED_BARE_ALIAS
+                .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
+                .union(DUCKDB_UNRESERVED_BARE_ALIAS_RESERVATION)
                 .union(DUCKDB_QUALIFY_RESERVATION)
                 .union(DUCKDB_PIVOT_RESERVATION)
                 .union(DUCKDB_NONSTANDARD_JOIN_RESERVATION)

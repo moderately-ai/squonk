@@ -280,6 +280,63 @@ mod tests {
     }
 
     #[test]
+    fn duckdb_unreserved_words_follow_engine_positions() {
+        for word in ["grant", "user"] {
+            for template in [
+                "SELECT {} FROM t",
+                "SELECT * FROM {}",
+                "SELECT {}(1)",
+                "SELECT CAST(1 AS {})",
+                "SET x = {}",
+                "SELECT 1 AS {}",
+            ] {
+                let sql = template.replace("{}", word);
+                assert!(
+                    parse_with(&sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                    "DuckDB admits its unreserved word in {sql:?}",
+                );
+            }
+            let sql = format!("SELECT 1 {word}");
+            assert!(
+                parse_with(&sql, crate::ParseConfig::new(DuckDb)).is_err(),
+                "DuckDB rejects its unreserved word as a bare alias in {sql:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn duckdb_special_value_names_are_callable_and_unreserved() {
+        for word in [
+            "current_catalog",
+            "current_date",
+            "current_role",
+            "current_schema",
+            "current_time",
+            "current_timestamp",
+            "current_user",
+            "localtime",
+            "localtimestamp",
+            "session_user",
+            "system_user",
+        ] {
+            for template in [
+                "SELECT {} FROM t",
+                "SELECT * FROM {}",
+                "SELECT {}(1)",
+                "SELECT CAST(1 AS {})",
+                "SELECT 1 {}",
+                "SET x = {}",
+            ] {
+                let sql = template.replace("{}", word);
+                assert!(
+                    parse_with(&sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                    "DuckDB admits its ordinary identifier in {sql:?}",
+                );
+            }
+        }
+    }
+
+    #[test]
     fn qualify_stays_an_ordinary_identifier_elsewhere() {
         // The keyword-inventory addition must not reserve the word anywhere else:
         // ANSI and PostgreSQL keep accepting `qualify` in every identifier position
