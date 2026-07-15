@@ -989,12 +989,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// [`parse_set_parameter_value`](Self::parse_set_parameter_value) intentionally do not
     /// inherit this restriction merely because they reuse the same AST shape.
     fn parse_generic_set_parameter_value(&mut self) -> ParseResult<SetParameterValue> {
-        if let Some(token) = self.peek()?
-            && matches!(token.kind, TokenKind::Word | TokenKind::Keyword(_))
-            && !self.token_is_set_bareword_value(token)
-            && !self.token_is_set_special_keyword_value(token)
-        {
-            return Err(self.unexpected("a non-reserved word or literal as a SET value"));
+        if let Some(token) = self.peek()? {
+            if matches!(token.kind, TokenKind::Word | TokenKind::Keyword(_))
+                && !self.token_is_set_bareword_value(token)
+                && !self.token_is_set_special_keyword_value(token)
+            {
+                return Err(self.unexpected("a non-reserved word or literal as a SET value"));
+            }
         }
         self.parse_set_parameter_value()
     }
