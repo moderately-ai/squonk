@@ -64,6 +64,7 @@ impl Spanned for SetParameterValue {
         match self {
             SetParameterValue::Literal { meta, .. } => meta.span,
             SetParameterValue::Name { meta, .. } => meta.span,
+            SetParameterValue::Parameter { meta, .. } => meta.span,
             SetParameterValue::List { meta, .. } => meta.span,
         }
     }

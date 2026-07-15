@@ -969,6 +969,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 let meta = self.make_meta(start.union(self.preceding_span()));
                 Ok(SetParameterValue::Literal { literal, meta })
             }
+            Some(token) if token.kind == TokenKind::Parameter => {
+                let (kind, meta) = self.parse_parameter_kind(token)?;
+                Ok(SetParameterValue::Parameter { kind, meta })
+            }
             Some(token)
                 if matches!(
                     token.kind,
@@ -2531,9 +2535,9 @@ mod tests {
         AccessControlStatement, AccountName, AlterUser, AuthOption, CharacterSetKeyword,
         ConfigParameter, ConstraintCheckTime, ConstraintsTarget, Expr, GrantObject, Grantee,
         InstallComponentSetScope, InstallComponentSetValue, InstallStatement, NamedObjectKind,
-        Privilege, PrivilegeKind, PrivilegeLevel, PrivilegeObjectType, Privileges, Resolver as _,
-        RoleSpec, RoutineObjectKind, SchemaObjectKind, SessionStatement, SetAssignment,
-        SetCharacterSetValue, SetNamesValue, SetParameterValue, SetScope, SetValue,
+        ParameterKind, Privilege, PrivilegeKind, PrivilegeLevel, PrivilegeObjectType, Privileges,
+        Resolver as _, RoleSpec, RoutineObjectKind, SchemaObjectKind, SessionStatement,
+        SetAssignment, SetCharacterSetValue, SetNamesValue, SetParameterValue, SetScope, SetValue,
         SetVariableAssignment, SetVariableKeyword, SetVariableValue, SpecialSetValue, Statement,
         SystemVariableScope, SystemVariableScopeKind, UninstallStatement, UserRoleListKind,
         WithRoleSpec,
@@ -3185,6 +3189,29 @@ mod tests {
             panic!("expected `SET <name> = <values>`, got {session:?}");
         };
         values
+    }
+
+    #[test]
+    fn postgres_set_value_list_accepts_positional_parameters() {
+        let sql = "SET e6eme6eme1 = 0, 6, $888";
+        let session = parse_session_with(sql, Postgres);
+        let values = set_list_values(&session);
+        assert_eq!(values.len(), 3);
+        assert!(matches!(
+            values[2],
+            SetParameterValue::Parameter {
+                kind: ParameterKind::Positional(888),
+                ..
+            }
+        ));
+
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres)).expect("PostgreSQL SET");
+        assert_eq!(
+            Renderer::new(Postgres)
+                .render_parsed(&parsed)
+                .expect("render PostgreSQL SET"),
+            "SET e6eme6eme1 TO 0, 6, $888",
+        );
     }
 
     #[test]

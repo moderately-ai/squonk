@@ -88,6 +88,7 @@ export type SetValue =
 export type SetParameterValue =
   | { Literal: { literal: Literal; meta: Meta; } }
   | { Name: { name: Ident; meta: Meta; } }
+  | { Parameter: { kind: ParameterKind; meta: Meta; } }
   | { List: { values: SetParameterValue[]; meta: Meta; } };
 
 export type SpecialSetValue =

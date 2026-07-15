@@ -76,6 +76,7 @@ impl<'ast> Visit<'ast, NoExt> for NodeIdWalk {
         self.metas.push(match node {
             SetParameterValue::Literal { meta, .. } => *meta,
             SetParameterValue::Name { meta, .. } => *meta,
+            SetParameterValue::Parameter { meta, .. } => *meta,
             SetParameterValue::List { meta, .. } => *meta,
         });
         visit::walk_set_parameter_value(self, node);

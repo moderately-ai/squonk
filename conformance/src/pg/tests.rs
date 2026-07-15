@@ -2354,7 +2354,8 @@ const TCL_SHAPE_CORPUS: &[&str] = &[
     "SET TRANSACTION READ ONLY",
     "SET TRANSACTION NOT DEFERRABLE",
     // Generic SET / RESET / SHOW: the string, bareword (both fold to one string
-    // constant), signed-integer, float, multi-value, and LOCAL-scope forms.
+    // constant), signed-integer, float, positional-parameter, multi-value, and
+    // LOCAL-scope forms.
     "SET search_path TO public",
     "SET search_path = public",
     "SET search_path TO public, pg_catalog",
@@ -2363,6 +2364,7 @@ const TCL_SHAPE_CORPUS: &[&str] = &[
     "SET x = 1.5",
     "SET x = 'foo'",
     "SET x = foo",
+    "SET x = 0, 6, $888",
     "RESET ALL",
     "RESET search_path",
     "SHOW ALL",

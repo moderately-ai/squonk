@@ -83,6 +83,9 @@ export const AST_FIELD_TYPES = Object.freeze({
   "SetParameterValue.Name": Object.freeze({
     "name": "Ident",
   }),
+  "SetParameterValue.Parameter": Object.freeze({
+    "kind": "ParameterKind",
+  }),
   "SetParameterValue.List": Object.freeze({
     "values": "SetParameterValue[]",
   }),

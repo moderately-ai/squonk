@@ -9,7 +9,7 @@
 
 use crate::ast::*;
 pub(crate) struct RenderShapeFingerprint<const VALUE: u64>;
-pub(crate) const CURRENT_RENDER_SHAPE_DCL: RenderShapeFingerprint<0xc1598aa589abcdb4> =
+pub(crate) const CURRENT_RENDER_SHAPE_DCL: RenderShapeFingerprint<0x0bc66b9b4759b4e4> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_DDL: RenderShapeFingerprint<0xb7fb9938befad896> =
     RenderShapeFingerprint;
@@ -277,6 +277,10 @@ pub(crate) fn render_shape_set_parameter_value(node: &SetParameterValue) {
         }
         SetParameterValue::Name { name, meta } => {
             render_shape_ident(name);
+            touch(meta);
+        }
+        SetParameterValue::Parameter { kind, meta } => {
+            render_shape_parameter_kind(kind);
             touch(meta);
         }
         SetParameterValue::List { values, meta } => {

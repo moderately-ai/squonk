@@ -326,6 +326,15 @@ SetParameterValueNameJson = TypedDict("SetParameterValueNameJson", {
     "Name": "SetParameterValueNamePayloadJson",
 })
 
+SetParameterValueParameterPayloadJson = TypedDict("SetParameterValueParameterPayloadJson", {
+    "kind": "AstNodeJson",
+    "meta": "MetaJson",
+})
+
+SetParameterValueParameterJson = TypedDict("SetParameterValueParameterJson", {
+    "Parameter": "SetParameterValueParameterPayloadJson",
+})
+
 SetParameterValueListPayloadJson = TypedDict("SetParameterValueListPayloadJson", {
     "values": "list[AstNodeJson]",
     "meta": "MetaJson",
@@ -338,6 +347,7 @@ SetParameterValueListJson = TypedDict("SetParameterValueListJson", {
 SetParameterValueJson: TypeAlias = Union[
     SetParameterValueLiteralJson,
     SetParameterValueNameJson,
+    SetParameterValueParameterJson,
     SetParameterValueListJson,
 ]
 

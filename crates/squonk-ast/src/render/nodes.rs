@@ -171,7 +171,7 @@ use thin_vec::ThinVec;
 #[cfg(test)]
 use crate::generated::render_skeleton as skeleton;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0xc1598aa589abcdb4> = skeleton::CURRENT_RENDER_SHAPE_DCL;
+const _: skeleton::RenderShapeFingerprint<0x0bc66b9b4759b4e4> = skeleton::CURRENT_RENDER_SHAPE_DCL;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0xb7fb9938befad896> = skeleton::CURRENT_RENDER_SHAPE_DDL;
 #[cfg(test)]
@@ -1687,23 +1687,9 @@ impl<X: Extension + Render> Render for Expr<X> {
                 close_group(full, f)
             }
             Expr::Subquery { query, .. } => render_query_in_parens(query, ctx, f),
-            Expr::Parameter { kind, .. } => match kind {
-                ParameterKind::Positional(index) => write!(f, "${index}"),
-                ParameterKind::Numbered(index) => write!(f, "?{index}"),
-                ParameterKind::Anonymous => f.write_str("?"),
-                // A placeholder's identity — the positional index above, or the sigil
-                // and name here — is query structure, not a value, so it renders
-                // verbatim in every mode (a name is never masked the way a `Literal`
-                // value is). The sigil tag restores the original spelling.
-                ParameterKind::Named { name, sigil } => {
-                    let sigil = match sigil {
-                        ParameterSigil::Colon => ':',
-                        ParameterSigil::At => '@',
-                        ParameterSigil::Dollar => '$',
-                    };
-                    write!(f, "{sigil}{}", ctx.resolve(*name))
-                }
-            },
+            // A placeholder's identity is query structure, not a value, so it renders
+            // verbatim in every mode.
+            Expr::Parameter { kind, .. } => render_parameter_kind(*kind, ctx, f),
             // A positional column reference's identity — its 1-based index — is query
             // structure, not a value, so it renders verbatim in every mode (never masked
             // the way a `Literal` value is), like the positional parameter above.
@@ -4310,11 +4296,32 @@ impl Render for SetParameterValue {
         match self {
             Self::Literal { literal, .. } => literal.render(ctx, f),
             Self::Name { name, .. } => name.render(ctx, f),
+            Self::Parameter { kind, .. } => render_parameter_kind(*kind, ctx, f),
             Self::List { values, .. } => {
                 f.write_str("[")?;
                 render_comma_separated(values, ctx, f)?;
                 f.write_str("]")
             }
+        }
+    }
+}
+
+fn render_parameter_kind(
+    kind: ParameterKind,
+    ctx: &RenderCtx<'_>,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    match kind {
+        ParameterKind::Positional(index) => write!(f, "${index}"),
+        ParameterKind::Numbered(index) => write!(f, "?{index}"),
+        ParameterKind::Anonymous => f.write_str("?"),
+        ParameterKind::Named { name, sigil } => {
+            let sigil = match sigil {
+                ParameterSigil::Colon => ':',
+                ParameterSigil::At => '@',
+                ParameterSigil::Dollar => '$',
+            };
+            write!(f, "{sigil}{}", ctx.resolve(name))
         }
     }
 }

@@ -111,6 +111,8 @@ pub const DIFFERENTIAL_REPLAYS: &[&[u8]] = &[
 /// shapes around them (accepted or rejected by both) that give the mutator productive
 /// starting points for the actual over-acceptance hunt.
 pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // PostgreSQL's comma-separated `var_value` list admits positional parameters.
+    b"set\ne6eme6eme1=0,6,$888",
     // A quoted identifier is a `var_value` name, including an identifier whose
     // materialized value is a double quote.
     br#"SET """" = """""#,
@@ -765,6 +767,9 @@ pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
 /// for the segmentation half.
 #[cfg(feature = "oracle-engines")]
 pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // A lexical fault reached by speculative postfix/infix lookahead remains an error
+    // after the parser rewinds over the retained token buffer.
+    b"select+e+/+1\"",
     // A nested block comment closes before the trailing non-ASCII code point, which
     // DuckDB's extraction API discards as bare-context input.
     b"/*;/**/\";*/\xd8\x9a",

@@ -541,6 +541,16 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// than any real parameter list; the named form interns its name (sigil stripped),
     /// exact-case, so it round-trips like an identifier.
     fn parse_parameter(&mut self, token: Token) -> ParseResult<Expr<D::Ext>> {
+        let (kind, meta) = self.parse_parameter_kind(token)?;
+        Ok(Expr::Parameter { kind, meta })
+    }
+
+    /// Consume and materialize a parameter token for expression and restricted-value
+    /// productions that share the dialect's parameter spelling.
+    pub(in crate::parser) fn parse_parameter_kind(
+        &mut self,
+        token: Token,
+    ) -> ParseResult<(ParameterKind, crate::ast::Meta)> {
         self.advance()?; // consume the placeholder token
         let text = self.span_text(token.span);
         let bytes = text.as_bytes();
@@ -599,7 +609,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             _ => ParameterKind::Anonymous,
         };
         let meta = self.make_meta(token.span);
-        Ok(Expr::Parameter { kind, meta })
+        Ok((kind, meta))
     }
     /// Parse a DuckDB `#n` positional column reference into [`Expr::PositionalColumn`].
     ///

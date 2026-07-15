@@ -85,6 +85,9 @@ AST_FIELD_TYPES: dict[str, dict[str, str]] = {
     "SetParameterValue.Name": {
         "name": "Ident",
     },
+    "SetParameterValue.Parameter": {
+        "kind": "ParameterKind",
+    },
     "SetParameterValue.List": {
         "values": "SetParameterValue[]",
     },

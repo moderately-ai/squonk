@@ -2519,13 +2519,23 @@ fn pg_variable_set_shape(set: &pgpb::VariableSetStmt) -> Result<StatementShape, 
     }
 }
 
-fn pg_set_values(args: &[pgpb::Node]) -> Result<Vec<LiteralShape>, String> {
+fn pg_set_values(args: &[pgpb::Node]) -> Result<Vec<SetParameterValueShape>, String> {
     args.iter().map(pg_set_value).collect()
 }
 
-fn pg_set_value(node: &pgpb::Node) -> Result<LiteralShape, String> {
+fn pg_set_value(node: &pgpb::Node) -> Result<SetParameterValueShape, String> {
     match node.node.as_ref() {
-        Some(NodeEnum::AConst(value)) => pg_literal_shape(value),
+        Some(NodeEnum::AConst(value)) => {
+            pg_literal_shape(value).map(SetParameterValueShape::Literal)
+        }
+        Some(NodeEnum::ParamRef(parameter)) => u32::try_from(parameter.number)
+            .map(SetParameterValueShape::PositionalParameter)
+            .map_err(|_| {
+                format!(
+                    "PostgreSQL SET positional parameter is negative: {}",
+                    parameter.number
+                )
+            }),
         other => Err(format!("unsupported PostgreSQL SET value node: {other:?}")),
     }
 }

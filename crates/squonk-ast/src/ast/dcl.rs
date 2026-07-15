@@ -5,7 +5,7 @@
 
 use super::{
     AccountName, DataType, DropBehavior, Expr, Extension, Ident, Literal, NoExt, ObjectName,
-    TransactionMode,
+    ParameterKind, TransactionMode,
 };
 use crate::vocab::Meta;
 use thin_vec::ThinVec;
@@ -408,14 +408,15 @@ pub enum SetValue {
     },
 }
 
-/// One value in a `SET` value list: a literal, a bareword name, or a DuckDB
-/// bracketed list of values.
+/// One value in a `SET` value list: a literal, a bareword name, a parameter, or a
+/// DuckDB bracketed list of values.
 ///
 /// PostgreSQL accepts numbers, strings, and barewords such as `on`/`off`/`iso`
 /// here; arbitrary expressions are not valid, so the value is this restricted
 /// literal-or-name shape rather than an [`Expr`]. A leading sign on a
 /// numeric value (PG `NumericOnly`, e.g. `-1`) is folded into the numeric
 /// [`Literal`]'s span rather than modelled as a unary operator.
+/// PostgreSQL also admits a positional parameter such as `$1` as a `var_value`.
 ///
 /// DuckDB additionally admits a bracketed list value ([`List`](Self::List)) —
 /// `SET allowed_paths = ['a', 'b']`, `SET allowed_directories = []` — reusing the same
@@ -440,6 +441,14 @@ pub enum SetParameterValue {
     Name {
         /// Name referenced by this syntax.
         name: Ident,
+        /// Source location and node identity.
+        meta: Meta,
+    },
+    /// A prepared-statement parameter accepted by the active dialect's parameter
+    /// syntax, such as PostgreSQL's positional `$1`.
+    Parameter {
+        /// Placeholder identity and spelling.
+        kind: ParameterKind,
         /// Source location and node identity.
         meta: Meta,
     },

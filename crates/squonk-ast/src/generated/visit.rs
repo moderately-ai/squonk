@@ -2881,6 +2881,10 @@ where
             visitor.visit_ident(name);
             let _ = meta;
         }
+        SetParameterValue::Parameter { kind, meta } => {
+            visitor.visit_parameter_kind(kind);
+            let _ = meta;
+        }
         SetParameterValue::List { values, meta } => {
             for item in values.iter() {
                 visitor.visit_set_parameter_value(item);
@@ -21162,6 +21166,10 @@ where
         }
         SetParameterValue::Name { name, meta } => {
             visitor.visit_ident_mut(name);
+            let _ = meta;
+        }
+        SetParameterValue::Parameter { kind, meta } => {
+            visitor.visit_parameter_kind_mut(kind);
             let _ = meta;
         }
         SetParameterValue::List { values, meta } => {

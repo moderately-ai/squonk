@@ -47,13 +47,13 @@ use squonk_ast::{
     InsertValue, IsDistinctFromSpelling, IsNotDistinctFromSpelling, IsolationLevel, JoinConstraint,
     JoinOperator, Limit, Literal, LiteralKind, LockStrength, LockWait, LockingClause, Merge,
     MergeAction, MergeMatchKind, NamedObjectKind, NoExt, ObjectName, OnCommitAction, OnConflict,
-    OrderByExpr, PivotExpr, Privilege, PrivilegeKind, Privileges, Quantifier, Query, QuoteStyle,
-    ReferentialAction, RelationInheritance, Resolver as _, Returning, RoleSpec, RoutineObjectKind,
-    RoutineSignature, SchemaObjectKind, Select, SelectDistinct, SelectItem, SemiAntiSide,
-    SessionStatement, SetExpr, SetOperator, SetParameterValue, SetQuantifier, SetScope, SetValue,
-    SpecialFunctionKeyword, Statement, SubscriptKind, TableAlias, TableConstraint,
-    TableConstraintDef, TableElement, TableFactor, TableFunctionColumn, TableSample,
-    TableWithJoins, TimeTypeName, TimeZone, TimestampTypeName, TransactionAccessMode,
+    OrderByExpr, ParameterKind, PivotExpr, Privilege, PrivilegeKind, Privileges, Quantifier, Query,
+    QuoteStyle, ReferentialAction, RelationInheritance, Resolver as _, Returning, RoleSpec,
+    RoutineObjectKind, RoutineSignature, SchemaObjectKind, Select, SelectDistinct, SelectItem,
+    SemiAntiSide, SessionStatement, SetExpr, SetOperator, SetParameterValue, SetQuantifier,
+    SetScope, SetValue, SpecialFunctionKeyword, Statement, SubscriptKind, TableAlias,
+    TableConstraint, TableConstraintDef, TableElement, TableFactor, TableFunctionColumn,
+    TableSample, TableWithJoins, TimeTypeName, TimeZone, TimestampTypeName, TransactionAccessMode,
     TransactionMode, TransactionStart, TransactionStatement, UnaryOperator, Update,
     UpdateAssignment, UpdateTupleSource, UpdateValue, Upsert, Values, ValuesItem, ViewCheckOption,
     With,
@@ -1324,7 +1324,13 @@ pub enum SessionShape {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SetValueShape {
     Default,
-    Values(Vec<LiteralShape>),
+    Values(Vec<SetParameterValueShape>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SetParameterValueShape {
+    Literal(LiteralShape),
+    PositionalParameter(u32),
 }
 
 // ---- ACCESS CONTROL (GRANT / REVOKE) ---------------------------------------
@@ -2541,12 +2547,23 @@ fn squonk_set_value_shape(parsed: &Parsed, value: &SetValue) -> SetValueShape {
     }
 }
 
-fn set_parameter_value_shape(parsed: &Parsed, value: &SetParameterValue) -> LiteralShape {
+fn set_parameter_value_shape(parsed: &Parsed, value: &SetParameterValue) -> SetParameterValueShape {
     match value {
         // PostgreSQL collapses a bareword name and a string literal to one string
         // constant (`A_Const` `Sval`), so both map to `String` (ADR-0015).
-        SetParameterValue::Name { name, .. } => LiteralShape::String(ident_shape(parsed, name)),
-        SetParameterValue::Literal { literal, .. } => literal_scalar_shape(parsed, literal),
+        SetParameterValue::Name { name, .. } => {
+            SetParameterValueShape::Literal(LiteralShape::String(ident_shape(parsed, name)))
+        }
+        SetParameterValue::Literal { literal, .. } => {
+            SetParameterValueShape::Literal(literal_scalar_shape(parsed, literal))
+        }
+        SetParameterValue::Parameter {
+            kind: ParameterKind::Positional(index),
+            ..
+        } => SetParameterValueShape::PositionalParameter(*index),
+        SetParameterValue::Parameter { .. } => unreachable!(
+            "only positional-dollar parameters are enabled under the PostgreSQL preset"
+        ),
         // The bracketed list value is DuckDB-only (gated by `collection_literals`, off in
         // the PostgreSQL preset this differential parses under), so it never reaches this
         // PostgreSQL shape mapping.

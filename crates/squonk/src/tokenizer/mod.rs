@@ -169,6 +169,11 @@ enum BufferedTokenSource<'s> {
     Stream {
         cursor: Cursor<'s>,
         reached_eof: bool,
+        /// First lexical fault encountered while filling the lazy buffer. Scanning an
+        /// unterminated construct advances the byte cursor to EOF before returning the
+        /// error, so the fault must be retained: speculative lookahead may rewind the
+        /// token position and encounter this boundary again.
+        lex_error: Option<LexError>,
         /// Cross-token lexical state (an open versioned-comment region) — owned
         /// here so it survives across `scan_loop` refills exactly as the cursor
         /// position does.
@@ -221,6 +226,7 @@ impl<'s> BufferedTokenCursor<'s> {
             source: BufferedTokenSource::Stream {
                 cursor: Cursor::new(src),
                 reached_eof: false,
+                lex_error: None,
                 lex: scan::LexState::default(),
             },
             features: Some(features.clone()),
@@ -368,6 +374,7 @@ impl<'s> BufferedTokenCursor<'s> {
         let BufferedTokenSource::Stream {
             cursor,
             reached_eof,
+            lex_error,
             lex,
         } = &mut self.source
         else {
@@ -378,16 +385,24 @@ impl<'s> BufferedTokenCursor<'s> {
             .as_ref()
             .expect("streaming token cursors carry dialect features");
 
+        if let Some(error) = *lex_error {
+            return Err(error);
+        }
+
         while !*reached_eof && self.buffer_start + self.buffer.len() <= target {
-            match scan::next_token(cursor, features, trivia, lex)? {
-                Some(token) => {
+            match scan::next_token(cursor, features, trivia, lex) {
+                Ok(Some(token)) => {
                     if self.buffer.capacity() == 0 {
                         self.buffer
                             .reserve_exact(stream_buffer_initial_capacity(cursor.src()));
                     }
                     self.buffer.push(token);
                 }
-                None => *reached_eof = true,
+                Ok(None) => *reached_eof = true,
+                Err(error) => {
+                    *lex_error = Some(error);
+                    return Err(error);
+                }
             }
         }
         Ok(())
@@ -3123,6 +3138,31 @@ mod tests {
             Some(TokenKind::Word),
             "checkpoint rewind reuses the retained lazy buffer",
         );
+    }
+
+    #[test]
+    fn buffered_token_cursor_replays_lex_error_after_speculation() {
+        let mut cursor = BufferedTokenCursor::streaming("foo\"", &FeatureSet::ANSI)
+            .expect("streaming cursor starts");
+        let checkpoint = cursor.pos();
+
+        let first = cursor
+            .peek_nth(1)
+            .expect_err("lookahead reaches the unterminated identifier");
+        assert_eq!(first.kind, LexErrorKind::UnterminatedQuotedIdent);
+
+        cursor.seek(checkpoint);
+        assert_eq!(
+            cursor
+                .advance()
+                .expect("buffered word")
+                .map(|token| token.kind),
+            Some(TokenKind::Word),
+        );
+        let replayed = cursor
+            .peek()
+            .expect_err("the lexical fault remains after rewind and buffered consumption");
+        assert_eq!(replayed, first);
     }
 
     #[test]
