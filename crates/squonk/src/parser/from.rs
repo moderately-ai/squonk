@@ -1279,20 +1279,34 @@ impl<'a, D: Dialect> Parser<'a, D> {
             return self.parse_only_table_factor(start);
         }
 
-        let Some(token) = self.peek()? else {
-            return Err(self.unexpected("a table name, function call, or `(`"));
+        // DuckDB admits a single-part Sconst relation name (`FROM ''`, `FROM 't'`,
+        // `FROM E't'`, `FROM $$t$$`; engine-measured on libduckdb 1.5.4). Dotted string
+        // names (`FROM 'a'.'b'`) remain rejects. Gated by
+        // [`IdentifierSyntax::string_literal_table_names`]; MySQL/PostgreSQL syntax-reject
+        // a string here. A string name cannot open a table-function call (`'f'(…)`),
+        // so the Sconst arm falls straight through to the named-table tail.
+        let (name, name_start) = if self.features().identifier_syntax.string_literal_table_names
+            && self.peek_is_name_sconst()?
+        {
+            let ident = self.parse_name_sconst_ident("a table name")?;
+            let span = ident.meta.span;
+            (ObjectName(thin_vec![ident]), span)
+        } else {
+            let Some(token) = self.peek()? else {
+                return Err(self.unexpected("a table name, function call, or `(`"));
+            };
+            let head_reserved = self.name_or_call_head_reserved()?;
+            if !self.token_admissible(token, head_reserved) {
+                return Err(self.unexpected("a table name, function call, or `(`"));
+            }
+            let name = self.parse_object_name_with(head_reserved)?;
+            (name, token.span)
         };
-        let head_reserved = self.name_or_call_head_reserved()?;
-        if !self.token_admissible(token, head_reserved) {
-            return Err(self.unexpected("a table name, function call, or `(`"));
-        }
-
-        let name = self.parse_object_name_with(head_reserved)?;
         if self.peek_is_punct(Punctuation::LParen)? {
             if !self.features().table_factor_syntax.table_functions {
                 return Err(self.unexpected("a table expression supported by this dialect"));
             }
-            let function = self.parse_function_call(name, token.span)?;
+            let function = self.parse_function_call(name, name_start)?;
             // PostgreSQL's `func_table` is `func_expr_windowless`: a function in FROM admits
             // the plain `func_application` (arguments, a `DISTINCT` quantifier, an
             // in-parenthesis `ORDER BY`) but never the windowed/aggregate wrapper clauses —
@@ -1335,7 +1349,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // parts via composite-field selection, but that is a different grammar position
         // (see `expr`), so only the relation path is capped.
         if name.0.len() > self.max_relation_name_parts() {
-            let span = token.span.union(self.preceding_span());
+            let span = name_start.union(self.preceding_span());
             let found = self.span_text(span).to_owned();
             return Err(self.error_at(span, self.relation_name_depth_expected(), found));
         }

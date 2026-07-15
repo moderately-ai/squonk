@@ -90,6 +90,7 @@ grouping_syntax::with_rollup
 identifier_syntax::dollar_in_identifiers
 identifier_syntax::empty_quoted_identifiers
 identifier_syntax::string_literal_identifiers
+identifier_syntax::string_literal_table_names
 index_alter_syntax::alter_column_set_data_type
 index_alter_syntax::alter_existence_guards
 index_alter_syntax::alter_table_extended

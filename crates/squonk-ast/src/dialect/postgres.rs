@@ -119,6 +119,8 @@ impl IdentifierSyntax {
         // PostgreSQL syntax-rejects a string literal in a name position — `DELETE FROM 't'`
         // is a parse error — so the SQLite string-identifier misfeature stays off.
         string_literal_identifiers: false,
+        // DuckDB-only `FROM 't'` single-part Sconst table name.
+        string_literal_table_names: false,
         empty_quoted_identifiers: false,
     };
 }

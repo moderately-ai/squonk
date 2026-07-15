@@ -849,6 +849,14 @@ pub struct IdentifierSyntax {
     ///
     /// [`QuoteStyle::Single`]: crate::ast::QuoteStyle::Single
     pub string_literal_identifiers: bool,
+    /// Accept a single-part Sconst spelling of a relation / table name — DuckDB's
+    /// `FROM 't'` / `FROM ''` / `FROM E't'` / `FROM $$t$$` (engine-measured on
+    /// libduckdb 1.5.4). The string is a *single-part* name only: a dotted string name
+    /// (`FROM 'a'.'b'`) is a parser reject, matching DuckDB. Distinct from
+    /// [`string_literal_identifiers`](Self::string_literal_identifiers) (SQLite's broader
+    /// multi-part `'schema'.'table'` misfeature on relation *targets*). On for DuckDB and
+    /// the permissive superset; off elsewhere.
+    pub string_literal_table_names: bool,
     /// Accept a *zero-length* delimited (quoted) identifier — the empty backtick
     /// `` `` ``, the empty bracket `[]`, and the empty double-quote `""` — which SQL's
     /// `<delimited identifier body>` and PostgreSQL/MySQL both forbid at scan time. SQLite

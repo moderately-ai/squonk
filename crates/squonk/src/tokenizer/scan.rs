@@ -85,10 +85,19 @@ pub(crate) fn next_token<S: TriviaSink>(
             // The escape grammar is the AST crate's, shared with lazy `as_str`
             // materialisation, so the eager verdict and the materialised value never
             // disagree (ADR-0006: the check is a no-allocation scan, not a decode).
+            //
+            // A continued string (`E'a'\n'b'`) spans multiple quote-delimited segments
+            // joined by newline whitespace; `postgres_escape_string_is_valid` only
+            // understands a single `E'…'` body, so skip the eager check when the span
+            // embeds a newline/`\r` (the continuation marker) and leave validation to
+            // materialisation, which walks each segment correctly.
             let text = cursor
                 .src()
                 .get(token.span.start() as usize..token.span.end() as usize);
-            if text.is_some_and(|text| !crate::ast::postgres_escape_string_is_valid(text)) {
+            if text.is_some_and(|text| {
+                !text.bytes().any(|b| b == b'\n' || b == b'\r')
+                    && !crate::ast::postgres_escape_string_is_valid(text)
+            }) {
                 return Err(LexError::new(
                     LexErrorKind::InvalidEscapeSequence,
                     token.span,
@@ -1223,11 +1232,82 @@ fn scan_session_variable(cursor: &mut Cursor, features: &FeatureSet) -> Token {
 /// asymmetric quote passes its close byte (the open is then an ordinary inner byte).
 fn scan_quoted(cursor: &mut Cursor, scan: QuoteScan) -> Result<Token, LexError> {
     let start = cursor.pos();
-    scan_quoted_body(cursor, start, scan)
+    let token = scan_quoted_body(cursor, start, scan)?;
+    // SQL-standard adjacent-string continuation is assembled at the lexer for
+    // `String` tokens so each continuation segment inherits the first segment's
+    // escape rules (an `E'…'` body's backslash mode applies to every joined
+    // segment). Without this, a later plain `'…'` segment can be unterminated
+    // under ANSI quote rules while PostgreSQL's scanner — which keeps the opener's
+    // escape mode across the newline — accepts the same spelling. Parse-level
+    // continuation still joins the resulting single token's value; this only
+    // extends the token span when a well-formed continuation is present.
+    if token.kind == TokenKind::String {
+        extend_string_continuations(cursor, token, scan)
+    } else {
+        Ok(token)
+    }
+}
+
+/// After a complete `String` token, fold SQL-standard adjacent-string continuations
+/// into the same token when the gap is whitespace containing a newline/`\r` and the
+/// next token is another quote-delimited string. Continuation segments inherit the
+/// opener's escape mode (`E'…'` keeps backslash rules on every joined segment),
+/// matching PostgreSQL's scanner — without this, a later plain segment can be
+/// unterminated under ANSI quote rules while libpg_query accepts the spelling.
+fn extend_string_continuations(
+    cursor: &mut Cursor,
+    mut token: Token,
+    scan: QuoteScan,
+) -> Result<Token, LexError> {
+    loop {
+        let save = cursor.pos();
+        let mut saw_newline = false;
+        loop {
+            match cursor.peek() {
+                Some(b'\n' | b'\r') => {
+                    saw_newline = true;
+                    cursor.bump();
+                }
+                Some(b' ' | b'\t' | 0x0b | 0x0c) => {
+                    cursor.bump();
+                }
+                _ => break,
+            }
+        }
+        if !saw_newline {
+            cursor.set_pos(save);
+            return Ok(token);
+        }
+        let close = match cursor.peek() {
+            Some(b'\'') => b'\'',
+            // A double-quoted continuation only applies when the first segment itself
+            // used `"` as a string delimiter (MySQL without ANSI_QUOTES).
+            Some(b'"') if scan.close == b'"' => b'"',
+            _ => {
+                cursor.set_pos(save);
+                return Ok(token);
+            }
+        };
+        // Scan the continuation segment under the *opener's* escape rules; the span
+        // still starts at the original opener so the full continued constant is one
+        // token (PostgreSQL's scanner does the same).
+        token = scan_quoted_body(
+            cursor,
+            token.span.start(),
+            QuoteScan {
+                close,
+                kind: TokenKind::String,
+                unterminated: LexErrorKind::UnterminatedString,
+                backslash: scan.backslash,
+                allow_zero_length: false,
+            },
+        )?;
+    }
 }
 
 /// What [`scan_quoted_body`] is scanning: the closing delimiter, the token kind to
 /// emit, the error kind if it never closes, and whether `\` escapes the next byte.
+#[derive(Clone, Copy)]
 struct QuoteScan {
     close: u8,
     kind: TokenKind,
@@ -1256,17 +1336,15 @@ fn scan_prefixed_string(
 ) -> Result<Token, LexError> {
     let start = cursor.pos();
     cursor.advance_bytes(prefix_len); // prefix byte(s): `E`, `N`, `U&`, or `_charset`
-    scan_quoted_body(
-        cursor,
-        start,
-        QuoteScan {
-            close,
-            kind: TokenKind::String,
-            unterminated: LexErrorKind::UnterminatedString,
-            backslash,
-            allow_zero_length: false,
-        },
-    )
+    let scan = QuoteScan {
+        close,
+        kind: TokenKind::String,
+        unterminated: LexErrorKind::UnterminatedString,
+        backslash,
+        allow_zero_length: false,
+    };
+    let token = scan_quoted_body(cursor, start, scan)?;
+    extend_string_continuations(cursor, token, scan)
 }
 
 /// Scan a `U&"..."` Unicode-escaped identifier, emitting a [`QuotedIdent`] token that

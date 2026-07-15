@@ -262,6 +262,8 @@ impl IdentifierSyntax {
         // contextual `INDEXED` keyword would collide with a table named `indexed`, kept off
         // here). Matches the `empty_in_list` / `bare_constraint_name` Lenient-on precedent.
         string_literal_identifiers: true,
+        // Union widening: DuckDB's single-part Sconst table name (`FROM 't'`).
+        string_literal_table_names: true,
         // Union widening: SQLite accepts an empty quoted identifier in every quote style, so
         // the permissive union does too (a pure accept-side addition).
         empty_quoted_identifiers: true,

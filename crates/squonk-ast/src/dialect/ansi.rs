@@ -224,6 +224,7 @@ impl IdentifierSyntax {
         non_ascii: super::NonAsciiIdentifierSyntax::UnicodeAlphanumeric,
         dollar_in_identifiers: false,
         string_literal_identifiers: false,
+        string_literal_table_names: false,
         empty_quoted_identifiers: false,
     };
 }

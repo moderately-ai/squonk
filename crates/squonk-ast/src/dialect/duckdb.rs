@@ -929,7 +929,16 @@ impl FeatureSet {
             numbered_question: false,
         },
         session_variables: SessionVariableSyntax::ANSI,
-        identifier_syntax: IdentifierSyntax::POSTGRES,
+        // DuckDB admits a single-part Sconst table name (`FROM 't'`, `FROM ''`;
+        // engine-measured on libduckdb 1.5.4) on top of the PostgreSQL identifier base
+        // (any non-ASCII, `$` continuation, no SQLite multi-part string identifiers).
+        identifier_syntax: IdentifierSyntax {
+            non_ascii: super::NonAsciiIdentifierSyntax::Any,
+            dollar_in_identifiers: true,
+            string_literal_identifiers: false,
+            string_literal_table_names: true,
+            empty_quoted_identifiers: false,
+        },
         table_expressions: TableExpressionSyntax::DUCKDB,
         join_syntax: JoinSyntax::DUCKDB,
         table_factor_syntax: TableFactorSyntax::DUCKDB,

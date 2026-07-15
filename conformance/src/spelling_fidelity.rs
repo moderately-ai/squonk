@@ -535,7 +535,7 @@ const CORPUS_PINS: &[(&str, usize, usize, usize, usize)] = &[
     // +1 accepted / +1 lossy: `duckdb-pg-operator-spelling-under-acceptance` armed the general
     // symbolic operator surface, so `SELECT ~(-50::UHUGEINT), -(-(50::UHUGEINT))` now parses;
     // its render elides the redundant parens (`~-50::UHUGEINT`), landing lossy.
-    ("duckdb_testsuite", 5655, 3747, 1590, 318),
+    ("duckdb_testsuite", 5659, 3751, 1590, 318),
     // The `U&"…" [UESCAPE 'c']` identifier form carries a `QuoteStyle::UnicodeDouble`
     // spelling the canonical (`PreserveSource`) render replays verbatim, so statements whose
     // only lossy hunk was a decoded `U&"…"` -> `"…"` identifier round-trip exactly.

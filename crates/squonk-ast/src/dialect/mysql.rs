@@ -205,6 +205,7 @@ impl IdentifierSyntax {
         // MySQL syntax-rejects a string literal in a name position, so the SQLite
         // string-identifier misfeature stays off.
         string_literal_identifiers: false,
+        string_literal_table_names: false,
         empty_quoted_identifiers: false,
     };
 }

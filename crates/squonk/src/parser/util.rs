@@ -4194,7 +4194,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
 
     /// Whether the current token is an Sconst spelling DuckDB admits as a name
     /// (`'…'`, `E'…'`, `$$…$$`); see [`string_literal_is_name_sconst`].
-    fn peek_is_name_sconst(&mut self) -> ParseResult<bool> {
+    pub(super) fn peek_is_name_sconst(&mut self) -> ParseResult<bool> {
         let Some(token) = self.peek()? else {
             return Ok(false);
         };
@@ -4208,7 +4208,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// dollar-quoted forms materialize their value via [`Literal::as_str`] and still
     /// record `QuoteStyle::Single` (the semantic name is the string value; exact source
     /// fidelity of the `E`/`$$` spelling is not required for accept/reject parity).
-    fn parse_name_sconst_ident(&mut self, expected: &'static str) -> ParseResult<Ident> {
+    pub(super) fn parse_name_sconst_ident(&mut self, expected: &'static str) -> ParseResult<Ident> {
         if let Some(ident) = self.parse_string_alias_ident()? {
             return Ok(ident);
         }

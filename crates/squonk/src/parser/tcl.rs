@@ -171,7 +171,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 {
                     // The `SAVEPOINT` keyword is optional in `ROLLBACK TO [SAVEPOINT] <name>`.
                     let savepoint_keyword = self.eat_contextual_keyword("SAVEPOINT")?;
-                    (savepoint_keyword, Some(self.parse_ident()?))
+                    (savepoint_keyword, Some(self.parse_savepoint_name()?))
                 } else {
                     (false, None)
                 };
@@ -194,7 +194,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         } else if self.features().utility_syntax.transaction_savepoints
             && self.eat_contextual_keyword("SAVEPOINT")?
         {
-            let name = self.parse_ident()?;
+            let name = self.parse_savepoint_name()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Savepoint { name, meta })
         } else if self.features().utility_syntax.transaction_savepoints
@@ -211,7 +211,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 self.expect_contextual_keyword("SAVEPOINT")?;
                 true
             };
-            let savepoint = self.parse_ident()?;
+            let savepoint = self.parse_savepoint_name()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Release {
                 savepoint_keyword,
@@ -321,6 +321,20 @@ impl<'a, D: Dialect> Parser<'a, D> {
             Ok(Some(Box::new(self.parse_ident()?)))
         } else {
             Ok(None)
+        }
+    }
+
+    /// Parse a savepoint name for `SAVEPOINT` / `RELEASE` / `ROLLBACK TO`.
+    ///
+    /// Under [`IdentifierSyntax::string_literal_identifiers`](crate::ast::dialect::IdentifierSyntax)
+    /// (SQLite), a single-quoted string is admitted as the name (`ROLLBACK TO '+'`,
+    /// `SAVEPOINT 'x'`; engine-measured on rusqlite — the string form is a parse accept
+    /// and only bind-fails when the savepoint is missing). Elsewhere a plain identifier.
+    fn parse_savepoint_name(&mut self) -> ParseResult<crate::ast::Ident> {
+        if self.features().identifier_syntax.string_literal_identifiers {
+            self.parse_string_or_ident_admitting(self.features().reserved_column_name)
+        } else {
+            self.parse_ident()
         }
     }
 

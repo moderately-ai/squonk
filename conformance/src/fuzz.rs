@@ -111,6 +111,10 @@ pub const DIFFERENTIAL_REPLAYS: &[&[u8]] = &[
 /// shapes around them (accepted or rejected by both) that give the mutator productive
 /// starting points for the actual over-acceptance hunt.
 pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // E-string continuation across `\\r` must keep backslash escape rules on every
+    // joined segment so `e''''\\r'c…\\t…` tokenizes (libpg_query accepts).
+    b"--k?\ndo''''\r'c'''''e''e''''''''''e''e''''\r'c''''''\\\t\\''e''e''''''''''e''e''''''''e''e''''",
+    b"SELECT e''''\r'c''''''\\\t\\''",
     // PostgreSQL's scanner accepts digit runs beyond u32 and materializes them via
     // its C `atol` -> parser-int path; Squonk retains the spelling and mirrors that
     // value only in the structural oracle projection.
@@ -644,6 +648,10 @@ pub fn pg_differential_raw_bytes(input: &[u8]) {
 /// (statement-count) half — the SQLite arm of the splitter hunt.
 #[cfg(feature = "oracle-engines")]
 pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // SQLite admits a string-literal savepoint name (`ROLLBACK TO '+'`).
+    b"rollback to'+'",
+    // Leading form-feed / vertical-tab whitespace before a string savepoint name.
+    b"\x0c\x0brollback to'+'",
     // A transaction-state prepare failure must be retried in an active transaction
     // so SQLite exposes and rejects the otherwise-hidden invalid tail.
     b"EnD\ntrAnsaction--\nE",
@@ -789,6 +797,9 @@ pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     b"USE 'n'",
     b"USE E'n'",
     b"USE $$n$$",
+    // DuckDB admits a single-part Sconst table name in FROM (`from''`).
+    b"from''",
+    b"FROM 't'",
     // `GRANT` is unreserved in DuckDB and can name a FROM relation; the second
     // unreserved word is its alias.
     b"FROM grant sm8",

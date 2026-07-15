@@ -110,6 +110,7 @@ const SESSION_VARIABLE_SUBFLAGS: &[&str] =
 const IDENTIFIER_SUBFLAGS: &[&str] = &[
     "dollar_in_identifiers",
     "string_literal_identifiers",
+    "string_literal_table_names",
     "empty_quoted_identifiers",
 ];
 
@@ -567,6 +568,7 @@ toggleable_features! {
     // claim the `@@` trigger).
     (DOLLAR_IN_IDENTIFIERS, "dollar_in_identifiers", IdentifierSyntax, identifier_syntax, IdentifierSyntax, dollar_in_identifiers),
     (STRING_LITERAL_IDENTIFIERS, "string_literal_identifiers", IdentifierSyntax, identifier_syntax, IdentifierSyntax, string_literal_identifiers),
+    (STRING_LITERAL_TABLE_NAMES, "string_literal_table_names", IdentifierSyntax, identifier_syntax, IdentifierSyntax, string_literal_table_names),
     (EMPTY_QUOTED_IDENTIFIERS, "empty_quoted_identifiers", IdentifierSyntax, identifier_syntax, IdentifierSyntax, empty_quoted_identifiers),
     (LATERAL, "lateral", TableFactorSyntax, table_factor_syntax, TableFactorSyntax, lateral),
     (TABLE_FUNCTIONS, "table_functions", TableFactorSyntax, table_factor_syntax, TableFactorSyntax, table_functions),
@@ -1379,6 +1381,7 @@ const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &VARIABLE_ASSIGNMENT,
     &DOLLAR_IN_IDENTIFIERS,
     &STRING_LITERAL_IDENTIFIERS,
+    &STRING_LITERAL_TABLE_NAMES,
     &EMPTY_QUOTED_IDENTIFIERS,
     &LATERAL,
     &TABLE_FUNCTIONS,
@@ -2195,6 +2198,16 @@ const LABELED_CASES: &[LabeledCase] = &[
         sql: "DELETE FROM 'table1'",
         expect: Expect::Accept,
         required: &[&STRING_LITERAL_IDENTIFIERS],
+        forbidden: &[],
+    },
+    // DuckDB's single-part Sconst table name: with the flag on, `FROM 't'` parses as the
+    // relation head; off, a string is not an admissible table-factor head and the statement
+    // rejects. Uses `SELECT * FROM …` so the baseline (ANSI) already admits the statement
+    // shape and only the name-position flag flips acceptance.
+    LabeledCase {
+        sql: "SELECT * FROM 't'",
+        expect: Expect::Accept,
+        required: &[&STRING_LITERAL_TABLE_NAMES],
         forbidden: &[],
     },
     // SQLite's empty quoted identifier: with the flag on the zero-length `""` lexes as an
@@ -5807,6 +5820,7 @@ mod tests {
             non_ascii: _,
             dollar_in_identifiers: _,
             string_literal_identifiers: _,
+            string_literal_table_names: _,
             empty_quoted_identifiers: _,
         } = IdentifierSyntax::POSTGRES;
         let TableExpressionSyntax {

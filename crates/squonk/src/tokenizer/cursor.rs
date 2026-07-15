@@ -56,6 +56,19 @@ impl<'a> Cursor<'a> {
         self.pos
     }
 
+    /// Rewind or jump the cursor to an earlier (or equal) absolute byte offset.
+    ///
+    /// Used by speculative lexers that must abandon a look-ahead (e.g. string
+    /// continuation that does not actually continue). `pos` must stay within the
+    /// source and on a UTF-8 boundary the caller already landed on via prior bumps.
+    pub fn set_pos(&mut self, pos: u32) {
+        debug_assert!(
+            (pos as usize) <= self.src.len(),
+            "set_pos must stay within the source",
+        );
+        self.pos = pos;
+    }
+
     /// True once the cursor has reached the end of the source.
     pub fn is_eof(&self) -> bool {
         self.pos as usize >= self.src.len()

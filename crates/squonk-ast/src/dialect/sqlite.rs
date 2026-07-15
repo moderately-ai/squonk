@@ -289,6 +289,9 @@ impl IdentifierSyntax {
         // KEY`/`UNIQUE` column-name positions (see the field doc); each is position-driven
         // and unambiguous.
         string_literal_identifiers: true,
+        // DuckDB-only single-part Sconst table-name form; SQLite's broader multi-part
+        // string-identifier misfeature is [`string_literal_identifiers`] above.
+        string_literal_table_names: false,
         // SQLite admits an empty quoted identifier in every quote style (`` `` ``, `[]`, `""`);
         // engine-measured on rusqlite, unique among the shipped engines.
         empty_quoted_identifiers: true,

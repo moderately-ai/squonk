@@ -1571,7 +1571,7 @@ mod oracle_sweep {
     // (the two-word `<expr> NOT NULL` postfix, `DROP MACRO`, short/typeless generated columns,
     // …) round-trip verbatim, so none introduces a syntax over-acceptance.
     const CORE_ACCEPT_QUADRANT: (usize, usize, usize, usize, usize, usize, usize) =
-        (5435, 1, 0, 220, 0, 2, 10);
+        (5435, 1, 0, 220, 4, 2, 6);
     // Reject-surface quadrant. over_accept_syntax is pinned 26 (the reject-surface syntax
     // over-accept floor); a syntactically-valid body DuckDB rejects only at *bind* time counts in
     // over_accept_binding, the documented never-ledgered noise class, not the syntax floor.
@@ -1792,7 +1792,7 @@ mod oracle_sweep {
     // DuckDB rejects only at bind time counts in over_accept_binding, the net-conserved
     // binding-noise class, not the syntax floor.
     const TRANCHE2_ACCEPT_QUADRANT: (usize, usize, usize, usize, usize, usize, usize) =
-        (6475, 77, 4, 998, 56, 0, 24);
+        (6476, 76, 4, 998, 61, 0, 19);
     // REJECT surface (known DuckDB `statement error` bodies): over_accept_syntax = 19 — not real
     // grammar over-acceptance but argument-value/arity semantic checks DuckDB spells as Parser
     // Errors that a parse-only validator legitimately does not enforce (the early-bind allowlist
