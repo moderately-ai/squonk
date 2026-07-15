@@ -69,6 +69,10 @@ npm native platform packages on one major version.
   including PostgreSQL's raw high-bit identifier class.
 - Fixed DuckDB parse-only parity for bare `DESCRIBE`, which the engine parses before
   rejecting at a later semantic stage.
+- Fixed DuckDB parse-only parity for the `DESC` utility spelling while preserving it
+  distinctly from `DESCRIBE` in the AST and renderer.
+- Fixed generic `SET` value parsing so PostgreSQL and DuckDB reject fully reserved
+  keywords, while retaining each engine's measured special-keyword spellings.
 
 ### Removed
 

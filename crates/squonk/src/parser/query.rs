@@ -632,9 +632,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
             self.parse_explain_or_describe_statement()
         } else if self.features().show_syntax.describe_summarize
             && (self.peek_is_contextual_keyword("DESCRIBE")?
+                || self.peek_is_contextual_keyword("DESC")?
                 || self.peek_is_contextual_keyword("SUMMARIZE")?)
         {
-            // DuckDB's `{DESCRIBE | SUMMARIZE} <query> | <table>` `SHOW_REF` utility as a
+            // DuckDB's `{DESCRIBE | DESC | SUMMARIZE} <query> | <table>` `SHOW_REF` utility as a
             // top-level statement — placed after the MySQL EXPLAIN/`describe` branch so the
             // permissive superset (both gates on) keeps reading `DESCRIBE` as the EXPLAIN
             // synonym and only routes `SUMMARIZE` here; DuckDB (`describe` off) routes both.

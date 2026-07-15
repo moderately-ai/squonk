@@ -899,7 +899,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             let meta = self.make_meta(start.union(self.preceding_span()));
             return Ok(SetValue::Default { meta });
         }
-        let values = self.parse_comma_separated(Self::parse_set_parameter_value)?;
+        let values = self.parse_comma_separated(Self::parse_generic_set_parameter_value)?;
         let meta = self.make_meta(start.union(self.preceding_span()));
         Ok(SetValue::Values { values, meta })
     }
@@ -981,6 +981,50 @@ impl<'a, D: Dialect> Parser<'a, D> {
             }
             _ => Err(self.unexpected("a SET value")),
         }
+    }
+
+    /// Parse one value in the generic `SET <parameter> {= | TO} ...` production,
+    /// applying that production's dialect-specific keyword class before materializing the
+    /// shared value node. SQLite `PRAGMA`, `SET NAMES`, and other consumers of
+    /// [`parse_set_parameter_value`](Self::parse_set_parameter_value) intentionally do not
+    /// inherit this restriction merely because they reuse the same AST shape.
+    fn parse_generic_set_parameter_value(&mut self) -> ParseResult<SetParameterValue> {
+        if let Some(token) = self.peek()?
+            && matches!(token.kind, TokenKind::Word | TokenKind::Keyword(_))
+            && !self.token_is_set_bareword_value(token)
+            && !self.token_is_set_special_keyword_value(token)
+        {
+            return Err(self.unexpected("a non-reserved word or literal as a SET value"));
+        }
+        self.parse_set_parameter_value()
+    }
+
+    /// Whether a token belongs to the dialect's ordinary bareword class for a generic
+    /// `SET` value.
+    fn token_is_set_bareword_value(&self, token: Token) -> bool {
+        match token.kind {
+            TokenKind::Word => true,
+            TokenKind::Keyword(keyword) => !self
+                .features()
+                .show_syntax
+                .set_value_reserved_words
+                .contains(keyword),
+            _ => false,
+        }
+    }
+
+    /// Whether an otherwise-reserved keyword is explicitly admitted by the generic `SET`
+    /// value grammar.
+    fn token_is_set_special_keyword_value(&self, token: Token) -> bool {
+        if !matches!(token.kind, TokenKind::Word | TokenKind::Keyword(_)) {
+            return false;
+        }
+        let text = self.span_text(token.span);
+        text.eq_ignore_ascii_case("TRUE")
+            || text.eq_ignore_ascii_case("FALSE")
+            || (self.features().show_syntax.set_value_on_keyword && text.eq_ignore_ascii_case("ON"))
+            || (self.features().show_syntax.set_value_null_keyword
+                && text.eq_ignore_ascii_case("NULL"))
     }
 
     /// Parse a DuckDB bracketed list value `[ <value> [, ...] ]` — possibly empty (`[]`)
@@ -2493,7 +2537,7 @@ mod tests {
         SystemVariableScope, SystemVariableScopeKind, UninstallStatement, UserRoleListKind,
         WithRoleSpec,
     };
-    use crate::dialect::{Lenient, MySql};
+    use crate::dialect::{DuckDb, Lenient, MySql, Postgres};
     use crate::parser::{Dialect, FeatureDialect, Parsed, TestDialect, parse_with};
     use crate::render::Renderer;
 
@@ -2613,6 +2657,36 @@ mod tests {
             parse_session("SET autocommit = on"),
             SessionStatement::Set { .. }
         ));
+    }
+
+    #[test]
+    fn generic_set_values_follow_dialect_reserved_word_boundaries() {
+        for sql in ["SET o = do", "SET o = select"] {
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_err(),
+                "PostgreSQL rejects a fully reserved keyword as a SET value: {sql:?}",
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_err(),
+                "DuckDB rejects a fully reserved keyword as a SET value: {sql:?}",
+            );
+        }
+
+        for sql in ["SET o = true", "SET o = false", "SET o = off"] {
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(Postgres)).is_ok(),
+                "PostgreSQL accepts {sql:?}",
+            );
+            assert!(
+                parse_with(sql, crate::ParseConfig::new(DuckDb)).is_ok(),
+                "DuckDB accepts {sql:?}",
+            );
+        }
+
+        assert!(parse_with("SET o = on", crate::ParseConfig::new(Postgres)).is_ok());
+        assert!(parse_with("SET o = on", crate::ParseConfig::new(DuckDb)).is_err());
+        assert!(parse_with("SET o = null", crate::ParseConfig::new(Postgres)).is_err());
+        assert!(parse_with("SET o = null", crate::ParseConfig::new(DuckDb)).is_ok());
     }
 
     #[test]

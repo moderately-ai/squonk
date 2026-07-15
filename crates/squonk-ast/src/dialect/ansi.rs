@@ -132,6 +132,11 @@ pub const POSTGRES_NON_GENERIC_FUNCTION_KEYWORDS: KeywordSet = KeywordSet::from_
 pub const RESERVED_FUNCTION_NAME: KeywordSet =
     POSTGRES_RESERVED_KEYWORDS.union(POSTGRES_NON_GENERIC_FUNCTION_KEYWORDS);
 
+/// Fully reserved words rejected by PostgreSQL's `var_value` production. This is
+/// deliberately narrower than [`RESERVED_FUNCTION_NAME`], which also contains keywords
+/// whose dedicated function syntax prevents them from being generic call names.
+pub const RESERVED_SET_VALUE_WORDS: KeywordSet = POSTGRES_RESERVED_KEYWORDS;
+
 /// Type-name reject set (`type_function_name`): a keyword usable as a type name is
 /// `unreserved ∪ type_func_name`, so this rejects `col_name ∪ reserved` — matching
 /// PostgreSQL, which rejects `CAST(x AS coalesce)` (`coalesce` is `col_name`).
@@ -773,6 +778,9 @@ impl ShowSyntax {
         describe: false,
         describe_summarize: false,
         session_statements: true,
+        set_value_reserved_words: RESERVED_SET_VALUE_WORDS,
+        set_value_on_keyword: true,
+        set_value_null_keyword: false,
         show_tables: false,
         show_columns: false,
         show_create_table: false,

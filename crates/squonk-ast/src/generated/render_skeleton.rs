@@ -29,7 +29,7 @@ pub(crate) const CURRENT_RENDER_SHAPE_PIPE_OPS: RenderShapeFingerprint<0x5ebfaa9
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_PIVOT: RenderShapeFingerprint<0xd3444362d3f03fe8> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_QUERY: RenderShapeFingerprint<0x9a0538badcfac3d0> =
+pub(crate) const CURRENT_RENDER_SHAPE_QUERY: RenderShapeFingerprint<0xe6cc8d2df67c101c> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_REPLICATION: RenderShapeFingerprint<0xfa8b2915218d27ba> =
     RenderShapeFingerprint;
@@ -7500,6 +7500,7 @@ pub(crate) fn render_shape_show_ref<X: Extension>(node: &ShowRef<X>) {
 pub(crate) fn render_shape_show_ref_kind(node: &ShowRefKind) {
     match node {
         ShowRefKind::Describe => {}
+        ShowRefKind::Desc => {}
         ShowRefKind::Show => {}
         ShowRefKind::Summarize => {}
     }

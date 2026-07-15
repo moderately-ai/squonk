@@ -1048,6 +1048,11 @@ impl ShowSyntax {
         show_admin: true,
         describe_summarize: false,
         session_statements: true,
+        // MySQL routes `SET` through the expression-valued variable-assignment grammar;
+        // these generic-value refinements are therefore inert.
+        set_value_reserved_words: KeywordSet::EMPTY,
+        set_value_on_keyword: false,
+        set_value_null_keyword: false,
         show_functions: false,
         show_verbose: false,
     };

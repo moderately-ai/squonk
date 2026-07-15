@@ -2805,6 +2805,7 @@ export interface ShowRef {
 
 export type ShowRefKind =
   | "Describe"
+  | "Desc"
   | "Show"
   | "Summarize";
 

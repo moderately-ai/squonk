@@ -17,10 +17,10 @@ use super::{
     GroupingSyntax, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, Keyword, KeywordOperators,
     KeywordSet, MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax,
     OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
-    RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
-    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
-    StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, UtilitySyntax,
+    RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS,
+    RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax,
+    ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
+    TableFactorSyntax, TargetSpelling, TypeNameSyntax, UtilitySyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
@@ -100,6 +100,12 @@ pub const DUCKDB_RESERVED_FUNCTION_NAME: KeywordSet = RESERVED_FUNCTION_NAME
 /// semi-anti-join words are *not* here: `CAST(1 AS asof)` and `CAST(1 AS semi)` parse in
 /// the engine (the type position admits any non-`reserved` word).
 pub const DUCKDB_RESERVED_TYPE_NAME: KeywordSet = RESERVED_TYPE_NAME
+    .union(DUCKDB_QUALIFY_RESERVATION)
+    .union(DUCKDB_PIVOT_RESERVATION);
+
+/// Fully reserved words rejected in a DuckDB generic `SET` value. The PostgreSQL-derived
+/// base is extended by DuckDB's own `reserved` keyword additions.
+pub const DUCKDB_RESERVED_SET_VALUE_WORDS: KeywordSet = RESERVED_SET_VALUE_WORDS
     .union(DUCKDB_QUALIFY_RESERVATION)
     .union(DUCKDB_PIVOT_RESERVATION);
 
@@ -794,6 +800,9 @@ impl ShowSyntax {
         show_tables: true,
         describe: false,
         session_statements: true,
+        set_value_reserved_words: DUCKDB_RESERVED_SET_VALUE_WORDS,
+        set_value_on_keyword: false,
+        set_value_null_keyword: true,
         show_columns: false,
         show_create_table: false,
         show_functions: false,
@@ -1261,6 +1270,10 @@ mod tests {
                 // DuckDB's leading-keyword `{DESCRIBE | SUMMARIZE}` introspection statement,
                 // off in the PostgreSQL base.
                 describe_summarize: true,
+                // DuckDB does not admit PostgreSQL's special `ON` SET value.
+                set_value_on_keyword: false,
+                set_value_null_keyword: true,
+                set_value_reserved_words: DUCKDB_RESERVED_SET_VALUE_WORDS,
                 ..pg.show_syntax
             },
         );

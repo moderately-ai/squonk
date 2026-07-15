@@ -1033,6 +1033,9 @@ impl ShowSyntax {
         describe_summarize: false,
         // SQLite has no SET/RESET/SHOW session statements and no GRANT/REVOKE.
         session_statements: false,
+        set_value_reserved_words: KeywordSet::EMPTY,
+        set_value_on_keyword: false,
+        set_value_null_keyword: false,
         show_tables: false,
         show_columns: false,
         show_create_table: false,

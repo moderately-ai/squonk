@@ -1922,8 +1922,10 @@ pub struct ShowRef<X: Extension = NoExt> {
 #[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
 pub enum ShowRefKind {
-    /// `DESCRIBE` (also spelled `DESC`) — column metadata of the target.
+    /// `DESCRIBE` — column metadata of the target.
     Describe,
+    /// `DESC` — the short spelling of DuckDB's `DESCRIBE` utility.
+    Desc,
     /// `SHOW` — the unqualified list forms (`SHOW databases`, `SHOW tables`) and
     /// `SHOW <table>`.
     Show,
@@ -1936,7 +1938,8 @@ pub enum ShowRefKind {
 #[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
 /// The SQL show ref target forms represented by the AST.
 pub enum ShowRefTarget<X: Extension = NoExt> {
-    /// Bare `DESCRIBE`, which DuckDB parses before rejecting at a later semantic stage.
+    /// Bare `DESCRIBE` or `DESC`, which DuckDB parses before rejecting at a later semantic
+    /// stage.
     Empty {
         /// Source location and node identity.
         meta: Meta,

@@ -80,8 +80,8 @@ mod snowflake;
 mod sqlite;
 
 pub use ansi::{
-    ANSI, RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
-    STANDARD_IDENTIFIER_QUOTES,
+    ANSI, RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME,
+    RESERVED_SET_VALUE_WORDS, RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES,
 };
 #[cfg(feature = "bigquery")]
 pub use bigquery::{BIGQUERY, BIGQUERY_IDENTIFIER_QUOTES};
@@ -3558,6 +3558,20 @@ pub struct ShowSyntax {
     /// an unknown statement. `SET TRANSACTION` is transaction control (claimed earlier in
     /// dispatch), so it is unaffected by this gate.
     pub session_statements: bool,
+    /// Keywords rejected as unquoted values in the generic
+    /// `SET <parameter> {= | TO} <value> [, ...]` grammar. String and numeric literals,
+    /// ordinary identifiers, and non-reserved keywords remain accepted. PostgreSQL's
+    /// `var_value` production and DuckDB's corresponding grammar both enforce this
+    /// boundary; permissive compatibility dialects may accept any keyword.
+    pub set_value_reserved_words: KeywordSet,
+    /// Accept the otherwise-reserved `ON` keyword as a generic `SET` value.
+    /// PostgreSQL names `ON` explicitly in `opt_boolean_or_string`; DuckDB does not.
+    /// `TRUE` and `FALSE` are accepted independently as boolean values whenever reserved
+    /// words are rejected.
+    pub set_value_on_keyword: bool,
+    /// Accept the otherwise-reserved `NULL` keyword as a generic `SET` value. DuckDB
+    /// accepts this spelling; PostgreSQL's `var_value` production does not.
+    pub set_value_null_keyword: bool,
     /// Accept the typed `SHOW [EXTENDED] [FULL] [ALL] TABLES [{FROM | IN} <db>] [LIKE
     /// '<pat>' | WHERE <expr>]` catalogue-listing statement
     /// ([`Statement::Show`](crate::ast::Statement::Show)). On for MySQL/DuckDB/Lenient;

@@ -7497,6 +7497,7 @@ ShowRefJson = TypedDict("ShowRefJson", {
 
 ShowRefKindJson: TypeAlias = Union[
     Literal["Describe"],
+    Literal["Desc"],
     Literal["Show"],
     Literal["Summarize"],
 ]

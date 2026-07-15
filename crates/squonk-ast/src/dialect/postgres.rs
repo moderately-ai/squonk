@@ -13,10 +13,10 @@ use super::{
     IdentifierSyntax, IndexAlterSyntax, JoinSyntax, KeywordOperators, KeywordSet,
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     POSTGRES_BYTE_CLASSES, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
-    RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
-    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
-    StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, UtilitySyntax,
+    RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS,
+    RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax,
+    ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
+    TableFactorSyntax, TargetSpelling, TypeNameSyntax, UtilitySyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
@@ -690,6 +690,11 @@ impl ShowSyntax {
         // DuckDB (PostgreSQL-derived) turns this on; PostgreSQL has no `DESCRIBE`/`SUMMARIZE`.
         describe_summarize: false,
         session_statements: true,
+        // `var_value` accepts `NonReservedWord_or_Sconst`, numeric values, and the
+        // explicitly named boolean keywords `TRUE`, `FALSE`, and `ON`.
+        set_value_reserved_words: RESERVED_SET_VALUE_WORDS,
+        set_value_on_keyword: true,
+        set_value_null_keyword: false,
         show_tables: false,
         show_columns: false,
         show_create_table: false,

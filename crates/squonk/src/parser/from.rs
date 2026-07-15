@@ -643,11 +643,12 @@ impl<'a, D: Dialect> Parser<'a, D> {
         lateral: bool,
     ) -> ParseResult<Option<TableFactor<D::Ext>>> {
         let inner_start = self.current_span()?;
-        // `SHOW` names its target; `DESCRIBE`/`SUMMARIZE` take a query *or* a table
-        // name. `DESC` is deliberately not matched here — it is overwhelmingly the sort
-        // direction, and DuckDB's corpus spells the utility `DESCRIBE` in full.
+        // `SHOW` names its target; `DESCRIBE`/`DESC`/`SUMMARIZE` take a query *or* a table
+        // name. This statement-leading position is disjoint from `DESC` sort direction.
         let kind = if self.peek_is_contextual_keyword("DESCRIBE")? {
             ShowRefKind::Describe
+        } else if self.peek_is_contextual_keyword("DESC")? {
+            ShowRefKind::Desc
         } else if self.peek_is_contextual_keyword("SUMMARIZE")? {
             ShowRefKind::Summarize
         } else if self.peek_is_contextual_keyword("SHOW")? {
@@ -660,7 +661,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             // (mirrors the parenthesized-pivot reject).
             return Err(self.unexpected("a query after `LATERAL (`"));
         }
-        self.advance()?; // the DESCRIBE / SHOW / SUMMARIZE keyword
+        self.advance()?; // the DESCRIBE / DESC / SHOW / SUMMARIZE keyword
         let target = self.parse_show_ref_target(kind)?;
         let show_meta = self.make_meta(inner_start.union(self.preceding_span()));
         self.expect_punct(Punctuation::RParen, "`)` to close the show statement")?;
@@ -684,19 +685,18 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// parenthesized-`FROM` table factor [`try_parenthesized_show_ref`](Self::try_parenthesized_show_ref).
     /// DuckDB desugars the statement to `SELECT * FROM (SHOW_REF …)`. Only reached under
     /// [`ShowSyntax::describe_summarize`](crate::ast::dialect::UtilitySyntax); the caller
-    /// has confirmed the leading keyword is `DESCRIBE` or `SUMMARIZE`.
+    /// has confirmed the leading keyword is `DESCRIBE`, `DESC`, or `SUMMARIZE`.
     pub(super) fn parse_describe_summarize_statement(&mut self) -> ParseResult<Statement<D::Ext>> {
         let start = self.current_span()?;
-        // `DESC` is not accepted here: it carries no distinct spelling on `ShowRefKind`, so
-        // admitting it would silently round-trip back as `DESCRIBE`; DuckDB's corpus spells
-        // the statement in full (mirrors the table-factor's `DESC` exclusion).
         let kind = if self.peek_is_contextual_keyword("DESCRIBE")? {
             ShowRefKind::Describe
+        } else if self.peek_is_contextual_keyword("DESC")? {
+            ShowRefKind::Desc
         } else {
             ShowRefKind::Summarize
         };
-        self.advance()?; // the DESCRIBE / SUMMARIZE keyword
-        let target = if matches!(kind, ShowRefKind::Describe)
+        self.advance()?; // the DESCRIBE / DESC / SUMMARIZE keyword
+        let target = if matches!(kind, ShowRefKind::Describe | ShowRefKind::Desc)
             && (self.is_eof()? || self.peek_is_punct(Punctuation::Semicolon)?)
         {
             ShowRefTarget::Empty {
@@ -6526,6 +6526,16 @@ mod tests {
             alias.is_some(),
             "the `t` alias attaches to the ShowRef factor"
         );
+
+        let short = parse_with(
+            "SELECT column_name FROM (DESC SELECT 1 AS a) t",
+            crate::ParseConfig::new(DuckDb),
+        )
+        .expect("DESC of a query as a table source parses");
+        let TableFactor::ShowRef { show, .. } = first_relation(&short) else {
+            panic!("expected a ShowRef table factor");
+        };
+        assert!(matches!(show.kind, ShowRefKind::Desc));
     }
 
     #[test]
@@ -6659,6 +6669,12 @@ mod tests {
         assert!(matches!(show.kind, ShowRefKind::Describe));
         assert!(matches!(show.target, ShowRefTarget::Query { .. }));
 
+        let d = parse_with("DESC SELECT 42 AS a", crate::ParseConfig::new(DuckDb))
+            .expect("DESC <query>");
+        let show = statement_show_ref(&d);
+        assert!(matches!(show.kind, ShowRefKind::Desc));
+        assert!(matches!(show.target, ShowRefTarget::Query { .. }));
+
         let s = parse_with("SUMMARIZE SELECT 42 AS a", crate::ParseConfig::new(DuckDb))
             .expect("SUMMARIZE <query>");
         let show = statement_show_ref(&s);
@@ -6681,6 +6697,8 @@ mod tests {
             "SUMMARIZE SELECT 42 AS a",
             "DESCRIBE arrays",
             "DESCRIBE",
+            "DESC arrays",
+            "DESC",
             "SUMMARIZE arrays",
         ] {
             let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))

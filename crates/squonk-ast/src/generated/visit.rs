@@ -12470,6 +12470,7 @@ where
     let _ = &mut *visitor;
     match node {
         ShowRefKind::Describe => {}
+        ShowRefKind::Desc => {}
         ShowRefKind::Show => {}
         ShowRefKind::Summarize => {}
     }
@@ -30732,6 +30733,7 @@ where
     let _ = &mut *visitor;
     match node {
         ShowRefKind::Describe => {}
+        ShowRefKind::Desc => {}
         ShowRefKind::Show => {}
         ShowRefKind::Summarize => {}
     }
