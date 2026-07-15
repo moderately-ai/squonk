@@ -118,6 +118,10 @@ pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // SET var_value admits Sconst only — bit-string `b''` is a parse reject.
     b"set pd='',b''",
     b"set\x0cpd=''\x0c\x0c,b''\x0c",
+    // E-string with a raw CR in the body and an invalid octal escape: not a
+    // multi-segment continuation; still rejected as invalid UTF-8 (libpg_query).
+    b"\rENd;Do'e'e'\r1\\666'",
+    b"Do'e'e'\r1\\666'",
     // PostgreSQL's scanner accepts digit runs beyond u32 and materializes them via
     // its C `atol` -> parser-int path; Squonk retains the spelling and mirrors that
     // value only in the structural oracle projection.

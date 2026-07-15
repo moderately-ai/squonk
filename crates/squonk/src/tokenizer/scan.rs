@@ -78,7 +78,7 @@ pub(crate) fn next_token<S: TriviaSink>(
             if features.string_literals.escape_strings && cursor.peek_nth(1) == Some(b'\'') =>
         {
             // PostgreSQL `E'...'` always processes backslash escapes for termination.
-            let token = scan_prefixed_string(cursor, 1, b'\'', true)?;
+            let (token, continued) = scan_prefixed_string(cursor, 1, b'\'', true)?;
             // Reject a malformed escape (short/invalid Unicode, an escape decoding to
             // NUL, or a byte escape that breaks UTF-8) here, as the real parser does
             // in its scanner — an unknown escape like `\q` stays a literal character.
@@ -86,18 +86,17 @@ pub(crate) fn next_token<S: TriviaSink>(
             // materialisation, so the eager verdict and the materialised value never
             // disagree (ADR-0006: the check is a no-allocation scan, not a decode).
             //
-            // A continued string (`E'a'\n'b'`) spans multiple quote-delimited segments
-            // joined by newline whitespace; `postgres_escape_string_is_valid` only
-            // understands a single `E'…'` body, so skip the eager check when the span
-            // embeds a newline/`\r` (the continuation marker) and leave validation to
-            // materialisation, which walks each segment correctly.
+            // A multi-segment continued string (`E'a'\n'b'`) spans several quote-delimited
+            // bodies; `postgres_escape_string_is_valid` only understands a single `E'…'`
+            // body, so skip the eager check only when continuation actually joined segments
+            // (not merely when a `\r`/`\n` appears *inside* a one-segment body, e.g.
+            // `e'\r1\666'` whose octal escape must still be rejected as invalid UTF-8).
             let text = cursor
                 .src()
                 .get(token.span.start() as usize..token.span.end() as usize);
-            if text.is_some_and(|text| {
-                !text.bytes().any(|b| b == b'\n' || b == b'\r')
-                    && !crate::ast::postgres_escape_string_is_valid(text)
-            }) {
+            if !continued
+                && text.is_some_and(|text| !crate::ast::postgres_escape_string_is_valid(text))
+            {
                 return Err(LexError::new(
                     LexErrorKind::InvalidEscapeSequence,
                     token.span,
@@ -108,7 +107,7 @@ pub(crate) fn next_token<S: TriviaSink>(
         b'N' | b'n'
             if features.string_literals.national_strings && cursor.peek_nth(1) == Some(b'\'') =>
         {
-            scan_prefixed_string(cursor, 1, b'\'', features.string_literals.backslash_escapes)?
+            scan_prefixed_string(cursor, 1, b'\'', features.string_literals.backslash_escapes)?.0
         }
         b'U' | b'u'
             if features.string_literals.unicode_strings
@@ -130,7 +129,7 @@ pub(crate) fn next_token<S: TriviaSink>(
             // clause into the literal's span) — so the eager check still lands before
             // any value is materialised, just one layer up from where `E'...'`
             // manages it.
-            scan_prefixed_string(cursor, 2, b'\'', false)?
+            scan_prefixed_string(cursor, 2, b'\'', false)?.0
         }
         // `U&"..."` Unicode-escaped *identifier* (PostgreSQL / SQL standard), the
         // delimited-identifier twin of the `U&'...'` string arm above — one `U&` escape
@@ -175,7 +174,7 @@ pub(crate) fn next_token<S: TriviaSink>(
             if features.string_literals.bit_string_literals
                 && cursor.peek_nth(1) == Some(b'\'') =>
         {
-            scan_prefixed_string(cursor, 1, b'\'', false)?
+            scan_prefixed_string(cursor, 1, b'\'', false)?.0
         }
         // MySQL `_charset'…'` / `_charset"…"` character-set introducer: an `_`-prefixed
         // charset name abutting a string literal (`_utf8mb4'x'`, `_latin1"x"`). Gated by
@@ -191,12 +190,15 @@ pub(crate) fn next_token<S: TriviaSink>(
         // [`charset_introducer_prefix`].
         b'_' if features.string_literals.charset_introducers => {
             match charset_introducer_prefix(cursor, features) {
-                Some((prefix_len, close)) => scan_prefixed_string(
-                    cursor,
-                    prefix_len,
-                    close,
-                    features.string_literals.backslash_escapes,
-                )?,
+                Some((prefix_len, close)) => {
+                    scan_prefixed_string(
+                        cursor,
+                        prefix_len,
+                        close,
+                        features.string_literals.backslash_escapes,
+                    )?
+                    .0
+                }
                 // No charset name, or no abutting string quote: an ordinary `_name`
                 // identifier. `_` is an identifier-start byte, so this is the same
                 // fallthrough the byte-class dispatch below would take.
@@ -1246,7 +1248,7 @@ fn scan_quoted(cursor: &mut Cursor, scan: QuoteScan) -> Result<Token, LexError> 
     // well-formed plain segments. Extending plain strings at the lexer would
     // over-accept under SQLite (e.g. `ROLLBACK TO ''\n'}'` becoming one name).
     if token.kind == TokenKind::String && scan.backslash {
-        extend_string_continuations(cursor, token, scan)
+        Ok(extend_string_continuations(cursor, token, scan)?.0)
     } else {
         Ok(token)
     }
@@ -1258,11 +1260,14 @@ fn scan_quoted(cursor: &mut Cursor, scan: QuoteScan) -> Result<Token, LexError> 
 /// opener's escape mode (`E'…'` keeps backslash rules on every joined segment),
 /// matching PostgreSQL's scanner — without this, a later plain segment can be
 /// unterminated under ANSI quote rules while libpg_query accepts the spelling.
+/// Fold adjacent-string continuations into `token`. Returns `(token, continued)`
+/// where `continued` is true iff at least one segment was joined.
 fn extend_string_continuations(
     cursor: &mut Cursor,
     mut token: Token,
     scan: QuoteScan,
-) -> Result<Token, LexError> {
+) -> Result<(Token, bool), LexError> {
+    let mut continued = false;
     loop {
         let save = cursor.pos();
         let mut saw_newline = false;
@@ -1280,7 +1285,7 @@ fn extend_string_continuations(
         }
         if !saw_newline {
             cursor.set_pos(save);
-            return Ok(token);
+            return Ok((token, continued));
         }
         let close = match cursor.peek() {
             Some(b'\'') => b'\'',
@@ -1289,7 +1294,7 @@ fn extend_string_continuations(
             Some(b'"') if scan.close == b'"' => b'"',
             _ => {
                 cursor.set_pos(save);
-                return Ok(token);
+                return Ok((token, continued));
             }
         };
         // Scan the continuation segment under the *opener's* escape rules; the span
@@ -1306,6 +1311,7 @@ fn extend_string_continuations(
                 allow_zero_length: false,
             },
         )?;
+        continued = true;
     }
 }
 
@@ -1332,12 +1338,15 @@ struct QuoteScan {
 /// constant length and the `'` delimiter; a charset introducer passes its measured
 /// length and the abutting quote byte ([`charset_introducer_prefix`]) — `'`, or `"`
 /// when the dialect strings double quotes.
+/// Scan a prefixed string. Returns `(token, continued)` where `continued` is true
+/// when at least one adjacent-string continuation segment was folded into the token
+/// (so callers that validate a single-segment body can skip multi-segment spans).
 fn scan_prefixed_string(
     cursor: &mut Cursor,
     prefix_len: u32,
     close: u8,
     backslash: bool,
-) -> Result<Token, LexError> {
+) -> Result<(Token, bool), LexError> {
     let start = cursor.pos();
     cursor.advance_bytes(prefix_len); // prefix byte(s): `E`, `N`, `U&`, or `_charset`
     let scan = QuoteScan {
@@ -1348,7 +1357,11 @@ fn scan_prefixed_string(
         allow_zero_length: false,
     };
     let token = scan_quoted_body(cursor, start, scan)?;
-    extend_string_continuations(cursor, token, scan)
+    if backslash {
+        extend_string_continuations(cursor, token, scan)
+    } else {
+        Ok((token, false))
+    }
 }
 
 /// Scan a `U&"..."` Unicode-escaped identifier, emitting a [`QuotedIdent`] token that
