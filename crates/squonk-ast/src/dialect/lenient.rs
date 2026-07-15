@@ -1028,6 +1028,9 @@ impl UtilitySyntax {
         // Admit the DuckDB dotted `USE catalog.schema` name (the superset direction: it
         // accepts a strict superset of MySQL's single-ident form).
         use_qualified_name: true,
+        // Admit DuckDB's string-literal `USE` target (`USE 'n'` / `E'n'` / `$$n$$`) — a pure
+        // addition over MySQL's identifier-only form.
+        use_string_literal_name: true,
         // The DuckDB prepared-statement lifecycle and `CALL` — pure additions (their
         // leading keywords `PREPARE`/`EXECUTE`/`DEALLOCATE`/`CALL` contend with nothing),
         // in keeping with the parse-anything union.

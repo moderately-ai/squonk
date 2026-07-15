@@ -361,4 +361,5 @@ utility_syntax::transaction_work_keyword
 utility_syntax::update_extensions
 utility_syntax::use_qualified_name
 utility_syntax::use_statement
+utility_syntax::use_string_literal_name
 utility_syntax::xa_transactions

@@ -480,6 +480,15 @@ impl<'a, D: Dialect> Parser<'a, D> {
 
     // --- Source text + interning -------------------------------------------
 
+    /// The full input source this parse is reading.
+    ///
+    /// Returns `&'a str` (tied to the input, not to `&self`) so the grammar can
+    /// materialize string-literal values ([`Literal::as_str`](crate::ast::Literal::as_str))
+    /// while still mutating the parser.
+    pub fn source(&self) -> &'a str {
+        self.source
+    }
+
     /// Recover the source text covered by `span` as a source-lifetime slice.
     ///
     /// Returns `&'a str` (tied to the input, not to `&self`) so the grammar can

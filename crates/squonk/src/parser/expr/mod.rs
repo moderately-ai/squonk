@@ -30,7 +30,7 @@ mod collections;
 mod core;
 mod keyword_forms;
 mod literals;
-pub(in crate::parser) use literals::string_literal_is_sconst;
+pub(in crate::parser) use literals::{string_literal_is_name_sconst, string_literal_is_sconst};
 mod primary;
 mod sqljson;
 mod string_funcs;

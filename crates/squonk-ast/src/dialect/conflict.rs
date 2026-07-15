@@ -394,6 +394,9 @@ impl FeatureSet {
         if self.utility_syntax.use_qualified_name && !self.utility_syntax.use_statement {
             return Some(V::UseQualifiedNameWithoutUseStatement);
         }
+        if self.utility_syntax.use_string_literal_name && !self.utility_syntax.use_statement {
+            return Some(V::UseStringLiteralNameWithoutUseStatement);
+        }
         if self.access_control_syntax.access_control_extended_objects
             && !self.access_control_syntax.access_control
         {
@@ -508,6 +511,9 @@ impl FeatureSet {
                 }
                 V::UseQualifiedNameWithoutUseStatement => {
                     features.utility_syntax.use_qualified_name = false;
+                }
+                V::UseStringLiteralNameWithoutUseStatement => {
+                    features.utility_syntax.use_string_literal_name = false;
                 }
                 V::AccessControlExtendedObjectsWithoutAccessControl => {
                     features
@@ -962,6 +968,11 @@ pub enum FeatureDependencyViolation {
     /// Without the base gate the leading `USE` is not dispatched, so the parser never reaches
     /// the arity check the flag widens and the flag is inert.
     UseQualifiedNameWithoutUseStatement,
+    /// [`UtilitySyntax::use_string_literal_name`] (DuckDB's `USE 'n'` / `E'n'` / `$$n$$`
+    /// single-part string-literal target) refines the name grammar of the base `USE`
+    /// statement, so it requires [`UtilitySyntax::use_statement`]. Without the base gate the
+    /// leading `USE` is not dispatched and the flag is inert.
+    UseStringLiteralNameWithoutUseStatement,
     /// [`AccessControlSyntax::access_control_extended_objects`] (the extended `GRANT`/`REVOKE`
     /// object and prefix grammar) builds on the base `GRANT`/`REVOKE` statements, so it
     /// requires [`AccessControlSyntax::access_control`]. Without the base gate the access-control
@@ -1468,6 +1479,15 @@ mod tests {
         assert_eq!(
             use_qualified.feature_dependencies(),
             Some(V::UseQualifiedNameWithoutUseStatement),
+        );
+        let use_string = FeatureSet::ANSI.with(FeatureDelta::EMPTY.utility_syntax(UtilitySyntax {
+            use_statement: false,
+            use_string_literal_name: true,
+            ..FeatureSet::ANSI.utility_syntax
+        }));
+        assert_eq!(
+            use_string.feature_dependencies(),
+            Some(V::UseStringLiteralNameWithoutUseStatement),
         );
         let extended_ac = FeatureSet::ANSI.with(FeatureDelta::EMPTY.access_control_syntax(
             AccessControlSyntax {

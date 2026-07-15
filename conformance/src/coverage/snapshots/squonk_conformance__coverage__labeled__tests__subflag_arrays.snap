@@ -345,6 +345,7 @@ utility_syntax
   purge_binary_logs
   replication_statements
   use_qualified_name
+  use_string_literal_name
   load_data
   do_expression_list
   lock_tables

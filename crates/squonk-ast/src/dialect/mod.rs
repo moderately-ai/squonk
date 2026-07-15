@@ -3264,6 +3264,18 @@ pub struct UtilitySyntax {
     /// mysql:8), and off (vacuously) wherever `use_statement` is off. DuckDB still rejects a
     /// three-part `USE a.b.c` even with this on — that arity bound is enforced in the parser.
     pub use_qualified_name: bool,
+    /// Accept a string-constant (`Sconst`) spelling of the `USE` target name — DuckDB's
+    /// `USE 'n'` / `USE E'n'` / `USE $$n$$` single-part form (engine-measured on
+    /// libduckdb 1.5.4 via `duckdb_extract_statements`). The string is a *single-part*
+    /// name only: a dotted string name (`USE 'a'.'b'`, `USE a.'b'`) is a parser reject,
+    /// matching DuckDB. Refines the name grammar of the base `USE` statement, so it
+    /// requires [`use_statement`](UtilitySyntax::use_statement): without it the leading
+    /// `USE` is not dispatched and this flag is inert, the dependency the
+    /// [`UseStringLiteralNameWithoutUseStatement`](crate::dialect::FeatureDependencyViolation::UseStringLiteralNameWithoutUseStatement)
+    /// registry variant records. On for DuckDB and the permissive superset; off for MySQL,
+    /// whose `USE ident` grammar `ER_PARSE_ERROR`s a string name (engine-measured on
+    /// mysql:8), and off (vacuously) wherever `use_statement` is off.
+    pub use_string_literal_name: bool,
     /// Accept the prepared-statement lifecycle: `PREPARE <name> [(<types>)] AS
     /// <statement>`, `EXECUTE <name> [(<args>)]`, and `DEALLOCATE [PREPARE] <name>`. One
     /// flag gates the three leading keywords because they are a single dialect unit — a

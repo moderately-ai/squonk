@@ -73,7 +73,7 @@ use thin_vec::{ThinVec, thin_vec};
 
 use super::Dialect;
 use super::engine::Parser;
-use super::expr::{number_literal_kind, string_literal_is_sconst};
+use super::expr::{number_literal_kind, string_literal_is_name_sconst, string_literal_is_sconst};
 
 /// The value shape a `CHANGE REPLICATION SOURCE TO` option name dictates — the parser-internal
 /// axis that [`SOURCE_OPTION_TABLE`] pairs with each [`SourceOption`] so the value grammar is
@@ -2633,19 +2633,17 @@ impl<'a, D: Dialect> Parser<'a, D> {
         } else {
             None
         };
-        // The optional name operand: DuckDB's qualified table (or single-quoted table
-        // name) or SQLite's single-ident schema. `VACUUM main.t` is a SQLite syntax
-        // error, so the SQLite branch reads a bare [`parse_ident`](Self::parse_ident);
-        // DuckDB reads either a dotted [`parse_object_name`](Self::parse_object_name)
-        // or one string-spelled identifier.
-        let string_table = duck && self.peek_is_string()?;
+        // The optional name operand: DuckDB's qualified table (or Sconst table name
+        // — plain `'…'`, `E'…'`, `$$…$$`) or SQLite's single-ident schema.
+        // `VACUUM main.t` is a SQLite syntax error, so the SQLite branch reads a bare
+        // [`parse_ident`](Self::parse_ident); DuckDB reads either a dotted
+        // [`parse_object_name`](Self::parse_object_name) or one string-spelled identifier.
+        let string_table = duck && self.peek_is_name_sconst()?;
         let (schema, table) = if !self.peek_is_contextual_keyword("INTO")?
             && (self.peek_can_start_column_name()? || string_table)
         {
             if string_table {
-                let ident = self
-                    .parse_string_alias_ident()?
-                    .expect("string_table confirms a plain string token");
+                let ident = self.parse_name_sconst_ident("a table name after VACUUM")?;
                 (None, Some(ObjectName(thin_vec![ident])))
             } else if duck {
                 (None, Some(self.parse_object_name()?))
@@ -2744,11 +2742,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
         let start = self.current_span()?;
         self.expect_contextual_keyword("ANALYZE")?;
         let string_target =
-            self.features().maintenance_syntax.analyze_columns && self.peek_is_string()?;
+            self.features().maintenance_syntax.analyze_columns && self.peek_is_name_sconst()?;
         let target = if string_target {
-            let ident = self
-                .parse_string_alias_ident()?
-                .expect("string_target confirms a plain string token");
+            let ident = self.parse_name_sconst_ident("a table name after ANALYZE")?;
             Some(ObjectName(thin_vec![ident]))
         } else if self.peek_can_start_column_name()? {
             Some(self.parse_object_name()?)
@@ -4156,28 +4152,75 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// [`parse_object_name`](Self::parse_object_name) consumes any number of dotted parts, so
     /// the dialect's arity bound is enforced here to keep parse acceptance aligned with the
     /// engine rather than over-accepting the deeper name.
+    ///
+    /// Under [`UtilitySyntax::use_string_literal_name`](crate::ast::dialect::UtilitySyntax)
+    /// DuckDB also admits a single-part Sconst target (`USE 'n'`, `USE E'n'`, `USE $$n$$`;
+    /// engine-measured on libduckdb 1.5.4). A dotted string name (`USE 'a'.'b'`) is left to
+    /// the identifier path, which rejects the string token — matching DuckDB's parser
+    /// error at the `.`.
     pub(super) fn parse_use_statement(&mut self) -> ParseResult<Statement<D::Ext>> {
         let start = self.current_span()?;
         self.expect_contextual_keyword("USE")?;
-        let name = self.parse_object_name()?;
-        let max_parts = if self.features().utility_syntax.use_qualified_name {
-            2
+        let name = if self.features().utility_syntax.use_string_literal_name
+            && self.peek_is_name_sconst()?
+        {
+            ObjectName(thin_vec![
+                self.parse_name_sconst_ident("a schema name after USE")?
+            ])
         } else {
-            1
-        };
-        if name.0.len() > max_parts {
-            return Err(self.unexpected(if max_parts == 2 {
-                "at most a two-part `catalog.schema` name after USE (DuckDB rejects a deeper name)"
+            let name = self.parse_object_name()?;
+            let max_parts = if self.features().utility_syntax.use_qualified_name {
+                2
             } else {
-                "a single unqualified schema name after USE (MySQL rejects a dotted name)"
-            }));
-        }
+                1
+            };
+            if name.0.len() > max_parts {
+                return Err(self.unexpected(if max_parts == 2 {
+                    "at most a two-part `catalog.schema` name after USE (DuckDB rejects a deeper name)"
+                } else {
+                    "a single unqualified schema name after USE (MySQL rejects a dotted name)"
+                }));
+            }
+            name
+        };
         let span = start.union(self.preceding_span());
         let statement_meta = self.make_meta(span);
         let meta = self.make_meta(span);
         Ok(Statement::Use {
             use_statement: Box::new(UseStatement { name, meta }),
             meta: statement_meta,
+        })
+    }
+
+    /// Whether the current token is an Sconst spelling DuckDB admits as a name
+    /// (`'…'`, `E'…'`, `$$…$$`); see [`string_literal_is_name_sconst`].
+    fn peek_is_name_sconst(&mut self) -> ParseResult<bool> {
+        let Some(token) = self.peek()? else {
+            return Ok(false);
+        };
+        Ok(token.kind == TokenKind::String
+            && string_literal_is_name_sconst(self.span_text(token.span)))
+    }
+
+    /// Fold a name-position Sconst into an [`Ident`] with [`QuoteStyle::Single`] so the
+    /// quotes round-trip on render. Plain `'…'` reuses
+    /// [`parse_string_alias_ident`](Self::parse_string_alias_ident); escape `E'…'` and
+    /// dollar-quoted forms materialize their value via [`Literal::as_str`] and still
+    /// record `QuoteStyle::Single` (the semantic name is the string value; exact source
+    /// fidelity of the `E`/`$$` spelling is not required for accept/reject parity).
+    fn parse_name_sconst_ident(&mut self, expected: &'static str) -> ParseResult<Ident> {
+        if let Some(ident) = self.parse_string_alias_ident()? {
+            return Ok(ident);
+        }
+        let literal = self.expect_string_literal(expected)?;
+        let value = literal
+            .as_str(self.source())
+            .map_err(|_| self.unexpected(expected))?;
+        let sym = self.intern_text(&value);
+        Ok(Ident {
+            sym,
+            quote: QuoteStyle::Single,
+            meta: literal.meta,
         })
     }
 
@@ -8558,6 +8601,7 @@ mod tests {
             FeatureSet::ANSI.with(FeatureDelta::EMPTY.utility_syntax(UtilitySyntax {
                 use_statement: true,
                 use_qualified_name: true,
+                use_string_literal_name: true,
                 ..UtilitySyntax::ANSI
             }));
         FeatureDialect {
@@ -8604,7 +8648,7 @@ mod tests {
 
     #[test]
     fn use_statement_round_trips() {
-        for sql in ["USE s1", "USE memory.main"] {
+        for sql in ["USE s1", "USE memory.main", "USE 'n'"] {
             let parsed = parse_with(sql, crate::ParseConfig::new(USE_DIALECT))
                 .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
             let rendered = Renderer::new(USE_DIALECT)
@@ -8612,6 +8656,49 @@ mod tests {
                 .unwrap_or_else(|err| panic!("{sql:?}: {err}"));
             assert_eq!(rendered, sql, "exact round-trip for {sql:?}");
         }
+        // Compact `use'n'` (no trivia) parses and renders the canonical form.
+        let compact = parse_with("use'n'", crate::ParseConfig::new(USE_DIALECT))
+            .expect("compact use'n' parses");
+        assert_eq!(
+            Renderer::new(USE_DIALECT)
+                .render_parsed(&compact)
+                .expect("renders"),
+            "USE 'n'",
+        );
+    }
+
+    #[test]
+    fn use_statement_admits_sconst_name_spellings() {
+        use crate::ast::QuoteStyle;
+        use crate::dialect::{DuckDb, MySql};
+
+        // DuckDB's USE name production admits plain / escape / dollar-quoted Sconsts
+        // as a single-part name (engine-measured on libduckdb 1.5.4). Folded to a
+        // single-quoted Ident so plain forms round-trip and E/$$ share the value.
+        for (sql, value) in [
+            ("USE 'n'", "n"),
+            ("use'n'", "n"),
+            ("USE E'n'", "n"),
+            ("USE $$n$$", "n"),
+            ("USE ''", ""),
+        ] {
+            let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .unwrap_or_else(|err| panic!("{sql:?}: {err:?}"));
+            let name = &use_of(&parsed).name;
+            assert_eq!(name.0.len(), 1, "{sql:?}");
+            assert_eq!(name.0[0].quote, QuoteStyle::Single, "{sql:?}");
+            assert_eq!(parsed.resolver().resolve(name.0[0].sym), value, "{sql:?}");
+        }
+
+        // Dotted string names reject (DuckDB parser error at the `.`).
+        for sql in ["USE 'a'.'b'", "USE 'a'.b", "USE a.'b'"] {
+            parse_with(sql, crate::ParseConfig::new(DuckDb))
+                .expect_err(&format!("{sql:?} must reject"));
+        }
+
+        // MySQL rejects a string USE name (ER_PARSE_ERROR on mysql:8).
+        parse_with("USE 'n'", crate::ParseConfig::new(MySql))
+            .expect_err("MySQL USE rejects a string name");
     }
 
     /// The fitted `MySql` `FeatureSet` wired as a `RenderDialect` (the bare `MySql` preset

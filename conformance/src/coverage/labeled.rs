@@ -316,6 +316,7 @@ const UTILITY_SUBFLAGS: &[&str] = &[
     "purge_binary_logs",
     "replication_statements",
     "use_qualified_name",
+    "use_string_literal_name",
     "load_data",
     "do_expression_list",
     "lock_tables",
@@ -870,6 +871,7 @@ toggleable_features! {
     (EXPORT_IMPORT_DATABASE, "export_import_database", UtilitySyntax, utility_syntax, UtilitySyntax, export_import_database),
     (UPDATE_EXTENSIONS, "update_extensions", UtilitySyntax, utility_syntax, UtilitySyntax, update_extensions),
     (USE_QUALIFIED_NAME, "use_qualified_name", UtilitySyntax, utility_syntax, UtilitySyntax, use_qualified_name),
+    (USE_STRING_LITERAL_NAME, "use_string_literal_name", UtilitySyntax, utility_syntax, UtilitySyntax, use_string_literal_name),
     (EXTENSION_DDL, "extension_ddl", StatementDdlGates, statement_ddl_gates, StatementDdlGates, extension_ddl),
     (TRANSFORM_DDL, "transform_ddl", StatementDdlGates, statement_ddl_gates, StatementDdlGates, transform_ddl),
     (ALTER_SYSTEM, "alter_system", StatementDdlGates, statement_ddl_gates, StatementDdlGates, alter_system),
@@ -1675,6 +1677,7 @@ const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &EXPORT_IMPORT_DATABASE,
     &UPDATE_EXTENSIONS,
     &USE_QUALIFIED_NAME,
+    &USE_STRING_LITERAL_NAME,
     &EXTENSION_DDL,
     &TRANSFORM_DDL,
     &ALTER_SYSTEM,
@@ -3550,6 +3553,15 @@ const LABELED_CASES: &[LabeledCase] = &[
         sql: "USE a.b",
         expect: Expect::Accept,
         required: &[&USE_STATEMENT, &USE_QUALIFIED_NAME],
+        forbidden: &[],
+    },
+    // DuckDB `USE 'n'` Sconst target — refines the `USE` name grammar, so it requires
+    // `use_statement` too: off, the leading `USE` is not dispatched; with the string-name
+    // flag off, the identifier-only grammar rejects the string token.
+    LabeledCase {
+        sql: "USE 'n'",
+        expect: Expect::Accept,
+        required: &[&USE_STATEMENT, &USE_STRING_LITERAL_NAME],
         forbidden: &[],
     },
     // PostgreSQL `CREATE EXTENSION` — a whole-statement gate; off, `EXTENSION` falls through to
@@ -6180,6 +6192,7 @@ mod tests {
             key_cache_statements: _,
             use_statement: _,
             use_qualified_name: _,
+            use_string_literal_name: _,
             prepared_statements: _,
             prepare_typed_parameters: _,
             prepared_statements_from: _,

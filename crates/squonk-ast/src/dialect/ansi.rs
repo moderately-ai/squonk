@@ -716,6 +716,8 @@ impl UtilitySyntax {
         key_cache_statements: false,
         use_statement: false,
         use_qualified_name: false,
+        // DuckDB-only `USE 'name'` / `USE E'…'` / `USE $$…$$` string-literal target.
+        use_string_literal_name: false,
         // DuckDB's `PREPARE`/`EXECUTE`/`DEALLOCATE` and `CALL` statements are not standard
         // SQL, so the ANSI baseline dispatches neither (and MySQL inherits both off).
         prepared_statements: false,

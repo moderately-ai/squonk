@@ -268,6 +268,7 @@ impl UtilitySyntax {
         key_cache_statements: false,
         use_statement: false,
         use_qualified_name: false,
+        use_string_literal_name: false,
         prepared_statements: false,
         prepare_typed_parameters: false,
         prepared_statements_from: false,

@@ -622,6 +622,8 @@ impl UtilitySyntax {
         use_statement: false,
         // Moot: `use_statement` is off, so the name-arity refinement is unreachable.
         use_qualified_name: false,
+        // Moot: `use_statement` is off, so the string-name refinement is unreachable.
+        use_string_literal_name: false,
         // PostgreSQL has `PREPARE`/`EXECUTE`/`DEALLOCATE` too (`CALL` is a distinct
         // statement PostgreSQL also has, but tracked by its own `call` flag below, off
         // here — a separate, unfitted grammar ticket).

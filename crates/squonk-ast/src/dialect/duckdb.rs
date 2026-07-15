@@ -766,6 +766,10 @@ impl UtilitySyntax {
         // DuckDB's `USE <catalog> . <schema>` admits the dotted two-part name (MySQL's
         // single-ident form is a subset); the deeper `USE a.b.c` is still parser-rejected.
         use_qualified_name: true,
+        // DuckDB's `USE` name production also admits a single-part Sconst (`USE 'n'`,
+        // `USE E'n'`, `USE $$n$$`; engine-measured on libduckdb 1.5.4). Dotted string
+        // names (`USE 'a'.'b'`) remain rejects.
+        use_string_literal_name: true,
         prepared_statements: true,
         // DuckDB structurally rejects the PostgreSQL `PREPARE name(<type>, …)` typed
         // parameter-type list
@@ -1252,6 +1256,7 @@ mod tests {
                 pragma: true,
                 use_statement: true,
                 use_qualified_name: true,
+                use_string_literal_name: true,
                 call: true,
                 attach: true,
                 load_bare_name: true,

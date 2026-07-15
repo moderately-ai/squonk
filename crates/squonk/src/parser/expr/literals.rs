@@ -791,6 +791,22 @@ pub(in crate::parser) fn string_literal_is_sconst(text: &str) -> bool {
     }
 }
 
+/// Whether a `String` lexeme is an Sconst spelling DuckDB admits in a *name* position
+/// (`USE 'n'`, `VACUUM E'n'`, `ANALYZE $$n$$`): plain `'…'`, escape `E'…'`, or
+/// dollar-quoted `$$…$$` / `$tag$…$tag$`.
+///
+/// Narrower than [`string_literal_is_sconst`]: a `U&'…'` Unicode-escape constant is an
+/// `Sconst` for PostgreSQL's grammar, but libduckdb 1.5.4 rejects it at extract time with
+/// `pg_verifymbstr NOT IMPLEMENTED`, and bit/national/charset-introducer forms are syntax
+/// errors in the same name positions. Keeping the name-position set exact avoids an
+/// accept/reject divergence against live DuckDB.
+pub(in crate::parser) fn string_literal_is_name_sconst(text: &str) -> bool {
+    matches!(
+        text.as_bytes(),
+        [b'\'', ..] | [b'E' | b'e', b'\'', ..] | [b'$', ..]
+    )
+}
+
 /// Classify the source gap between two adjacent string constants. PostgreSQL joins
 /// them only across whitespace that contains a newline; a comment in the gap (even
 /// one that itself contains a newline) does not continue the string, so any

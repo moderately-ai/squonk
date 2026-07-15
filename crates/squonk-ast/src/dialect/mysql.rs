@@ -1008,6 +1008,9 @@ impl UtilitySyntax {
         pragma: false,
         attach: false,
         use_qualified_name: false,
+        // MySQL's `USE ident` rejects a string name (`USE 'db'` is `ER_PARSE_ERROR` on
+        // mysql:8); the DuckDB Sconst form stays off.
+        use_string_literal_name: false,
         prepared_statements: false,
         prepare_typed_parameters: false,
         load_extension: false,

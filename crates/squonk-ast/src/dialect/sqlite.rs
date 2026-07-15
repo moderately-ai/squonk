@@ -981,6 +981,8 @@ impl UtilitySyntax {
         use_statement: false,
         // Moot: `use_statement` is off, so the name-arity refinement is unreachable.
         use_qualified_name: false,
+        // Moot: `use_statement` is off, so the string-name refinement is unreachable.
+        use_string_literal_name: false,
         // The DuckDB prepared-statement lifecycle and `CALL` are not SQLite statements.
         prepared_statements: false,
         // Moot: the typed parameter list widens `PREPARE`, which is already off.

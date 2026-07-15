@@ -2123,8 +2123,11 @@ pub enum PurgeTarget<X: Extension = NoExt> {
 /// (`Expected "USE database" or "USE database.schema"`), while MySQL's `USE ident` takes a
 /// single unqualified schema and `ER_PARSE_ERROR`s any dotted name (engine-measured on
 /// mysql:8) — so this holds an [`ObjectName`] of one or two [`Ident`]s and the parser
-/// enforces whichever bound the dialect does. Non-generic, like [`DetachStatement`]: a
-/// qualified name carries no expressions or extension nodes.
+/// enforces whichever bound the dialect does. Under
+/// [`UtilitySyntax::use_string_literal_name`](crate::dialect::UtilitySyntax) DuckDB also
+/// admits a single-part Sconst target (`USE 'n'` / `E'n'` / `$$n$$`), folded into a
+/// single-quoted [`Ident`] so the quotes round-trip. Non-generic, like [`DetachStatement`]:
+/// a qualified name carries no expressions or extension nodes.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde-serialize", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]

@@ -783,6 +783,12 @@ pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // DuckDB's maintenance target may use its single-quoted name spelling, including
     // an empty name and no trivia after the statement head.
     b"VACUUM''",
+    // DuckDB's `USE` name production admits a single-part Sconst (`use'n'`, `USE 'n'`,
+    // `USE E'n'`, `USE $$n$$`); the fuzzer's minimized crash was the compact form.
+    b"use'n'",
+    b"USE 'n'",
+    b"USE E'n'",
+    b"USE $$n$$",
     // `GRANT` is unreserved in DuckDB and can name a FROM relation; the second
     // unreserved word is its alias.
     b"FROM grant sm8",
