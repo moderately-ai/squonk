@@ -122,6 +122,9 @@ pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // multi-segment continuation; still rejected as invalid UTF-8 (libpg_query).
     b"\rENd;Do'e'e'\r1\\666'",
     b"Do'e'e'\r1\\666'",
+    // PostgreSQL bare `SET NAMES` is `client_encoding` DEFAULT (no charset required).
+    b"set names",
+    b"\t\tset\tnAMes",
     // PostgreSQL's scanner accepts digit runs beyond u32 and materializes them via
     // its C `atol` -> parser-int path; Squonk retains the spelling and mirrors that
     // value only in the structural oracle projection.
@@ -816,6 +819,10 @@ pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // DuckDB prefix colon alias with string names (`FROM '' : ''`).
     b"from'':''",
     b"from''\n\n:''",
+    // Unknown PRAGMA names parse; DuckDB extract catalog-rejects them — the
+    // extract_statement_count path treats Catalog Error as parse accept.
+    b"pragma\nn",
+    b"PRAGMA n",
     // `GRANT` is unreserved in DuckDB and can name a FROM relation; the second
     // unreserved word is its alias.
     b"FROM grant sm8",

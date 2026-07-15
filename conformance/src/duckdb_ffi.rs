@@ -212,7 +212,20 @@ impl Connection {
                     // zero statements (accept), matching our parser.
                     Ok(0)
                 } else {
-                    Err(cstr_or(err_ptr, "duckdb_extract_statements failed"))
+                    let msg = cstr_or(err_ptr, "duckdb_extract_statements failed");
+                    // Measured on libduckdb 1.5.4: unknown `PRAGMA <name>` returns
+                    // `n == 0` with a *Catalog* error (`Pragma Function with name … does
+                    // not exist`), not a Parser Error — extract validates the pragma
+                    // name against the catalog even though the rest of the API is
+                    // parse-only (unresolved tables/functions still extract as `Ok(1)`).
+                    // Treat catalog-only failures as parse accept of one statement so
+                    // the differential stays on parse footing rather than inventing a
+                    // false `duckdb=reject` for syntactically valid PRAGMA forms.
+                    if msg.starts_with("Catalog Error:") {
+                        Ok(1)
+                    } else {
+                        Err(msg)
+                    }
                 };
                 duckdb_destroy_extracted(&mut extracted);
                 return result;

@@ -447,7 +447,24 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// Parse `NAMES { <charset> [COLLATE <collation>] | DEFAULT }` after `SET` (MySQL).
     fn parse_set_names(&mut self, start: Span) -> ParseResult<SessionStatement<D::Ext>> {
         self.expect_contextual_keyword("NAMES")?;
-        let value = Box::new(self.parse_set_names_value()?);
+        // PostgreSQL's bare `SET NAMES` (no charset) is a historical alias for
+        // `SET client_encoding TO DEFAULT` (libpg_query: `VariableSetStmt` with
+        // `VarSetDefault` / `client_encoding`). MySQL requires a charset or the
+        // keyword `DEFAULT` after `NAMES` (`SET NAMES;` is `ER_PARSE_ERROR` on
+        // mysql:8). Under MySQL's variable-assignment surface, a missing value is
+        // therefore a reject; elsewhere an omitted value is the bare-NAMES default.
+        let at_value = self.peek()?.is_some_and(|token| {
+            !matches!(token.kind, TokenKind::Punctuation(Punctuation::Semicolon))
+        });
+        let value = if !at_value {
+            if self.features().session_variables.variable_assignment {
+                return Err(self.unexpected("a character set name or DEFAULT after SET NAMES"));
+            }
+            let meta = self.make_meta(self.preceding_span());
+            Box::new(SetNamesValue::Default { meta })
+        } else {
+            Box::new(self.parse_set_names_value()?)
+        };
         let meta = self.make_meta(start.union(self.preceding_span()));
         Ok(SessionStatement::SetNames { value, meta })
     }
