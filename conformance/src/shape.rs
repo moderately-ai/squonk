@@ -1330,7 +1330,7 @@ pub enum SetValueShape {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SetParameterValueShape {
     Literal(LiteralShape),
-    PositionalParameter(u32),
+    PositionalParameter(i32),
 }
 
 // ---- ACCESS CONTROL (GRANT / REVOKE) ---------------------------------------
@@ -2560,7 +2560,13 @@ fn set_parameter_value_shape(parsed: &Parsed, value: &SetParameterValue) -> SetP
         SetParameterValue::Parameter {
             kind: ParameterKind::Positional(index),
             ..
-        } => SetParameterValueShape::PositionalParameter(*index),
+        } => SetParameterValueShape::PositionalParameter(*index as i32),
+        SetParameterValue::Parameter {
+            kind: ParameterKind::PositionalLarge { digits },
+            ..
+        } => SetParameterValueShape::PositionalParameter(postgres_parameter_number(
+            parsed.resolver().resolve(*digits),
+        )),
         SetParameterValue::Parameter { .. } => unreachable!(
             "only positional-dollar parameters are enabled under the PostgreSQL preset"
         ),
@@ -2571,6 +2577,13 @@ fn set_parameter_value_shape(parsed: &Parsed, value: &SetParameterValue) -> SetP
             unreachable!("a bracketed SET list value is a DuckDB-only form absent under PostgreSQL")
         }
     }
+}
+
+/// Mirror PostgreSQL's scanner materialization for an oversized `$<digits>` token:
+/// `atol` saturates at signed-long max on the 64-bit oracle builds, then assignment
+/// to the parser's `int` field retains the low 32 bits.
+fn postgres_parameter_number(digits: &str) -> i32 {
+    digits.parse::<i64>().unwrap_or(i64::MAX) as i32
 }
 
 /// The neutral shape of a scalar literal used as a `SET` value — the same mapping

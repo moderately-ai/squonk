@@ -1411,6 +1411,16 @@ pub enum LambdaParamSpelling {
 pub enum ParameterKind {
     /// PostgreSQL positional `$1`, `$2`, … — the carried value is the 1-based index.
     Positional(u32),
+    /// A PostgreSQL positional parameter whose digit run exceeds [`u32`].
+    ///
+    /// PostgreSQL's raw parser accepts these spellings and materializes them through
+    /// its C `atol` scanner path. Keeping the original digits interned preserves a
+    /// renderable, round-trippable AST instead of rejecting a parse-valid placeholder
+    /// or collapsing its engine-specific overflow result into an ordinary index.
+    PositionalLarge {
+        /// Decimal digits after the `$` sigil.
+        digits: Symbol,
+    },
     /// SQLite numbered `?1`, `?123` — the `?`-spelled positional parameter (distinct from
     /// PostgreSQL's `$`-spelled [`Positional`](Self::Positional) so it round-trips as `?N`).
     /// The carried value is the 1-based index; SQLite restricts it to `1..=32766`

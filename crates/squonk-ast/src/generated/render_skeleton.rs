@@ -15,7 +15,7 @@ pub(crate) const CURRENT_RENDER_SHAPE_DDL: RenderShapeFingerprint<0xb7fb9938befa
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_DML: RenderShapeFingerprint<0x5bdcbbc8cc864aec> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_EXPR: RenderShapeFingerprint<0xbcc8a4346507a25c> =
+pub(crate) const CURRENT_RENDER_SHAPE_EXPR: RenderShapeFingerprint<0xde8cec2513ed42e5> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_EXT: RenderShapeFingerprint<0xffd1225e92e4dab2> =
     RenderShapeFingerprint;
@@ -37,7 +37,7 @@ pub(crate) const CURRENT_RENDER_SHAPE_STMT: RenderShapeFingerprint<0x957db431c4a
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_STORED_PROGRAM: RenderShapeFingerprint<0xfb50d22f049b4cc7> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_TCL: RenderShapeFingerprint<0x53fc3a24d97e2ce3> =
+pub(crate) const CURRENT_RENDER_SHAPE_TCL: RenderShapeFingerprint<0x1a58662f47080916> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_TY: RenderShapeFingerprint<0x03efd7c0644eb26a> =
     RenderShapeFingerprint;
@@ -5059,6 +5059,9 @@ pub(crate) fn render_shape_parameter_kind(node: &ParameterKind) {
         ParameterKind::Positional(field0) => {
             touch(field0);
         }
+        ParameterKind::PositionalLarge { digits } => {
+            touch(digits);
+        }
         ParameterKind::Numbered(field0) => {
             touch(field0);
         }
@@ -9347,6 +9350,7 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
             syntax,
             mode,
             block,
+            name,
             modes,
             meta,
         } => {
@@ -9357,6 +9361,9 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
             if let Some(item) = block.as_ref() {
                 render_shape_transaction_block_keyword(item);
             }
+            if let Some(item) = name.as_ref() {
+                render_shape_ident(item);
+            }
             for item in modes.iter() {
                 render_shape_transaction_mode(item);
             }
@@ -9365,6 +9372,7 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
         TransactionStatement::Commit {
             syntax,
             block,
+            name,
             chain,
             release,
             meta,
@@ -9373,6 +9381,9 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
             if let Some(item) = block.as_ref() {
                 render_shape_transaction_block_keyword(item);
             }
+            if let Some(item) = name.as_ref() {
+                render_shape_ident(item);
+            }
             touch(chain);
             touch(release);
             touch(meta);
@@ -9380,6 +9391,7 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
         TransactionStatement::Rollback {
             syntax,
             block,
+            name,
             savepoint_keyword,
             to_savepoint,
             chain,
@@ -9389,6 +9401,9 @@ pub(crate) fn render_shape_transaction_statement(node: &TransactionStatement) {
             render_shape_transaction_rollback_keyword(syntax);
             if let Some(item) = block.as_ref() {
                 render_shape_transaction_block_keyword(item);
+            }
+            if let Some(item) = name.as_ref() {
+                render_shape_ident(item);
             }
             touch(savepoint_keyword);
             if let Some(item) = to_savepoint.as_ref() {

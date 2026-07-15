@@ -743,6 +743,7 @@ impl UtilitySyntax {
         begin_transaction_keyword: true,
         commit_transaction_keyword: true,
         rollback_transaction_keyword: true,
+        transaction_name: false,
         begin_transaction_modes: true,
         transaction_savepoints: false,
         set_transaction: false,
@@ -917,6 +918,7 @@ impl FeatureSet {
         parameters: ParameterSyntax {
             anonymous_question: true,
             positional_dollar: true,
+            positional_dollar_large: true,
             named_colon: false,
             named_at: false,
             named_dollar: false,

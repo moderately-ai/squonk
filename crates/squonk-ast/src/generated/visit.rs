@@ -9191,6 +9191,9 @@ where
         ParameterKind::Positional(field0) => {
             let _ = field0;
         }
+        ParameterKind::PositionalLarge { digits } => {
+            let _ = digits;
+        }
         ParameterKind::Numbered(field0) => {
             let _ = field0;
         }
@@ -14755,6 +14758,7 @@ where
             syntax,
             mode,
             block,
+            name,
             modes,
             meta,
         } => {
@@ -14765,6 +14769,9 @@ where
             if let Some(item) = block.as_ref() {
                 visitor.visit_transaction_block_keyword(item);
             }
+            if let Some(item) = name.as_ref() {
+                visitor.visit_ident(item);
+            }
             for item in modes.iter() {
                 visitor.visit_transaction_mode(item);
             }
@@ -14773,6 +14780,7 @@ where
         TransactionStatement::Commit {
             syntax,
             block,
+            name,
             chain,
             release,
             meta,
@@ -14781,6 +14789,9 @@ where
             if let Some(item) = block.as_ref() {
                 visitor.visit_transaction_block_keyword(item);
             }
+            if let Some(item) = name.as_ref() {
+                visitor.visit_ident(item);
+            }
             let _ = chain;
             let _ = release;
             let _ = meta;
@@ -14788,6 +14799,7 @@ where
         TransactionStatement::Rollback {
             syntax,
             block,
+            name,
             savepoint_keyword,
             to_savepoint,
             chain,
@@ -14797,6 +14809,9 @@ where
             visitor.visit_transaction_rollback_keyword(syntax);
             if let Some(item) = block.as_ref() {
                 visitor.visit_transaction_block_keyword(item);
+            }
+            if let Some(item) = name.as_ref() {
+                visitor.visit_ident(item);
             }
             let _ = savepoint_keyword;
             if let Some(item) = to_savepoint.as_ref() {
@@ -27460,6 +27475,9 @@ where
         ParameterKind::Positional(field0) => {
             let _ = field0;
         }
+        ParameterKind::PositionalLarge { digits } => {
+            let _ = digits;
+        }
         ParameterKind::Numbered(field0) => {
             let _ = field0;
         }
@@ -33018,6 +33036,7 @@ where
             syntax,
             mode,
             block,
+            name,
             modes,
             meta,
         } => {
@@ -33028,6 +33047,9 @@ where
             if let Some(item) = block.as_mut() {
                 visitor.visit_transaction_block_keyword_mut(item);
             }
+            if let Some(item) = name.as_mut() {
+                visitor.visit_ident_mut(item);
+            }
             for item in modes.iter_mut() {
                 visitor.visit_transaction_mode_mut(item);
             }
@@ -33036,6 +33058,7 @@ where
         TransactionStatement::Commit {
             syntax,
             block,
+            name,
             chain,
             release,
             meta,
@@ -33044,6 +33067,9 @@ where
             if let Some(item) = block.as_mut() {
                 visitor.visit_transaction_block_keyword_mut(item);
             }
+            if let Some(item) = name.as_mut() {
+                visitor.visit_ident_mut(item);
+            }
             let _ = chain;
             let _ = release;
             let _ = meta;
@@ -33051,6 +33077,7 @@ where
         TransactionStatement::Rollback {
             syntax,
             block,
+            name,
             savepoint_keyword,
             to_savepoint,
             chain,
@@ -33060,6 +33087,9 @@ where
             visitor.visit_transaction_rollback_keyword_mut(syntax);
             if let Some(item) = block.as_mut() {
                 visitor.visit_transaction_block_keyword_mut(item);
+            }
+            if let Some(item) = name.as_mut() {
+                visitor.visit_ident_mut(item);
             }
             let _ = savepoint_keyword;
             if let Some(item) = to_savepoint.as_mut() {

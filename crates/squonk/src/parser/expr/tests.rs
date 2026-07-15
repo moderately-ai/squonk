@@ -1379,6 +1379,7 @@ const PARAMETER_DIALECT: FeatureDialect = {
     const FEATURES: FeatureSet =
         FeatureSet::ANSI.with(FeatureDelta::EMPTY.parameters(ParameterSyntax {
             positional_dollar: true,
+            positional_dollar_large: false,
             anonymous_question: true,
             named_colon: true,
             named_at: true,
@@ -1665,7 +1666,8 @@ fn mysql_bare_string_alias_and_adjacent_concat_split_by_parse_order() {
 #[test]
 fn positional_parameter_index_overflow_is_a_clean_error() {
     // `$<huge>` lexes as one placeholder, but the index does not fit in u32, so
-    // parsing reports a precise error rather than panicking on the overflow.
+    // dialects without PostgreSQL's permissive `ParamRef` narrowing report a precise
+    // error rather than panicking on the overflow.
     let err = parse_with(
         "SELECT $99999999999",
         crate::ParseConfig::new(PARAMETER_DIALECT),
@@ -1675,6 +1677,20 @@ fn positional_parameter_index_overflow_is_a_clean_error() {
         err.expected.as_str(),
         "a positional parameter index within u32 range",
     );
+
+    let parsed = parse_with(
+        "SELECT $99999999999",
+        crate::ParseConfig::new(crate::dialect::Postgres),
+    )
+    .expect("PostgreSQL preserves the oversized ParamRef spelling");
+    let Expr::Parameter {
+        kind: ParameterKind::PositionalLarge { digits },
+        ..
+    } = project_expr(&parsed)
+    else {
+        panic!("expected an oversized positional parameter");
+    };
+    assert_eq!(parsed.resolver().resolve(*digits), "99999999999");
 }
 
 const SESSION_VARIABLE_DIALECT: FeatureDialect = {

@@ -91,6 +91,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             let block = self.eat_transaction_block_keyword(
                 self.features().utility_syntax.begin_transaction_keyword,
             )?;
+            let name = self.parse_transaction_name(block)?;
             let modes = if self.features().utility_syntax.begin_transaction_modes {
                 self.parse_transaction_modes_with(
                     self.features().utility_syntax.transaction_isolation_mode,
@@ -106,6 +107,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 syntax: TransactionStart::Begin,
                 mode,
                 block,
+                name,
                 modes,
                 meta,
             })
@@ -139,6 +141,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 syntax: TransactionStart::Start,
                 mode: None,
                 block,
+                name: None,
                 modes,
                 meta,
             })
@@ -146,11 +149,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
             let block = self.eat_transaction_block_keyword(
                 self.features().utility_syntax.commit_transaction_keyword,
             )?;
+            let name = self.parse_transaction_name(block)?;
             let (chain, release) = self.parse_transaction_completion()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Commit {
                 syntax,
                 block,
+                name,
                 chain,
                 release,
                 meta,
@@ -159,6 +164,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             let block = self.eat_transaction_block_keyword(
                 self.features().utility_syntax.rollback_transaction_keyword,
             )?;
+            let name = self.parse_transaction_name(block)?;
             let (savepoint_keyword, to_savepoint) =
                 if self.features().utility_syntax.transaction_savepoints
                     && self.eat_contextual_keyword("TO")?
@@ -178,6 +184,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             Ok(TransactionStatement::Rollback {
                 syntax,
                 block,
+                name,
                 savepoint_keyword,
                 to_savepoint,
                 chain,
@@ -296,6 +303,22 @@ impl<'a, D: Dialect> Parser<'a, D> {
             Ok(Some(TransactionBlockKeyword::Work))
         } else if transaction_keyword && self.eat_contextual_keyword("TRANSACTION")? {
             Ok(Some(TransactionBlockKeyword::Transaction))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn parse_transaction_name(
+        &mut self,
+        block: Option<TransactionBlockKeyword>,
+    ) -> ParseResult<Option<Box<crate::ast::Ident>>> {
+        if self.features().utility_syntax.transaction_name
+            && block == Some(TransactionBlockKeyword::Transaction)
+            && self.peek()?.is_some_and(|token| {
+                self.token_admissible(token, self.features().reserved_column_name)
+            })
+        {
+            Ok(Some(Box::new(self.parse_ident()?)))
         } else {
             Ok(None)
         }

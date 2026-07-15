@@ -1853,6 +1853,7 @@ export type LambdaParamSpelling =
 
 export type ParameterKind =
   | { Positional: number }
+  | { PositionalLarge: { digits: number; } }
   | { Numbered: number }
   | "Anonymous"
   | { Named: { name: number; sigil: ParameterSigil; } };
@@ -3433,9 +3434,9 @@ export type ConditionInfoItemName =
   | "ReturnedSqlstate";
 
 export type TransactionStatement =
-  | { Begin: { syntax: TransactionStart; mode: TransactionModeKind | null; block: TransactionBlockKeyword | null; modes: TransactionMode[]; meta: Meta; } }
-  | { Commit: { syntax: TransactionCommitKeyword; block: TransactionBlockKeyword | null; chain: boolean | null; release: boolean | null; meta: Meta; } }
-  | { Rollback: { syntax: TransactionRollbackKeyword; block: TransactionBlockKeyword | null; savepoint_keyword: boolean; to_savepoint: Ident | null; chain: boolean | null; release: boolean | null; meta: Meta; } }
+  | { Begin: { syntax: TransactionStart; mode: TransactionModeKind | null; block: TransactionBlockKeyword | null; name: Ident | null; modes: TransactionMode[]; meta: Meta; } }
+  | { Commit: { syntax: TransactionCommitKeyword; block: TransactionBlockKeyword | null; name: Ident | null; chain: boolean | null; release: boolean | null; meta: Meta; } }
+  | { Rollback: { syntax: TransactionRollbackKeyword; block: TransactionBlockKeyword | null; name: Ident | null; savepoint_keyword: boolean; to_savepoint: Ident | null; chain: boolean | null; release: boolean | null; meta: Meta; } }
   | { Savepoint: { name: Ident; meta: Meta; } }
   | { Release: { savepoint_keyword: boolean; savepoint: Ident; meta: Meta; } }
   | { SetCharacteristics: { modes: TransactionMode[]; meta: Meta; } };

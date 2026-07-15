@@ -178,6 +178,7 @@ impl ParameterSyntax {
     /// The `MYSQL` preset for parameter syntax.
     pub const MYSQL: Self = Self {
         positional_dollar: false,
+        positional_dollar_large: false,
         anonymous_question: true,
         named_colon: false,
         named_at: false,
@@ -981,6 +982,7 @@ impl UtilitySyntax {
         begin_transaction_keyword: false,
         commit_transaction_keyword: false,
         rollback_transaction_keyword: false,
+        transaction_name: false,
         begin_transaction_modes: false,
         transaction_savepoints: true,
         set_transaction: true,

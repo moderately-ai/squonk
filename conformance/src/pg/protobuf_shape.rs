@@ -2528,14 +2528,9 @@ fn pg_set_value(node: &pgpb::Node) -> Result<SetParameterValueShape, String> {
         Some(NodeEnum::AConst(value)) => {
             pg_literal_shape(value).map(SetParameterValueShape::Literal)
         }
-        Some(NodeEnum::ParamRef(parameter)) => u32::try_from(parameter.number)
-            .map(SetParameterValueShape::PositionalParameter)
-            .map_err(|_| {
-                format!(
-                    "PostgreSQL SET positional parameter is negative: {}",
-                    parameter.number
-                )
-            }),
+        Some(NodeEnum::ParamRef(parameter)) => Ok(SetParameterValueShape::PositionalParameter(
+            parameter.number,
+        )),
         other => Err(format!("unsupported PostgreSQL SET value node: {other:?}")),
     }
 }

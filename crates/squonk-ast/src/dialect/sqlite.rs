@@ -263,6 +263,7 @@ impl ParameterSyntax {
     /// The `SQLITE` preset for parameter syntax.
     pub const SQLITE: Self = Self {
         positional_dollar: false,
+        positional_dollar_large: false,
         anonymous_question: true,
         named_colon: true,
         named_at: true,
@@ -933,6 +934,7 @@ impl UtilitySyntax {
         begin_transaction_keyword: true,
         commit_transaction_keyword: true,
         rollback_transaction_keyword: true,
+        transaction_name: true,
         begin_transaction_modes: false,
         transaction_savepoints: true,
         set_transaction: false,

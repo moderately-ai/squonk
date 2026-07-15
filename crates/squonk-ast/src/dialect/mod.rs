@@ -669,6 +669,10 @@ pub struct ParameterSyntax {
     /// from dollar-quoting: `$` + digit is a parameter, `$` + tag-start/`$` opens a
     /// dollar-quoted string, so both forms can be enabled together.
     pub positional_dollar: bool,
+    /// Preserve a `$` positional parameter whose digit run exceeds `u32`. PostgreSQL's
+    /// scanner accepts these spellings and narrows them into its signed `ParamRef.number`;
+    /// dialects that range-check their parameter indices leave this off.
+    pub positional_dollar_large: bool,
     /// Accept anonymous positional `?` placeholders (ODBC/JDBC).
     pub anonymous_question: bool,
     /// Accept colon-named `:name` placeholders (Oracle, SQLite, JDBC/psycopg). The
@@ -3083,6 +3087,10 @@ pub struct UtilitySyntax {
     pub commit_transaction_keyword: bool,
     /// Accept `TRANSACTION` as the optional block word after `ROLLBACK`.
     pub rollback_transaction_keyword: bool,
+    /// Accept SQLite's optional transaction name immediately after an explicit
+    /// `TRANSACTION` block word (`BEGIN TRANSACTION name`, `COMMIT TRANSACTION name`,
+    /// or `ROLLBACK TRANSACTION name`).
+    pub transaction_name: bool,
     /// Accept a standard transaction-mode list after `BEGIN [WORK | TRANSACTION]`.
     pub begin_transaction_modes: bool,
     /// Accept transaction savepoint statements: `SAVEPOINT`, `RELEASE`, and

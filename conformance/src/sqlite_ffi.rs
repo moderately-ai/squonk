@@ -82,6 +82,14 @@ pub enum SqliteSegmentation {
 /// differential, so a resolution failure means "references a name that does not
 /// exist" (proof of parse) rather than a schema-specific reject.
 pub fn segment(conn: &Connection, sql: &str) -> SqliteSegmentation {
+    segment_with_retry(conn, sql, true)
+}
+
+fn segment_with_retry(
+    conn: &Connection,
+    sql: &str,
+    retry_in_active_transaction: bool,
+) -> SqliteSegmentation {
     // Interior NUL rejects at the C-string boundary — the same contract libpg_query
     // and the DuckDB arm enforce, so the NUL-in-SQL class is armed for SQLite too.
     let Ok(c_sql) = CString::new(sql) else {
@@ -103,6 +111,19 @@ pub fn segment(conn: &Connection, sql: &str) -> SqliteSegmentation {
 
             if rc != ffi::SQLITE_OK {
                 let msg = errmsg(db);
+                // COMMIT/END/ROLLBACK can bind-fail solely because this never-execute
+                // connection has no active transaction. That failure leaves `pzTail`
+                // unset, which can hide a malformed suffix. Retry the same bytes on a
+                // scratch connection whose only executed setup is `BEGIN`; the input
+                // itself is still prepared and finalized without stepping, and SQLite
+                // can now expose the real tail boundary.
+                if retry_in_active_transaction && needs_active_transaction(&msg) {
+                    if let Ok(retry) = Connection::open_in_memory() {
+                        if retry.execute_batch("BEGIN").is_ok() {
+                            return segment_with_retry(&retry, sql, false);
+                        }
+                    }
+                }
                 // A resolution error proves the statement parsed; count is now
                 // truncated (a failed prepare leaves `pzTail` unset), so the boolean
                 // accept holds but the count does not.
@@ -138,6 +159,12 @@ pub fn segment(conn: &Connection, sql: &str) -> SqliteSegmentation {
             count_reliable: true,
         }
     }
+}
+
+fn needs_active_transaction(msg: &str) -> bool {
+    msg.contains("cannot commit")
+        || msg.contains("cannot rollback")
+        || msg.contains("no transaction is active")
 }
 
 /// Whether an `sqlite3_errmsg` string is a name-resolution / semantic error (the

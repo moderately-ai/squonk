@@ -900,8 +900,10 @@ mod serde_impls {
             if self.error.is_some() {
                 return;
             }
-            if let ParameterKind::Named { name, .. } = node {
-                self.check_symbol(*name);
+            match node {
+                ParameterKind::Named { name, .. } => self.check_symbol(*name),
+                ParameterKind::PositionalLarge { digits } => self.check_symbol(*digits),
+                _ => {}
             }
             visit::walk_parameter_kind::<Self, X>(self, node);
         }

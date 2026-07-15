@@ -97,6 +97,7 @@ impl ParameterSyntax {
     /// The `POSTGRES` preset for parameter syntax.
     pub const POSTGRES: Self = Self {
         positional_dollar: true,
+        positional_dollar_large: true,
         anonymous_question: false,
         named_colon: false,
         named_at: false,
@@ -571,6 +572,7 @@ impl UtilitySyntax {
         begin_transaction_keyword: true,
         commit_transaction_keyword: true,
         rollback_transaction_keyword: true,
+        transaction_name: false,
         begin_transaction_modes: true,
         transaction_savepoints: true,
         set_transaction: true,

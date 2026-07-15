@@ -310,7 +310,7 @@ impl<'ast> Visit<'ast> for TargetSupport<'_> {
         if let Expr::Parameter { kind, meta } = node {
             let params = &self.features.parameters;
             let (supported, message) = match kind {
-                ParameterKind::Positional(_) => (
+                ParameterKind::Positional(_) | ParameterKind::PositionalLarge { .. } => (
                     params.positional_dollar,
                     "target does not support positional $n parameters",
                 ),

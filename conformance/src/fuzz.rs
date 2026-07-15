@@ -111,6 +111,10 @@ pub const DIFFERENTIAL_REPLAYS: &[&[u8]] = &[
 /// shapes around them (accepted or rejected by both) that give the mutator productive
 /// starting points for the actual over-acceptance hunt.
 pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // PostgreSQL's scanner accepts digit runs beyond u32 and materializes them via
+    // its C `atol` -> parser-int path; Squonk retains the spelling and mirrors that
+    // value only in the structural oracle projection.
+    b"set\x0cua=$05505555550",
     // PostgreSQL's comma-separated `var_value` list admits positional parameters.
     b"set\ne6eme6eme1=0,6,$888",
     // A quoted identifier is a `var_value` name, including an identifier whose
@@ -640,6 +644,9 @@ pub fn pg_differential_raw_bytes(input: &[u8]) {
 /// (statement-count) half — the SQLite arm of the splitter hunt.
 #[cfg(feature = "oracle-engines")]
 pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // A transaction-state prepare failure must be retried in an active transaction
+    // so SQLite exposes and rejects the otherwise-hidden invalid tail.
+    b"EnD\ntrAnsaction--\nE",
     // Schema-independent both-accept singles (curated M2 corpus shapes).
     b"SELECT 1",
     b"SELECT 1 + 2 * 3",

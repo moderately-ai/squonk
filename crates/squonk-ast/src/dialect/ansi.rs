@@ -200,6 +200,7 @@ impl ParameterSyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
         positional_dollar: false,
+        positional_dollar_large: false,
         anonymous_question: false,
         named_colon: false,
         named_at: false,
@@ -667,6 +668,7 @@ impl UtilitySyntax {
         begin_transaction_keyword: true,
         commit_transaction_keyword: true,
         rollback_transaction_keyword: true,
+        transaction_name: false,
         begin_transaction_modes: true,
         transaction_savepoints: true,
         set_transaction: true,

@@ -476,7 +476,7 @@ const SIZE_BUDGETS: &[(&str, usize)] = &[
     ("TlsOption", 40),
     ("TlsRequirement", 24),
     ("TransactionMode", 16),
-    ("TransactionStatement", 40),
+    ("TransactionStatement", 48),
     ("TriggerEvent", 24),
     ("TriggerOrder", 36),
     ("UnlockTablesStatement", 16),

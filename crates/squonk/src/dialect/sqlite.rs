@@ -429,12 +429,16 @@ mod tests {
         for sql in [
             "BEGIN",
             "BEGIN TRANSACTION",
+            "BEGIN TRANSACTION tx",
             "COMMIT",
             "COMMIT TRANSACTION",
+            "COMMIT TRANSACTION tx",
             "END",
             "END TRANSACTION",
+            "END TRANSACTION tx",
             "ROLLBACK",
             "ROLLBACK TRANSACTION",
+            "ROLLBACK TRANSACTION tx",
             "SAVEPOINT s",
             "RELEASE s",
             "RELEASE SAVEPOINT s",
@@ -463,6 +467,11 @@ mod tests {
         }
 
         assert_eq!(sqlite_render("END TRANSACTION"), "END TRANSACTION");
+        assert_eq!(sqlite_render("EnD\ntrAnsaction--\nE"), "END TRANSACTION E");
+        assert!(
+            parse_with("END TRANSACTION E F", crate::ParseConfig::new(Sqlite)).is_err(),
+            "SQLite admits at most one transaction name",
+        );
     }
 
     #[test]

@@ -2365,6 +2365,7 @@ const TCL_SHAPE_CORPUS: &[&str] = &[
     "SET x = 'foo'",
     "SET x = foo",
     "SET x = 0, 6, $888",
+    "SET x = $05505555550",
     "RESET ALL",
     "RESET search_path",
     "SHOW ALL",

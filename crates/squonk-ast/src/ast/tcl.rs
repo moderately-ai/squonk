@@ -38,6 +38,8 @@ pub enum TransactionStatement {
         /// `Some(Transaction)`; dialect data controls whether `START` may omit the word
         /// or use `WORK`.
         block: Option<TransactionBlockKeyword>,
+        /// SQLite's optional name after an explicit `TRANSACTION` keyword.
+        name: Option<Box<Ident>>,
         /// modes in source order.
         modes: ThinVec<TransactionMode>,
         /// Source location and node identity.
@@ -49,6 +51,8 @@ pub enum TransactionStatement {
         syntax: TransactionCommitKeyword,
         /// The optional `TRANSACTION` / `WORK` block noise word after `COMMIT`.
         block: Option<TransactionBlockKeyword>,
+        /// SQLite's optional name after an explicit `TRANSACTION` keyword.
+        name: Option<Box<Ident>>,
         /// `Some(true)` for `AND CHAIN`, `Some(false)` for `AND NO CHAIN`.
         chain: Option<bool>,
         /// `Some(true)` for `RELEASE`, `Some(false)` for `NO RELEASE`.
@@ -65,6 +69,8 @@ pub enum TransactionStatement {
         syntax: TransactionRollbackKeyword,
         /// The optional `TRANSACTION` / `WORK` block noise word after `ROLLBACK`.
         block: Option<TransactionBlockKeyword>,
+        /// SQLite's optional name after an explicit `TRANSACTION` keyword.
+        name: Option<Box<Ident>>,
         /// Whether the optional `SAVEPOINT` keyword was written before the savepoint
         /// name (`ROLLBACK TO SAVEPOINT x` vs the bare `ROLLBACK TO x`). Meaningful
         /// only when `to_savepoint` is `Some`; the canonical render emits `SAVEPOINT`.

@@ -3215,6 +3215,28 @@ mod tests {
     }
 
     #[test]
+    fn postgres_set_value_accepts_oversized_positional_parameter() {
+        let sql = "SET ua = $05505555550";
+        let session = parse_session_with(sql, Postgres);
+        let values = set_list_values(&session);
+        assert!(matches!(
+            values[0],
+            SetParameterValue::Parameter {
+                kind: ParameterKind::PositionalLarge { .. },
+                ..
+            }
+        ));
+
+        let parsed = parse_with(sql, crate::ParseConfig::new(Postgres)).expect("PostgreSQL SET");
+        assert_eq!(
+            Renderer::new(Postgres)
+                .render_parsed(&parsed)
+                .expect("render PostgreSQL SET"),
+            "SET ua TO $05505555550",
+        );
+    }
+
+    #[test]
     fn set_list_value_parses_and_captures_elements() {
         // A single bracketed list value (the corpus's `allowed_configs` setting).
         let session = parse_session_with(

@@ -538,8 +538,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// token is `:name` / `@name`. The placeholder span is never empty, so the first
     /// byte is the sigil. The positional 1-based index is materialized here (like a
     /// `Number`'s value), whose only failure is a `u32` overflow — a far larger bound
-    /// than any real parameter list; the named form interns its name (sigil stripped),
-    /// exact-case, so it round-trips like an identifier.
+    /// than most real parameter lists. PostgreSQL nevertheless parse-accepts larger
+    /// digit runs through its C scanner, so those are interned verbatim to remain
+    /// round-trippable; the named form likewise interns its name (sigil stripped),
+    /// exact-case.
     fn parse_parameter(&mut self, token: Token) -> ParseResult<Expr<D::Ext>> {
         let (kind, meta) = self.parse_parameter_kind(token)?;
         Ok(Expr::Parameter { kind, meta })
@@ -558,13 +560,21 @@ impl<'a, D: Dialect> Parser<'a, D> {
             // `$1` positional index vs `$name` (SQLite): the byte after `$`
             // disambiguates (the tokenizer required a digit or an identifier-start).
             b'$' if bytes.get(1).is_some_and(u8::is_ascii_digit) => {
-                ParameterKind::Positional(text[1..].parse::<u32>().map_err(|_| {
-                    self.error_at(
-                        token.span,
-                        "a positional parameter index within u32 range",
-                        text.to_owned(),
-                    )
-                })?)
+                match text[1..].parse::<u32>() {
+                    Ok(index) => ParameterKind::Positional(index),
+                    Err(_) if self.features().parameters.positional_dollar_large => {
+                        ParameterKind::PositionalLarge {
+                            digits: self.intern_text(&text[1..]),
+                        }
+                    }
+                    Err(_) => {
+                        return Err(self.error_at(
+                            token.span,
+                            "a positional parameter index within u32 range",
+                            text.to_owned(),
+                        ));
+                    }
+                }
             }
             // `$name` (SQLite) / `:name` / `@name`: the sigil is one ASCII byte, so the
             // name begins at `start + 1`; record which sigil spelled it for an exact

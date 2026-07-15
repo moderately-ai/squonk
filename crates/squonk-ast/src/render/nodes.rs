@@ -177,7 +177,7 @@ const _: skeleton::RenderShapeFingerprint<0xb7fb9938befad896> = skeleton::CURREN
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0x5bdcbbc8cc864aec> = skeleton::CURRENT_RENDER_SHAPE_DML;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0xbcc8a4346507a25c> = skeleton::CURRENT_RENDER_SHAPE_EXPR;
+const _: skeleton::RenderShapeFingerprint<0xde8cec2513ed42e5> = skeleton::CURRENT_RENDER_SHAPE_EXPR;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0xffd1225e92e4dab2> = skeleton::CURRENT_RENDER_SHAPE_EXT;
 #[cfg(test)]
@@ -204,7 +204,7 @@ const _: skeleton::RenderShapeFingerprint<0x957db431c4a1db51> = skeleton::CURREN
 const _: skeleton::RenderShapeFingerprint<0xfb50d22f049b4cc7> =
     skeleton::CURRENT_RENDER_SHAPE_STORED_PROGRAM;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0x53fc3a24d97e2ce3> = skeleton::CURRENT_RENDER_SHAPE_TCL;
+const _: skeleton::RenderShapeFingerprint<0x1a58662f47080916> = skeleton::CURRENT_RENDER_SHAPE_TCL;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0x03efd7c0644eb26a> = skeleton::CURRENT_RENDER_SHAPE_TY;
 #[cfg(test)]
@@ -3250,6 +3250,7 @@ impl Render for TransactionStatement {
                 syntax,
                 mode,
                 block,
+                name,
                 modes,
                 ..
             } => {
@@ -3272,14 +3273,15 @@ impl Render for TransactionStatement {
                 // replayed only by a source-fidelity render, dropped by a re-spell and
                 // the redacted fingerprint. The START spelling handles its block word
                 // above because its standard re-spell must restore `TRANSACTION`.
-                if *syntax == TransactionStart::Begin && honours_source_spelling(ctx) {
-                    render_transaction_block_keyword(*block, f)?;
+                if *syntax == TransactionStart::Begin {
+                    render_transaction_block_and_name(*block, name.as_deref(), ctx, f)?;
                 }
                 render_transaction_modes(modes, ctx, f)
             }
             Self::Commit {
                 syntax,
                 block,
+                name,
                 chain,
                 release,
                 ..
@@ -3289,14 +3291,13 @@ impl Render for TransactionStatement {
                 } else {
                     f.write_str("COMMIT")?;
                 }
-                if honours_source_spelling(ctx) {
-                    render_transaction_block_keyword(*block, f)?;
-                }
+                render_transaction_block_and_name(*block, name.as_deref(), ctx, f)?;
                 render_transaction_completion(*chain, *release, f)
             }
             Self::Rollback {
                 syntax,
                 block,
+                name,
                 savepoint_keyword,
                 to_savepoint,
                 chain,
@@ -3308,9 +3309,7 @@ impl Render for TransactionStatement {
                 } else {
                     f.write_str("ROLLBACK")?;
                 }
-                if honours_source_spelling(ctx) {
-                    render_transaction_block_keyword(*block, f)?;
-                }
+                render_transaction_block_and_name(*block, name.as_deref(), ctx, f)?;
                 if let Some(name) = to_savepoint {
                     // The `SAVEPOINT` keyword is optional after `TO`; the canonical
                     // render emits it, a source-fidelity render drops it when the
@@ -3383,6 +3382,22 @@ fn render_transaction_block_keyword(
         Some(TransactionBlockKeyword::Transaction) => f.write_str(" TRANSACTION"),
         Some(TransactionBlockKeyword::Work) => f.write_str(" WORK"),
         None => Ok(()),
+    }
+}
+
+fn render_transaction_block_and_name(
+    block: Option<TransactionBlockKeyword>,
+    name: Option<&Ident>,
+    ctx: &RenderCtx<'_>,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    if let Some(name) = name {
+        f.write_str(" TRANSACTION ")?;
+        name.render(ctx, f)
+    } else if honours_source_spelling(ctx) {
+        render_transaction_block_keyword(block, f)
+    } else {
+        Ok(())
     }
 }
 
@@ -4313,6 +4328,7 @@ fn render_parameter_kind(
 ) -> fmt::Result {
     match kind {
         ParameterKind::Positional(index) => write!(f, "${index}"),
+        ParameterKind::PositionalLarge { digits } => write!(f, "${}", ctx.resolve(digits)),
         ParameterKind::Numbered(index) => write!(f, "?{index}"),
         ParameterKind::Anonymous => f.write_str("?"),
         ParameterKind::Named { name, sigil } => {

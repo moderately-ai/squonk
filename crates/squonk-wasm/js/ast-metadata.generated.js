@@ -3026,15 +3026,18 @@ export const AST_FIELD_TYPES = Object.freeze({
     "syntax": "TransactionStart",
     "mode": "TransactionModeKind",
     "block": "TransactionBlockKeyword",
+    "name": "Ident",
     "modes": "TransactionMode[]",
   }),
   "TransactionStatement.Commit": Object.freeze({
     "syntax": "TransactionCommitKeyword",
     "block": "TransactionBlockKeyword",
+    "name": "Ident",
   }),
   "TransactionStatement.Rollback": Object.freeze({
     "syntax": "TransactionRollbackKeyword",
     "block": "TransactionBlockKeyword",
+    "name": "Ident",
     "to_savepoint": "Ident",
   }),
   "TransactionStatement.Savepoint": Object.freeze({

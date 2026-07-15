@@ -165,8 +165,10 @@ impl VisitMut<NoExt> for SymbolRemapper<'_> {
     }
 
     fn visit_parameter_kind_mut(&mut self, node: &mut ParameterKind) {
-        if let ParameterKind::Named { name, .. } = node {
-            self.remap(name);
+        match node {
+            ParameterKind::Named { name, .. } => self.remap(name),
+            ParameterKind::PositionalLarge { digits } => self.remap(digits),
+            _ => {}
         }
         visit::walk_parameter_kind_mut(self, node);
     }
@@ -273,8 +275,10 @@ impl<'ast> Visit<'ast, NoExt> for SymbolCollector<'_> {
     }
 
     fn visit_parameter_kind(&mut self, node: &'ast ParameterKind) {
-        if let ParameterKind::Named { name, .. } = node {
-            self.record(*name);
+        match node {
+            ParameterKind::Named { name, .. } => self.record(*name),
+            ParameterKind::PositionalLarge { digits } => self.record(*digits),
+            _ => {}
         }
         visit::walk_parameter_kind(self, node);
     }

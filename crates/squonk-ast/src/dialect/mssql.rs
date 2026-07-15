@@ -162,6 +162,7 @@ impl ParameterSyntax {
     pub const MSSQL: Self = Self {
         named_at: true,
         positional_dollar: false,
+        positional_dollar_large: false,
         anonymous_question: false,
         named_colon: false,
         named_dollar: false,

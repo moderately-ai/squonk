@@ -1136,6 +1136,17 @@ mod tests {
         assert_eq!(segment(&conn, "SELECT 1;"), accept(1));
         assert_eq!(segment(&conn, "SELECT 1;; SELECT 2"), accept(2));
         assert_eq!(segment(&conn, ";; SELECT 1"), accept(1));
+        // A transaction-state error on the schema-less connection must not hide the
+        // first statement's `pzTail`: the oracle retries in an active transaction.
+        // SQLite admits one transaction name after an explicit `TRANSACTION` keyword,
+        // but a second name is a genuine invalid tail.
+        assert_eq!(segment(&conn, "END TRANSACTION"), accept(1));
+        assert_eq!(segment(&conn, "END TRANSACTION--\nE"), accept(1));
+        let transaction_tail = segment(&conn, "END TRANSACTION E F");
+        assert!(
+            matches!(transaction_tail, SqliteSegmentation::Reject(_)),
+            "unexpected transaction-tail verdict: {transaction_tail:?}"
+        );
         // A genuine syntax error rejects.
         assert!(matches!(
             segment(&conn, "SELCT 1"),

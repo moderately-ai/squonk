@@ -5330,6 +5330,14 @@ ParameterKindPositionalJson = TypedDict("ParameterKindPositionalJson", {
     "Positional": "int",
 })
 
+ParameterKindPositionalLargePayloadJson = TypedDict("ParameterKindPositionalLargePayloadJson", {
+    "digits": "int",
+})
+
+ParameterKindPositionalLargeJson = TypedDict("ParameterKindPositionalLargeJson", {
+    "PositionalLarge": "ParameterKindPositionalLargePayloadJson",
+})
+
 ParameterKindNumberedJson = TypedDict("ParameterKindNumberedJson", {
     "Numbered": "int",
 })
@@ -5345,6 +5353,7 @@ ParameterKindNamedJson = TypedDict("ParameterKindNamedJson", {
 
 ParameterKindJson: TypeAlias = Union[
     ParameterKindPositionalJson,
+    ParameterKindPositionalLargeJson,
     ParameterKindNumberedJson,
     Literal["Anonymous"],
     ParameterKindNamedJson,
@@ -10080,6 +10089,7 @@ TransactionStatementBeginPayloadJson = TypedDict("TransactionStatementBeginPaylo
     "syntax": "AstNodeJson",
     "mode": "AstNodeJson | None",
     "block": "AstNodeJson | None",
+    "name": "AstNodeJson | None",
     "modes": "list[AstNodeJson]",
     "meta": "MetaJson",
 })
@@ -10091,6 +10101,7 @@ TransactionStatementBeginJson = TypedDict("TransactionStatementBeginJson", {
 TransactionStatementCommitPayloadJson = TypedDict("TransactionStatementCommitPayloadJson", {
     "syntax": "AstNodeJson",
     "block": "AstNodeJson | None",
+    "name": "AstNodeJson | None",
     "chain": "bool | None",
     "release": "bool | None",
     "meta": "MetaJson",
@@ -10103,6 +10114,7 @@ TransactionStatementCommitJson = TypedDict("TransactionStatementCommitJson", {
 TransactionStatementRollbackPayloadJson = TypedDict("TransactionStatementRollbackPayloadJson", {
     "syntax": "AstNodeJson",
     "block": "AstNodeJson | None",
+    "name": "AstNodeJson | None",
     "savepoint_keyword": "bool",
     "to_savepoint": "AstNodeJson | None",
     "chain": "bool | None",

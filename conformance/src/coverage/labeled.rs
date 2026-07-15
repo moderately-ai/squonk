@@ -5779,6 +5779,7 @@ mod tests {
         } = CommentSyntax::ANSI;
         let ParameterSyntax {
             positional_dollar: _,
+            positional_dollar_large: _,
             anonymous_question: _,
             named_colon: _,
             named_at: _,
@@ -6141,6 +6142,7 @@ mod tests {
             start_transaction: _,
             start_transaction_block_optional: _,
             transaction_work_keyword: _,
+            transaction_name: _,
             begin_transaction_keyword: _,
             commit_transaction_keyword: _,
             rollback_transaction_keyword: _,
