@@ -1783,16 +1783,16 @@ mod oracle_sweep {
     // reject surface over `# reject`), measured independently so nothing here disturbs
     // the tranche-1 pins. The tuples are `(agree_accept, coverage_gap, over_accept_syntax,
     // over_accept_binding, over_accept_other, agree_reject_syntax, agree_reject_binding)`.
-    // ACCEPT surface: 78 coverage gaps (DuckDB accepts, we reject) — the remaining fix-child
-    // inventory, one lower after `duckdb-postfix-operator-dimension` closed the `SELECT 10!`
-    // postfix gap (it moves into agree_accept). over_accept_syntax = 4: the early-bind
+    // ACCEPT surface: 77 coverage gaps (DuckDB accepts, we reject) — the remaining fix-child
+    // inventory. `ABORT` moved into agree-accept when the DuckDB transaction aliases were
+    // fitted to the oracle. over_accept_syntax = 4: the early-bind
     // `query(...)`/`read_csv(getvariable(...))` string-arg class, already reasoned in
     // `DUCKDB_DIVERGENCE_ALLOWLIST` (DuckDB constant-folds+re-parses a string arg; a non-constant
     // fold → syntax error — not replicable in a parse-only validator). A syntactically-valid body
     // DuckDB rejects only at bind time counts in over_accept_binding, the net-conserved
     // binding-noise class, not the syntax floor.
     const TRANCHE2_ACCEPT_QUADRANT: (usize, usize, usize, usize, usize, usize, usize) =
-        (6474, 78, 4, 998, 56, 0, 24);
+        (6475, 77, 4, 998, 56, 0, 24);
     // REJECT surface (known DuckDB `statement error` bodies): over_accept_syntax = 19 — not real
     // grammar over-acceptance but argument-value/arity semantic checks DuckDB spells as Parser
     // Errors that a parse-only validator legitimately does not enforce (the early-bind allowlist

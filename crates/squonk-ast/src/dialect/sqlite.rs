@@ -276,6 +276,8 @@ impl ParameterSyntax {
 impl IdentifierSyntax {
     /// The `SQLITE` preset for identifier syntax.
     pub const SQLITE: Self = Self {
+        // SQLite's IdChar class admits every code point at or above U+0080.
+        non_ascii: super::NonAsciiIdentifierSyntax::Any,
         // SQLite's IdChar set includes `$` as a *continuation* byte (`L$C3`, `a$b`, `t$x` are
         // one identifier each; engine-measured on rusqlite). `$` never *starts* an identifier —
         // a leading `$name` is the dollar-named placeholder (`named_dollar`) and a lone `$` is a

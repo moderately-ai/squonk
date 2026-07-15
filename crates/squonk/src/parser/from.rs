@@ -696,7 +696,15 @@ impl<'a, D: Dialect> Parser<'a, D> {
             ShowRefKind::Summarize
         };
         self.advance()?; // the DESCRIBE / SUMMARIZE keyword
-        let target = self.parse_show_ref_target(kind)?;
+        let target = if matches!(kind, ShowRefKind::Describe)
+            && (self.is_eof()? || self.peek_is_punct(Punctuation::Semicolon)?)
+        {
+            ShowRefTarget::Empty {
+                meta: self.make_meta(self.preceding_span()),
+            }
+        } else {
+            self.parse_show_ref_target(kind)?
+        };
         let span = start.union(self.preceding_span());
         Ok(Statement::ShowRef {
             show: Box::new(ShowRef {
@@ -6564,6 +6572,11 @@ mod tests {
         };
         assert!(matches!(show.kind, ShowRefKind::Describe));
         assert!(matches!(show.target, ShowRefTarget::Name { .. }));
+
+        let bare = parse_with("DESCRIBE", crate::ParseConfig::new(DuckDb))
+            .expect("bare DESCRIBE is syntactically valid");
+        let show = statement_show_ref(&bare);
+        assert!(matches!(show.target, ShowRefTarget::Empty { .. }));
     }
 
     #[test]
@@ -6667,6 +6680,7 @@ mod tests {
             "DESCRIBE SELECT 42 AS a",
             "SUMMARIZE SELECT 42 AS a",
             "DESCRIBE arrays",
+            "DESCRIBE",
             "SUMMARIZE arrays",
         ] {
             let parsed = parse_with(sql, crate::ParseConfig::new(DuckDb))

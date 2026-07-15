@@ -12482,6 +12482,9 @@ where
 {
     let _ = &mut *visitor;
     match node {
+        ShowRefTarget::Empty { meta } => {
+            let _ = meta;
+        }
         ShowRefTarget::Query { query, meta } => {
             visitor.visit_query(query);
             let _ = meta;
@@ -30741,6 +30744,9 @@ where
 {
     let _ = &mut *visitor;
     match node {
+        ShowRefTarget::Empty { meta } => {
+            let _ = meta;
+        }
         ShowRefTarget::Query { query, meta } => {
             visitor.visit_query_mut(query);
             let _ = meta;

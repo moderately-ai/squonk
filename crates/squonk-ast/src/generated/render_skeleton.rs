@@ -29,7 +29,7 @@ pub(crate) const CURRENT_RENDER_SHAPE_PIPE_OPS: RenderShapeFingerprint<0x5ebfaa9
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_PIVOT: RenderShapeFingerprint<0xd3444362d3f03fe8> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_QUERY: RenderShapeFingerprint<0x305c97c17f4b1723> =
+pub(crate) const CURRENT_RENDER_SHAPE_QUERY: RenderShapeFingerprint<0x9a0538badcfac3d0> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_REPLICATION: RenderShapeFingerprint<0xfa8b2915218d27ba> =
     RenderShapeFingerprint;
@@ -7506,6 +7506,9 @@ pub(crate) fn render_shape_show_ref_kind(node: &ShowRefKind) {
 }
 pub(crate) fn render_shape_show_ref_target<X: Extension>(node: &ShowRefTarget<X>) {
     match node {
+        ShowRefTarget::Empty { meta } => {
+            touch(meta);
+        }
         ShowRefTarget::Query { query, meta } => {
             render_shape_query(query);
             touch(meta);

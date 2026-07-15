@@ -252,6 +252,7 @@ impl IdentifierSyntax {
     /// `$`+digit still dispatches to the parameter form — `$` only continues an
     /// identifier, it does not start one — so this does not conflict with rule 3.
     pub const LENIENT: Self = Self {
+        non_ascii: super::NonAsciiIdentifierSyntax::Any,
         dollar_in_identifiers: true,
         // The permissive union admits SQLite's string-literal identifier in the two
         // corpus-admitted name positions (relation target, `PRIMARY KEY`/`UNIQUE` column

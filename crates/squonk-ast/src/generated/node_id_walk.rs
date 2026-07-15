@@ -1608,6 +1608,7 @@ impl<'ast> Visit<'ast, NoExt> for NodeIdWalk {
     }
     fn visit_show_ref_target(&mut self, node: &'ast ShowRefTarget<NoExt>) {
         self.metas.push(match node {
+            ShowRefTarget::Empty { meta, .. } => *meta,
             ShowRefTarget::Query { meta, .. } => *meta,
             ShowRefTarget::Name { meta, .. } => *meta,
         });

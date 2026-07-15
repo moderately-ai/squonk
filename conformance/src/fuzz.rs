@@ -111,6 +111,9 @@ pub const DIFFERENTIAL_REPLAYS: &[&[u8]] = &[
 /// shapes around them (accepted or rejected by both) that give the mutator productive
 /// starting points for the actual over-acceptance hunt.
 pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
+    // PostgreSQL treats every high-bit code point as an unquoted identifier character;
+    // U+009C after vertical-tab whitespace is therefore a variable name, not a stray byte.
+    b"set\x0b\xc2\x9c=u",
     br#"SELECT "" FROM t"#,
     br"U&'\0000'",
     br#"SELECT "a" FROM t"#,
@@ -652,6 +655,9 @@ pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // SQLite reports `near \"the same\": syntax error`; quoted input text must not
     // match a semantic-stage diagnostic stem.
     b"\"the same\"",
+    // An unterminated quoted identifier reports `unrecognized token`; its quoted input
+    // contains a semantic diagnostic stem but remains a syntax rejection.
+    b"`term out of range%",
     b"begin transaction",
     b"end transaction",
     b"savepoint s",
@@ -771,6 +777,8 @@ pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     b"start work read only",
     b"abort work",
     b"end transaction",
+    // DuckDB's parser admits the utility head without a target; binding rejects it later.
+    b"describe",
     // Transaction controls the engine rejects at parse time.
     b"savepoint s",
     b"set transaction read only",

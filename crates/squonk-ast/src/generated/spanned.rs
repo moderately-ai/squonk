@@ -1857,6 +1857,7 @@ impl<X: Extension> Spanned for ShowRef<X> {
 impl<X: Extension> Spanned for ShowRefTarget<X> {
     fn span(&self) -> Span {
         match self {
+            ShowRefTarget::Empty { meta, .. } => meta.span,
             ShowRefTarget::Query { meta, .. } => meta.span,
             ShowRefTarget::Name { meta, .. } => meta.span,
         }

@@ -2809,6 +2809,7 @@ export type ShowRefKind =
   | "Summarize";
 
 export type ShowRefTarget =
+  | { Empty: { meta: Meta; } }
   | { Query: { query: Query; meta: Meta; } }
   | { Name: { name: ObjectName; meta: Meta; } };
 

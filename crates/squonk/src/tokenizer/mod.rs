@@ -2883,6 +2883,20 @@ mod tests {
     }
 
     #[test]
+    fn non_ascii_identifier_policy_is_dialect_data() {
+        let control = "\u{009c}";
+        let err = tokenize_with(control, &FeatureSet::ANSI)
+            .expect_err("ANSI restricts unquoted identifiers to Unicode letters");
+        assert_eq!(err.kind, LexErrorKind::StrayByte);
+
+        let tokens = tokenize_with(control, &FeatureSet::POSTGRES)
+            .expect("PostgreSQL admits every high-bit code point in an identifier");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::Word);
+        assert_eq!(text(control, &tokens[0]), control);
+    }
+
+    #[test]
     fn non_letter_code_points_are_not_identifier_starts() {
         // A non-letter code point does not begin an identifier under the Unicode
         // policy — deliberately stricter than a raw "any high byte" rule, which would

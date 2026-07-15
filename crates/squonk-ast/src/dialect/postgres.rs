@@ -110,6 +110,8 @@ impl ParameterSyntax {
 impl IdentifierSyntax {
     /// The `POSTGRES` preset for identifier syntax.
     pub const POSTGRES: Self = Self {
+        // PostgreSQL's scanner admits every high-bit character in an unquoted identifier.
+        non_ascii: super::NonAsciiIdentifierSyntax::Any,
         // `$` is an identifier-continue byte, not an identifier-start byte, so `a$b` is
         // one word while a leading `$1` still dispatches to the parameter scanner.
         dollar_in_identifiers: true,

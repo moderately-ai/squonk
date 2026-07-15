@@ -196,7 +196,7 @@ const _: skeleton::RenderShapeFingerprint<0x5ebfaa9fb0c1caf9> =
 const _: skeleton::RenderShapeFingerprint<0xd3444362d3f03fe8> =
     skeleton::CURRENT_RENDER_SHAPE_PIVOT;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0x305c97c17f4b1723> =
+const _: skeleton::RenderShapeFingerprint<0x9a0538badcfac3d0> =
     skeleton::CURRENT_RENDER_SHAPE_QUERY;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0x957db431c4a1db51> = skeleton::CURRENT_RENDER_SHAPE_STMT;
@@ -11626,13 +11626,20 @@ impl<X: Extension + Render> Render for TableFactor<X> {
 impl<X: Extension + Render> Render for ShowRef<X> {
     fn render(&self, ctx: &RenderCtx<'_>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self.kind {
-            ShowRefKind::Describe => "DESCRIBE ",
-            ShowRefKind::Show => "SHOW ",
-            ShowRefKind::Summarize => "SUMMARIZE ",
+            ShowRefKind::Describe => "DESCRIBE",
+            ShowRefKind::Show => "SHOW",
+            ShowRefKind::Summarize => "SUMMARIZE",
         })?;
         match &self.target {
-            ShowRefTarget::Query { query, .. } => query.render(ctx, f),
-            ShowRefTarget::Name { name, .. } => name.render(ctx, f),
+            ShowRefTarget::Empty { .. } => Ok(()),
+            ShowRefTarget::Query { query, .. } => {
+                f.write_str(" ")?;
+                query.render(ctx, f)
+            }
+            ShowRefTarget::Name { name, .. } => {
+                f.write_str(" ")?;
+                name.render(ctx, f)
+            }
         }
     }
 }

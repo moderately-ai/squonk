@@ -1936,6 +1936,11 @@ pub enum ShowRefKind {
 #[cfg_attr(feature = "serde-deserialize", derive(serde::Deserialize))]
 /// The SQL show ref target forms represented by the AST.
 pub enum ShowRefTarget<X: Extension = NoExt> {
+    /// Bare `DESCRIBE`, which DuckDB parses before rejecting at a later semantic stage.
+    Empty {
+        /// Source location and node identity.
+        meta: Meta,
+    },
     /// `DESCRIBE <query>` / `SUMMARIZE <query>` — the described query (a `SELECT`,
     /// `PIVOT`, or `UNPIVOT` body).
     Query {

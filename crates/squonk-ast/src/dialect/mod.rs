@@ -782,29 +782,41 @@ pub struct SessionVariableSyntax {
     pub variable_assignment: bool,
 }
 
+/// Policy for non-ASCII code points in an *unquoted* identifier.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NonAsciiIdentifierSyntax {
+    /// Only Unicode letters may start an identifier; Unicode letters and numbers may
+    /// continue it.
+    UnicodeAlphanumeric,
+    /// Every non-ASCII code point may start or continue an identifier.
+    Any,
+}
+
 /// Dialect-owned policy for which characters form an *unquoted* identifier.
 ///
 /// The identifier-start and identifier-continue classes are an explicit,
-/// Unicode-aware policy, not an ad-hoc byte rule. The default mirrors
-/// PostgreSQL — the M1 reference dialect: an identifier starts with a Unicode
-/// *letter* (`char::is_alphabetic`) or `_`, and continues with a letter, a Unicode
-/// *digit* (`char::is_alphanumeric`), `_`, or — where [`dollar_in_identifiers`] is
-/// set — `$`. Quoted identifiers bypass the policy entirely (any character may be
+/// Unicode-aware policy, not an ad-hoc byte rule. ANSI starts with a Unicode *letter*
+/// (`char::is_alphabetic`) or `_`, and continues with a letter, a Unicode *digit*
+/// (`char::is_alphanumeric`), `_`, or — where [`dollar_in_identifiers`] is set — `$`.
+/// PostgreSQL, MySQL, and SQLite instead admit every non-ASCII code point. Quoted
+/// identifiers bypass the policy entirely (any character may be
 /// quoted), and no identifier *normalization* (NFC/NFKC) is performed — characters
 /// are compared as written; case folding for identity is the separate
 /// [`identifier_casing`] concern.
 ///
 /// Only the dialect-*variable* part lives here. The ASCII letter/digit/`_` classes
 /// are the shared byte-class table (so a dialect can still add ASCII identifier bytes
-/// like T-SQL `#`/`@` through [`byte_classes`]), and the non-ASCII rule is the fixed
-/// Unicode letter/alphanumeric property. The one knob that genuinely differs across
-/// shipped dialects is `$`.
+/// like T-SQL `#`/`@` through [`byte_classes`]); [`non_ascii`](IdentifierSyntax::non_ascii)
+/// selects the non-ASCII rule.
 ///
 /// [`dollar_in_identifiers`]: IdentifierSyntax::dollar_in_identifiers
 /// [`identifier_casing`]: FeatureSet::identifier_casing
 /// [`byte_classes`]: FeatureSet::byte_classes
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct IdentifierSyntax {
+    /// Select the non-ASCII start/continue policy. ASCII characters remain governed by
+    /// [`FeatureSet::byte_classes`].
+    pub non_ascii: NonAsciiIdentifierSyntax,
     /// Accept `$` as an identifier-*continue* character (`foo$bar`), a PostgreSQL /
     /// Oracle extension that strict ANSI forbids. `$` never *starts* an identifier (a
     /// leading `$` is a parameter or dollar-quote), and it is never a dollar-quote

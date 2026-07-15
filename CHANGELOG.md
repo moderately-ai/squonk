@@ -9,7 +9,7 @@ All notable changes to this project are documented here. The format is based on 
 
 _No unreleased changes yet._
 
-## [2.0.0] — 2026-07-14
+## [2.0.0] — 2026-07-15
 
 This release makes the deliberately breaking interface cleanup identified after the
 first stable publish and coordinates the Rust crates, Python wheel, npm facades, and
@@ -65,6 +65,10 @@ npm native platform packages on one major version.
   handling found by raw-byte differential fuzzing.
 - Fixed SQLite diagnostic classification so quoted parser-error text cannot be
   mistaken for a post-parse resolution failure.
+- Fixed unquoted non-ASCII identifier parity for PostgreSQL, MySQL, and SQLite,
+  including PostgreSQL's raw high-bit identifier class.
+- Fixed DuckDB parse-only parity for bare `DESCRIBE`, which the engine parses before
+  rejecting at a later semantic stage.
 
 ### Removed
 

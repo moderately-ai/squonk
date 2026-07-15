@@ -215,6 +215,7 @@ impl SessionVariableSyntax {
 impl IdentifierSyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
+        non_ascii: super::NonAsciiIdentifierSyntax::UnicodeAlphanumeric,
         dollar_in_identifiers: false,
         string_literal_identifiers: false,
         empty_quoted_identifiers: false,

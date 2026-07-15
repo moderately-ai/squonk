@@ -7501,6 +7501,14 @@ ShowRefKindJson: TypeAlias = Union[
     Literal["Summarize"],
 ]
 
+ShowRefTargetEmptyPayloadJson = TypedDict("ShowRefTargetEmptyPayloadJson", {
+    "meta": "MetaJson",
+})
+
+ShowRefTargetEmptyJson = TypedDict("ShowRefTargetEmptyJson", {
+    "Empty": "ShowRefTargetEmptyPayloadJson",
+})
+
 ShowRefTargetQueryPayloadJson = TypedDict("ShowRefTargetQueryPayloadJson", {
     "query": "AstNodeJson",
     "meta": "MetaJson",
@@ -7520,6 +7528,7 @@ ShowRefTargetNameJson = TypedDict("ShowRefTargetNameJson", {
 })
 
 ShowRefTargetJson: TypeAlias = Union[
+    ShowRefTargetEmptyJson,
     ShowRefTargetQueryJson,
     ShowRefTargetNameJson,
 ]

@@ -199,6 +199,7 @@ impl SessionVariableSyntax {
 impl IdentifierSyntax {
     /// The `MYSQL` preset for identifier syntax.
     pub const MYSQL: Self = Self {
+        non_ascii: super::NonAsciiIdentifierSyntax::Any,
         dollar_in_identifiers: true,
         // MySQL syntax-rejects a string literal in a name position, so the SQLite
         // string-identifier misfeature stays off.

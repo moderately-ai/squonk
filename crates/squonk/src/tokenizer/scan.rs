@@ -1936,25 +1936,26 @@ fn scan_punctuation(cursor: &mut Cursor, features: &FeatureSet) -> Token {
 
 /// Whether `ch` may **begin** an unquoted identifier under this dialect.
 ///
-/// The explicit, Unicode-aware identifier policy, mirroring PostgreSQL —
-/// the M1 reference dialect: a Unicode *letter* (`char::is_alphabetic`) or `_`. The
+/// The explicit, dialect-owned identifier policy. ANSI uses a Unicode *letter*
+/// (`char::is_alphabetic`) or `_`; PostgreSQL's lexer admits every high-bit code point. The
 /// ASCII range is decided by the dialect byte-class table, which already encodes
 /// "letter or `_`" and is where a dialect adds extra ASCII identifier bytes (T-SQL
 /// `#`/`@`); only a non-ASCII lead character pays for the Unicode property test, so
 /// the hot ASCII path stays a single table lookup. `$` never *starts* an identifier
 /// (a leading `$` opens a parameter or dollar-quote).
 ///
-/// This is deliberately the Unicode *letter* property, not PostgreSQL's raw "any
-/// high byte" lexer rule: a Unicode-aware tokenizer should reject a non-letter code
-/// point (an emoji, a symbol, a lone combining mark) as an identifier start rather
-/// than silently folding it into a word. We do **not** XID-classify or
-/// NF-normalize: characters are taken as written, and case folding for identity is a
-/// separate concern ([`Casing`](crate::ast::dialect::Casing)).
+/// We do **not** NF-normalize: characters are taken as written, and case folding for
+/// identity is a separate concern ([`Casing`](crate::ast::dialect::Casing)).
 fn is_identifier_start(ch: char, features: &FeatureSet) -> bool {
     if ch.is_ascii() {
         features.has_byte_class(ch as u8, CLASS_IDENTIFIER_START)
     } else {
-        ch.is_alphabetic()
+        match features.identifier_syntax.non_ascii {
+            crate::ast::dialect::NonAsciiIdentifierSyntax::UnicodeAlphanumeric => {
+                ch.is_alphabetic()
+            }
+            crate::ast::dialect::NonAsciiIdentifierSyntax::Any => true,
+        }
     }
 }
 
@@ -1968,7 +1969,12 @@ fn is_identifier_continue(ch: char, features: &FeatureSet) -> bool {
     if ch.is_ascii() {
         features.has_byte_class(ch as u8, CLASS_IDENTIFIER_CONTINUE)
     } else {
-        ch.is_alphanumeric()
+        match features.identifier_syntax.non_ascii {
+            crate::ast::dialect::NonAsciiIdentifierSyntax::UnicodeAlphanumeric => {
+                ch.is_alphanumeric()
+            }
+            crate::ast::dialect::NonAsciiIdentifierSyntax::Any => true,
+        }
     }
 }
 

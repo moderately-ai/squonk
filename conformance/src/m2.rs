@@ -1175,15 +1175,17 @@ mod tests {
     #[test]
     fn sqlite_syntax_error_text_cannot_match_a_resolution_stem() {
         let conn = SqliteConnection::open_in_memory().unwrap();
-        assert!(matches!(
-            crate::sqlite_ffi::segment(&conn, "\"the same\""),
-            SqliteSegmentation::Reject(_),
-        ));
-        assert_eq!(
-            sqlite_raw_bytes_divergence(&conn, "\"the same\""),
-            None,
-            "both SQLite and the fitted dialect reject the bare quoted identifier",
-        );
+        for sql in ["\"the same\"", "`term out of range%"] {
+            assert!(matches!(
+                crate::sqlite_ffi::segment(&conn, sql),
+                SqliteSegmentation::Reject(_),
+            ));
+            assert_eq!(
+                sqlite_raw_bytes_divergence(&conn, sql),
+                None,
+                "both SQLite and the fitted dialect reject {sql:?}",
+            );
+        }
     }
 
     #[test]

@@ -152,7 +152,9 @@ fn is_resolution_error(msg: &str) -> bool {
     // semantic stems must never classify their quoted text. For example, the syntax
     // error for a bare `"the same"` contains that phrase even though no resolution
     // stage was reached.
-    if msg.starts_with("near ") && msg.ends_with(": syntax error") {
+    if (msg.starts_with("near ") && msg.ends_with(": syntax error"))
+        || msg.starts_with("unrecognized token:")
+    {
         return false;
     }
     // Lower-cased once; SQLite's messages are stable lower-case English.

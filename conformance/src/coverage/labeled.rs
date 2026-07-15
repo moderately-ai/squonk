@@ -5791,6 +5791,7 @@ mod tests {
             variable_assignment: _,
         } = SessionVariableSyntax::MYSQL;
         let IdentifierSyntax {
+            non_ascii: _,
             dollar_in_identifiers: _,
             string_literal_identifiers: _,
             empty_quoted_identifiers: _,
