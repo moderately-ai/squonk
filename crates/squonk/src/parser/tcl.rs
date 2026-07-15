@@ -314,14 +314,26 @@ impl<'a, D: Dialect> Parser<'a, D> {
     ) -> ParseResult<Option<Box<crate::ast::Ident>>> {
         if self.features().utility_syntax.transaction_name
             && block == Some(TransactionBlockKeyword::Transaction)
-            && self.peek()?.is_some_and(|token| {
-                self.token_admissible(token, self.features().reserved_column_name)
-            })
         {
-            Ok(Some(Box::new(self.parse_ident()?)))
-        } else {
-            Ok(None)
+            // SQLite admits a string-literal transaction name after `TRANSACTION`
+            // (`END TRANSACTION ''`; engine-measured — the string form is a parse
+            // accept and only fails later if no transaction is active).
+            if self.features().identifier_syntax.string_literal_identifiers
+                && self
+                    .peek()?
+                    .is_some_and(|token| token.kind == crate::tokenizer::TokenKind::String)
+            {
+                return Ok(Some(Box::new(self.parse_string_or_ident_admitting(
+                    self.features().reserved_column_name,
+                )?)));
+            }
+            if self.peek()?.is_some_and(|token| {
+                self.token_admissible(token, self.features().reserved_column_name)
+            }) {
+                return Ok(Some(Box::new(self.parse_ident()?)));
+            }
         }
+        Ok(None)
     }
 
     /// Parse a savepoint name for `SAVEPOINT` / `RELEASE` / `ROLLBACK TO`.

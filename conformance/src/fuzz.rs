@@ -125,6 +125,8 @@ pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // PostgreSQL bare `SET NAMES` is `client_encoding` DEFAULT (no charset required).
     b"set names",
     b"\t\tset\tnAMes",
+    // Continued E-string segments still reject invalid `\\U` escapes (libpg_query).
+    b"do''e'f''\n''icU_\\Ucccc_\\Uccccccf''\n''icU_\\Ucccc_\\UcccccE''c'\n''",
     // PostgreSQL's scanner accepts digit runs beyond u32 and materializes them via
     // its C `atol` -> parser-int path; Squonk retains the spelling and mirrors that
     // value only in the structural oracle projection.
@@ -668,6 +670,9 @@ pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // SQLite does not join adjacent string literals across newlines, so a
     // second string after `ROLLBACK TO ''` is trailing junk (not a continued name).
     b" ; rollback  ;rollback transaction ;rollback to \n''\n'}'\n''\n''",
+    // SQLite admits a string-literal name after `END TRANSACTION`.
+    b"end\x0c\x0ctransaction''",
+    b"END TRANSACTION ''",
     // A transaction-state prepare failure must be retried in an active transaction
     // so SQLite exposes and rejects the otherwise-hidden invalid tail.
     b"EnD\ntrAnsaction--\nE",

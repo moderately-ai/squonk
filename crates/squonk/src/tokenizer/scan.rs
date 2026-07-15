@@ -86,17 +86,21 @@ pub(crate) fn next_token<S: TriviaSink>(
             // materialisation, so the eager verdict and the materialised value never
             // disagree (ADR-0006: the check is a no-allocation scan, not a decode).
             //
-            // A multi-segment continued string (`E'a'\n'b'`) spans several quote-delimited
-            // bodies; `postgres_escape_string_is_valid` only understands a single `E'…'`
-            // body, so skip the eager check only when continuation actually joined segments
-            // (not merely when a `\r`/`\n` appears *inside* a one-segment body, e.g.
-            // `e'\r1\666'` whose octal escape must still be rejected as invalid UTF-8).
+            // Multi-segment continued strings (`E'a'\n'b'`) are validated *per segment*
+            // so an invalid `\U` escape in a later segment is still rejected (libpg_query:
+            // `invalid Unicode escape`), while a one-segment body with an embedded CR
+            // (e.g. `e'\r1\666'`) is also checked.
             let text = cursor
                 .src()
                 .get(token.span.start() as usize..token.span.end() as usize);
-            if !continued
-                && text.is_some_and(|text| !crate::ast::postgres_escape_string_is_valid(text))
-            {
+            let invalid = text.is_some_and(|text| {
+                if continued {
+                    !escape_string_segments_are_valid(text)
+                } else {
+                    !crate::ast::postgres_escape_string_is_valid(text)
+                }
+            });
+            if invalid {
                 return Err(LexError::new(
                     LexErrorKind::InvalidEscapeSequence,
                     token.span,
@@ -1260,6 +1264,70 @@ fn scan_quoted(cursor: &mut Cursor, scan: QuoteScan) -> Result<Token, LexError> 
 /// opener's escape mode (`E'…'` keeps backslash rules on every joined segment),
 /// matching PostgreSQL's scanner — without this, a later plain segment can be
 /// unterminated under ANSI quote rules while libpg_query accepts the spelling.
+/// Validate every quote-delimited segment of a possibly-continued `E'…'` / `e'…'`
+/// span. Each segment is checked with
+/// [`crate::ast::postgres_escape_string_is_valid`] so an invalid `\U` / octal / NUL
+/// escape in any segment is rejected, matching libpg_query's `invalid Unicode
+/// escape` on continued constants.
+fn escape_string_segments_are_valid(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.len() < 3 || !matches!(bytes[0], b'E' | b'e') || bytes[1] != b'\'' {
+        return crate::ast::postgres_escape_string_is_valid(text);
+    }
+    let prefix = bytes[0];
+    let mut i = 1; // on first opening quote
+    loop {
+        if i >= bytes.len() || bytes[i] != b'\'' {
+            return false;
+        }
+        let seg_open = i;
+        i += 1; // past open
+        let mut closed = false;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\\' if i + 1 < bytes.len() => i += 2,
+                b'\'' if i + 1 < bytes.len() && bytes[i + 1] == b'\'' => i += 2,
+                b'\'' => {
+                    // Segment bytes: prefix + open..close inclusive.
+                    let mut seg = Vec::with_capacity((i - seg_open) + 2);
+                    seg.push(prefix);
+                    seg.extend_from_slice(&bytes[seg_open..=i]);
+                    let Ok(seg_text) = std::str::from_utf8(&seg) else {
+                        return false;
+                    };
+                    if !crate::ast::postgres_escape_string_is_valid(seg_text) {
+                        return false;
+                    }
+                    i += 1;
+                    closed = true;
+                    break;
+                }
+                _ => i += 1,
+            }
+        }
+        if !closed {
+            return false;
+        }
+        // Optional continuation gap: whitespace containing a newline, then another quote.
+        let mut saw_newline = false;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\n' | b'\r' => {
+                    saw_newline = true;
+                    i += 1;
+                }
+                b' ' | b'\t' | 0x0b | 0x0c => i += 1,
+                _ => break,
+            }
+        }
+        if saw_newline && i < bytes.len() && bytes[i] == b'\'' {
+            continue;
+        }
+        // No further continuation: the span must be fully consumed.
+        return i == bytes.len();
+    }
+}
+
 /// Fold adjacent-string continuations into `token`. Returns `(token, continued)`
 /// where `continued` is true iff at least one segment was joined.
 fn extend_string_continuations(
