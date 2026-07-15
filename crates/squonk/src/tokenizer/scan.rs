@@ -1233,15 +1233,19 @@ fn scan_session_variable(cursor: &mut Cursor, features: &FeatureSet) -> Token {
 fn scan_quoted(cursor: &mut Cursor, scan: QuoteScan) -> Result<Token, LexError> {
     let start = cursor.pos();
     let token = scan_quoted_body(cursor, start, scan)?;
-    // SQL-standard adjacent-string continuation is assembled at the lexer for
-    // `String` tokens so each continuation segment inherits the first segment's
-    // escape rules (an `E'…'` body's backslash mode applies to every joined
-    // segment). Without this, a later plain `'…'` segment can be unterminated
-    // under ANSI quote rules while PostgreSQL's scanner — which keeps the opener's
-    // escape mode across the newline — accepts the same spelling. Parse-level
-    // continuation still joins the resulting single token's value; this only
-    // extends the token span when a well-formed continuation is present.
-    if token.kind == TokenKind::String {
+    // SQL-standard adjacent-string continuation is assembled at the lexer only for
+    // backslash-mode strings (`E'…'`, MySQL with `backslash_escapes`) so each
+    // continuation segment inherits the opener's escape rules. Without this, a
+    // later plain `'…'` segment can be unterminated under ANSI quote rules while
+    // PostgreSQL's scanner — which keeps the opener's escape mode across the
+    // newline — accepts the same spelling.
+    //
+    // Plain (non-backslash) strings stay separate tokens: SQLite does not join
+    // adjacent string literals (`SELECT 'a'\n'b'` is a syntax error there), and
+    // parse-level continuation still handles the PostgreSQL/standard join for
+    // well-formed plain segments. Extending plain strings at the lexer would
+    // over-accept under SQLite (e.g. `ROLLBACK TO ''\n'}'` becoming one name).
+    if token.kind == TokenKind::String && scan.backslash {
         extend_string_continuations(cursor, token, scan)
     } else {
         Ok(token)

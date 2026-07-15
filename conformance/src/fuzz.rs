@@ -658,6 +658,9 @@ pub const SQLITE_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // SQLite syntax-rejects the SQL `<explicit table>` form (`TABLE t`).
     b"table tab",
     b"\x0c\x0c;table\x0ctab",
+    // SQLite does not join adjacent string literals across newlines, so a
+    // second string after `ROLLBACK TO ''` is trailing junk (not a continued name).
+    b" ; rollback  ;rollback transaction ;rollback to \n''\n'}'\n''\n''",
     // A transaction-state prepare failure must be retried in an active transaction
     // so SQLite exposes and rejects the otherwise-hidden invalid tail.
     b"EnD\ntrAnsaction--\nE",
