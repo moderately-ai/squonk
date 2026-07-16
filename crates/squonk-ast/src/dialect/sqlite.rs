@@ -15,9 +15,9 @@ use super::{
     IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, KeywordOperators, KeywordSet,
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax, SQLITE_BYTE_CLASSES,
-    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax, StringFuncForms,
-    StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
-    TransactionSyntax, UtilitySyntax,
+    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
+    StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
+    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, STANDARD_SET_OPERATION_BINDING_POWERS,
@@ -636,7 +636,6 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `SQLITE` preset for statement ddl gates.
     pub const SQLITE: Self = Self {
-
         colocation_groups: false,
         // SQLite's `CREATE TRIGGER … BEGIN … END` compound-statement body.
         create_trigger: true,
@@ -681,7 +680,7 @@ impl StatementDdlGates {
         resource_group: false,
         alter_sequence: false,
         alter_object_set_schema: false,
-};
+    };
 }
 impl ViewSequenceClauseSyntax {
     /// View/sequence clause surface for the `SQLITE` preset.
@@ -693,7 +692,6 @@ impl ViewSequenceClauseSyntax {
         view_definition_options: false,
     };
 }
-
 
 impl CreateTableClauseSyntax {
     /// The `SQLITE` preset for create table clause syntax.
@@ -1012,7 +1010,7 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
-};
+    };
 }
 impl TransactionSyntax {
     /// Transaction-control surface for the `SQLITE` preset (split from UtilitySyntax).
@@ -1045,7 +1043,6 @@ impl TransactionSyntax {
         xa_transactions: false,
     };
 }
-
 
 impl ShowSyntax {
     /// The `SQLITE` preset for show syntax.

@@ -21,23 +21,23 @@
 //! # Table-driven simple heads
 //!
 //! Single-keyword, single-gate utility/maintenance heads are dispatched from
-//! [`SIMPLE_CONTEXTUAL_HEADS`] / [`try_parse_simple_contextual_head`] so adding a
+//! `SIMPLE_CONTEXTUAL_HEADS` / `try_parse_simple_contextual_head` so adding a
 //! nullary keyword gate is one table row. Multi-word lookaheads (SHOW TABLES,
 //! LOAD DATA, PREPARE/EXECUTE duals, LOCK TABLES vs INSTANCE, …) stay as explicit
 //! arms below — they are not single-row table entries by nature.
 
 use super::engine::Parser;
 use super::{Dialect, HookResult};
-use crate::ast::dialect::keyword::Keyword;
 use crate::ast::dialect::FeatureSet;
-use crate::ast::{Statement, Spanned};
+use crate::ast::dialect::keyword::Keyword;
+use crate::ast::{Spanned, Statement};
 use crate::error::ParseResult;
 use crate::tokenizer::Punctuation;
 
 /// A single contextual-keyword statement head: gate + keyword + parse entry.
 ///
 /// `parse` is an associated method on [`Parser`] selected by the match in
-/// [`Parser::try_parse_simple_contextual_head`].
+/// `Parser::try_parse_simple_contextual_head`.
 #[derive(Clone, Copy)]
 enum SimpleContextualHead {
     CommentOn,
@@ -56,22 +56,81 @@ enum SimpleContextualHead {
     Xa,
 }
 
+/// One simple contextual-head table row: keyword text, feature gate, dispatch tag.
+type SimpleContextualHeadRow = (&'static str, fn(&FeatureSet) -> bool, SimpleContextualHead);
+
 /// Table of simple (keyword, gate, head) rows — order is try-order among these heads only.
-const SIMPLE_CONTEXTUAL_HEADS: &[(&str, fn(&FeatureSet) -> bool, SimpleContextualHead)] = &[
-    ("COMMENT", |f| f.utility_syntax.comment_on, SimpleContextualHead::CommentOn),
-    ("PRAGMA", |f| f.utility_syntax.pragma, SimpleContextualHead::Pragma),
-    ("KILL", |f| f.utility_syntax.kill, SimpleContextualHead::Kill),
-    ("SHUTDOWN", |f| f.utility_syntax.shutdown, SimpleContextualHead::Shutdown),
-    ("RESTART", |f| f.utility_syntax.restart, SimpleContextualHead::Restart),
-    ("CLONE", |f| f.utility_syntax.clone, SimpleContextualHead::Clone),
-    ("HELP", |f| f.utility_syntax.help_statement, SimpleContextualHead::Help),
-    ("BINLOG", |f| f.utility_syntax.binlog, SimpleContextualHead::Binlog),
-    ("FLUSH", |f| f.utility_syntax.flush, SimpleContextualHead::Flush),
-    ("PURGE", |f| f.utility_syntax.purge_binary_logs, SimpleContextualHead::Purge),
-    ("RENAME", |f| f.utility_syntax.rename_statement, SimpleContextualHead::Rename),
-    ("CALL", |f| f.utility_syntax.call, SimpleContextualHead::Call),
-    ("REINDEX", |f| f.maintenance_syntax.reindex, SimpleContextualHead::Reindex),
-    ("XA", |f| f.transaction_syntax.xa_transactions, SimpleContextualHead::Xa),
+const SIMPLE_CONTEXTUAL_HEADS: &[SimpleContextualHeadRow] = &[
+    (
+        "COMMENT",
+        |f| f.utility_syntax.comment_on,
+        SimpleContextualHead::CommentOn,
+    ),
+    (
+        "PRAGMA",
+        |f| f.utility_syntax.pragma,
+        SimpleContextualHead::Pragma,
+    ),
+    (
+        "KILL",
+        |f| f.utility_syntax.kill,
+        SimpleContextualHead::Kill,
+    ),
+    (
+        "SHUTDOWN",
+        |f| f.utility_syntax.shutdown,
+        SimpleContextualHead::Shutdown,
+    ),
+    (
+        "RESTART",
+        |f| f.utility_syntax.restart,
+        SimpleContextualHead::Restart,
+    ),
+    (
+        "CLONE",
+        |f| f.utility_syntax.clone,
+        SimpleContextualHead::Clone,
+    ),
+    (
+        "HELP",
+        |f| f.utility_syntax.help_statement,
+        SimpleContextualHead::Help,
+    ),
+    (
+        "BINLOG",
+        |f| f.utility_syntax.binlog,
+        SimpleContextualHead::Binlog,
+    ),
+    (
+        "FLUSH",
+        |f| f.utility_syntax.flush,
+        SimpleContextualHead::Flush,
+    ),
+    (
+        "PURGE",
+        |f| f.utility_syntax.purge_binary_logs,
+        SimpleContextualHead::Purge,
+    ),
+    (
+        "RENAME",
+        |f| f.utility_syntax.rename_statement,
+        SimpleContextualHead::Rename,
+    ),
+    (
+        "CALL",
+        |f| f.utility_syntax.call,
+        SimpleContextualHead::Call,
+    ),
+    (
+        "REINDEX",
+        |f| f.maintenance_syntax.reindex,
+        SimpleContextualHead::Reindex,
+    ),
+    (
+        "XA",
+        |f| f.transaction_syntax.xa_transactions,
+        SimpleContextualHead::Xa,
+    ),
 ];
 
 impl<D: Dialect> Parser<'_, D> {
@@ -168,7 +227,7 @@ impl<D: Dialect> Parser<'_, D> {
             // Checked before sessions: `SET TRANSACTION` is transaction control,
             // while every other `SET` is a session statement.
             self.parse_transaction_statement()
-         } else if self.features().show_syntax.show_tables
+        } else if self.features().show_syntax.show_tables
             && self.peek_is_contextual_keyword("SHOW")?
             && self.peek_starts_show_tables()?
         {
@@ -264,7 +323,7 @@ impl<D: Dialect> Parser<'_, D> {
             // leading keyword; the helper branches on the `INTO` that distinguishes
             // Snowflake `COPY INTO` from the PostgreSQL `COPY <table> {FROM | TO}`.
             self.parse_copy_or_copy_into_statement()
-         } else if self.features().utility_syntax.attach
+        } else if self.features().utility_syntax.attach
             && self.peek_is_contextual_keyword("ATTACH")?
         {
             // `attach` gates `ATTACH` and its `DETACH` inverse as one dialect unit
@@ -353,7 +412,7 @@ impl<D: Dialect> Parser<'_, D> {
             // (`[ANALYZE] <table> (<cols>)`); the parser reads whichever tail its gate
             // admits (off everywhere but SQLite/DuckDB/Lenient).
             self.parse_vacuum_statement()
-         } else if self.features().maintenance_syntax.table_maintenance
+        } else if self.features().maintenance_syntax.table_maintenance
             && self.peek_starts_table_maintenance()?
         {
             // The MySQL admin-table verb family (`ANALYZE/CHECK/CHECKSUM/OPTIMIZE/REPAIR
@@ -369,7 +428,7 @@ impl<D: Dialect> Parser<'_, D> {
             // A *leading* `ANALYZE` is the maintenance statement; the `ANALYZE` inside
             // `EXPLAIN ANALYSE` is consumed by the `EXPLAIN` grammar below, never here.
             self.parse_analyze_statement()
-           } else if self.features().utility_syntax.use_statement
+        } else if self.features().utility_syntax.use_statement
             && self.peek_is_keyword(Keyword::Use)?
         {
             // `use_statement` gates the leading `USE` keyword like `pragma`: on for DuckDB and
@@ -378,7 +437,7 @@ impl<D: Dialect> Parser<'_, D> {
             // consumed by the FROM grammar, so it never reaches this statement-leading
             // position. The accepted name arity is dialect data (`use_qualified_name`).
             self.parse_use_statement()
-         } else if self.features().utility_syntax.handler_statements
+        } else if self.features().utility_syntax.handler_statements
             && self.peek_is_keyword(Keyword::Handler)?
         {
             // `handler_statements` gates the leading `HANDLER` keyword like `kill`: off outside
@@ -400,7 +459,7 @@ impl<D: Dialect> Parser<'_, D> {
             // The inverse of `INSTALL`, sharing the same gate (an install/uninstall pair, like
             // `ATTACH`/`DETACH`): `UNINSTALL PLUGIN <name>` / `UNINSTALL COMPONENT <urn> …`.
             self.parse_uninstall_statement()
-             } else if self.features().utility_syntax.prepared_statements
+        } else if self.features().utility_syntax.prepared_statements
             && self.peek_is_contextual_keyword("PREPARE")?
         {
             // `prepared_statements` gates DuckDB's `PREPARE`/`EXECUTE`/`DEALLOCATE` leading
@@ -444,7 +503,7 @@ impl<D: Dialect> Parser<'_, D> {
             // MySQL-first — mandatory `PREPARE` — disagreeing with the DuckDB-first head dispatch
             // above; that incoherence is why the combination has no defined semantics.
             self.parse_deallocate_statement()
-         } else if self.features().utility_syntax.do_statement
+        } else if self.features().utility_syntax.do_statement
             && self.peek_is_contextual_keyword("DO")?
         {
             // `do_statement` gates the leading `DO` anonymous-code-block keyword like `copy`:
@@ -562,7 +621,7 @@ impl<D: Dialect> Parser<'_, D> {
         }
     }
 
-    /// Try the [`SIMPLE_CONTEXTUAL_HEADS`] table: one contextual keyword, one gate, one parse.
+    /// Try the `SIMPLE_CONTEXTUAL_HEADS` table: one contextual keyword, one gate, one parse.
     fn try_parse_simple_contextual_head(&mut self) -> ParseResult<Option<Statement<D::Ext>>> {
         for &(keyword, gate, head) in SIMPLE_CONTEXTUAL_HEADS {
             // Evaluate the gate before any mutable peek so `features` is not held across

@@ -24,9 +24,9 @@ use super::{
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     POSTGRES_BYTE_CLASSES, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
-    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax,
+    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
+    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::STANDARD_SET_OPERATION_BINDING_POWERS;
 
@@ -199,7 +199,6 @@ impl ColumnDefinitionSyntax {
 impl StatementDdlGates {
     /// Statement-level DDL productions enabled by this preset.
     pub const QUILTDB: Self = Self {
-
         colocation_groups: true,
         create_trigger: false,
         create_macro: false,
@@ -229,7 +228,7 @@ impl StatementDdlGates {
         resource_group: false,
         alter_sequence: false,
         alter_object_set_schema: false,
-};
+    };
 }
 impl ViewSequenceClauseSyntax {
     /// View/sequence clause surface for the `QUILTDB` preset.
@@ -241,7 +240,6 @@ impl ViewSequenceClauseSyntax {
         view_definition_options: false,
     };
 }
-
 
 impl TypeNameSyntax {
     /// Type-name syntax enabled by this preset.
@@ -335,7 +333,7 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
-};
+    };
 }
 impl TransactionSyntax {
     /// Transaction-control surface for the `QUILTDB` preset (split from UtilitySyntax).
@@ -368,7 +366,6 @@ impl TransactionSyntax {
         xa_transactions: false,
     };
 }
-
 
 impl FeatureSet {
     /// The complete QuiltDB feature set.

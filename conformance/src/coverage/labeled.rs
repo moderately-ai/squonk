@@ -555,7 +555,10 @@ const COMPOSITE_SUBFLAGS: &[(Feature, &[&str])] = &[
     (Feature::TableFactorSyntax, TABLE_FACTOR_SUBFLAGS),
     (Feature::MutationSyntax, MUTATION_SUBFLAGS),
     (Feature::StatementDdlGates, STATEMENT_DDL_GATES_SUBFLAGS),
-    (Feature::ViewSequenceClauseSyntax, VIEW_SEQUENCE_CLAUSE_SUBFLAGS),
+    (
+        Feature::ViewSequenceClauseSyntax,
+        VIEW_SEQUENCE_CLAUSE_SUBFLAGS,
+    ),
     (
         Feature::CreateTableClauseSyntax,
         CREATE_TABLE_CLAUSE_SUBFLAGS,
@@ -1527,11 +1530,9 @@ const EXPONENT_OPERATOR: ToggleableFeature = ToggleableFeature {
     },
 };
 
-/// Every gated sub-flag as a toggleable feature. The enumeration guard below
-/// destructures the sub-flag structs, so a new flag must be added here too.
 // Residual promotions: top-level / lexically-coupled flags that cannot use the
 // `toggleable_features!` nested-bool arm.
-
+//
 // Top-level scalar knobs: like `LOGICAL_OR_PIPE` / `EXPONENT_OPERATOR`, these are
 // hand-written ToggleableFeatures referenced by LabeledCases but deliberately *not*
 // listed in `TOGGLEABLE_FEATURES` (that array enumerates composite-knob sub-flags only;
@@ -1678,6 +1679,8 @@ fn cast_target_is_fixed_width_int(parsed: &Parsed) -> bool {
     )
 }
 
+/// Every gated sub-flag as a toggleable feature. The enumeration guard below
+/// destructures the sub-flag structs, so a new flag must be added here too.
 const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &ESCAPE_STRINGS,
     &DOLLAR_QUOTED,
@@ -2046,7 +2049,7 @@ const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &LIBERAL_TYPE_NAMES,
     &STRING_TYPE_MODIFIERS,
     // --- residual promotions ---
-&ALTER_COLUMN_ADD_IDENTITY,
+    &ALTER_COLUMN_ADD_IDENTITY,
     &ALTER_NESTED_COLUMN_PATHS,
     &ALTER_ROLE_RENAME,
     &ALTER_TABLE_MULTIPLE_ACTIONS,
@@ -2125,7 +2128,6 @@ const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &WILDCARD_REPLACE,
     &WINDOW_FUNCTION_TAIL,
     &WITH_TIES_REQUIRES_ORDER_BY,
-
 ];
 
 /// What a labelled case expects of a parse: an accept/reject outcome, or — for a
@@ -5741,7 +5743,7 @@ const LABELED_CASES: &[LabeledCase] = &[
         forbidden: &[],
     },
     // --- residual promotions (verified Accept/Reject/Shape) ---
-LabeledCase {
+    LabeledCase {
         sql: "ALTER TABLE t ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY",
         expect: Expect::Accept,
         required: &[&ALTER_COLUMN_ADD_IDENTITY],
@@ -6227,7 +6229,6 @@ LabeledCase {
         required: &[&WITH_TIES_REQUIRES_ORDER_BY],
         forbidden: &[],
     },
-
 ];
 
 /// Whether the first GROUP BY item of `parsed` is a `ROLLUP` grouping construct — the
@@ -6639,10 +6640,8 @@ mod tests {
     /// LabeledCase (see residual promotions in `toggleable_features!` / `LABELED_CASES`).
     #[test]
     fn every_residual_bool_is_now_toggleable() {
-        let toggleable: std::collections::HashSet<&str> = TOGGLEABLE_FEATURES
-            .iter()
-            .map(|t| t.sub_flag)
-            .collect();
+        let toggleable: std::collections::HashSet<&str> =
+            TOGGLEABLE_FEATURES.iter().map(|t| t.sub_flag).collect();
         // Top-level scalars are labeled but not in TOGGLEABLE_FEATURES (composite-only array).
         let labeled: std::collections::HashSet<&str> = LABELED_CASES
             .iter()
@@ -6680,7 +6679,6 @@ mod tests {
             );
         }
     }
-
 
     #[test]
     fn statement_head_ledger_claimants_are_all_toggleable() {

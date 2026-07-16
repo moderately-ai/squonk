@@ -28,6 +28,13 @@ npm native platform packages on one major version.
   WebAssembly-only.
 - **Wire schema v2 records the 2.x AST contract.** Generated Rust, Python, and
   TypeScript views expose the same transaction spelling and mode information.
+- **Dialect organization freeze gate.** `cargo xtask knob-org` (also part of
+  `cargo xtask tidy` / preflight) holds FeatureSet packaging bijection, synopsis
+  honesty, head-contention ledger completeness, and residual-bool labeling
+  discipline so organization drift fails CI rather than accumulating silently.
+- **Closed-delta helpers for satellite presets.** ANSI satellites and DuckDB assert
+  their exact top-level axis divergence from the documented base, keeping preset
+  deltas MECE and reviewable.
 
 ### Changed
 
@@ -58,6 +65,21 @@ npm native platform packages on one major version.
   and MySQL independently model opener aliases, block words, savepoints, mode
   placement and repetition, chaining, release, and consistent snapshots according
   to their measured engine behavior.
+- **Dialect FeatureSet organization is MECE and flip-proven.** Composite knobs are
+  split along real grammar axes rather than packaging convenience:
+  - New `TransactionSyntax` and `ViewSequenceClauseSyntax` composites (fields moved
+    out of `UtilitySyntax` / `StatementDdlGates`).
+  - `create_or_replace_table` lives on `StatementDdlGates`.
+  - `prefix_colon_alias` is split by grammar position (`SelectSyntax` vs
+    `TableExpressionSyntax`).
+  - Transaction mode flag renames for polarity honesty:
+    `transaction_mode_comma_required` → `transaction_modes_require_commas`,
+    `transaction_modes_unique` → `transaction_modes_reject_duplicates`.
+  - Statement dispatch is extracted; multi-claimant heads use dual-require companion
+    gates and a complete head-contention ledger.
+  - Every former residual dialect bool is a `ToggleableFeature` required by a
+    flip-verified `LabeledCase` (accept, reject, or structural shape), closing the
+    DP6 inventory without an AXIS_COVERED escape hatch.
 
 ### Fixed
 

@@ -20,8 +20,8 @@ use super::{
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS,
     RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax,
     ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
+    TableFactorSyntax, TargetSpelling, TransactionSyntax, TypeNameSyntax, UtilitySyntax,
     ViewSequenceClauseSyntax,
-    TableFactorSyntax, TargetSpelling, TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
@@ -804,7 +804,7 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
-};
+    };
 }
 impl TransactionSyntax {
     /// Transaction-control surface for the `DUCKDB` preset (split from UtilitySyntax).
@@ -837,7 +837,6 @@ impl TransactionSyntax {
         xa_transactions: false,
     };
 }
-
 
 impl ShowSyntax {
     /// The `DUCKDB` preset for show syntax.
@@ -2049,44 +2048,43 @@ mod tests {
             &FeatureSet::POSTGRES,
             &FeatureSet::DUCKDB,
             &[
-            "reserved_column_name",
-            "reserved_function_name",
-            "reserved_type_name",
-            "reserved_bare_alias",
-            "byte_classes",
-            "binding_powers",
-            "numeric_literals",
-            "parameters",
-            "identifier_syntax",
-            "table_expressions",
-            "join_syntax",
-            "table_factor_syntax",
-            "expression_syntax",
-            "operator_syntax",
-            "call_syntax",
-            "string_func_forms",
-            "aggregate_call_syntax",
-            "predicate_syntax",
-            "double_ampersand",
-            "keyword_operators",
-            "hash_bitwise_xor",
-            "mutation_syntax",
-            "statement_ddl_gates",
-            "view_sequence_clause_syntax",
-            "create_table_clause_syntax",
-            "column_definition_syntax",
-            "constraint_syntax",
-            "index_alter_syntax",
-            "select_syntax",
-            "query_tail_syntax",
-            "grouping_syntax",
-            "utility_syntax",
-            "transaction_syntax",
-            "show_syntax",
-            "maintenance_syntax",
-            "type_name_syntax"
+                "reserved_column_name",
+                "reserved_function_name",
+                "reserved_type_name",
+                "reserved_bare_alias",
+                "byte_classes",
+                "binding_powers",
+                "numeric_literals",
+                "parameters",
+                "identifier_syntax",
+                "table_expressions",
+                "join_syntax",
+                "table_factor_syntax",
+                "expression_syntax",
+                "operator_syntax",
+                "call_syntax",
+                "string_func_forms",
+                "aggregate_call_syntax",
+                "predicate_syntax",
+                "double_ampersand",
+                "keyword_operators",
+                "hash_bitwise_xor",
+                "mutation_syntax",
+                "statement_ddl_gates",
+                "view_sequence_clause_syntax",
+                "create_table_clause_syntax",
+                "column_definition_syntax",
+                "constraint_syntax",
+                "index_alter_syntax",
+                "select_syntax",
+                "query_tail_syntax",
+                "grouping_syntax",
+                "utility_syntax",
+                "transaction_syntax",
+                "show_syntax",
+                "maintenance_syntax",
+                "type_name_syntax",
             ],
         );
     }
-
 }

@@ -1827,7 +1827,7 @@ pub struct CreateSchema<X: Extension = NoExt> {
 ///
 /// `recursive` records the `CREATE [OR REPLACE] [TEMP|TEMPORARY] RECURSIVE VIEW`
 /// spelling (DuckDB, gated by
-/// [`StatementDdlGates::recursive_views`](crate::dialect::StatementDdlGates::recursive_views)):
+/// [`ViewSequenceClauseSyntax::recursive_views`](crate::dialect::ViewSequenceClauseSyntax::recursive_views)):
 /// the keyword
 /// sits between the `TEMP`/`TEMPORARY` prefix and `VIEW`, never composes with
 /// `MATERIALIZED` (engine-rejected), and — mirroring the engine, which desugars a
@@ -1982,7 +1982,7 @@ pub struct ViewOptions {
 
 /// `ALTER [ALGORITHM = …] [DEFINER = …] [SQL SECURITY …] VIEW <name> [(<columns>)] AS <query>
 /// [WITH [CASCADED | LOCAL] CHECK OPTION]` — the MySQL view redefinition (gated by
-/// [`StatementDdlGates::view_definition_options`](crate::dialect::StatementDdlGates::view_definition_options)).
+/// [`ViewSequenceClauseSyntax::view_definition_options`](crate::dialect::ViewSequenceClauseSyntax::view_definition_options)).
 ///
 /// MySQL's `ALTER VIEW` re-specifies the whole view body; it is the [`CreateView`] grammar
 /// minus `OR REPLACE`/`IF NOT EXISTS` (server-measured: both `ER_PARSE_ERROR` after `ALTER`)

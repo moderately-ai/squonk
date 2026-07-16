@@ -571,8 +571,7 @@ impl FeatureSet {
         // `prefix_colon_alias` off).
         // Either projection or table-factor prefix-colon alias collides with semi-structured
         // `base : key` at an `<ident> :` head.
-        if (self.select_syntax.prefix_colon_alias
-            || self.table_expressions.prefix_colon_alias)
+        if (self.select_syntax.prefix_colon_alias || self.table_expressions.prefix_colon_alias)
             && self.expression_syntax.semi_structured_access
         {
             return Some(G::PrefixColonAliasVersusSemiStructuredAccess);

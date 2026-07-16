@@ -94,9 +94,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
             let name = self.parse_transaction_name(block)?;
             let modes = if self.features().transaction_syntax.begin_transaction_modes {
                 self.parse_transaction_modes_with(
-                    self.features().transaction_syntax.transaction_isolation_mode,
+                    self.features()
+                        .transaction_syntax
+                        .transaction_isolation_mode,
                     self.features().transaction_syntax.transaction_access_mode,
-                    self.features().transaction_syntax.transaction_deferrable_mode,
+                    self.features()
+                        .transaction_syntax
+                        .transaction_deferrable_mode,
                     false,
                 )?
             } else {
@@ -147,7 +151,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
             })
         } else if let Some(syntax) = self.eat_transaction_commit_keyword()? {
             let block = self.eat_transaction_block_keyword(
-                self.features().transaction_syntax.commit_transaction_keyword,
+                self.features()
+                    .transaction_syntax
+                    .commit_transaction_keyword,
             )?;
             let name = self.parse_transaction_name(block)?;
             let (chain, release) = self.parse_transaction_completion()?;
@@ -162,7 +168,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
             })
         } else if let Some(syntax) = self.eat_transaction_rollback_keyword()? {
             let block = self.eat_transaction_block_keyword(
-                self.features().transaction_syntax.rollback_transaction_keyword,
+                self.features()
+                    .transaction_syntax
+                    .rollback_transaction_keyword,
             )?;
             let name = self.parse_transaction_name(block)?;
             let (savepoint_keyword, to_savepoint) =
@@ -371,9 +379,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// `SET TRANSACTION`, and the session `SET SESSION CHARACTERISTICS`).
     pub(super) fn parse_transaction_modes(&mut self) -> ParseResult<ThinVec<TransactionMode>> {
         self.parse_transaction_modes_with(
-            self.features().transaction_syntax.transaction_isolation_mode,
+            self.features()
+                .transaction_syntax
+                .transaction_isolation_mode,
             self.features().transaction_syntax.transaction_access_mode,
-            self.features().transaction_syntax.transaction_deferrable_mode,
+            self.features()
+                .transaction_syntax
+                .transaction_deferrable_mode,
             false,
         )
     }
@@ -400,7 +412,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 }
                 break;
             };
-            if self.features().transaction_syntax.transaction_modes_reject_duplicates
+            if self
+                .features()
+                .transaction_syntax
+                .transaction_modes_reject_duplicates
                 && modes
                     .iter()
                     .any(|existing| same_transaction_mode_kind(existing, &mode))
@@ -408,7 +423,11 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 return Err(self.unexpected("a transaction mode that has not already appeared"));
             }
             modes.push(mode);
-            if !self.features().transaction_syntax.transaction_multiple_modes {
+            if !self
+                .features()
+                .transaction_syntax
+                .transaction_multiple_modes
+            {
                 break;
             }
             // The mode separator is an optional comma: ANSI writes commas between

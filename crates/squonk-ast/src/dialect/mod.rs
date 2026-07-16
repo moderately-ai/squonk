@@ -1672,7 +1672,8 @@ pub struct StatementDdlGates {
     /// `CREATE SEQUENCE` has `DROP SEQUENCE`. The modelled tail is the shared standard option
     /// core both engines' parsers accept (`START [WITH]`, `INCREMENT [BY]`, `MIN`/`MAXVALUE`,
     /// `NO MIN`/`MAXVALUE`, `CYCLE`/`NO CYCLE`). The independently gated PostgreSQL
-    /// `CACHE` extension is modelled by [`create_sequence_cache`](Self::create_sequence_cache);
+    /// `CACHE` extension is modelled by
+    /// [`ViewSequenceClauseSyntax::create_sequence_cache`];
     /// `AS` and `OWNED BY` remain unmodelled.
     pub create_sequence: bool,
     /// Accept the PostgreSQL extension-DDL statements `CREATE EXTENSION [IF NOT EXISTS]
@@ -4770,7 +4771,7 @@ pub struct CallSyntax {
     /// arrow lexemes. **Shared `:=` claim:** MySQL's
     /// [`SessionVariableSyntax::variable_assignment`] also enables `:=` lexing for
     /// `SET @v := …`; the two never coexist in a shipped preset, so one
-    /// [`Operator::ColonEquals`](crate::ast::Operator) token stays unambiguous per
+    /// `Operator::ColonEquals` token stays unambiguous per
     /// dialect (see tokenizer `:=` munch comments).
     pub named_argument: bool,
     /// Accept MySQL's `UTC_DATE` / `UTC_TIME` / `UTC_TIMESTAMP` niladic date/time
@@ -5744,7 +5745,10 @@ mod standard_catalog;
 mod support_tier;
 
 pub use conflict::{FeatureDependencyViolation, GrammarConflict, LexicalConflict};
-pub use head_contention::{HeadResolution, MULTI_CLAIMANT_STATEMENT_HEADS, MultiClaimantHead};
+pub use head_contention::{
+    BASE_VS_FEATURE_STATEMENT_HEADS, BaseVsFeatureStatementHead, FeatureGatePredicate,
+    HeadResolution, MULTI_CLAIMANT_STATEMENT_HEADS, MultiClaimantHead, NamedFeatureGate,
+};
 pub use standard_catalog::{
     Conformance, FeatureMetadata, Maturity, STANDARD_FEATURE_CATALOG, StandardFeature,
     max_feature_metadata, standard_feature, standard_features_as_of, unsupported_standard_features,

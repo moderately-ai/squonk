@@ -261,7 +261,12 @@ const FEATURE_FIELDS: &[FieldMeta] = &[
     ),
     meta("grouping_syntax", "GroupingSyntax", "grouping_syntax", None),
     meta("utility_syntax", "UtilitySyntax", "utility_syntax", None),
-    meta("transaction_syntax", "TransactionSyntax", "transaction_syntax", None),
+    meta(
+        "transaction_syntax",
+        "TransactionSyntax",
+        "transaction_syntax",
+        None,
+    ),
     meta("show_syntax", "ShowSyntax", "show_syntax", None),
     meta(
         "maintenance_syntax",

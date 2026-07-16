@@ -745,13 +745,12 @@ impl<'a, D: Dialect> Parser<'a, D> {
         } else {
             // DuckDB admits a single-part Sconst table name after DESCRIBE/SUMMARIZE
             // (`DESCRIBE e'0e'`, `SUMMARIZE 't'`; engine-measured on libduckdb 1.5.4).
-            let name = if let Some(ident) =
-                self.try_parse_string_literal_table_name("a table name")?
-            {
-                ObjectName(thin_vec![ident])
-            } else {
-                self.parse_object_name()?
-            };
+            let name =
+                if let Some(ident) = self.try_parse_string_literal_table_name("a table name")? {
+                    ObjectName(thin_vec![ident])
+                } else {
+                    self.parse_object_name()?
+                };
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(ShowRefTarget::Name { name, meta })
         }
@@ -1300,25 +1299,24 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // DuckDB admits a single-part Sconst relation name (`FROM ''`, `FROM 't'`,
         // `FROM E't'`, `FROM $$t$$`; engine-measured on libduckdb 1.5.4). Dotted string
         // names (`FROM 'a'.'b'`) remain rejects. Gated by
-        // [`IdentifierSyntax::string_literal_table_names`]; MySQL/PostgreSQL syntax-reject
+        // [`IdentifierSyntax::string_literal_table_names`](crate::ast::dialect::IdentifierSyntax::string_literal_table_names); MySQL/PostgreSQL syntax-reject
         // a string here. A string name cannot open a table-function call (`'f'(…)`),
         // so the Sconst arm falls straight through to the named-table tail.
-        let (name, name_start) = if let Some(ident) =
-            self.try_parse_string_literal_table_name("a table name")?
-        {
-            let span = ident.meta.span;
-            (ObjectName(thin_vec![ident]), span)
-        } else {
-            let Some(token) = self.peek()? else {
-                return Err(self.unexpected("a table name, function call, or `(`"));
+        let (name, name_start) =
+            if let Some(ident) = self.try_parse_string_literal_table_name("a table name")? {
+                let span = ident.meta.span;
+                (ObjectName(thin_vec![ident]), span)
+            } else {
+                let Some(token) = self.peek()? else {
+                    return Err(self.unexpected("a table name, function call, or `(`"));
+                };
+                let head_reserved = self.name_or_call_head_reserved()?;
+                if !self.token_admissible(token, head_reserved) {
+                    return Err(self.unexpected("a table name, function call, or `(`"));
+                }
+                let name = self.parse_object_name_with(head_reserved)?;
+                (name, token.span)
             };
-            let head_reserved = self.name_or_call_head_reserved()?;
-            if !self.token_admissible(token, head_reserved) {
-                return Err(self.unexpected("a table name, function call, or `(`"));
-            }
-            let name = self.parse_object_name_with(head_reserved)?;
-            (name, token.span)
-        };
         if self.peek_is_punct(Punctuation::LParen)? {
             if !self.features().table_factor_syntax.table_functions {
                 return Err(self.unexpected("a table expression supported by this dialect"));
@@ -2744,7 +2742,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
 
     /// The relation-target object name, admitting SQLite's single-quoted string-literal
     /// identifier spelling in each dotted part (`DELETE FROM 'table1'`, `'schema'.'table'`)
-    /// under [`IdentifierSyntax::string_literal_identifiers`](crate::ast::dialect::IdentifierSyntax);
+    /// under [`IdentifierSyntax::string_literal_identifiers`](crate::ast::dialect::IdentifierSyntax::string_literal_identifiers);
     /// otherwise the plain [`parse_object_name`](Self::parse_object_name).
     ///
     /// Confined to the relation-*target* position (DML/DDL) — the corpus-demanded site
@@ -2789,7 +2787,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         self.parse_ident_admitting(reserved, "an identifier")
     }
 
-    /// Central choke for [`IdentifierSyntax::string_literal_table_names`]: when the flag is
+    /// Central choke for [`IdentifierSyntax::string_literal_table_names`](crate::ast::dialect::IdentifierSyntax::string_literal_table_names): when the flag is
     /// on and the head is a name Sconst, fold it to a single-part table-name [`Ident`].
     /// Returns `None` when the flag is off or the head is not an Sconst so callers keep a
     /// single pattern instead of re-checking the flag at every table-name site.
@@ -2807,13 +2805,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
     }
 
     /// True when a name Sconst may open a table-name / prefix-alias position under
-    /// [`IdentifierSyntax::string_literal_table_names`].
+    /// [`IdentifierSyntax::string_literal_table_names`](crate::ast::dialect::IdentifierSyntax::string_literal_table_names).
     pub(super) fn peek_string_literal_table_name(&mut self) -> ParseResult<bool> {
         Ok(self.features().identifier_syntax.string_literal_table_names
             && self.peek_is_name_sconst()?)
     }
 
-    /// Central choke for [`IdentifierSyntax::string_literal_identifiers`]: parse a name that
+    /// Central choke for [`IdentifierSyntax::string_literal_identifiers`](crate::ast::dialect::IdentifierSyntax::string_literal_identifiers): parse a name that
     /// may be a single-quoted string under the flag, else a plain identifier against
     /// `reserved`. Call sites must not re-check the flag themselves.
     pub(super) fn parse_ident_allowing_string_literal(

@@ -72,9 +72,9 @@ use super::{
     KeywordSet, MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax,
     OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
-    STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax,
+    STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
+    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -327,7 +327,7 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
-};
+    };
 }
 impl TransactionSyntax {
     /// Transaction-control surface for the `DATABRICKS` preset (split from UtilitySyntax).
@@ -360,7 +360,6 @@ impl TransactionSyntax {
         xa_transactions: false,
     };
 }
-
 
 impl ShowSyntax {
     /// The `DATABRICKS` preset for show syntax.
@@ -671,20 +670,19 @@ mod tests {
             &FeatureSet::ANSI,
             &FeatureSet::DATABRICKS,
             &[
-            "identifier_casing",
-            "identifier_quotes",
-            "reserved_column_name",
-            "reserved_function_name",
-            "reserved_type_name",
-            "reserved_bare_alias",
-            "table_expressions",
-            "join_syntax",
-            "expression_syntax",
-            "select_syntax",
-            "grouping_syntax",
-            "show_syntax"
+                "identifier_casing",
+                "identifier_quotes",
+                "reserved_column_name",
+                "reserved_function_name",
+                "reserved_type_name",
+                "reserved_bare_alias",
+                "table_expressions",
+                "join_syntax",
+                "expression_syntax",
+                "select_syntax",
+                "grouping_syntax",
+                "show_syntax",
             ],
         );
     }
-
 }

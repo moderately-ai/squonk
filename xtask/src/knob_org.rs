@@ -105,11 +105,7 @@ fn feature_fields_meta(src: &str) -> BTreeSet<String> {
             rest = &rest[q + 1..];
             if let Some(end) = rest.find('"') {
                 let name = &rest[..end];
-                if !name.is_empty()
-                    && name
-                        .chars()
-                        .all(|c| c.is_ascii_lowercase() || c == '_')
-                {
+                if !name.is_empty() && name.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
                     out.insert(name.to_owned());
                 }
                 rest = &rest[end + 1..];
@@ -190,9 +186,7 @@ fn check_wrapper_synopsis_honesty(root: &Path) -> TidyResult {
         let name = path.file_name().unwrap().to_string_lossy();
         for phrase in banned {
             if text.contains(phrase) {
-                errors.push(format!(
-                    "{name}: banned stale synopsis phrase `{phrase}`"
-                ));
+                errors.push(format!("{name}: banned stale synopsis phrase `{phrase}`"));
             }
         }
     }
@@ -272,7 +266,11 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let mod_rs = fs::read_to_string(root.join("crates/squonk-ast/src/dialect/mod.rs")).unwrap();
         let fields = feature_set_struct_fields(&mod_rs);
-        assert!(fields.len() >= 48, "expected FeatureSet fields, got {}", fields.len());
+        assert!(
+            fields.len() >= 48,
+            "expected FeatureSet fields, got {}",
+            fields.len()
+        );
         assert!(fields.contains("utility_syntax"));
         assert!(fields.contains("transaction_syntax"));
         assert!(fields.contains("view_sequence_clause_syntax"));

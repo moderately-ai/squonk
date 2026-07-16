@@ -17,9 +17,9 @@ use super::{
     IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, Keyword, KeywordOperators,
     KeywordSet, MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax,
     OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
-    STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax,
+    STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
+    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -377,7 +377,6 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
-
         colocation_groups: false,
         // `CREATE TRIGGER`'s only modelled body form is SQLite's, so the standard
         // baseline does not dispatch it.
@@ -426,7 +425,7 @@ impl StatementDdlGates {
         resource_group: false,
         alter_sequence: false,
         alter_object_set_schema: false,
-};
+    };
 }
 impl ViewSequenceClauseSyntax {
     /// View/sequence clause surface for the `ANSI` preset.
@@ -438,7 +437,6 @@ impl ViewSequenceClauseSyntax {
         view_definition_options: false,
     };
 }
-
 
 impl CreateTableClauseSyntax {
     /// The `ANSI` predefined value.
@@ -756,7 +754,7 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
-};
+    };
 }
 impl TransactionSyntax {
     /// Transaction-control surface for the `ANSI` preset (split from UtilitySyntax).
@@ -789,7 +787,6 @@ impl TransactionSyntax {
         xa_transactions: false,
     };
 }
-
 
 impl ShowSyntax {
     /// The `ANSI` predefined value.

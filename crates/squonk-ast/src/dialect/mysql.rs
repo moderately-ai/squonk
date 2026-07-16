@@ -17,9 +17,9 @@ use super::{
     IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, Keyword, KeywordOperators,
     KeywordSet, MYSQL_BYTE_CLASSES, MaintenanceSyntax, MutationSyntax, NullOrdering,
     NumericLiteralSyntax, OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax,
-    QueryTailSyntax, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax,
+    QueryTailSyntax, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
+    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, STANDARD_SET_OPERATION_BINDING_POWERS,
@@ -375,7 +375,6 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `MYSQL` preset for statement ddl gates.
     pub const MYSQL: Self = Self {
-
         colocation_groups: false,
         // MySQL's `CREATE TRIGGER` body is not the modelled SQLite `BEGIN … END` form.
         create_trigger: false,
@@ -429,7 +428,7 @@ impl StatementDdlGates {
         alter_object_set_schema: false,
         // MySQL owns the view definition-option surface: the `ALGORITHM`/`DEFINER`/`SQL
         // SECURITY` prefix on `CREATE VIEW` and the whole `ALTER VIEW` redefinition.
-};
+    };
 }
 impl ViewSequenceClauseSyntax {
     /// View/sequence clause surface for the `MYSQL` preset.
@@ -441,7 +440,6 @@ impl ViewSequenceClauseSyntax {
         view_definition_options: true,
     };
 }
-
 
 impl CreateTableClauseSyntax {
     /// The `MYSQL` preset for create table clause syntax.
@@ -1004,7 +1002,7 @@ impl UtilitySyntax {
         do_statement: false,
         export_import_database: false,
         update_extensions: false,
-};
+    };
 }
 impl TransactionSyntax {
     /// Transaction-control surface for the `MYSQL` preset (split from UtilitySyntax).
@@ -1037,7 +1035,6 @@ impl TransactionSyntax {
         begin_transaction_mode: false,
     };
 }
-
 
 impl ShowSyntax {
     /// The `MYSQL` preset for show syntax.

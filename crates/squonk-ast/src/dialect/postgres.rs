@@ -15,8 +15,9 @@ use super::{
     POSTGRES_BYTE_CLASSES, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS,
     RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax,
-    ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
-    TableFactorSyntax, TargetSpelling, TypeNameSyntax, TransactionSyntax, UtilitySyntax,
+    ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
+    TableFactorSyntax, TargetSpelling, TransactionSyntax, TypeNameSyntax, UtilitySyntax,
+    ViewSequenceClauseSyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
@@ -271,7 +272,6 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `POSTGRES` preset for statement ddl gates.
     pub const POSTGRES: Self = Self {
-
         colocation_groups: false,
         // PostgreSQL's `CREATE TRIGGER` uses an `EXECUTE FUNCTION` body, not the
         // modelled SQLite `BEGIN … END` form, so it is not dispatched here.
@@ -320,7 +320,7 @@ impl StatementDdlGates {
         resource_group: false,
         alter_sequence: false,
         alter_object_set_schema: false,
-};
+    };
 }
 impl ViewSequenceClauseSyntax {
     /// View/sequence clause surface for the `POSTGRES` preset.
@@ -332,7 +332,6 @@ impl ViewSequenceClauseSyntax {
         view_definition_options: false,
     };
 }
-
 
 impl CreateTableClauseSyntax {
     /// The `POSTGRES` preset for create table clause syntax.
@@ -668,7 +667,7 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
-};
+    };
 }
 impl TransactionSyntax {
     /// Transaction-control surface for the `POSTGRES` preset (split from UtilitySyntax).
@@ -701,7 +700,6 @@ impl TransactionSyntax {
         xa_transactions: false,
     };
 }
-
 
 impl ShowSyntax {
     /// The `POSTGRES` preset for show syntax.

@@ -117,7 +117,9 @@ fn feature_enablement(feature: Feature, preset: &FeatureSet) -> Enablement {
         Feature::TypeNameSyntax => preset.type_name_syntax != ansi.type_name_syntax,
         Feature::TargetSpelling => preset.target_spelling != ansi.target_spelling,
         Feature::TransactionSyntax => preset.transaction_syntax != ansi.transaction_syntax,
-        Feature::ViewSequenceClauseSyntax => preset.view_sequence_clause_syntax != ansi.view_sequence_clause_syntax,
+        Feature::ViewSequenceClauseSyntax => {
+            preset.view_sequence_clause_syntax != ansi.view_sequence_clause_syntax
+        }
     };
     if diverges {
         Enablement::Diverges

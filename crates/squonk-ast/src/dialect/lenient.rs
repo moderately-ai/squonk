@@ -94,9 +94,9 @@ use super::{
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax, RESERVED_BARE_ALIAS,
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
-    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax, StringFuncForms,
-    StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
-    TransactionSyntax, UtilitySyntax,
+    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
+    StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
+    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
@@ -655,7 +655,6 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `LENIENT` preset for statement ddl gates.
     pub const LENIENT: Self = Self {
-
         colocation_groups: true,
         // The parse-anything union accepts the SQLite `CREATE TRIGGER` body form too.
         create_trigger: true,
@@ -701,7 +700,7 @@ impl StatementDdlGates {
         resource_group: true,
         alter_sequence: true,
         alter_object_set_schema: true,
-};
+    };
 }
 impl ViewSequenceClauseSyntax {
     /// View/sequence clause surface for the `LENIENT` preset.
@@ -713,7 +712,6 @@ impl ViewSequenceClauseSyntax {
         view_definition_options: true,
     };
 }
-
 
 impl CreateTableClauseSyntax {
     /// The `LENIENT` preset for create table clause syntax.
@@ -1081,7 +1079,7 @@ impl UtilitySyntax {
         flush: true,
         purge_binary_logs: true,
         replication_statements: true,
-};
+    };
 }
 impl TransactionSyntax {
     /// Transaction-control surface for the `LENIENT` preset (split from UtilitySyntax).
@@ -1114,7 +1112,6 @@ impl TransactionSyntax {
         xa_transactions: true,
     };
 }
-
 
 impl ShowSyntax {
     /// The `LENIENT` preset for show syntax.

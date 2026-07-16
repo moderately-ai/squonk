@@ -59,9 +59,9 @@ use super::{
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax, RESERVED_BARE_ALIAS,
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
-    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax,
+    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
+    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -271,7 +271,7 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
-};
+    };
 }
 impl TransactionSyntax {
     /// Transaction-control surface for the `SNOWFLAKE` preset (split from UtilitySyntax).
@@ -304,7 +304,6 @@ impl TransactionSyntax {
         xa_transactions: false,
     };
 }
-
 
 impl ExpressionSyntax {
     /// Snowflake expression surface: the ANSI baseline plus semi-structured path access
@@ -541,7 +540,10 @@ mod tests {
         assert_eq!(sf.table_factor_syntax, TableFactorSyntax::SNOWFLAKE);
         assert_ne!(sf.table_factor_syntax, ansi.table_factor_syntax);
         assert_eq!(sf.operator_syntax, ansi.operator_syntax);
-        assert_eq!(sf.view_sequence_clause_syntax, ansi.view_sequence_clause_syntax);
+        assert_eq!(
+            sf.view_sequence_clause_syntax,
+            ansi.view_sequence_clause_syntax
+        );
         assert_eq!(sf.transaction_syntax, ansi.transaction_syntax);
         assert_eq!(sf.call_syntax, ansi.call_syntax);
         assert_eq!(sf.predicate_syntax, ansi.predicate_syntax);
@@ -650,18 +652,17 @@ mod tests {
             &FeatureSet::ANSI,
             &FeatureSet::SNOWFLAKE,
             &[
-            "reserved_column_name",
-            "reserved_function_name",
-            "reserved_type_name",
-            "reserved_bare_alias",
-            "table_expressions",
-            "table_factor_syntax",
-            "expression_syntax",
-            "select_syntax",
-            "grouping_syntax",
-            "utility_syntax"
+                "reserved_column_name",
+                "reserved_function_name",
+                "reserved_type_name",
+                "reserved_bare_alias",
+                "table_expressions",
+                "table_factor_syntax",
+                "expression_syntax",
+                "select_syntax",
+                "grouping_syntax",
+                "utility_syntax",
             ],
         );
     }
-
 }

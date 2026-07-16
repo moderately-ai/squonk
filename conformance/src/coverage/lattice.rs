@@ -152,10 +152,10 @@
 
 use super::harness::AdHocDialect;
 use super::*;
-use squonk::ast::dialect::{TransactionSyntax, ViewSequenceClauseSyntax};
 use squonk::ast::dialect::{
     GrammarConflict, HeadResolution, LexicalConflict, MULTI_CLAIMANT_STATEMENT_HEADS,
 };
+use squonk::ast::dialect::{TransactionSyntax, ViewSequenceClauseSyntax};
 use squonk_ast::render::RenderMode;
 
 /// A toggleable boolean [`FeatureSet`] flag with the closures to read and flip it.

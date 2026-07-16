@@ -31,9 +31,9 @@ use crate::error::ParseResult;
 use crate::tokenizer::{Operator, Punctuation, Token, TokenKind};
 use thin_vec::{ThinVec, thin_vec};
 
+use super::Dialect;
 use super::clause_marks::ClauseKw;
 use super::engine::Parser;
-use super::Dialect;
 
 /// The parsed query-tail `ORDER BY` clause: the ordinary sort-key list, or DuckDB's
 /// whole-clause `ALL` mode — exactly one of the pair is populated (the grammar
@@ -91,7 +91,6 @@ impl<'a, D: Dialect> Parser<'a, D> {
 
     // Statement-head dispatch (`parse_statement` / `parse_statement_inner`) lives in
     // [`super::statement_dispatch`] so this module stays query-level grammar only.
-
 
     /// Parse a statement whose leading token is `WITH`.
     ///
@@ -2710,21 +2709,17 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// True when the next two tokens open a prefix colon alias head — a bare-alias-admissible
     /// identifier (or name Sconst under `string_literal_table_names`) immediately followed by
     /// a single `:` — **and** `enabled` is on. Projection and table-factor positions each pass
-    /// their own FeatureSet flag ([`SelectSyntax::prefix_colon_alias`] /
-    /// [`TableExpressionSyntax::prefix_colon_alias`]). A `::` typecast lexes as
+    /// their own FeatureSet flag ([`SelectSyntax::prefix_colon_alias`](crate::ast::dialect::SelectSyntax::prefix_colon_alias) /
+    /// [`TableExpressionSyntax::prefix_colon_alias`](crate::ast::dialect::TableExpressionSyntax::prefix_colon_alias)). A `::` typecast lexes as
     /// [`Punctuation::DoubleColon`], not `Colon`, so `x :: int` never matches.
-    pub(super) fn peek_starts_prefix_colon_alias_if(
-        &mut self,
-        enabled: bool,
-    ) -> ParseResult<bool> {
+    pub(super) fn peek_starts_prefix_colon_alias_if(&mut self, enabled: bool) -> ParseResult<bool> {
         if !enabled {
             return Ok(false);
         }
         // DuckDB admits a single-part Sconst as the prefix alias too (`FROM '' : t`,
         // `FROM '' : ''`; engine-measured on libduckdb 1.5.4), so a name-Sconst head
         // followed by `:` opens the same form as a bare-alias identifier.
-        let head_ok =
-            self.peek_can_start_bare_alias()? || self.peek_string_literal_table_name()?;
+        let head_ok = self.peek_can_start_bare_alias()? || self.peek_string_literal_table_name()?;
         Ok(head_ok && self.peek_nth_is_punct(1, Punctuation::Colon)?)
     }
 

@@ -268,6 +268,12 @@ pub const MULTI_CLAIMANT_STATEMENT_HEADS: &[MultiClaimantHead] = &[
     },
 ];
 
+/// Predicate that reads a single gate from a resolved [`FeatureSet`].
+pub type FeatureGatePredicate = fn(&FeatureSet) -> bool;
+
+/// Named optional parent/base gate for a one-claimant statement head.
+pub type NamedFeatureGate = (&'static str, FeatureGatePredicate);
+
 /// One-claimant statement-head entries that are not true contender pairs.
 ///
 /// These are not included in
@@ -281,14 +287,18 @@ pub struct BaseVsFeatureStatementHead {
     /// The single `FeatureSet` flag that contributes this head.
     pub feature: &'static str,
     /// Reads the flag from a resolved preset.
-    pub is_on: fn(&FeatureSet) -> bool,
+    pub is_on: FeatureGatePredicate,
     /// Optional parent/base gate name and predicate if the feature refines a broader parser
     /// gate; this is documentation-only metadata for this ledger.
-    pub base_gate: Option<(&'static str, fn(&FeatureSet) -> bool)>,
+    pub base_gate: Option<NamedFeatureGate>,
     /// Where the parser resolution is implemented.
     pub doc: &'static str,
 }
 
+/// One-claimant statement heads that refine a broader base gate (not multi-claimant pairs).
+///
+/// Complements [`MULTI_CLAIMANT_STATEMENT_HEADS`]: each row documents a single feature
+/// that owns a head without contending with another feature for the same lead keyword.
 #[allow(dead_code)]
 pub const BASE_VS_FEATURE_STATEMENT_HEADS: &[BaseVsFeatureStatementHead] = &[
     BaseVsFeatureStatementHead {

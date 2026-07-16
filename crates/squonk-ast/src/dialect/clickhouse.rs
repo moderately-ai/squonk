@@ -43,9 +43,9 @@ use super::{
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax, RESERVED_BARE_ALIAS,
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
-    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax, StringFuncForms,
-    StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
-    TransactionSyntax, UtilitySyntax,
+    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
+    StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
+    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -374,12 +374,11 @@ mod tests {
             &FeatureSet::ANSI,
             &FeatureSet::CLICKHOUSE,
             &[
-            "identifier_casing",
-            "identifier_quotes",
-            "query_tail_syntax",
-            "type_name_syntax"
+                "identifier_casing",
+                "identifier_quotes",
+                "query_tail_syntax",
+                "type_name_syntax",
             ],
         );
     }
-
 }

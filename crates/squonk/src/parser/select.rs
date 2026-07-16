@@ -1195,7 +1195,8 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // value. It folds onto the ordinary trailing-alias field (DuckDB canonicalizes it
         // to `AS`), so once the prefix is read the item takes no trailing alias — a
         // following `AS y` / bare word is left unconsumed and rejects, matching the engine.
-        if self.peek_starts_prefix_colon_alias_if(self.features().select_syntax.prefix_colon_alias)?
+        if self
+            .peek_starts_prefix_colon_alias_if(self.features().select_syntax.prefix_colon_alias)?
         {
             let alias = self.parse_bare_alias_ident()?;
             let start = alias.span();
