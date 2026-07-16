@@ -157,7 +157,11 @@ jobs:
         run: |
           set -euo pipefail
           version=${{ steps.version.outputs.version }}
-          cargo publish --dry-run -p squonk
+          # Package the exact tarball for checksum comparison (same as squonk-ast).
+          # Do not use `cargo publish --dry-run` here: it aborts the upload path and
+          # does not reliably leave `target/package/squonk-*.crate` for sha256sum.
+          # After squonk-ast is on the registry, a normal package resolves it by version.
+          cargo package -p squonk
           expected=$(sha256sum "target/package/squonk-$version.crate" | cut -d' ' -f1)
           index=https://index.crates.io/sq/uo/squonk
           published=$(curl --fail --silent --show-error "$index" | jq -r "select(.vers == \"$version\") | .cksum" | tail -1)
