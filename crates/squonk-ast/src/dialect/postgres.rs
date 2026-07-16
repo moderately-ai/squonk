@@ -151,6 +151,7 @@ impl TableExpressionSyntax {
         table_json_path: false,
         // No SQLite `INDEXED BY` / `NOT INDEXED` index directive under PostgreSQL.
         indexed_by: false,
+        prefix_colon_alias: false,
     };
 }
 

@@ -998,6 +998,12 @@ pub struct TableExpressionSyntax {
     /// (the directive-versus-bare-alias readings are mutually exclusive given the keyword's
     /// one-position semantics, and Lenient prefers the more permissive bare-alias reading).
     pub indexed_by: bool,
+    /// Accept DuckDB's **table-factor** prefix colon alias — `<alias> : <relation>` at a
+    /// `FROM` head (`FROM b : a` → relation `a` aliased `b`). Projection-position twin is
+    /// [`SelectSyntax::prefix_colon_alias`]. Same pure-`AS` sugar and
+    /// [`GrammarConflict::PrefixColonAliasVersusSemiStructuredAccess`] hazard when either
+    /// position is on with `semi_structured_access`. On for DuckDB / Lenient; off elsewhere.
+    pub prefix_colon_alias: bool,
 }
 
 /// Dialect-owned join-operator and recursive-query relation-composition syntax
@@ -2703,33 +2709,18 @@ pub struct SelectSyntax {
     /// parser to reject — the same clean parse error those dialects report. On for DuckDB
     /// / Lenient, off elsewhere.
     pub trailing_comma: bool,
-    /// Accept DuckDB's prefix colon alias — an alias written *before* its value as
-    /// `<alias> : <value>`, in two positions: a projection item (`SELECT j : 42`, the
-    /// alias `j` on the value `42`) and a `FROM` table factor (`FROM b : a`, the alias
-    /// `b` on the relation `a` — the alias precedes the table). It is pure sugar for the
-    /// standard trailing `AS` alias: DuckDB records it in the ordinary alias field with
-    /// no spelling tag and canonically re-emits it as `AS` (json round-trip on 1.5.4:
-    /// `SELECT j : 42` → `SELECT 42 AS j`, `FROM b : a` → `FROM a AS b`), so it folds
-    /// onto the existing [`SelectItem::Expr`](crate::ast::SelectItem) /
-    /// [`TableFactor`](crate::ast::TableFactor) alias field and renders as `AS` — never a
-    /// new node. The `<alias>` is a single bare (`BareColLabel`) or quoted identifier: a
-    /// qualified `a.b :`, a call `f() :`, and a reserved word are all rejected, and the
-    /// prefix is mutually exclusive with a trailing alias (`SELECT x : 42 AS y` /
-    /// `FROM b : a c` reject — the value's own alias parse is suppressed once a prefix is
-    /// read, so a trailing alias is left unconsumed and rejects).
+    /// Accept DuckDB's **projection** prefix colon alias — an alias written *before* its
+    /// value as `<alias> : <value>` on a select-item head only (`SELECT j : 42` → alias `j`
+    /// on value `42`). Pure sugar for the standard trailing `AS` alias: DuckDB records it
+    /// in the ordinary alias field and canonically re-emits `AS` (json round-trip on 1.5.4:
+    /// `SELECT j : 42` → `SELECT 42 AS j`). The FROM-position twin lives on
+    /// [`TableExpressionSyntax::prefix_colon_alias`] so a dialect can enable one position
+    /// without the other.
     ///
-    /// This is a *grammar-position* gate, not a lexical trigger: a lone `:` always
-    /// tokenizes as a `Colon` punctuation token, and reading it as an alias separator at a
-    /// select-item / table-factor head is a parser decision (like slice `a[x:y]` and struct
-    /// `{a: b}` are parser readings of the same byte), so no [`LexicalConflict`] variant
-    /// governs it. The one genuine hazard is a *parser-position* collision with
-    /// [`ExpressionSyntax::semi_structured_access`] — a top-level `base : key` path would
-    /// read the same `<ident> :` head — so the two must not be enabled together
-    /// ([`GrammarConflict::PrefixColonAliasVersusSemiStructuredAccess`]). On for DuckDB and
-    /// Lenient, both of which leave `semi_structured_access` off, so no shipped preset has the
-    /// collision; a future dialect enabling both would silently mis-read one — the hazard the
-    /// tokenizer-trigger-only lexical registry cannot catch, now tracked by the grammar
-    /// registry.
+    /// Grammar-position gate (not lexical): lone `:` is always `Colon` punctuation. Collides
+    /// at a value head with [`ExpressionSyntax::semi_structured_access`]
+    /// ([`GrammarConflict::PrefixColonAliasVersusSemiStructuredAccess`]) when either this
+    /// flag or the table-position twin is on. On for DuckDB / Lenient; off elsewhere.
     pub prefix_colon_alias: bool,
     /// Accept the Hive/Spark `LATERAL VIEW [OUTER] <generator>(args) <alias>
     /// [AS <col> [, …]]` table-generating clauses, written after the whole `FROM`

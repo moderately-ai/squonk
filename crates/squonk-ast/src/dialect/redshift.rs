@@ -138,6 +138,7 @@ impl FeatureSet {
             bare_table_alias_is_bare_label: false,
             table_version: false,
             indexed_by: false,
+            prefix_colon_alias: false,
         },
         join_syntax: JoinSyntax::ANSI,
         table_factor_syntax: TableFactorSyntax::ANSI,

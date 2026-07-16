@@ -348,6 +348,7 @@ impl TableExpressionSyntax {
         aliased_parenthesized_join: true,
         table_version: false,
         table_json_path: false,
+        prefix_colon_alias: false,
     };
 }
 

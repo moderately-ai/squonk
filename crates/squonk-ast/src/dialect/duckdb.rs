@@ -670,6 +670,7 @@ impl TableExpressionSyntax {
         table_version: false,
         table_json_path: false,
         indexed_by: false,
+        prefix_colon_alias: true,
     };
 }
 

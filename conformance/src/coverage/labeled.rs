@@ -5866,6 +5866,7 @@ mod tests {
             table_version: _,
             table_json_path: _,
             indexed_by: _,
+            prefix_colon_alias: _,
         } = TableExpressionSyntax::POSTGRES;
         let JoinSyntax {
             stacked_join_qualifiers: _,

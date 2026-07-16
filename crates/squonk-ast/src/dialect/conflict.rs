@@ -569,7 +569,12 @@ impl FeatureSet {
         // reading. No shipped preset pairs them (DuckDB/Lenient enable the prefix alias with
         // `semi_structured_access` off; Snowflake/Databricks enable the path with
         // `prefix_colon_alias` off).
-        if self.select_syntax.prefix_colon_alias && self.expression_syntax.semi_structured_access {
+        // Either projection or table-factor prefix-colon alias collides with semi-structured
+        // `base : key` at an `<ident> :` head.
+        if (self.select_syntax.prefix_colon_alias
+            || self.table_expressions.prefix_colon_alias)
+            && self.expression_syntax.semi_structured_access
+        {
             return Some(G::PrefixColonAliasVersusSemiStructuredAccess);
         }
 
@@ -1069,17 +1074,17 @@ pub enum FeatureDependencyViolation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum GrammarConflict {
-    /// The `<ident> :` head is claimed by both [`SelectSyntax::prefix_colon_alias`] (DuckDB's
-    /// alias-before-value `SELECT j : 42` / `FROM b : a`) and
+    /// The `<ident> :` head is claimed by DuckDB's prefix colon alias — either
+    /// [`SelectSyntax::prefix_colon_alias`] (projection `SELECT j : 42`) or
+    /// [`TableExpressionSyntax::prefix_colon_alias`] (table-factor `FROM b : a`) — and by
     /// [`ExpressionSyntax::semi_structured_access`] (the `base : key` postfix path). The `:`
     /// always lexes as a lone `Colon` punctuation token — no [`LexicalConflict`] governs it —
     /// so the contention is purely grammatical: at a value / select-item head the prefix-alias
     /// branch is tried first, binding `a : b` as an alias and silently shadowing the path
-    /// reading, so a feature set must pick one meaning for a leading `<ident> :`. No shipped
-    /// preset pairs them (DuckDB/Lenient enable the prefix alias with
-    /// [`semi_structured_access`](ExpressionSyntax::semi_structured_access) off;
-    /// Snowflake/Databricks enable the path with
-    /// [`prefix_colon_alias`](SelectSyntax::prefix_colon_alias) off).
+    /// reading. Enabling either alias position with semi-structured access is a conflict.
+    /// No shipped preset pairs them (DuckDB/Lenient enable both alias positions with
+    /// semi-structured access off; Snowflake/Databricks enable the path with both alias
+    /// flags off).
     PrefixColonAliasVersusSemiStructuredAccess,
     /// The leading `DO` head is claimed by both [`UtilitySyntax::do_statement`] (PostgreSQL's
     /// `DO [LANGUAGE <lang>] '<body>'` anonymous code block) and

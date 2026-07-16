@@ -2707,14 +2707,17 @@ impl<'a, D: Dialect> Parser<'a, D> {
             .is_some_and(|token| self.token_admissible(token, self.features().reserved_bare_alias)))
     }
 
-    /// True when the next two tokens open DuckDB's prefix colon alias — a
-    /// bare-alias-admissible identifier immediately followed by a single `:` — under
-    /// [`SelectSyntax::prefix_colon_alias`](crate::ast::dialect::SelectSyntax::prefix_colon_alias).
-    /// Shared by the projection (`SELECT j : 42`) and table-factor (`FROM b : a`) heads.
-    /// A `::` typecast lexes as [`Punctuation::DoubleColon`], not `Colon`, so `x :: int`
-    /// never matches; the flag is checked first so the peeks are skipped when off.
-    pub(super) fn peek_starts_prefix_colon_alias(&mut self) -> ParseResult<bool> {
-        if !self.features().select_syntax.prefix_colon_alias {
+    /// True when the next two tokens open a prefix colon alias head — a bare-alias-admissible
+    /// identifier (or name Sconst under `string_literal_table_names`) immediately followed by
+    /// a single `:` — **and** `enabled` is on. Projection and table-factor positions each pass
+    /// their own FeatureSet flag ([`SelectSyntax::prefix_colon_alias`] /
+    /// [`TableExpressionSyntax::prefix_colon_alias`]). A `::` typecast lexes as
+    /// [`Punctuation::DoubleColon`], not `Colon`, so `x :: int` never matches.
+    pub(super) fn peek_starts_prefix_colon_alias_if(
+        &mut self,
+        enabled: bool,
+    ) -> ParseResult<bool> {
+        if !enabled {
             return Ok(false);
         }
         // DuckDB admits a single-part Sconst as the prefix alias too (`FROM '' : t`,

@@ -181,7 +181,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// `pub(super)` so the `MERGE` grammar in [`super::dml`] can read its `USING`
     /// source (a single table or derived subquery) through the one table-factor entry.
     pub(super) fn parse_table_factor(&mut self) -> ParseResult<TableFactor<D::Ext>> {
-        if self.peek_starts_prefix_colon_alias()? {
+        if self.peek_starts_prefix_colon_alias_if(
+            self.features().table_expressions.prefix_colon_alias,
+        )? {
             return self.parse_prefix_colon_aliased_factor();
         }
         let start = self.current_span()?;

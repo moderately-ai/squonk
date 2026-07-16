@@ -309,6 +309,7 @@ impl TableExpressionSyntax {
         // prefers the more permissive bare-alias reading, so it forgoes the directive to keep
         // `indexed` an ordinary alias everywhere.
         indexed_by: false,
+        prefix_colon_alias: true,
     };
 }
 

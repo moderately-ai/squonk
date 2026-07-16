@@ -255,6 +255,7 @@ impl TableExpressionSyntax {
         table_json_path: false,
         // SQLite's `INDEXED BY` / `NOT INDEXED` index directive is a SQLite extension.
         indexed_by: false,
+        prefix_colon_alias: false,
     };
 }
 

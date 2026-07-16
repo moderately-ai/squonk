@@ -251,6 +251,7 @@ impl TableExpressionSyntax {
         // MySQL has no SQLite `INDEXED BY` / `NOT INDEXED` index directive (it has its own
         // `index_hints`).
         indexed_by: false,
+        prefix_colon_alias: false,
     };
 }
 
