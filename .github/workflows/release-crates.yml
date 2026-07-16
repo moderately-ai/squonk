@@ -41,6 +41,15 @@ jobs:
           key: release-crates-v1
           cache-bin: false
 
+      # `cargo xtask semver` shells out to `cargo semver-checks` (required on v*
+      # tags for the immutable major baseline). Install the prebuilt binary the same
+      # way every other workflow installs cargo tools — a bare runner does not ship it.
+      - name: Install cargo-semver-checks
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        with:
+          tool: cargo-semver-checks
+
       - name: Resolve and validate the release version
         id: version
         shell: bash
