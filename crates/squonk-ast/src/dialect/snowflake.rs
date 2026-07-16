@@ -644,4 +644,24 @@ mod tests {
         assert_eq!(sf.grammar_conflict(), None);
         assert!(sf.has_no_grammar_conflict());
     }
+    #[test]
+    fn snowflake_closed_delta_axes_match_documented_set() {
+        crate::dialect::closed_delta::assert_closed_delta(
+            &FeatureSet::ANSI,
+            &FeatureSet::SNOWFLAKE,
+            &[
+            "reserved_column_name",
+            "reserved_function_name",
+            "reserved_type_name",
+            "reserved_bare_alias",
+            "table_expressions",
+            "table_factor_syntax",
+            "expression_syntax",
+            "select_syntax",
+            "grouping_syntax",
+            "utility_syntax"
+            ],
+        );
+    }
+
 }

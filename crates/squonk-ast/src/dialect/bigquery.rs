@@ -559,4 +559,22 @@ mod tests {
             Some(super::super::FeatureDependencyViolation::UnnestWithOffsetWithoutUnnest),
         );
     }
+    #[test]
+    fn bigquery_closed_delta_axes_match_documented_set() {
+        crate::dialect::closed_delta::assert_closed_delta(
+            &FeatureSet::ANSI,
+            &FeatureSet::BIGQUERY,
+            &[
+            "identifier_casing",
+            "identifier_quotes",
+            "reserved_column_name",
+            "string_literals",
+            "table_expressions",
+            "table_factor_syntax",
+            "expression_syntax",
+            "type_name_syntax"
+            ],
+        );
+    }
+
 }

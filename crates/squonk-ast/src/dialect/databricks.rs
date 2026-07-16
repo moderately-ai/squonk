@@ -665,4 +665,26 @@ mod tests {
         assert_eq!(dbx.grammar_conflict(), None);
         assert!(dbx.has_no_grammar_conflict());
     }
+    #[test]
+    fn databricks_closed_delta_axes_match_documented_set() {
+        crate::dialect::closed_delta::assert_closed_delta(
+            &FeatureSet::ANSI,
+            &FeatureSet::DATABRICKS,
+            &[
+            "identifier_casing",
+            "identifier_quotes",
+            "reserved_column_name",
+            "reserved_function_name",
+            "reserved_type_name",
+            "reserved_bare_alias",
+            "table_expressions",
+            "join_syntax",
+            "expression_syntax",
+            "select_syntax",
+            "grouping_syntax",
+            "show_syntax"
+            ],
+        );
+    }
+
 }

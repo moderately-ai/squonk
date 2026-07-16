@@ -2043,4 +2043,50 @@ mod tests {
             },
         );
     }
+    #[test]
+    fn duckdb_closed_delta_axes_vs_postgres() {
+        crate::dialect::closed_delta::assert_closed_delta(
+            &FeatureSet::POSTGRES,
+            &FeatureSet::DUCKDB,
+            &[
+            "reserved_column_name",
+            "reserved_function_name",
+            "reserved_type_name",
+            "reserved_bare_alias",
+            "byte_classes",
+            "binding_powers",
+            "numeric_literals",
+            "parameters",
+            "identifier_syntax",
+            "table_expressions",
+            "join_syntax",
+            "table_factor_syntax",
+            "expression_syntax",
+            "operator_syntax",
+            "call_syntax",
+            "string_func_forms",
+            "aggregate_call_syntax",
+            "predicate_syntax",
+            "double_ampersand",
+            "keyword_operators",
+            "hash_bitwise_xor",
+            "mutation_syntax",
+            "statement_ddl_gates",
+            "view_sequence_clause_syntax",
+            "create_table_clause_syntax",
+            "column_definition_syntax",
+            "constraint_syntax",
+            "index_alter_syntax",
+            "select_syntax",
+            "query_tail_syntax",
+            "grouping_syntax",
+            "utility_syntax",
+            "transaction_syntax",
+            "show_syntax",
+            "maintenance_syntax",
+            "type_name_syntax"
+            ],
+        );
+    }
+
 }

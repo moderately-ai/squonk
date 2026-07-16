@@ -453,4 +453,19 @@ mod tests {
         assert_eq!(hive.grammar_conflict(), None);
         assert!(hive.has_no_grammar_conflict());
     }
+    #[test]
+    fn hive_closed_delta_axes_match_documented_set() {
+        crate::dialect::closed_delta::assert_closed_delta(
+            &FeatureSet::ANSI,
+            &FeatureSet::HIVE,
+            &[
+            "identifier_casing",
+            "identifier_quotes",
+            "string_literals",
+            "join_syntax",
+            "select_syntax"
+            ],
+        );
+    }
+
 }

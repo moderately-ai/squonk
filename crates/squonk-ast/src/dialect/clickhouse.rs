@@ -368,4 +368,18 @@ mod tests {
         assert_eq!(ch.grammar_conflict(), None);
         assert!(ch.has_no_grammar_conflict());
     }
+    #[test]
+    fn clickhouse_closed_delta_axes_match_documented_set() {
+        crate::dialect::closed_delta::assert_closed_delta(
+            &FeatureSet::ANSI,
+            &FeatureSet::CLICKHOUSE,
+            &[
+            "identifier_casing",
+            "identifier_quotes",
+            "query_tail_syntax",
+            "type_name_syntax"
+            ],
+        );
+    }
+
 }

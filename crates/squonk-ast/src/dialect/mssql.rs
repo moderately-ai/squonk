@@ -520,4 +520,23 @@ mod tests {
         assert_eq!(mssql.grammar_conflict(), None);
         assert!(mssql.has_no_grammar_conflict());
     }
+    #[test]
+    fn mssql_closed_delta_axes_match_documented_set() {
+        crate::dialect::closed_delta::assert_closed_delta(
+            &FeatureSet::ANSI,
+            &FeatureSet::MSSQL,
+            &[
+            "identifier_casing",
+            "identifier_quotes",
+            "string_literals",
+            "numeric_literals",
+            "parameters",
+            "table_expressions",
+            "join_syntax",
+            "table_factor_syntax",
+            "query_tail_syntax"
+            ],
+        );
+    }
+
 }

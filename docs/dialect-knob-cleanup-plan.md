@@ -92,6 +92,16 @@ order below is merge-safety only.
 See adversarial synthesis; track completion in PRs. Source findings under
 `/tmp/squonk-adversarial-review/` from the review session.
 
+
+## Optional polish (completed / deferred)
+
+| Item | Status |
+|---|---|
+| Dead simple-head if/else arms | cleaned (table owns simple heads; multi-word arms remain) |
+| `assert_closed_delta` on all ANSI satellites + DuckDB | done |
+| Per-bool LabeledCase for every residual flag | **deferred**: bulk SQL labels fail baseline/lexical-conflict checks; residual bools stay AXIS_COVERED under parent Feature objective coverage + ToggleableFeature inventory for labeled subset |
+| Scratch review files | removed |
+
 ## Non-goals
 
 - Oracle verdict changes unrelated to dual-require / plumbing  

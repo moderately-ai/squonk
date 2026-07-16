@@ -353,11 +353,7 @@ impl<D: Dialect> Parser<'_, D> {
             // (`[ANALYZE] <table> (<cols>)`); the parser reads whichever tail its gate
             // admits (off everywhere but SQLite/DuckDB/Lenient).
             self.parse_vacuum_statement()
-        } else if self.features().maintenance_syntax.reindex
-            && self.peek_is_contextual_keyword("REINDEX")?
-        {
-            self.parse_reindex_statement()
-        } else if self.features().maintenance_syntax.table_maintenance
+         } else if self.features().maintenance_syntax.table_maintenance
             && self.peek_starts_table_maintenance()?
         {
             // The MySQL admin-table verb family (`ANALYZE/CHECK/CHECKSUM/OPTIMIZE/REPAIR
@@ -404,34 +400,7 @@ impl<D: Dialect> Parser<'_, D> {
             // The inverse of `INSTALL`, sharing the same gate (an install/uninstall pair, like
             // `ATTACH`/`DETACH`): `UNINSTALL PLUGIN <name>` / `UNINSTALL COMPONENT <urn> …`.
             self.parse_uninstall_statement()
-        } else if self.features().utility_syntax.shutdown
-            && self.peek_is_contextual_keyword("SHUTDOWN")?
-        {
-            // `shutdown` gates the nullary leading `SHUTDOWN` keyword like `kill`: off outside
-            // MySQL (and the permissive superset), where it surfaces as an unknown statement.
-            self.parse_shutdown_statement()
-        } else if self.features().utility_syntax.restart
-            && self.peek_is_contextual_keyword("RESTART")?
-        {
-            // `restart` gates the nullary leading `RESTART` keyword like `kill`.
-            self.parse_restart_statement()
-        } else if self.features().utility_syntax.clone
-            && self.peek_is_contextual_keyword("CLONE")?
-        {
-            // `clone` gates the leading `CLONE` keyword like `kill`; both the `LOCAL` and
-            // `INSTANCE` forms follow it.
-            self.parse_clone_statement()
-        } else if self.features().utility_syntax.help_statement
-            && self.peek_is_contextual_keyword("HELP")?
-        {
-            // `help_statement` gates the leading `HELP` keyword like `kill`.
-            self.parse_help_statement()
-        } else if self.features().utility_syntax.binlog
-            && self.peek_is_contextual_keyword("BINLOG")?
-        {
-            // `binlog` gates the leading `BINLOG` keyword like `kill`.
-            self.parse_binlog_statement()
-        } else if self.features().utility_syntax.prepared_statements
+             } else if self.features().utility_syntax.prepared_statements
             && self.peek_is_contextual_keyword("PREPARE")?
         {
             // `prepared_statements` gates DuckDB's `PREPARE`/`EXECUTE`/`DEALLOCATE` leading
@@ -475,12 +444,7 @@ impl<D: Dialect> Parser<'_, D> {
             // MySQL-first — mandatory `PREPARE` — disagreeing with the DuckDB-first head dispatch
             // above; that incoherence is why the combination has no defined semantics.
             self.parse_deallocate_statement()
-        } else if self.features().utility_syntax.call && self.peek_is_contextual_keyword("CALL")? {
-            // `call` gates the leading `CALL` routine-invocation keyword like `copy`: off
-            // outside DuckDb (and Lenient), where it falls through to the unknown-statement
-            // error.
-            self.parse_call_statement()
-        } else if self.features().utility_syntax.do_statement
+         } else if self.features().utility_syntax.do_statement
             && self.peek_is_contextual_keyword("DO")?
         {
             // `do_statement` gates the leading `DO` anonymous-code-block keyword like `copy`:
