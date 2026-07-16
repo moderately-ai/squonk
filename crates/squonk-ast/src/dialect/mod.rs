@@ -421,10 +421,12 @@ impl CaretOperator {
 /// explicit dialect data decision.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CommentSyntax {
-    /// Treat `#` as a line-comment introducer (MySQL). Mutually exclusive with
-    /// using `#` as an identifier byte (T-SQL `#temp`): a dialect that sets this
-    /// must not also mark `#` an identifier-start in its byte classes, or the
-    /// comment branch wins and `#temp` would never lex as a word.
+    /// Treat `#` as a line-comment introducer (MySQL). One of several coexisting
+    /// `#` claimants (see [`FeatureSet`] module docs, "Shared byte-trigger ownership:
+    /// `#`"); trivia phase shadows identifier / XOR / positional readings when on.
+    /// Do not also mark `#` an identifier-start in byte classes (T-SQL `#temp`), or the
+    /// comment branch wins and `#temp` never lexes as a word
+    /// ([`LexicalConflict::HashCommentVersusHashIdentifier`](crate::dialect::LexicalConflict)).
     pub line_comment_hash: bool,
     /// Whether a bare carriage return (`\r`, `0x0d`) ends a `--`/`#` line comment, on
     /// top of the newline (`\n`) that always ends one. PostgreSQL and DuckDB terminate a
@@ -788,6 +790,9 @@ pub struct SessionVariableSyntax {
     /// and MySQL (a shipped preset) already exercises the route deterministically. Registering it
     /// would require promoting the standard `SET` config grammar to its own flag or converting this
     /// field to an enum axis — see the [`GrammarConflict`] enum doc's route-flag discussion.
+    ///
+    /// **Shared `:=` claim** with [`CallSyntax::named_argument`] (PostgreSQL named args): both
+    /// enable `:=` lexing; shipped presets never arm both, so the token stays unambiguous.
     pub variable_assignment: bool,
 }
 
@@ -4760,8 +4765,12 @@ pub struct OperatorSyntax {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CallSyntax {
     /// Accept PostgreSQL named function arguments `f(name => value)` and the
-    /// deprecated `f(name := value)`. Also gates the tokenizer: the `=>` / `:=`
-    /// arrow lexemes are munched only under a dialect that sets this.
+    /// deprecated `f(name := value)`. Also gates the tokenizer for the `=>` / `:=`
+    /// arrow lexemes. **Shared `:=` claim:** MySQL's
+    /// [`SessionVariableSyntax::variable_assignment`] also enables `:=` lexing for
+    /// `SET @v := …`; the two never coexist in a shipped preset, so one
+    /// [`Operator::ColonEquals`](crate::ast::Operator) token stays unambiguous per
+    /// dialect (see tokenizer `:=` munch comments).
     pub named_argument: bool,
     /// Accept MySQL's `UTC_DATE` / `UTC_TIME` / `UTC_TIMESTAMP` niladic date/time
     /// functions — the UTC-clock analogues of the `CURRENT_*` special value functions,

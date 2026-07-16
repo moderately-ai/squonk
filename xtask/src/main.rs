@@ -59,6 +59,21 @@ fn main() {
         }
         process::exit(xtask::run_feature_matrix(&root));
     }
+    // `knob-org` is a freeze gate for dialect FeatureSet organization (bijection,
+    // orphans, synopsis honesty, naming). Registered in CHECKS so `tidy` runs it too.
+    if command == "knob-org" {
+        if !rest.is_empty() {
+            usage();
+            process::exit(2);
+        }
+        match xtask::check_knob_org(&root) {
+            Ok(()) => {
+                println!("xtask knob-org: ok");
+                return;
+            }
+            Err(errors) => fail("xtask knob-org", errors),
+        }
+    }
     // `semver` validates the checked baseline in 0.x and shells out to
     // cargo-semver-checks after 1.0, returning that tool's status.
     if command == "semver" {

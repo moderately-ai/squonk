@@ -537,7 +537,12 @@ mod tests {
             ansi.table_expressions,
         );
         assert!(sf.table_expressions.table_json_path);
+        // Table-factor surface: pivot_value_sources + match_recognize (not ANSI).
+        assert_eq!(sf.table_factor_syntax, TableFactorSyntax::SNOWFLAKE);
+        assert_ne!(sf.table_factor_syntax, ansi.table_factor_syntax);
         assert_eq!(sf.operator_syntax, ansi.operator_syntax);
+        assert_eq!(sf.view_sequence_clause_syntax, ansi.view_sequence_clause_syntax);
+        assert_eq!(sf.transaction_syntax, ansi.transaction_syntax);
         assert_eq!(sf.call_syntax, ansi.call_syntax);
         assert_eq!(sf.predicate_syntax, ansi.predicate_syntax);
         assert_eq!(sf.mutation_syntax, ansi.mutation_syntax);

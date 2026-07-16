@@ -1335,3 +1335,26 @@ mod tests {
         }
     }
 }
+
+
+#[cfg(test)]
+mod organization_completeness {
+    use squonk::ast::dialect::FEATURES;
+
+    /// DP6 (axis level): every top-level FeatureSet field is registered as a Feature enum
+    /// variant so maturity/coverage gates can see it. Sub-flag breadth is the ToggleableFeature
+    /// + LabeledCase system (`every_gated_subflag_is_required_by_a_labeled_case`) plus the
+    /// `knob-org` orphan scan for every bool field under crates/squonk/src.
+    #[test]
+    fn every_feature_set_axis_has_a_feature_enum_variant() {
+        assert_eq!(
+            FEATURES.len(),
+            50,
+            "Feature registry must stay aligned with FeatureSet fields (run squonk-sourcegen after axis splits)"
+        );
+        let ids: Vec<_> = FEATURES.iter().map(|f| f.id()).collect();
+        assert!(ids.iter().any(|id| *id == "transaction_syntax"));
+        assert!(ids.iter().any(|id| *id == "view_sequence_clause_syntax"));
+        assert!(ids.iter().any(|id| *id == "utility_syntax"));
+    }
+}

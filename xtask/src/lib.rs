@@ -8,10 +8,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 mod feature_matrix;
+mod knob_org;
 mod license_header;
 mod preflight;
 mod semver;
 pub use feature_matrix::run as run_feature_matrix;
+pub use knob_org::check_knob_org;
 pub use license_header::{check_license_headers, write_license_headers};
 pub use preflight::run_preflight;
 pub use semver::run as run_semver;
@@ -142,6 +144,7 @@ pub const CHECKS: &[(&str, Check)] = &[
     ("extension-seam", check_extension_seam),
     ("precedence", check_precedence),
     ("dialect-generic", check_dialect_generic),
+    ("knob-org", check_knob_org),
 ];
 
 /// Run every local tidy gate.

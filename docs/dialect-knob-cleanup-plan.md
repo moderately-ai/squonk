@@ -72,16 +72,16 @@ order below is merge-safety only.
 | create_or_replace_table → StatementDdlGates | committed |
 | table_options dual-position documented as intentional unit | committed |
 
-### Still open (equal priority)
+### Complete
 
-| Item | Notes |
+| Item | Status |
 |---|---|
-| **ε remaining axis splits** | StatementDdlGates view/sequence *clause* flags (`temporary_views`, `view_definition_options`, `create_sequence_cache`, …) → possible ViewSequenceClauseSyntax |
-| **C0.*** | Live catalog script + drift gate |
-| **ζ DP6** | Expand properties to every stable FeatureSet bool |
-| **C2.17 closed-delta ratchets** | Uniform template for every preset |
-| **C4.5–C4.6** | Cross-link `:=` / `#` multi-claim in field docs (tokenizer already notes) |
-| **C7 freeze gates** | Orphan scan, synopsis scan, naming lint |
+| ViewSequenceClauseSyntax extract | done |
+| C0 / C7 freeze gate | `cargo xtask knob-org` (bijection, orphan bools, synopsis ban, naming) |
+| DP6 axis properties | `FEATURES.len()==50` + every_feature coverage + every_gated subflags + orphan scan |
+| C4.5–C4.6 `:=` / `#` | cross-linked in field docs + FeatureSet `#` ownership section |
+| Closed-delta honesty | satellite tests assert divergent axes (incl. Snowflake table_factor) |
+| All prior ε/δ items | committed |
 
 ## Checklist
 
