@@ -34,6 +34,8 @@
 //! an allowlist line. (Lexical-trigger sacrifices — the `"` / `[` / `$` conflicts — are the
 //! separate concern of `LexicalConflict` and the `LENIENT` module's rules 1-8.)
 
+use super::FeatureSet;
+
 /// How the permissive union resolves a statement head that two or more features claim.
 ///
 /// MECE over the multi-claimant heads: a head is a clean lookahead split
@@ -135,6 +137,22 @@ pub const MULTI_CLAIMANT_STATEMENT_HEADS: &[MultiClaimantHead] = &[
             `parse_deallocate_statement`.",
     },
     MultiClaimantHead {
+        heads: &["COPY"],
+        claimants: &["copy", "copy_into"],
+        resolution: HeadResolution::MeceLookahead,
+        lenient_excludes: &[],
+        lenient_reading: "both kept — PostgreSQL's `COPY <table> {FROM|TO}` and Snowflake's `COPY INTO` split on the `INTO` lookahead: `COPY` routes to `copy` while `COPY INTO` routes to `copy_into`.",
+        doc: "squonk/src/parser/query.rs `COPY` dispatch and util.rs `parse_copy_or_copy_into_statement`.",
+    },
+    MultiClaimantHead {
+        heads: &["DESCRIBE", "DESC", "SUMMARIZE"],
+        claimants: &["describe", "describe_summarize"],
+        resolution: HeadResolution::DispatchOrderUnion,
+        lenient_excludes: &[],
+        lenient_reading: "both kept — `DESCRIBE`/`DESC` and `SUMMARIZE` remain exposed with Lenient's documented dispatch split by parser arm and shape.",
+        doc: "squonk/src/parser/query.rs `describe`/`describe_summarize` dispatch and from.rs `parse_describe_summarize_statement`.",
+    },
+    MultiClaimantHead {
         heads: &["GRANT", "REVOKE"],
         claimants: &[
             "access_control_account_grants",
@@ -149,18 +167,6 @@ pub const MULTI_CLAIMANT_STATEMENT_HEADS: &[MultiClaimantHead] = &[
         doc: "squonk/src/parser/dcl.rs `parse_grant_kind` / `parse_revoke_kind` \
             (the `access_control_account_grants` route branches to \
             `parse_account_grant` / `parse_account_revoke`).",
-    },
-    MultiClaimantHead {
-        heads: &["SET"],
-        claimants: &["variable_assignment"],
-        resolution: HeadResolution::Route,
-        lenient_excludes: &["variable_assignment"],
-        lenient_reading: "the generic `SET [SESSION|LOCAL] <name> {=|TO} <value>` session \
-            grammar; MySQL's `variable_assignment` comma-list route (heterogeneous \
-            assignments over full expressions, plus `:=`) structurally replaces it and relies \
-            on the `@name`-as-user-variable read that `LENIENT` does not take, so it is forgone.",
-        doc: "squonk/src/parser/dcl.rs `parse_set` (the `variable_assignment` route \
-            branches to `parse_mysql_set_variables`).",
     },
     MultiClaimantHead {
         heads: &["LOCK", "UNLOCK"],
@@ -214,18 +220,6 @@ pub const MULTI_CLAIMANT_STATEMENT_HEADS: &[MultiClaimantHead] = &[
             `ANALYZE` arm (`peek_starts_table_maintenance` insists on `TABLE`/`TABLES`).",
     },
     MultiClaimantHead {
-        heads: &["UPDATE"],
-        claimants: &["update_extensions"],
-        resolution: HeadResolution::MeceLookahead,
-        lenient_excludes: &[],
-        lenient_reading: "both kept — DuckDB's `UPDATE EXTENSIONS [(names)]` claims the head \
-            only when `EXTENSIONS` is followed by `(` or statement end, otherwise the DML \
-            `UPDATE <target> SET …` wins (an `UPDATE extensions SET …` still targets a table \
-            named `extensions`).",
-        doc: "squonk/src/parser/util.rs `peek_starts_update_extensions` / \
-            `parse_update_extensions_statement`.",
-    },
-    MultiClaimantHead {
         heads: &["ALTER", "VIEW"],
         claimants: &["view_definition_options", "alter_object_set_schema"],
         resolution: HeadResolution::MeceLookahead,
@@ -272,16 +266,53 @@ pub const MULTI_CLAIMANT_STATEMENT_HEADS: &[MultiClaimantHead] = &[
             before the `export_import_database` arm.",
         doc: "squonk/src/parser/query.rs `IMPORT TABLE` / `IMPORT` dispatch arms.",
     },
-    MultiClaimantHead {
+];
+
+/// One-claimant statement-head entries that are not true contender pairs.
+///
+/// These are not included in
+/// [`MULTI_CLAIMANT_STATEMENT_HEADS`], whose invariant is "two or more claimants,"
+/// but they still need explicit registration so feature truth tables remain complete.
+#[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
+pub struct BaseVsFeatureStatementHead {
+    /// The leading keyword(s) that dispatch this head.
+    pub heads: &'static [&'static str],
+    /// The single `FeatureSet` flag that contributes this head.
+    pub feature: &'static str,
+    /// Reads the flag from a resolved preset.
+    pub is_on: fn(&FeatureSet) -> bool,
+    /// Optional parent/base gate name and predicate if the feature refines a broader parser
+    /// gate; this is documentation-only metadata for this ledger.
+    pub base_gate: Option<(&'static str, fn(&FeatureSet) -> bool)>,
+    /// Where the parser resolution is implemented.
+    pub doc: &'static str,
+}
+
+#[allow(dead_code)]
+pub const BASE_VS_FEATURE_STATEMENT_HEADS: &[BaseVsFeatureStatementHead] = &[
+    BaseVsFeatureStatementHead {
+        heads: &["SET"],
+        feature: "variable_assignment",
+        is_on: |f| f.session_variables.variable_assignment,
+        base_gate: Some(("show_syntax.session_statements", |f| {
+            f.show_syntax.session_statements
+        })),
+        doc: "squonk/src/parser/query.rs `session` dispatch to `parse_set`, and dcl.rs parse_set's `parse_mysql_set_variables` branch.",
+    },
+    BaseVsFeatureStatementHead {
+        heads: &["UPDATE"],
+        feature: "update_extensions",
+        is_on: |f| f.utility_syntax.update_extensions,
+        base_gate: None,
+        doc: "squonk/src/parser/query.rs `UPDATE` dispatch branch with `peek_starts_update_extensions` before `parse_update_statement_with`.",
+    },
+    BaseVsFeatureStatementHead {
         heads: &["CACHE", "LOAD INDEX"],
-        claimants: &["key_cache_statements"],
-        resolution: HeadResolution::MeceLookahead,
-        lenient_excludes: &[],
-        lenient_reading: "kept — MySQL's `CACHE INDEX` (an uncontended leading `CACHE`) and \
-            `LOAD INDEX INTO CACHE` key-cache pair; the `LOAD INDEX` two-token lookahead keeps \
-            the second head MECE against the `LOAD <extension>` statement (see the `LOAD` row).",
-        doc: "squonk/src/parser/query.rs `CACHE` / `LOAD INDEX` dispatch arms; \
-            util.rs `parse_cache_index_statement` / `parse_load_index_statement`.",
+        feature: "key_cache_statements",
+        is_on: |f| f.utility_syntax.key_cache_statements,
+        base_gate: None,
+        doc: "squonk/src/parser/query.rs `CACHE` / `LOAD INDEX` dispatch arms, plus util.rs `parse_cache_index_statement` and `parse_load_index_statement`.",
     },
 ];
 
@@ -355,6 +386,28 @@ mod tests {
             flag: "access_control_extended_objects",
             get: |f| f.access_control_syntax.access_control_extended_objects,
             expected: [T, T, F, F, T],
+        },
+        // COPY — PostgreSQL-style copy vs Snowflake `COPY INTO` split by lookahead.
+        HeadGateValueRow {
+            flag: "copy",
+            get: |f| f.utility_syntax.copy,
+            expected: [F, T, F, F, T],
+        },
+        HeadGateValueRow {
+            flag: "copy_into",
+            get: |f| f.utility_syntax.copy_into,
+            expected: [F, F, F, F, F],
+        },
+        // DESCRIBE/SUMMARIZE — parser-route split by statement family.
+        HeadGateValueRow {
+            flag: "describe",
+            get: |f| f.show_syntax.describe,
+            expected: [F, F, F, T, F],
+        },
+        HeadGateValueRow {
+            flag: "describe_summarize",
+            get: |f| f.show_syntax.describe_summarize,
+            expected: [F, F, F, F, T],
         },
         // SET — the generic session grammar vs MySQL's `variable_assignment` comma-list route.
         HeadGateValueRow {
@@ -489,15 +542,21 @@ mod tests {
         }
     }
 
-    /// The value pin covers exactly the ledger's claimants: a new multi-claimant head forces
-    /// a new valued row (with its own measured per-preset cells), so the value-level coverage
-    /// cannot silently fall behind the ledger. Kept separate from the value assertions so the
-    /// flag *set* is gated even if a value cell is later, deliberately, changed.
+    /// The value pin covers exactly the ledger's claimants: a new multi-claimant or
+    /// base-vs-feature entry forces a new valued row (with its own measured per-preset cells),
+    /// so the value-level coverage cannot silently fall behind the ledger. Kept separate from
+    /// the value assertions so the flag *set* is gated even if a value cell is later,
+    /// deliberately, changed.
     #[test]
     fn value_pinned_gates_cover_every_ledger_claimant() {
         let mut from_ledger: Vec<&str> = MULTI_CLAIMANT_STATEMENT_HEADS
             .iter()
             .flat_map(|head| head.claimants.iter().copied())
+            .chain(
+                BASE_VS_FEATURE_STATEMENT_HEADS
+                    .iter()
+                    .map(|head| head.feature),
+            )
             .collect();
         from_ledger.sort_unstable();
         from_ledger.dedup();
@@ -511,8 +570,7 @@ mod tests {
 
         assert_eq!(
             from_ledger, valued,
-            "the value pin must value exactly the ledger's claimant flags — add or remove a \
-             row in STATEMENT_HEAD_GATE_VALUES to match a ledger change",
+            "the value pin must value exactly the ledger's claimant flags — add or remove a row in STATEMENT_HEAD_GATE_VALUES to match a ledger or base-vs-feature change",
         );
     }
 
@@ -549,11 +607,72 @@ mod tests {
         }
     }
 
+    #[test]
+    fn multi_claimant_rows_are_purely_multi_claimant() {
+        assert!(
+            MULTI_CLAIMANT_STATEMENT_HEADS
+                .iter()
+                .all(|head| head.claimants.len() >= 2),
+            "single-claimant entries belong in BASE_VS_FEATURE_STATEMENT_HEADS, not the multi table",
+        );
+    }
+
+    #[test]
+    fn single_claimant_heads_are_registered_once() {
+        let mut from_base: Vec<&str> = BASE_VS_FEATURE_STATEMENT_HEADS
+            .iter()
+            .map(|row| row.feature)
+            .collect();
+        from_base.sort_unstable();
+        from_base.dedup();
+
+        let mut from_multi: Vec<&str> = MULTI_CLAIMANT_STATEMENT_HEADS
+            .iter()
+            .flat_map(|head| head.claimants.iter().copied())
+            .collect();
+        from_multi.sort_unstable();
+        from_multi.dedup();
+
+        let mut base_off_lenient: Vec<&str> = BASE_VS_FEATURE_STATEMENT_HEADS
+            .iter()
+            .filter(|row| !(row.is_on)(&FeatureSet::LENIENT))
+            .map(|row| row.feature)
+            .collect();
+        base_off_lenient.sort_unstable();
+
+        assert_eq!(
+            from_base,
+            [
+                "key_cache_statements",
+                "update_extensions",
+                "variable_assignment"
+            ],
+            "unexpected base-vs-feature registration set",
+        );
+        assert!(
+            !from_multi.contains(&"variable_assignment"),
+            "`variable_assignment` should stay out of the multi table",
+        );
+        assert!(
+            !from_multi.contains(&"update_extensions"),
+            "`update_extensions` should stay out of the multi table",
+        );
+        assert!(
+            from_multi.contains(&"key_cache_statements"),
+            "`key_cache_statements` should remain in the multi table due `LOAD` sharing",
+        );
+        assert_eq!(
+            base_off_lenient,
+            ["variable_assignment"],
+            "base-vs-feature lenient-off feature set changed; update LENIENT expectations if intentional",
+        );
+    }
+
     /// The exclusion columns match `FeatureSet::LENIENT` in both directions: every
-    /// statement-head flag Lenient turns off appears as an excluded claimant in exactly one
-    /// row, and every excluded claimant in the ledger is genuinely off in Lenient. This is
-    /// the artifact `oracle-parity-lenient` consumes — a new head-level exclusion needs a
-    /// ledger row, not an allowlist line.
+    /// statement-head flag Lenient turns off in multi-contender rows appears as an excluded
+    /// claimant in exactly one row, and every excluded claimant in those rows is genuinely off
+    /// in Lenient. This is the artifact `oracle-parity-lenient` consumes — a new
+    /// head-level exclusion needs a ledger row, not an allowlist line.
     ///
     /// Gated on the `lenient` feature because `FeatureSet::LENIENT` compiles only there;
     /// the scope is the statement-head exclusions, NOT every `false` flag in the preset
@@ -565,11 +684,7 @@ mod tests {
         let lenient = FeatureSet::LENIENT;
         // The statement-head claimants Lenient documents as "stays off" (lenient.rs), paired
         // with their live flag value so the assertion reads the real preset, not a mirror.
-        let stays_off: [(&str, bool); 6] = [
-            (
-                "variable_assignment",
-                lenient.session_variables.variable_assignment,
-            ),
+        let stays_off: [(&str, bool); 5] = [
             (
                 "do_expression_list",
                 lenient.utility_syntax.do_expression_list,
