@@ -209,10 +209,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
     fn parse_prefix_colon_aliased_factor(&mut self) -> ParseResult<TableFactor<D::Ext>> {
         // The prefix alias is a bare ColLabel, or under `string_literal_table_names` a
         // single-part Sconst (`FROM '' : t`).
-        let name = if self.features().identifier_syntax.string_literal_table_names
-            && self.peek_is_name_sconst()?
+        let name = if let Some(ident) =
+            self.try_parse_string_literal_table_name("a prefix table alias")?
         {
-            self.parse_name_sconst_ident("a prefix table alias")?
+            ident
         } else {
             self.parse_bare_alias_ident()?
         };
@@ -743,10 +743,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
         } else {
             // DuckDB admits a single-part Sconst table name after DESCRIBE/SUMMARIZE
             // (`DESCRIBE e'0e'`, `SUMMARIZE 't'`; engine-measured on libduckdb 1.5.4).
-            let name = if self.features().identifier_syntax.string_literal_table_names
-                && self.peek_is_name_sconst()?
+            let name = if let Some(ident) =
+                self.try_parse_string_literal_table_name("a table name")?
             {
-                ObjectName(thin_vec![self.parse_name_sconst_ident("a table name")?])
+                ObjectName(thin_vec![ident])
             } else {
                 self.parse_object_name()?
             };
@@ -1301,10 +1301,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // [`IdentifierSyntax::string_literal_table_names`]; MySQL/PostgreSQL syntax-reject
         // a string here. A string name cannot open a table-function call (`'f'(…)`),
         // so the Sconst arm falls straight through to the named-table tail.
-        let (name, name_start) = if self.features().identifier_syntax.string_literal_table_names
-            && self.peek_is_name_sconst()?
+        let (name, name_start) = if let Some(ident) =
+            self.try_parse_string_literal_table_name("a table name")?
         {
-            let ident = self.parse_name_sconst_ident("a table name")?;
             let span = ident.meta.span;
             (ObjectName(thin_vec![ident]), span)
         } else {
@@ -2786,6 +2785,30 @@ impl<'a, D: Dialect> Parser<'a, D> {
             return Ok(ident);
         }
         self.parse_ident_admitting(reserved, "an identifier")
+    }
+
+    /// Central choke for [`IdentifierSyntax::string_literal_table_names`]: when the flag is
+    /// on and the head is a name Sconst, fold it to a single-part table-name [`Ident`].
+    /// Returns `None` when the flag is off or the head is not an Sconst so callers keep a
+    /// single pattern instead of re-checking the flag at every table-name site.
+    pub(super) fn try_parse_string_literal_table_name(
+        &mut self,
+        what: &'static str,
+    ) -> ParseResult<Option<Ident>> {
+        if self.features().identifier_syntax.string_literal_table_names
+            && self.peek_is_name_sconst()?
+        {
+            Ok(Some(self.parse_name_sconst_ident(what)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// True when a name Sconst may open a table-name / prefix-alias position under
+    /// [`IdentifierSyntax::string_literal_table_names`].
+    pub(super) fn peek_string_literal_table_name(&mut self) -> ParseResult<bool> {
+        Ok(self.features().identifier_syntax.string_literal_table_names
+            && self.peek_is_name_sconst()?)
     }
 
     /// Parse a possibly-dotted name whose *leading* part is gated by `head_reserved`.

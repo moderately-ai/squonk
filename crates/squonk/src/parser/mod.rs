@@ -23,8 +23,10 @@
 //! `Parser<D>` defined in — and unit-tested from — its owning module, so the
 //! dispatch boundary stays small and every family stays a unit-testable seam:
 //!
-//! - `query` — statement dispatch (the router) plus the query-level grammar: set
-//!   operations, `ORDER BY`, `LIMIT`/`OFFSET`, `VALUES`, and the `WITH`/CTE clause.
+//! - `statement_dispatch` — the leading-keyword statement router (`parse_statement`).
+//!   Owns statement-head FeatureSet gates; family modules own parse bodies.
+//! - `query` — the query-level grammar: set operations, `ORDER BY`, `LIMIT`/`OFFSET`,
+//!   `VALUES`, the `WITH`/CTE clause, and pipe operators.
 //! - `select` — the SELECT body: projection, `WHERE`, `GROUP BY`, `HAVING`.
 //! - `from` — the `FROM` relation grammar: table factors, joins, qualified names.
 //! - `expr` — the Pratt expression core over the one binding-power table.
@@ -39,8 +41,8 @@
 //! `ty` (type names) and `window` (the `OVER` clause) are cross-family
 //! sub-grammars, not statement dispatchers: they own no dispatch arm and are reached
 //! from whichever family needs them. A new statement family adds one arm to the
-//! `query` router and its dispatcher-plus-helpers as a new module — never a body
-//! of family-specific parsing in `query` itself.
+//! `statement_dispatch` router and its dispatcher-plus-helpers as a new module — never a body
+//! of family-specific parsing in the router itself.
 
 mod body;
 mod clause_marks;
@@ -57,6 +59,7 @@ mod query;
 mod recovery;
 mod select;
 mod signal;
+mod statement_dispatch;
 mod streaming;
 mod tcl;
 mod ty;

@@ -400,9 +400,14 @@ impl<'a, D: Dialect> Parser<'a, D> {
 
     /// Snowflake `@stage` / `@~` / `@%table` stage endpoint when
     /// [`UtilitySyntax::stage_references`](crate::ast::dialect::UtilitySyntax::stage_references)
-    /// is on. The full stage text (including `@` and path) is interned as a bare
-    /// [`Ident`] so render can re-emit the source spelling.
+    /// is on. The tokenizer only emits [`TokenKind::StageReference`] under the same
+    /// flag; this path re-checks so a custom `FeatureSet` cannot accept stage endpoints
+    /// from a mismatched token stream. The full stage text (including `@` and path) is
+    /// interned as a bare [`Ident`] so render can re-emit the source spelling.
     fn try_parse_stage_reference(&mut self) -> ParseResult<Option<Ident>> {
+        if !self.features().utility_syntax.stage_references {
+            return Ok(None);
+        }
         let Some(token) = self.peek()? else {
             return Ok(None);
         };

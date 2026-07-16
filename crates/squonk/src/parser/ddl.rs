@@ -5293,12 +5293,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
 
     /// `COMMENT [IF EXISTS] ON <object> IS '<text>' | NULL`.
     fn parse_truncate_table_name(&mut self) -> ParseResult<ObjectName> {
-        if self.features().identifier_syntax.string_literal_table_names
-            && self.peek_is_name_sconst()?
+        if let Some(ident) =
+            self.try_parse_string_literal_table_name("a table name after TRUNCATE")?
         {
-            Ok(ObjectName(thin_vec![
-                self.parse_name_sconst_ident("a table name after TRUNCATE")?,
-            ]))
+            Ok(ObjectName(thin_vec![ident]))
         } else {
             self.parse_object_name()
         }

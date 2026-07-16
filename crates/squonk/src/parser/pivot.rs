@@ -263,6 +263,11 @@ impl<'a, D: Dialect> Parser<'a, D> {
         mut factor: TableFactor<D::Ext>,
     ) -> ParseResult<TableFactor<D::Ext>> {
         loop {
+            // Dual-require on every entry path: PIVOT is admitted when either the DuckDB-style
+            // `pivot` gate or the BigQuery/Snowflake-style `pivot_value_sources` gate is on
+            // (those presets keep `pivot: false` and use `pivot_value_sources` as the sole
+            // primary). Same disjunction for UNPIVOT. Pipe paths must use this same check
+            // — `pipe_syntax` alone must not admit the surface.
             if (self.features().table_factor_syntax.pivot
                 || self.features().table_factor_syntax.pivot_value_sources)
                 && self.peek_is_keyword(Keyword::Pivot)?

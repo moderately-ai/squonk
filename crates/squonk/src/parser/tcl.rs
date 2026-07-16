@@ -55,7 +55,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// when `TRANSACTION` follows. The dispatcher must therefore test this before
     /// the session recognizer.
     pub(super) fn peek_starts_transaction_statement(&mut self) -> ParseResult<bool> {
-        let syntax = self.features().utility_syntax;
+        let syntax = self.features().transaction_syntax;
         Ok(self.peek_is_contextual_keyword("BEGIN")?
             || (syntax.start_transaction && self.peek_is_contextual_keyword("START")?)
             || self.peek_is_contextual_keyword("COMMIT")?
@@ -89,14 +89,14 @@ impl<'a, D: Dialect> Parser<'a, D> {
         if self.eat_contextual_keyword("BEGIN")? {
             let mode = self.parse_transaction_mode_kind()?;
             let block = self.eat_transaction_block_keyword(
-                self.features().utility_syntax.begin_transaction_keyword,
+                self.features().transaction_syntax.begin_transaction_keyword,
             )?;
             let name = self.parse_transaction_name(block)?;
-            let modes = if self.features().utility_syntax.begin_transaction_modes {
+            let modes = if self.features().transaction_syntax.begin_transaction_modes {
                 self.parse_transaction_modes_with(
-                    self.features().utility_syntax.transaction_isolation_mode,
-                    self.features().utility_syntax.transaction_access_mode,
-                    self.features().utility_syntax.transaction_deferrable_mode,
+                    self.features().transaction_syntax.transaction_isolation_mode,
+                    self.features().transaction_syntax.transaction_access_mode,
+                    self.features().transaction_syntax.transaction_deferrable_mode,
                     false,
                 )?
             } else {
@@ -111,12 +111,12 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 modes,
                 meta,
             })
-        } else if self.features().utility_syntax.start_transaction
+        } else if self.features().transaction_syntax.start_transaction
             && self.eat_contextual_keyword("START")?
         {
             let block = if self
                 .features()
-                .utility_syntax
+                .transaction_syntax
                 .start_transaction_block_optional
             {
                 self.eat_transaction_block_keyword(true)?
@@ -126,14 +126,14 @@ impl<'a, D: Dialect> Parser<'a, D> {
             };
             let modes = self.parse_transaction_modes_with(
                 self.features()
-                    .utility_syntax
+                    .transaction_syntax
                     .start_transaction_isolation_mode,
-                self.features().utility_syntax.transaction_access_mode,
+                self.features().transaction_syntax.transaction_access_mode,
                 self.features()
-                    .utility_syntax
+                    .transaction_syntax
                     .start_transaction_deferrable_mode,
                 self.features()
-                    .utility_syntax
+                    .transaction_syntax
                     .start_transaction_consistent_snapshot,
             )?;
             let meta = self.make_meta(start.union(self.preceding_span()));
@@ -147,7 +147,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             })
         } else if let Some(syntax) = self.eat_transaction_commit_keyword()? {
             let block = self.eat_transaction_block_keyword(
-                self.features().utility_syntax.commit_transaction_keyword,
+                self.features().transaction_syntax.commit_transaction_keyword,
             )?;
             let name = self.parse_transaction_name(block)?;
             let (chain, release) = self.parse_transaction_completion()?;
@@ -162,11 +162,11 @@ impl<'a, D: Dialect> Parser<'a, D> {
             })
         } else if let Some(syntax) = self.eat_transaction_rollback_keyword()? {
             let block = self.eat_transaction_block_keyword(
-                self.features().utility_syntax.rollback_transaction_keyword,
+                self.features().transaction_syntax.rollback_transaction_keyword,
             )?;
             let name = self.parse_transaction_name(block)?;
             let (savepoint_keyword, to_savepoint) =
-                if self.features().utility_syntax.transaction_savepoints
+                if self.features().transaction_syntax.transaction_savepoints
                     && self.eat_contextual_keyword("TO")?
                 {
                     // The `SAVEPOINT` keyword is optional in `ROLLBACK TO [SAVEPOINT] <name>`.
@@ -191,19 +191,19 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 release,
                 meta,
             })
-        } else if self.features().utility_syntax.transaction_savepoints
+        } else if self.features().transaction_syntax.transaction_savepoints
             && self.eat_contextual_keyword("SAVEPOINT")?
         {
             let name = self.parse_savepoint_name()?;
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(TransactionStatement::Savepoint { name, meta })
-        } else if self.features().utility_syntax.transaction_savepoints
+        } else if self.features().transaction_syntax.transaction_savepoints
             && self.eat_contextual_keyword("RELEASE")?
         {
             // The `SAVEPOINT` keyword is optional in `RELEASE [SAVEPOINT] <name>`.
             let savepoint_keyword = if self
                 .features()
-                .utility_syntax
+                .transaction_syntax
                 .release_savepoint_keyword_optional
             {
                 self.eat_contextual_keyword("SAVEPOINT")?
@@ -218,7 +218,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 savepoint,
                 meta,
             })
-        } else if self.features().utility_syntax.set_transaction
+        } else if self.features().transaction_syntax.set_transaction
             && self.eat_contextual_keyword("SET")?
         {
             self.expect_contextual_keyword("TRANSACTION")?;
@@ -234,7 +234,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     }
 
     fn parse_transaction_chain(&mut self) -> ParseResult<Option<bool>> {
-        if !self.features().utility_syntax.transaction_chain
+        if !self.features().transaction_syntax.transaction_chain
             || !self.eat_contextual_keyword("AND")?
         {
             return Ok(None);
@@ -246,7 +246,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
 
     fn parse_transaction_completion(&mut self) -> ParseResult<(Option<bool>, Option<bool>)> {
         let chain = self.parse_transaction_chain()?;
-        if chain.is_some() || !self.features().utility_syntax.transaction_release {
+        if chain.is_some() || !self.features().transaction_syntax.transaction_release {
             return Ok((chain, None));
         }
         let release = if self.eat_contextual_keyword("RELEASE")? {
@@ -266,7 +266,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     fn eat_transaction_commit_keyword(&mut self) -> ParseResult<Option<TransactionCommitKeyword>> {
         if self.eat_contextual_keyword("COMMIT")? {
             Ok(Some(TransactionCommitKeyword::Commit))
-        } else if self.features().utility_syntax.end_transaction_alias
+        } else if self.features().transaction_syntax.end_transaction_alias
             && self.eat_contextual_keyword("END")?
         {
             Ok(Some(TransactionCommitKeyword::End))
@@ -280,7 +280,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     ) -> ParseResult<Option<TransactionRollbackKeyword>> {
         if self.eat_contextual_keyword("ROLLBACK")? {
             Ok(Some(TransactionRollbackKeyword::Rollback))
-        } else if self.features().utility_syntax.abort_transaction_alias
+        } else if self.features().transaction_syntax.abort_transaction_alias
             && self.eat_contextual_keyword("ABORT")?
         {
             Ok(Some(TransactionRollbackKeyword::Abort))
@@ -297,7 +297,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         &mut self,
         transaction_keyword: bool,
     ) -> ParseResult<Option<TransactionBlockKeyword>> {
-        if self.features().utility_syntax.transaction_work_keyword
+        if self.features().transaction_syntax.transaction_work_keyword
             && self.eat_contextual_keyword("WORK")?
         {
             Ok(Some(TransactionBlockKeyword::Work))
@@ -312,7 +312,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         &mut self,
         block: Option<TransactionBlockKeyword>,
     ) -> ParseResult<Option<Box<crate::ast::Ident>>> {
-        if self.features().utility_syntax.transaction_name
+        if self.features().transaction_syntax.transaction_name
             && block == Some(TransactionBlockKeyword::Transaction)
         {
             // SQLite admits a string-literal transaction name after `TRANSACTION`
@@ -351,13 +351,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
     }
 
     /// Parse SQLite's optional `{DEFERRED | IMMEDIATE | EXCLUSIVE}` transaction-mode
-    /// modifier immediately after `BEGIN`, gated by `utility_syntax.begin_transaction_mode`.
+    /// modifier immediately after `BEGIN`, gated by `transaction_syntax.begin_transaction_mode`.
     /// `None` when the dialect does not admit the modifier or the statement omits it; in
     /// either case the word (if any) is left unconsumed for the noise-word/mode-list parse
     /// that follows, so an unrecognized modifier surfaces as the existing trailing-token
     /// error rather than a bespoke one.
     fn parse_transaction_mode_kind(&mut self) -> ParseResult<Option<TransactionModeKind>> {
-        if !self.features().utility_syntax.begin_transaction_mode {
+        if !self.features().transaction_syntax.begin_transaction_mode {
             return Ok(None);
         }
         if self.eat_contextual_keyword("DEFERRED")? {
@@ -375,9 +375,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// `SET TRANSACTION`, and the session `SET SESSION CHARACTERISTICS`).
     pub(super) fn parse_transaction_modes(&mut self) -> ParseResult<ThinVec<TransactionMode>> {
         self.parse_transaction_modes_with(
-            self.features().utility_syntax.transaction_isolation_mode,
-            self.features().utility_syntax.transaction_access_mode,
-            self.features().utility_syntax.transaction_deferrable_mode,
+            self.features().transaction_syntax.transaction_isolation_mode,
+            self.features().transaction_syntax.transaction_access_mode,
+            self.features().transaction_syntax.transaction_deferrable_mode,
             false,
         )
     }
@@ -404,7 +404,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 }
                 break;
             };
-            if self.features().utility_syntax.transaction_modes_unique
+            if self.features().transaction_syntax.transaction_modes_reject_duplicates
                 && modes
                     .iter()
                     .any(|existing| same_transaction_mode_kind(existing, &mode))
@@ -412,7 +412,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 return Err(self.unexpected("a transaction mode that has not already appeared"));
             }
             modes.push(mode);
-            if !self.features().utility_syntax.transaction_multiple_modes {
+            if !self.features().transaction_syntax.transaction_multiple_modes {
                 break;
             }
             // The mode separator is an optional comma: ANSI writes commas between
@@ -421,8 +421,8 @@ impl<'a, D: Dialect> Parser<'a, D> {
             let comma = self.eat_punct(Punctuation::Comma)?;
             if self
                 .features()
-                .utility_syntax
-                .transaction_mode_comma_required
+                .transaction_syntax
+                .transaction_modes_require_commas
                 && !comma
             {
                 break;
