@@ -16,7 +16,8 @@ use crate::parser::Dialect;
 /// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Sqlite))`. It
 /// diverges from [`Ansi`](super::Ansi) across the pure-data families the phase-0
 /// sweep proved needed — backtick / `[bracket]` identifier quotes, hex integers, the
-/// `?`/`:name`/`@name`/`$name` placeholders, the `LIMIT <offset>, <count>` comma
+/// `$`-continuation bare identifiers (via `dollar_in_identifiers`) and `?`/`:name`/`@name`/
+/// `$name` placeholders, the `LIMIT <offset>, <count>` comma
 /// form, the JSON `->`/`->>` accessors, and the `ON CONFLICT`/`RETURNING`/`REPLACE
 /// INTO` + `IF [NOT] EXISTS`/partial-index surface — plus the small new grammar the
 /// sweep surfaced: the `==` equality spelling, general-equality `IS` / `IS NOT`, and

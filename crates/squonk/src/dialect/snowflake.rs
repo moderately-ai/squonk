@@ -23,9 +23,9 @@ use crate::parser::Dialect;
 /// `FILE_FORMAT = (...)`/`FILES`/`PATTERN`/`VALIDATION_MODE` and the copy options).
 /// Snowflake folds unquoted identifiers to uppercase and quotes with `"…"`, both already
 /// the ANSI baseline. The remaining Snowflake surface (`FLATTEN`, `LATERAL` table
-/// functions, `MATCH_RECOGNIZE`, `$$…$$` string literals, stage/`@`-path references —
-/// including as `COPY INTO` endpoints — the `//` line comment, `ILIKE`, `CONNECT BY`, …)
-/// is owned by follow-up grammar tickets and not yet accepted here.
+/// functions, `$$…$$` string literals, general stage/`@`-path references outside `COPY INTO`,
+/// the `//` line comment, `ILIKE`, …) is owned by follow-up grammar tickets and not yet
+/// accepted here.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Snowflake;
 

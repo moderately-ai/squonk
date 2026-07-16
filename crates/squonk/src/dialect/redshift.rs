@@ -16,15 +16,16 @@ use crate::parser::Dialect;
 /// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Redshift))`. Redshift is a
 /// PostgreSQL-8 fork, but it is exposed here as a deliberately conservative *ANSI*-derived preset
 /// (no Redshift oracle exists to fit a wider surface, and deriving from our PG-17-fitted
-/// `Postgres` preset would silently over-accept features Redshift never had). Over ANSI it adds a
-/// single axis: unquoted identifiers fold case-insensitively to lowercase (Redshift's default
-/// `enable_case_sensitive_identifier` off) — an identity-only fold that never changes acceptance.
-/// Its lexis is standard ANSI: `"…"` quotes identifiers and `'…'` spells strings. The
-/// PostgreSQL-heritage surface Redshift genuinely accepts (`ILIKE`, `SIMILAR TO`, `DISTINCT ON`,
-/// `QUALIFY`) and its own extensions (`DISTKEY`/`SORTKEY`/`DISTSTYLE` table attributes,
-/// `UNLOAD`/`COPY`, the `SUPER` type with PartiQL navigation, window-frame differences, …) are
-/// deferred to follow-up grammar tickets and not yet accepted here — each is a clean reject, not a
-/// silent over-accept.
+/// `Postgres` preset would silently over-accept features Redshift never had). Over ANSI it adds
+/// two axes: (1) unquoted identifiers fold case-insensitively to lowercase (Redshift's default
+/// `enable_case_sensitive_identifier` off) — an identity-only fold that never changes acceptance;
+/// (2) table-position PartiQL / SUPER JSON path (`FROM src[0].a`, `table_json_path`). Its lexis
+/// is standard ANSI: `"…"` quotes identifiers and `'…'` spells strings. The PostgreSQL-heritage
+/// surface Redshift genuinely accepts (`ILIKE`, `SIMILAR TO`, `DISTINCT ON`, `QUALIFY`) and other
+/// extensions (`DISTKEY`/`SORTKEY`/`DISTSTYLE`, `UNLOAD`/`COPY`, full SUPER DDL, window-frame
+/// differences, …) remain deferred — each is a clean reject, not a silent over-accept. See
+/// [`FeatureSet::REDSHIFT`](crate::ast::dialect::FeatureSet::REDSHIFT) module docs for the full
+/// closed delta.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Redshift;
 

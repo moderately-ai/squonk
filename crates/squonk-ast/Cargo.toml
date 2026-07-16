@@ -39,9 +39,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 # feature gates it); every other dialect is opt-in so the default build is the
 # smallest useful thing (ANSI-only). The data-driven grammar stays always-compiled
 # — these features gate only the per-dialect preset *data*, never the grammar.
-# `lenient` is reserved here so the feature vocabulary stays stable when work
-# adds its behaviour; it gates no data yet. `full` is the drop-in parity build (every
-# dialect, plus lenient once it lands).
+# `lenient` gates the permissive union preset (`FeatureSet::LENIENT` / `Lenient` dialect).
+# `full` is the drop-in parity build (every dialect, including lenient).
 [features]
 default = []
 postgres = []

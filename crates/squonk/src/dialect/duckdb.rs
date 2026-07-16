@@ -23,9 +23,10 @@ use crate::parser::Dialect;
 /// and the `PIVOT`/`UNPIVOT` operators (both the
 /// leading-keyword statement and the `FROM t PIVOT (…)` table factor, with their
 /// keyword reservations) are accepted, while the empty (bare `SELECT`) target list is
-/// rejected where PostgreSQL accepts it. The remaining DuckDB-specific grammar
-/// (`//`, `*COLUMNS(…)` unpacking, …) is owned by follow-up grammar-family tickets and not
-/// yet accepted here.
+/// rejected where PostgreSQL accepts it. `COLUMNS(…)` and `*COLUMNS(…)` unpack forms are
+/// part of the shipped surface (see dialect tests). Other DuckDB-specific grammar still
+/// deferred is listed in [`FeatureSet::DUCKDB`] module docs — not claimed “unsupported”
+/// when a gate is already on.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct DuckDb;
 

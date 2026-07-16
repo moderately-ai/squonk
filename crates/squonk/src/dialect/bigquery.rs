@@ -19,12 +19,12 @@ use crate::parser::Dialect;
 /// `WITH OFFSET [AS <alias>]` tail, the `STRUCT(...)` value constructor (`STRUCT(1, 2)`,
 /// `STRUCT(x AS a)`, `STRUCT<a INT64>(1)`), backtick-quoted identifiers (`` `name` ``), and `"…"`
 /// double-quoted string constants (BigQuery quotes strings with both `'…'` and `"…"`, reserving
-/// the backtick for identifiers). Unquoted identifiers fold case-insensitively for identity. The
-/// remaining BigQuery surface (query pipe syntax `|>`, the `STRUCT<…>`/`ARRAY<…>` *type-position*
-/// surface (`CAST(x AS STRUCT<…>)`, column types), `SELECT AS STRUCT/VALUE`,
-/// `EXCEPT`/`REPLACE` in `SELECT *`, `QUALIFY`, the `SAFE.` prefix, …)
-/// is owned by follow-up grammar tickets and not yet accepted here — `|>` pipe syntax
-/// deliberately so, until the pipe-operator surface is coherent (see the preset module docs).
+/// the backtick for identifiers). Unquoted identifiers fold case-insensitively for identity.
+/// Also enabled in the closed delta (see [`FeatureSet::BIGQUERY`]): type-position
+/// `STRUCT<…>`/`ARRAY<…>` (`angle_bracket_types`), `PIVOT` via `pivot_value_sources`, and
+/// table time-travel (`table_version`). Deferred surfaces include query pipe syntax `|>`,
+/// `SELECT AS STRUCT/VALUE`, `EXCEPT`/`REPLACE` in `SELECT *`, `QUALIFY`, the `SAFE.` prefix,
+/// … — each is a clean reject until modelled.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BigQuery;
 

@@ -364,6 +364,22 @@ const FEATURE_MATRIX: &[FeatureCombo] = &[
             "full,document-render",
         ],
     },
+    // Public interaction: `serde` and `document-render` are independently selectable
+    // on `squonk` and a consumer may enable both without `full`. The solo cells above
+    // do not compile this combination.
+    FeatureCombo {
+        name: "serde-document-render",
+        args: &[
+            "check",
+            "-p",
+            "squonk",
+            "-p",
+            "squonk-ast",
+            "--no-default-features",
+            "--features",
+            "serde,document-render",
+        ],
+    },
     // The one test endpoint: check-only for the matrix, tests only at `full`. Adds
     // `document-render` so the formatter's own tests (the `format` module) run in a
     // gate — the standard default/oracle lanes build without the feature.

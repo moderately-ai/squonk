@@ -15,16 +15,15 @@ use crate::parser::Dialect;
 ///
 /// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Databricks))`.
 /// Databricks is exposed as a deliberately conservative ANSI-derived preset (no Databricks
-/// oracle exists to fit a wider surface): it adds the sided `{LEFT|RIGHT} {SEMI|ANTI} JOIN`
-/// family, semi-structured colon path access (`base:key[0].field` over `VARIANT`/JSON
-/// columns), the `QUALIFY <predicate>` post-window filter (with `QUALIFY` reserved as an
-/// identifier, matching Spark's ANSI reserved-keyword list), and the `GROUP BY ALL` /
-/// `ORDER BY ALL` clause modes. Databricks quotes identifiers with the MySQL-style
-/// backtick and the standard `"…"`, and preserves unquoted identifier case at parse time.
-/// The remaining Databricks surface (`LATERAL VIEW`, the side-less `SEMI JOIN` spelling,
-/// stage/`@`-path references, `$`-templated variables, `//`-free comment forms, backslash
-/// string escapes, `MERGE` extensions, …) is owned by follow-up grammar tickets and not yet
-/// accepted here.
+/// oracle exists to fit a wider surface). Over ANSI it currently enables (non-exhaustive
+/// headline list — full closed delta in [`FeatureSet::DATABRICKS`]): the sided
+/// `{LEFT|RIGHT} {SEMI|ANTI} JOIN` family, semi-structured colon path access
+/// (`base:key[0].field`), `QUALIFY` (reserved as an identifier), `GROUP BY ALL` /
+/// `ORDER BY ALL`, Spark-style `LATERAL VIEW`, `VERSION`/`TIMESTAMP AS OF` table time
+/// travel, and `SHOW FUNCTIONS`. Identifiers accept MySQL-style backticks and standard
+/// `"…"`; unquoted case is preserved at parse time. Deferred surfaces (side-less
+/// `SEMI JOIN`, stage/`@` paths, `$` templates, broader `MERGE` extensions, …) remain
+/// clean rejects.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Databricks;
 

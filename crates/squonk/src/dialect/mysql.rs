@@ -17,8 +17,10 @@ use crate::parser::Dialect;
 /// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(MySql))`. It
 /// diverges from [`Ansi`](super::Ansi) across many *data* dimensions (backtick
 /// identifier quotes, `#` comments, `&&`-as-`AND`, `||`-as-`OR`, `"..."` strings with
-/// backslash escapes, `0x`/`0b` numbers, `?` placeholders) plus one new gated grammar
-/// production — the `LIMIT <offset>, <count>` comma form. The per-dimension "how clean
+/// backslash escapes, `0x`/`0b` numbers, `?` placeholders) plus the SQL-surface gates
+/// `STRAIGHT_JOIN` (join syntax) and `GROUP_CONCAT(... SEPARATOR ...)` (aggregate modifier),
+/// and one new gated grammar production — the `LIMIT <offset>, <count>` comma form. The
+/// per-dimension "how clean
 /// was dialect #3" verdict lives on [`FeatureSet::MYSQL`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct MySql;

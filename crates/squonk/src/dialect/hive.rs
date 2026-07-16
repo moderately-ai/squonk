@@ -15,15 +15,14 @@ use crate::parser::Dialect;
 ///
 /// Reached via [`parse_with`](crate::parse_with), e.g. `parse_with(src, crate::ParseConfig::new(Hive))`. Hive is exposed
 /// as a deliberately conservative ANSI-derived preset (no Hive oracle exists to fit a wider
-/// surface): it adds the sided `{LEFT|RIGHT} {SEMI|ANTI} JOIN` family (Hive originated
-/// `LEFT SEMI JOIN`), backtick-quoted identifiers (`` `name` ``), and `"…"` double-quoted
-/// string constants (HiveQL string literals may be written with single or double quotes,
-/// reserving the backtick for identifiers). Unquoted identifiers fold case-insensitively for
-/// identity. The remaining Hive surface (`LATERAL VIEW`, the `STRUCT`/`ARRAY<…>`/`MAP<…>`
-/// complex types, `TRANSFORM`/`MAP`/`REDUCE` script operators,
-/// `DISTRIBUTE BY`/`SORT BY`/`CLUSTER BY`, `TABLESAMPLE` bucketing, the side-less `SEMI JOIN`
-/// spelling, backslash string escapes, …) is owned by follow-up grammar tickets and not yet
-/// accepted here.
+/// surface). Over ANSI it currently enables (see [`FeatureSet::HIVE`] for the closed delta):
+/// the sided `{LEFT|RIGHT} {SEMI|ANTI} JOIN` family (Hive originated `LEFT SEMI JOIN`), the
+/// `LATERAL VIEW [OUTER] …` table-generating clause, backtick-quoted identifiers
+/// (`` `name` ``), and `"…"` double-quoted string constants (HiveQL strings may use `'` or
+/// `"`, reserving the backtick for identifiers). Unquoted identifiers fold case-insensitively
+/// for identity. Deferred surfaces (`STRUCT`/`ARRAY<…>`/`MAP<…>` type-position forms,
+/// `TRANSFORM`/`MAP`/`REDUCE`, `DISTRIBUTE BY`/`SORT BY`/`CLUSTER BY`, `TABLESAMPLE`
+/// bucketing, side-less `SEMI JOIN`, backslash escapes, …) remain clean rejects.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Hive;
 

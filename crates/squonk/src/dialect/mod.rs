@@ -2,8 +2,8 @@
 // Copyright (c) 2026 Moderately AI Inc.
 
 //! The public dialects ([`Ansi`], the feature-gated `Postgres`, `MySql`, `Sqlite`,
-//! `DuckDb`, `Lenient`, and the conservative `BigQuery`, `Hive`, `ClickHouse`, `Databricks`,
-//! `Mssql`, `Snowflake`, and `Redshift` presets) and the [`parse`] convenience.
+//! `DuckDb`, `QuiltDb`, `Lenient`, and the conservative `BigQuery`, `Hive`, `ClickHouse`,
+//! `Databricks`, `Mssql`, `Snowflake`, and `Redshift` presets) and the [`parse`] convenience.
 //! [`BuiltinDialect::ALL`] is the authoritative selectable list.
 //!
 //! A dialect is *data*: each of these is a zero-sized unit struct whose
@@ -24,8 +24,9 @@
 //!
 //! The dialects run from the strict standard to a parse-anything union: [`Ansi`] is
 //! the strict SQL:2016 baseline (the honest "generic"), `Postgres`, `MySql`, `Sqlite`,
-//! and `DuckDb` are the oracle-compared single-dialect surfaces (each held to its real
-//! engine by a differential oracle), and `Lenient` (the `lenient` feature) is the
+//! `DuckDb`, and `QuiltDb` are the oracle-compared or product single-dialect surfaces
+//! (Postgres/MySQL/SQLite/DuckDB held to real engines by differential oracles; QuiltDB is
+//! the Postgres-derived product dialect), and `Lenient` (the `lenient` feature) is the
 //! permissive "parse anything" catch-all. `BigQuery`, `Hive`, `ClickHouse`, `Databricks`,
 //! `Mssql`, `Snowflake`, and `Redshift` are the conservative, no-oracle presets: each derives
 //! from [`Ansi`] and enables only the surface with a modelled, tested parser gate and documentary

@@ -20,7 +20,7 @@ use crate::parser::Dialect;
 /// national-character string constants, and `$1234.56` money literals. Identifiers are also
 /// quoted with the standard `"…"` (T-SQL's default `QUOTED_IDENTIFIER ON`) and folded
 /// case-insensitively for identity. The remaining T-SQL surface (`SELECT … INTO <table>`,
-/// `TOP (n)`, table hints `WITH (NOLOCK)`, `GO` batch separators, `#temp` tables, the `OUTPUT`
+/// `TOP (n)`, `GO` batch separators, `#temp` tables, the `OUTPUT`
 /// clause, the T-SQL `MERGE` variants, …) is owned by follow-up grammar tickets and not yet
 /// accepted here.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
