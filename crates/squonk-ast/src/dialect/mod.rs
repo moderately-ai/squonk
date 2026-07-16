@@ -1930,13 +1930,16 @@ pub struct StatementDdlGates {
 pub struct CreateTableClauseSyntax {
     /// Accept the MySQL `CREATE TABLE` storage decorations: the trailing table-option
     /// list (`ENGINE = InnoDB`, `AUTO_INCREMENT = 100`, `DEFAULT CHARSET = utf8mb4`,
-    /// `COMMENT = '...'`, `ROW_FORMAT = ...`, `COLLATE = ...`) and the column-level
-    /// `AUTO_INCREMENT` attribute. One flag gates both grammar points because they
-    /// are a single dialect unit — MySQL always admits the column attribute wherever
-    /// it admits the table option (mirroring how `existence_guards.if_exists` gates
-    /// `IF EXISTS` on `DROP` and `IF NOT EXISTS` on `ADD COLUMN` together). Not
-    /// ANSI/PostgreSQL,
-    /// which reject the trailing options and the column attribute as leftover input.
+    /// `COMMENT = '...'`, `ROW_FORMAT = ...`, `COLLATE = ...`) **and** the column-level
+    /// underscored `AUTO_INCREMENT` attribute.
+    ///
+    /// **Deliberate dual-position unit (not a MECE bug):** both grammar points are one
+    /// MySQL dialect unit — MySQL always admits the column attribute wherever it admits
+    /// the table options (mirroring how `existence_guards.if_exists` co-gates related
+    /// sites). Splitting them would invent independent axes no shipped engine separates.
+    /// The SQLite joined `AUTOINCREMENT` spelling is a separate flag on
+    /// [`ColumnDefinitionSyntax`]. Not ANSI/PostgreSQL, which reject both surfaces as
+    /// leftover input.
     pub table_options: bool,
     /// Accept the SQLite trailing `WITHOUT ROWID` table option on `CREATE TABLE`
     /// (`CREATE TABLE t (a INTEGER PRIMARY KEY) WITHOUT ROWID`), recorded as

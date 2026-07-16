@@ -69,12 +69,14 @@ order below is merge-safety only.
 | statement_dispatch + dual-require + stage_references | committed |
 | TransactionSyntax extract | committed |
 | prefix_colon_alias position split | committed |
+| create_or_replace_table → StatementDdlGates | committed |
+| table_options dual-position documented as intentional unit | committed |
 
 ### Still open (equal priority)
 
 | Item | Notes |
 |---|---|
-| **ε remaining axis splits** | StatementDdlGates clause tails; CreateTableClause head vs column (`table_options` AUTO_INCREMENT) |
+| **ε remaining axis splits** | StatementDdlGates view/sequence *clause* flags (`temporary_views`, `view_definition_options`, `create_sequence_cache`, …) → possible ViewSequenceClauseSyntax |
 | **C0.*** | Live catalog script + drift gate |
 | **ζ DP6** | Expand properties to every stable FeatureSet bool |
 | **C2.17 closed-delta ratchets** | Uniform template for every preset |
