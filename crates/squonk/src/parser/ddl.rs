@@ -5257,8 +5257,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // whether it was written so a source-fidelity render replays it.
         let table_keyword = self.eat_contextual_keyword("TABLE")?;
         // `ONLY t` / `t *` relation forms are out of scope (not in the parity corpus);
-        // a plain object-name list matches the constructs we target.
-        let tables = self.parse_comma_separated(Self::parse_object_name)?;
+        // a plain object-name list matches the constructs we target. DuckDB also admits
+        // a single-part Sconst table name (`TRUNCATE ''`, `TRUNCATE TABLE 't'`;
+        // engine-measured on libduckdb 1.5.4).
+        let tables = self.parse_comma_separated(Self::parse_truncate_table_name)?;
         let restart_identity = if self.eat_contextual_keyword("RESTART")? {
             self.expect_contextual_keyword("IDENTITY")?;
             Some(true)
@@ -5290,6 +5292,18 @@ impl<'a, D: Dialect> Parser<'a, D> {
     }
 
     /// `COMMENT [IF EXISTS] ON <object> IS '<text>' | NULL`.
+    fn parse_truncate_table_name(&mut self) -> ParseResult<ObjectName> {
+        if self.features().identifier_syntax.string_literal_table_names
+            && self.peek_is_name_sconst()?
+        {
+            Ok(ObjectName(thin_vec![
+                self.parse_name_sconst_ident("a table name after TRUNCATE")?,
+            ]))
+        } else {
+            self.parse_object_name()
+        }
+    }
+
     pub(super) fn parse_comment_on_statement(&mut self) -> ParseResult<Statement<D::Ext>> {
         let start = self.current_span()?;
         self.expect_contextual_keyword("COMMENT")?;
