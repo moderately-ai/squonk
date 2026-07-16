@@ -16,7 +16,7 @@ use super::{
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS,
     RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax,
     ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
-    TableFactorSyntax, TargetSpelling, TypeNameSyntax, UtilitySyntax,
+    TableFactorSyntax, TargetSpelling, TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
@@ -569,30 +569,6 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `POSTGRES` preset for utility syntax.
     pub const POSTGRES: Self = Self {
-        start_transaction: true,
-        start_transaction_block_optional: false,
-        transaction_work_keyword: true,
-        begin_transaction_keyword: true,
-        commit_transaction_keyword: true,
-        rollback_transaction_keyword: true,
-        transaction_name: false,
-        begin_transaction_modes: true,
-        transaction_savepoints: true,
-        set_transaction: true,
-        transaction_isolation_mode: true,
-        transaction_access_mode: true,
-        transaction_deferrable_mode: true,
-        start_transaction_isolation_mode: true,
-        start_transaction_deferrable_mode: true,
-        start_transaction_consistent_snapshot: false,
-        transaction_multiple_modes: true,
-        transaction_mode_comma_required: false,
-        transaction_modes_unique: false,
-        abort_transaction_alias: true,
-        end_transaction_alias: true,
-        transaction_release: false,
-        transaction_chain: true,
-        release_savepoint_keyword_optional: true,
         copy: true,
         // PostgreSQL's `COPY` is the `{FROM | TO}` transfer (the `copy` gate above);
         // Snowflake's `COPY INTO` load/unload is a different statement PostgreSQL has no
@@ -666,10 +642,8 @@ impl UtilitySyntax {
         // ONLY|WRITE`/`[NOT] DEFERRABLE` (the existing `TransactionMode` list), not
         // SQLite's `DEFERRED`/`IMMEDIATE`/`EXCLUSIVE` keywords (pg_query PG-17 rejects all
         // three), so this stays off.
-        begin_transaction_mode: false,
         // MySQL's `XA` distributed-transaction family is MySQL-only; PostgreSQL has no `XA`
         // statement, so the leading `XA` keyword is not dispatched.
-        xa_transactions: false,
         // The standalone `RENAME TABLE`/`RENAME USER` statements are MySQL-only; PostgreSQL
         // renames objects via `ALTER … RENAME TO`, so the leading `RENAME` is not dispatched.
         rename_statement: false,
@@ -687,8 +661,40 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
+};
+}
+impl TransactionSyntax {
+    /// Transaction-control surface for the `POSTGRES` preset (split from UtilitySyntax).
+    pub const POSTGRES: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        transaction_name: false,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: true,
+        transaction_modes_require_commas: false,
+        transaction_modes_reject_duplicates: false,
+        abort_transaction_alias: true,
+        end_transaction_alias: true,
+        transaction_release: false,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: true,
+        begin_transaction_mode: false,
+        xa_transactions: false,
     };
 }
+
 
 impl ShowSyntax {
     /// The `POSTGRES` preset for show syntax.
@@ -1157,6 +1163,7 @@ impl FeatureSet {
         query_tail_syntax: QueryTailSyntax::POSTGRES,
         grouping_syntax: GroupingSyntax::POSTGRES,
         utility_syntax: UtilitySyntax::POSTGRES,
+        transaction_syntax: TransactionSyntax::POSTGRES,
         show_syntax: ShowSyntax::POSTGRES,
         maintenance_syntax: MaintenanceSyntax::POSTGRES,
         access_control_syntax: AccessControlSyntax::POSTGRES,

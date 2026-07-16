@@ -103,7 +103,7 @@ use super::{
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
     SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
     StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
-    UtilitySyntax,
+    TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -324,6 +324,7 @@ impl FeatureSet {
         query_tail_syntax: QueryTailSyntax::MSSQL,
         grouping_syntax: GroupingSyntax::ANSI,
         utility_syntax: UtilitySyntax::ANSI,
+        transaction_syntax: TransactionSyntax::ANSI,
         show_syntax: ShowSyntax::ANSI,
         maintenance_syntax: MaintenanceSyntax::ANSI,
         access_control_syntax: AccessControlSyntax::ANSI,
@@ -360,11 +361,12 @@ mod tests {
     #[test]
     fn mssql_is_ansi_plus_the_six_gates_and_two_lexical_facts() {
         // The preset is ANSI with a documented, closed set of divergent axes: the two lexical
-        // facts (case-folding, dual identifier quoting) and the four enabled sub-presets that
-        // carry the six gates (the `table_expressions` sub-preset carries two — `apply_join`
-        // and `table_hints`). Asserting the whole rest equals ANSI keeps the "ANSI-derived,
-        // every delta documented" claim honest against a future stray edit. Bind to locals so
-        // the const reads are not flagged by clippy's `assertions_on_constants`.
+        // facts (case-folding, dual identifier quoting) and the five enabled sub-presets that
+        // carry the six gates (the `join_syntax` sub-preset carries `apply_join`, and the
+        // `table_expressions` sub-preset carries `table_hints` and `table_version`). Asserting
+        // the whole rest equals ANSI keeps the "ANSI-derived, every delta documented" claim
+        // honest against a future stray edit. Bind to locals so the const reads are not flagged by
+        // clippy's `assertions_on_constants`.
         let ansi = FeatureSet::ANSI;
         let mssql = FeatureSet::MSSQL;
 
@@ -387,7 +389,7 @@ mod tests {
                 .any(|quote| quote.open() == '`')
         );
 
-        // The four divergent sub-presets.
+        // The five divergent sub-presets.
         assert_eq!(mssql.string_literals, StringLiteralSyntax::MSSQL);
         assert_ne!(mssql.string_literals, ansi.string_literals);
         assert_eq!(mssql.numeric_literals, NumericLiteralSyntax::MSSQL);
@@ -436,10 +438,10 @@ mod tests {
 
     #[test]
     fn mssql_enables_exactly_the_six_staged_gates() {
-        // The capstone: CROSS/OUTER APPLY, `WITH (...)` table hints, bracket identifiers,
-        // `@name` parameters, `N'…'` national strings, and `$…` money literals are on, and each
-        // is off in the ANSI base it derives from. Forcing the flags back off recovers the ANSI
-        // sub-presets verbatim.
+        // The capstone: CROSS/OUTER APPLY, `WITH (...)` table hints, `FOR SYSTEM_TIME` table
+        // versioning, bracket identifiers, `@name` parameters, `N'…'` national strings, and
+        // `$…` money literals are on, and each is off in the ANSI base it derives from.
+        // Forcing the flags back off recovers the ANSI sub-presets verbatim.
         let ansi = FeatureSet::ANSI;
         let mssql = FeatureSet::MSSQL;
 
@@ -450,7 +452,7 @@ mod tests {
         assert!(mssql.parameters.named_at && !ansi.parameters.named_at);
         assert!(mssql.string_literals.national_strings && !ansi.string_literals.national_strings);
         assert!(mssql.numeric_literals.money_literals && !ansi.numeric_literals.money_literals);
-        // The bracket opener is the fifth gate (an identifier-quote delta, not a bool).
+        // The bracket opener is the sixth gate (an identifier-quote delta, not a bool).
         assert!(
             mssql
                 .identifier_quotes
@@ -507,7 +509,7 @@ mod tests {
         // Both self-consistency registries must be clean: the `[` bracket quote, the `@` named-at
         // sigil, and the `$` money sigil each have a single claimant (array/subscript grammar off,
         // `user_variables` off, `positional_dollar` off, `double_quoted_strings` off), and none of
-        // the five enabled gates rides an unset base flag.
+        // the six enabled gates rides an unset base flag.
         let mssql = FeatureSet::MSSQL;
         assert_eq!(mssql.lexical_conflict(), None);
         assert!(mssql.is_lexically_consistent());

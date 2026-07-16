@@ -16,7 +16,7 @@
 //!
 //! # What this preset adds over ANSI
 //!
-//! Two table-expression gates carry the headline BigQuery surface:
+//! Three headline gates carry the BigQuery surface:
 //!
 //! - [`unnest`](TableFactorSyntax::unnest) — the first-class `UNNEST(<expr>)` table
 //!   factor (`FROM UNNEST(…)`), BigQuery's array-to-relation expansion. It is not
@@ -31,6 +31,9 @@
 //!   `unnest` is therefore on above, and this is the first shipped preset to exercise that
 //!   dependency in the satisfied direction. PostgreSQL and DuckDB both parse-*reject*
 //!   `WITH OFFSET` (engine-probed), so the tail is a clean cross-preset reject.
+//!
+//! - [`angle_bracket_types`](TypeNameSyntax::angle_bracket_types) — type-position support
+//!   for BigQuery-style `ARRAY<...>` / `STRUCT<...>` and array-of-struct declarations.
 //!
 //! One expression gate:
 //!
@@ -94,7 +97,7 @@ use super::{
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
     STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, UtilitySyntax,
+    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -345,6 +348,7 @@ impl FeatureSet {
         query_tail_syntax: QueryTailSyntax::ANSI,
         grouping_syntax: GroupingSyntax::ANSI,
         utility_syntax: UtilitySyntax::ANSI,
+        transaction_syntax: TransactionSyntax::ANSI,
         show_syntax: ShowSyntax::ANSI,
         maintenance_syntax: MaintenanceSyntax::ANSI,
         access_control_syntax: AccessControlSyntax::ANSI,
@@ -381,7 +385,8 @@ mod tests {
     fn bigquery_is_ansi_plus_the_gates_and_two_lexical_facts() {
         // The preset is ANSI with a documented, closed set of divergent axes: the two lexical
         // facts (case-folding, backtick-only quoting coupled with double-quoted strings), the
-        // enabled table-expression/factor gates, and the `PIVOT`/`UNPIVOT` `ColId` reservation.
+        // enabled table-expression/factor gates, the `STRUCT`/`ARRAY` angle-bracket type-position
+        // support, and the `PIVOT`/`UNPIVOT` `ColId` reservation.
         // Asserting the whole rest equals ANSI keeps the "ANSI-derived, every delta documented"
         // claim honest against a future stray edit.
         // Bind to locals so the const reads are not flagged by clippy's

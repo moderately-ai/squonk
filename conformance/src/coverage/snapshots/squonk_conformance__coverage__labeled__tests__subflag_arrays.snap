@@ -291,29 +291,6 @@ grouping_syntax
   group_by_all
   order_by_all
 utility_syntax
-  start_transaction
-  start_transaction_block_optional
-  transaction_work_keyword
-  begin_transaction_keyword
-  commit_transaction_keyword
-  rollback_transaction_keyword
-  begin_transaction_modes
-  transaction_savepoints
-  set_transaction
-  transaction_isolation_mode
-  transaction_access_mode
-  transaction_deferrable_mode
-  start_transaction_isolation_mode
-  start_transaction_deferrable_mode
-  start_transaction_consistent_snapshot
-  transaction_multiple_modes
-  transaction_mode_comma_required
-  transaction_modes_unique
-  abort_transaction_alias
-  end_transaction_alias
-  transaction_release
-  transaction_chain
-  release_savepoint_keyword_optional
   copy
   copy_into
   comment_on
@@ -340,8 +317,6 @@ utility_syntax
   reset_scope
   detach_if_exists
   do_statement
-  begin_transaction_mode
-  xa_transactions
   rename_statement
   flush
   purge_binary_logs
@@ -356,6 +331,33 @@ utility_syntax
   signal_diagnostics
   export_import_database
   update_extensions
+transaction_syntax
+  transaction_name
+  start_transaction
+  start_transaction_block_optional
+  transaction_work_keyword
+  begin_transaction_keyword
+  commit_transaction_keyword
+  rollback_transaction_keyword
+  begin_transaction_modes
+  transaction_savepoints
+  set_transaction
+  transaction_isolation_mode
+  transaction_access_mode
+  transaction_deferrable_mode
+  start_transaction_isolation_mode
+  start_transaction_deferrable_mode
+  start_transaction_consistent_snapshot
+  transaction_multiple_modes
+  transaction_modes_require_commas
+  transaction_modes_reject_duplicates
+  abort_transaction_alias
+  end_transaction_alias
+  transaction_release
+  transaction_chain
+  release_savepoint_keyword_optional
+  begin_transaction_mode
+  xa_transactions
 show_syntax
   describe
   describe_summarize

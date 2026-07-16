@@ -1388,6 +1388,26 @@ pub(crate) const COVERAGE_CASES: &[CoverageCase] = &[
         }]),
     },
     CoverageCase {
+        feature: Feature::TransactionSyntax,
+        polarity: Polarity::Positive,
+        name: "ansi_transaction_syntax_accepts_start_transaction",
+        // ANSI dispatches standard `START TRANSACTION` (TCL axis).
+        coverage: Coverage::Behavior(&[Probe::ParseAccepts {
+            sql: "START TRANSACTION",
+            features: &FeatureSet::ANSI,
+        }]),
+    },
+    CoverageCase {
+        feature: Feature::TransactionSyntax,
+        polarity: Polarity::Negative,
+        name: "sqlite_transaction_syntax_rejects_start_transaction",
+        // SQLite exposes only `BEGIN` — `START TRANSACTION` is gated off on the TCL axis.
+        coverage: Coverage::Behavior(&[Probe::ParseRejects {
+            sql: "START TRANSACTION",
+            features: &FeatureSet::SQLITE,
+        }]),
+    },
+    CoverageCase {
         feature: Feature::UtilitySyntax,
         polarity: Polarity::Positive,
         name: "postgres_utility_syntax_accepts_copy",

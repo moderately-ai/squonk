@@ -107,6 +107,8 @@ pub struct FeatureDelta {
     pub grouping_syntax: Option<GroupingSyntax>,
     /// Override for the `utility_syntax` dialect-data dimension; `None` preserves the base value.
     pub utility_syntax: Option<UtilitySyntax>,
+    /// Override for the `transaction_syntax` dialect-data dimension; `None` preserves the base value.
+    pub transaction_syntax: Option<TransactionSyntax>,
     /// Override for the `show_syntax` dialect-data dimension; `None` preserves the base value.
     pub show_syntax: Option<ShowSyntax>,
     /// Override for the `maintenance_syntax` dialect-data dimension; `None` preserves the base value.
@@ -164,6 +166,7 @@ impl FeatureDelta {
         query_tail_syntax: None,
         grouping_syntax: None,
         utility_syntax: None,
+        transaction_syntax: None,
         show_syntax: None,
         maintenance_syntax: None,
         access_control_syntax: None,
@@ -385,6 +388,11 @@ impl FeatureDelta {
         self.utility_syntax = Some(value);
         self
     }
+    /// Override the `transaction_syntax` dialect-data dimension.
+    pub const fn transaction_syntax(mut self, value: TransactionSyntax) -> Self {
+        self.transaction_syntax = Some(value);
+        self
+    }
     /// Override the `show_syntax` dialect-data dimension.
     pub const fn show_syntax(mut self, value: ShowSyntax) -> Self {
         self.show_syntax = Some(value);
@@ -592,6 +600,10 @@ impl FeatureSet {
                 Some(value) => value,
                 None => self.utility_syntax,
             },
+            transaction_syntax: match delta.transaction_syntax {
+                Some(value) => value,
+                None => self.transaction_syntax,
+            },
             show_syntax: match delta.show_syntax {
                 Some(value) => value,
                 None => self.show_syntax,
@@ -704,6 +716,8 @@ pub enum Feature {
     GroupingSyntax,
     /// The `utility_syntax` dialect-data dimension.
     UtilitySyntax,
+    /// The `transaction_syntax` dialect-data dimension.
+    TransactionSyntax,
     /// The `show_syntax` dialect-data dimension.
     ShowSyntax,
     /// The `maintenance_syntax` dialect-data dimension.
@@ -717,7 +731,7 @@ pub enum Feature {
 }
 impl Feature {
     /// Features in stable coverage-matrix order; `Feature::ALL[d] as usize == d`.
-    pub const ALL: [Self; 48] = [
+    pub const ALL: [Self; 49] = [
         Self::IdentifierCasing,
         Self::IdentifierQuote,
         Self::DefaultNullOrdering,
@@ -761,6 +775,7 @@ impl Feature {
         Self::QueryTailSyntax,
         Self::GroupingSyntax,
         Self::UtilitySyntax,
+        Self::TransactionSyntax,
         Self::ShowSyntax,
         Self::MaintenanceSyntax,
         Self::AccessControlSyntax,
@@ -813,6 +828,7 @@ impl Feature {
             Self::QueryTailSyntax => "query_tail_syntax",
             Self::GroupingSyntax => "grouping_syntax",
             Self::UtilitySyntax => "utility_syntax",
+            Self::TransactionSyntax => "transaction_syntax",
             Self::ShowSyntax => "show_syntax",
             Self::MaintenanceSyntax => "maintenance_syntax",
             Self::AccessControlSyntax => "access_control_syntax",
@@ -900,6 +916,7 @@ pub const FEATURE_METADATA: &[FeatureMetadata] = &[
     Feature::QueryTailSyntax.metadata(),
     Feature::GroupingSyntax.metadata(),
     Feature::UtilitySyntax.metadata(),
+    Feature::TransactionSyntax.metadata(),
     Feature::ShowSyntax.metadata(),
     Feature::MaintenanceSyntax.metadata(),
     Feature::AccessControlSyntax.metadata(),

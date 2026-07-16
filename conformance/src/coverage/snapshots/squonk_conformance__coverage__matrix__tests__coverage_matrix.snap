@@ -47,6 +47,7 @@ select_syntax              | stable   | baseline | diverges | diverges | diverge
 query_tail_syntax          | stable   | baseline | diverges | diverges | diverges | diverges | postgres_query_tail_syntax_accepts_locking_clause            | ansi_query_tail_syntax_rejects_locking_clause
 grouping_syntax            | stable   | baseline | diverges | diverges | diverges | diverges | postgres_grouping_syntax_accepts_order_by_using              | ansi_grouping_syntax_rejects_order_by_using
 utility_syntax             | stable   | baseline | diverges | diverges | diverges | diverges | postgres_utility_syntax_accepts_copy                         | ansi_utility_syntax_rejects_copy
+transaction_syntax         | stable   | baseline | diverges | diverges | diverges | diverges | ansi_transaction_syntax_accepts_start_transaction            | sqlite_transaction_syntax_rejects_start_transaction
 show_syntax                | stable   | baseline | baseline | diverges | diverges | diverges | duckdb_show_syntax_accepts_describe_summarize_statement      | ansi_show_syntax_rejects_describe_summarize
 maintenance_syntax         | stable   | baseline | diverges | diverges | diverges | diverges | sqlite_maintenance_syntax_accepts_vacuum_reindex_and_analyze | ansi_and_postgres_maintenance_syntax_reject_vacuum_reindex_and_analyze
 access_control_syntax      | stable   | baseline | diverges | diverges | diverges | diverges | postgres_access_control_syntax_accepts_grant                 | sqlite_access_control_syntax_rejects_grant

@@ -20,7 +20,7 @@ use super::{
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS,
     RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax,
     ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
-    TableFactorSyntax, TargetSpelling, TypeNameSyntax, UtilitySyntax,
+    TableFactorSyntax, TargetSpelling, TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
@@ -738,30 +738,6 @@ impl TableFactorSyntax {
 impl UtilitySyntax {
     /// The `DUCKDB` preset for utility syntax.
     pub const DUCKDB: Self = Self {
-        start_transaction: true,
-        start_transaction_block_optional: true,
-        transaction_work_keyword: true,
-        begin_transaction_keyword: true,
-        commit_transaction_keyword: true,
-        rollback_transaction_keyword: true,
-        transaction_name: false,
-        begin_transaction_modes: true,
-        transaction_savepoints: false,
-        set_transaction: false,
-        transaction_isolation_mode: false,
-        transaction_access_mode: true,
-        transaction_deferrable_mode: false,
-        start_transaction_isolation_mode: false,
-        start_transaction_deferrable_mode: false,
-        start_transaction_consistent_snapshot: false,
-        transaction_multiple_modes: false,
-        transaction_mode_comma_required: false,
-        transaction_modes_unique: false,
-        abort_transaction_alias: true,
-        end_transaction_alias: true,
-        transaction_release: false,
-        transaction_chain: false,
-        release_savepoint_keyword_optional: true,
         pragma: true,
         use_statement: true,
         // DuckDB's `USE <catalog> . <schema>` admits the dotted two-part name (MySQL's
@@ -821,15 +797,45 @@ impl UtilitySyntax {
         do_expression_list: false,
         lock_tables: false,
         lock_instance: false,
-        begin_transaction_mode: false,
-        xa_transactions: false,
         rename_statement: false,
         signal_diagnostics: false,
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
+};
+}
+impl TransactionSyntax {
+    /// Transaction-control surface for the `DUCKDB` preset (split from UtilitySyntax).
+    pub const DUCKDB: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: true,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        transaction_name: false,
+        begin_transaction_modes: true,
+        transaction_savepoints: false,
+        set_transaction: false,
+        transaction_isolation_mode: false,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: false,
+        start_transaction_isolation_mode: false,
+        start_transaction_deferrable_mode: false,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: false,
+        transaction_modes_require_commas: false,
+        transaction_modes_reject_duplicates: false,
+        abort_transaction_alias: true,
+        end_transaction_alias: true,
+        transaction_release: false,
+        transaction_chain: false,
+        release_savepoint_keyword_optional: true,
+        begin_transaction_mode: false,
+        xa_transactions: false,
     };
 }
+
 
 impl ShowSyntax {
     /// The `DUCKDB` preset for show syntax.
@@ -1177,6 +1183,7 @@ impl FeatureSet {
         query_tail_syntax: QueryTailSyntax::DUCKDB,
         grouping_syntax: GroupingSyntax::DUCKDB,
         utility_syntax: UtilitySyntax::DUCKDB,
+        transaction_syntax: TransactionSyntax::DUCKDB,
         show_syntax: ShowSyntax::DUCKDB,
         maintenance_syntax: MaintenanceSyntax::DUCKDB,
         access_control_syntax: AccessControlSyntax::DUCKDB,
@@ -1286,6 +1293,13 @@ mod tests {
                 // inherited unchanged from PostgreSQL, both on.
                 do_statement: false,
                 prepare_typed_parameters: false,
+                ..pg.utility_syntax
+            },
+        );
+        assert_eq!(duck.transaction_syntax, TransactionSyntax::DUCKDB);
+        assert_eq!(
+            duck.transaction_syntax,
+            TransactionSyntax {
                 // DuckDB 1.5.4 accepts bare `START`, `START WORK`, and a single access
                 // mode, but has no savepoint, SET TRANSACTION, isolation/deferrable,
                 // repeated-mode, or transaction-chain grammar.
@@ -1300,7 +1314,7 @@ mod tests {
                 abort_transaction_alias: true,
                 end_transaction_alias: true,
                 transaction_chain: false,
-                ..pg.utility_syntax
+                ..pg.transaction_syntax
             },
         );
         assert_eq!(

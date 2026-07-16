@@ -75,14 +75,16 @@
 //! are claimed by two or more features, and `LENIENT` resolves each by a lookahead split, a
 //! dispatch precedence, or a deliberate one-reading exclusion. Those resolutions — including
 //! the flags this preset turns *off* (`do_expression_list`, `prepared_statements_from`,
-//! `drop_database`, `index_drop_on_table`, `access_control_account_grants`,
-//! `variable_assignment`) and the accepted-both unions (`LOAD`, `VACUUM`, `ANALYZE`,
-//! `ALTER VIEW`, `ALTER DATABASE`, `IMPORT`, `UPDATE`, `LOCK`/`UNLOCK`, `CACHE`) — are
-//! enumerated, one row per head, in the
-//! [`MULTI_CLAIMANT_STATEMENT_HEADS`](super::MULTI_CLAIMANT_STATEMENT_HEADS) ledger. Each
-//! `false` in a statement-gate field below that carries a "stays off" / conflict-resolution
-//! note has a corresponding exclusion row there; the ledger's `lenient_exclusions_match_the_ledger`
-//! test proves that correspondence is complete in both directions.
+//! `drop_database`, `index_drop_on_table`, `access_control_account_grants`) and the accepted-both
+//! unions (`DESCRIBE`/`SUMMARIZE`, `COPY`, `LOAD`, `VACUUM`, `ANALYZE`, `ALTER VIEW`,
+//! `ALTER DATABASE`, `IMPORT`, `LOCK`/`UNLOCK`) — are enumerated, one row per head, in the
+//! [`MULTI_CLAIMANT_STATEMENT_HEADS`](super::MULTI_CLAIMANT_STATEMENT_HEADS) ledger. The
+//! base-vs-feature statement-heads (`SET`, `UPDATE`, `CACHE`/`LOAD INDEX`) are documented in
+//! [`BASE_VS_FEATURE_STATEMENT_HEADS`](super::BASE_VS_FEATURE_STATEMENT_HEADS), and the base-feature
+//! `variable_assignment` off decision is explicitly noted there. Each `false` in a statement-gate
+//! field below that carries a "stays off" / conflict-resolution note has a corresponding exclusion
+//! row there; the ledger's `lenient_exclusions_match_the_ledger` test proves that correspondence
+//! is complete in both directions.
 
 use super::{
     AccessControlSyntax, AggregateCallSyntax, CallSyntax, CaretOperator, Casing,
@@ -94,7 +96,7 @@ use super::{
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
     SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
     StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
-    UtilitySyntax,
+    TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
@@ -970,30 +972,6 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `LENIENT` preset for utility syntax.
     pub const LENIENT: Self = Self {
-        start_transaction: true,
-        start_transaction_block_optional: true,
-        transaction_work_keyword: true,
-        begin_transaction_keyword: true,
-        commit_transaction_keyword: true,
-        rollback_transaction_keyword: true,
-        transaction_name: true,
-        begin_transaction_modes: true,
-        transaction_savepoints: true,
-        set_transaction: true,
-        transaction_isolation_mode: true,
-        transaction_access_mode: true,
-        transaction_deferrable_mode: true,
-        start_transaction_isolation_mode: true,
-        start_transaction_deferrable_mode: true,
-        start_transaction_consistent_snapshot: true,
-        transaction_multiple_modes: true,
-        transaction_mode_comma_required: false,
-        transaction_modes_unique: false,
-        abort_transaction_alias: true,
-        end_transaction_alias: true,
-        transaction_release: true,
-        transaction_chain: true,
-        release_savepoint_keyword_optional: true,
         copy: true,
         // Snowflake's `COPY INTO` load/unload — a pure addition on top of the PostgreSQL
         // `COPY`, dispatched by the `INTO` after `COPY`, in keeping with the permissive
@@ -1079,10 +1057,8 @@ impl UtilitySyntax {
         lock_instance: true,
         // SQLite's `BEGIN {DEFERRED|IMMEDIATE|EXCLUSIVE}` transaction-mode modifier — a
         // pure addition, in keeping with the union.
-        begin_transaction_mode: true,
         // MySQL's `XA` distributed-transaction family — a pure addition: `XA` is a unique
         // leading keyword no other dialect claims, so the union simply admits it.
-        xa_transactions: true,
         // MySQL's standalone `RENAME TABLE`/`RENAME USER` statements — a pure addition.
         rename_statement: true,
         signal_diagnostics: true,
@@ -1098,8 +1074,40 @@ impl UtilitySyntax {
         flush: true,
         purge_binary_logs: true,
         replication_statements: true,
+};
+}
+impl TransactionSyntax {
+    /// Transaction-control surface for the `LENIENT` preset (split from UtilitySyntax).
+    pub const LENIENT: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: true,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        transaction_name: true,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: true,
+        transaction_multiple_modes: true,
+        transaction_modes_require_commas: false,
+        transaction_modes_reject_duplicates: false,
+        abort_transaction_alias: true,
+        end_transaction_alias: true,
+        transaction_release: true,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: true,
+        begin_transaction_mode: true,
+        xa_transactions: true,
     };
 }
+
 
 impl ShowSyntax {
     /// The `LENIENT` preset for show syntax.
@@ -1401,6 +1409,7 @@ impl FeatureSet {
         query_tail_syntax: QueryTailSyntax::LENIENT,
         grouping_syntax: GroupingSyntax::LENIENT,
         utility_syntax: UtilitySyntax::LENIENT,
+        transaction_syntax: TransactionSyntax::LENIENT,
         show_syntax: ShowSyntax::LENIENT,
         maintenance_syntax: MaintenanceSyntax::LENIENT,
         access_control_syntax: AccessControlSyntax::LENIENT,

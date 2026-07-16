@@ -19,7 +19,7 @@ use super::{
     NumericLiteralSyntax, OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax,
     QueryTailSyntax, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, UtilitySyntax,
+    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, STANDARD_SET_OPERATION_BINDING_POWERS,
@@ -968,7 +968,6 @@ impl UtilitySyntax {
         // MySQL's `XA` distributed-transaction family (`XA START/END/PREPARE/COMMIT/ROLLBACK/
         // RECOVER`) — a leading-keyword gate like `kill`. Live mysql:8.4.10: every grammar-valid
         // form is `ER_UNSUPPORTED_PS` 1295 (recognized, not preparable over the wire).
-        xa_transactions: true,
         // MySQL's `LOAD {DATA | XML} … INFILE … INTO TABLE …` bulk-import statement — the MySQL
         // reading of the leading `LOAD` keyword (the PostgreSQL/DuckDB `load_extension`
         // shared-library load is a different behaviour, off here; the two dispatch on the
@@ -978,30 +977,6 @@ impl UtilitySyntax {
         // `DATA` and `XML` (the format restrictions are semantic, enforced post-parse).
         load_data: true,
         // Every remaining utility statement head is explicitly pinned below.
-        start_transaction: true,
-        start_transaction_block_optional: false,
-        transaction_work_keyword: true,
-        begin_transaction_keyword: false,
-        commit_transaction_keyword: false,
-        rollback_transaction_keyword: false,
-        transaction_name: false,
-        begin_transaction_modes: false,
-        transaction_savepoints: true,
-        set_transaction: true,
-        transaction_isolation_mode: true,
-        transaction_access_mode: true,
-        transaction_deferrable_mode: false,
-        start_transaction_isolation_mode: false,
-        start_transaction_deferrable_mode: false,
-        start_transaction_consistent_snapshot: true,
-        transaction_multiple_modes: true,
-        transaction_mode_comma_required: true,
-        transaction_modes_unique: true,
-        abort_transaction_alias: false,
-        end_transaction_alias: false,
-        transaction_release: true,
-        transaction_chain: true,
-        release_savepoint_keyword_optional: false,
         copy: false,
         copy_into: false,
         stage_references: false,
@@ -1020,11 +995,42 @@ impl UtilitySyntax {
         reset_scope: false,
         detach_if_exists: false,
         do_statement: false,
-        begin_transaction_mode: false,
         export_import_database: false,
         update_extensions: false,
+};
+}
+impl TransactionSyntax {
+    /// Transaction-control surface for the `MYSQL` preset (split from UtilitySyntax).
+    pub const MYSQL: Self = Self {
+        xa_transactions: true,
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: false,
+        commit_transaction_keyword: false,
+        rollback_transaction_keyword: false,
+        transaction_name: false,
+        begin_transaction_modes: false,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: false,
+        start_transaction_isolation_mode: false,
+        start_transaction_deferrable_mode: false,
+        start_transaction_consistent_snapshot: true,
+        transaction_multiple_modes: true,
+        transaction_modes_require_commas: true,
+        transaction_modes_reject_duplicates: true,
+        abort_transaction_alias: false,
+        end_transaction_alias: false,
+        transaction_release: true,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: false,
+        begin_transaction_mode: false,
     };
 }
+
 
 impl ShowSyntax {
     /// The `MYSQL` preset for show syntax.
@@ -1390,6 +1396,7 @@ impl FeatureSet {
         // statements, but it does have `KILL` and the `DESCRIBE`/`DESC` EXPLAIN synonyms, so
         // it takes its own preset (those two on, the rest off) rather than the ANSI baseline.
         utility_syntax: UtilitySyntax::MYSQL,
+        transaction_syntax: TransactionSyntax::MYSQL,
         show_syntax: ShowSyntax::MYSQL,
         maintenance_syntax: MaintenanceSyntax::MYSQL,
         access_control_syntax: AccessControlSyntax::MYSQL,

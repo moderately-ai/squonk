@@ -29,9 +29,7 @@
 //!
 //! # What this preset adds over ANSI
 //!
-//! Exactly one axis, and it is *dialect-open* (a general folding model the [`Casing`] enum
-//! describes, not a flag our docs tie to one engine), so external Redshift documentation is the
-//! admissible evidence:
+//! Two axes (both evidence-backed; the rest stays ANSI verbatim):
 //!
 //! - **Case folding to lowercase.** Redshift resolves unquoted identifiers case-insensitively and
 //!   folds them to lowercase (its default `enable_case_sensitive_identifier` is off — the
@@ -39,12 +37,17 @@
 //!   lowercase), so [`identifier_casing`](FeatureSet::identifier_casing) is [`Casing::Lower`]
 //!   rather than ANSI's [`Casing::Upper`]. The fold is identity-only: the interned text still
 //!   renders exactly as written and acceptance never changes — this is a name-resolution fact, not
-//!   a parse boundary.
+//!   a parse boundary. `Casing` is *dialect-open* (a general folding model, not a flag our docs
+//!   tie to one engine), so external Redshift documentation is the admissible evidence.
+//! - **Table-position PartiQL / SUPER JSON path**
+//!   ([`table_json_path`](TableExpressionSyntax::table_json_path)) — `FROM src[0].a` navigation
+//!   of a SUPER column (sqlparser-rs's `supports_partiql` surface). A parse boundary, not just
+//!   identity.
 //!
-//! Everything else is ANSI verbatim, including the lexis: Redshift quotes identifiers with the
-//! standard `"…"` (unlike Hive's backtick or MSSQL's bracket) and spells strings with `'…'`, so
-//! the ANSI [`STANDARD_IDENTIFIER_QUOTES`] and [`StringLiteralSyntax::ANSI`] are exact and this
-//! preset adds no new lexical trigger at all (the `const` assert below stays trivially clean).
+//! Lexis remains ANSI: Redshift quotes identifiers with the standard `"…"` (unlike Hive's
+//! backtick or MSSQL's bracket) and spells strings with `'…'`, so the ANSI
+//! [`STANDARD_IDENTIFIER_QUOTES`] and [`StringLiteralSyntax::ANSI`] are exact and this preset
+//! adds no new lexical trigger (the `const` assert below stays clean).
 //!
 //! # Deliberately deferred (conservative reject)
 //!
@@ -62,12 +65,13 @@
 //!   DuckDB (Teradata-origin) and needs the reserved-keyword modelling Snowflake's preset does;
 //!   deferred rather than half-modelled.
 //! - **The large unmodelled Redshift surface.** `DISTKEY`/`SORTKEY`/`DISTSTYLE`/`ENCODE` table
-//!   attributes, `UNLOAD`/`COPY` bulk-load statements, the `SUPER` type with PartiQL
-//!   dot/subscript navigation, `INTERVAL` literal spellings, and Redshift's window-frame
+//!   attributes, `UNLOAD`/`COPY` bulk-load statements, full `SUPER` type DDL (beyond the table-
+//!   position JSON path above), `INTERVAL` literal spellings, and Redshift's window-frame
 //!   differences all have no modelled gate and are clean rejects routed to follow-up tickets.
 //!
 //! A reader can predict from this module exactly what Redshift accepts beyond the standard: the
-//! lowercase identifier fold, and nothing else, until each deferred surface earns its own gate.
+//! lowercase identifier fold and table-position `table_json_path`, and nothing else, until each
+//! deferred surface earns its own gate.
 
 use super::{
     AccessControlSyntax, AggregateCallSyntax, CallSyntax, CaretOperator, Casing,
@@ -79,7 +83,7 @@ use super::{
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
     STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, UtilitySyntax,
+    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -88,7 +92,7 @@ impl FeatureSet {
     /// rationale — including why a PostgreSQL-8 fork still derives from ANSI, not `POSTGRES` — and
     /// the conservatism bar).
     pub const REDSHIFT: Self = Self {
-        // The sole delta over ANSI: Redshift folds unquoted identifiers to lowercase (its default
+        // Delta 1/2 over ANSI: Redshift folds unquoted identifiers to lowercase (its default
         // `enable_case_sensitive_identifier` off — the PostgreSQL-inherited lowercase model).
         // Identity only: the interned text still renders exactly as written, so this never affects
         // acceptance. `Casing` is dialect-open, so external Redshift docs are the admissible
@@ -164,6 +168,7 @@ impl FeatureSet {
         query_tail_syntax: QueryTailSyntax::ANSI,
         grouping_syntax: GroupingSyntax::ANSI,
         utility_syntax: UtilitySyntax::ANSI,
+        transaction_syntax: TransactionSyntax::ANSI,
         show_syntax: ShowSyntax::ANSI,
         maintenance_syntax: MaintenanceSyntax::ANSI,
         access_control_syntax: AccessControlSyntax::ANSI,

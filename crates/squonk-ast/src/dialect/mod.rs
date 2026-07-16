@@ -31,6 +31,11 @@
 //! - [`CallSyntax::restricted_cast_targets`] is grandfathered: the participle already reads
 //!   as a narrowing, and the name is referenced widely enough that a rename to the
 //!   `requires`/`rejects` form would churn more than it clarifies.
+//! - [`QueryTailSyntax::with_ties_requires_order_by`] is named for its load-bearing
+//!   `ORDER BY` guard; investigation shows it always co-varies with PostgreSQL's paired
+//!   `SKIP LOCKED` + `WITH TIES` reject (only Postgres enables the flag), so both guards
+//!   ride one knob rather than a second `rejects_skip_locked` field that would never
+//!   diverge in shipped presets.
 //!
 //! # Struct header docs: category + doctrine, never member lists
 //!
@@ -2879,15 +2884,19 @@ pub struct QueryTailSyntax {
     /// ordinary modulo, and `LIMIT a PERCENT` / `LIMIT (1 + 1) PERCENT` are DuckDB syntax
     /// errors (verified on 1.5.4), so the gate does not over-accept them.
     pub limit_percent: bool,
-    /// Enforce PostgreSQL's `gram.y` validity checks on `FETCH FIRST … WITH TIES` — the two
+    /// Enforce PostgreSQL's `gram.y` validity checks on `FETCH FIRST … WITH TIES` — both
     /// semantic guards `insertSelectOptions` raises during raw parsing (so `pg_query`, a
-    /// parse-only oracle, rejects them): `WITH TIES` requires a governing `ORDER BY` at the
-    /// same query level (`WITH TIES cannot be specified without ORDER BY clause`), and
-    /// `WITH TIES` cannot combine with a `SKIP LOCKED` locking clause (`SKIP LOCKED and
-    /// WITH TIES options cannot be used together`). On for PostgreSQL only; other dialects
-    /// with `fetch_first` keep accepting both forms unchanged. When off, neither guard fires.
-    /// The name carries the load-bearing `ORDER BY` guard; the `SKIP LOCKED` combination
-    /// guard is the same `gram.y` check site and rides along.
+    /// parse-only oracle, rejects them):
+    ///
+    /// 1. **`ORDER BY` required** — `WITH TIES` needs a governing `ORDER BY` at the same
+    ///    query level (`WITH TIES cannot be specified without ORDER BY clause`).
+    /// 2. **`SKIP LOCKED` rejected** — `WITH TIES` cannot combine with a `SKIP LOCKED`
+    ///    locking clause (`SKIP LOCKED and WITH TIES options cannot be used together`).
+    ///
+    /// On for PostgreSQL only; other dialects with `fetch_first` keep accepting both forms
+    /// unchanged. When off, neither guard fires. The two rules always co-vary in shipped
+    /// presets (only Postgres enables this flag), so they share one knob rather than a
+    /// second independently toggled field — see the module-level naming-exception note.
     pub with_ties_requires_order_by: bool,
     /// Accept BigQuery/ZetaSQL **query pipe syntax**: a trailing chain of `|>` operators
     /// that post-process a query result one step at a time
@@ -3072,18 +3081,17 @@ pub struct GroupingSyntax {
     pub order_by_all: bool,
 }
 
-/// Dialect-owned utility-statement syntax extensions accepted by the parser.
+/// Dialect-owned transaction-control (TCL) syntax accepted by the parser.
 ///
-/// The non-standard utility statements whose leading keyword a dialect dispatches — the
-/// statement-keyword analogue of [`MutationSyntax::merge`]. Whether each is dispatched is
-/// explicit dialect data: when a flag is off the keyword is left undispatched and surfaces
-/// as an unknown statement, the same reject mechanism `merge`/`replace_into` use for a
-/// leading keyword. `EXPLAIN` is not gated here (it is accepted dialect-agnostically for
-/// now). The introspection, physical-maintenance, and access-control statements split out
-/// into [`ShowSyntax`], [`MaintenanceSyntax`], and [`AccessControlSyntax`] as this struct
-/// crossed its 16-field line, so those axes live there rather than here.
+/// Transaction openers, completers, savepoints, mode lists, and XA distributed-transaction
+/// forms — the SQL transaction-control family. Split out of [`UtilitySyntax`] so utility
+/// statement-head gates (COPY/PRAGMA/SHOW siblings) are not mixed with TCL grammar and
+/// narrowing validators. Statement-head flags that open TCL statements
+/// (`start_transaction`, `set_transaction`, `xa_transactions`, …) are still consumed by
+/// `parser::statement_dispatch` / `parser::tcl`; mode-list validators are read by the TCL
+/// body parser.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct UtilitySyntax {
+pub struct TransactionSyntax {
     /// Accept the standard `START TRANSACTION` transaction opener. Some engines,
     /// notably SQLite, expose only `BEGIN` and reject the `START` spelling.
     pub start_transaction: bool,
@@ -3129,12 +3137,12 @@ pub struct UtilitySyntax {
     pub start_transaction_consistent_snapshot: bool,
     /// Accept more than one transaction mode, separated by an optional comma.
     pub transaction_multiple_modes: bool,
-    /// Require a comma between adjacent transaction modes. PostgreSQL permits bare
-    /// whitespace; MySQL requires the comma.
-    pub transaction_mode_comma_required: bool,
-    /// Reject a repeated transaction-mode kind in one list. MySQL's grammar permits
-    /// each characteristic category at most once.
-    pub transaction_modes_unique: bool,
+    /// ON rejects a missing comma between adjacent transaction modes (MySQL).
+    /// PostgreSQL permits bare whitespace between modes when this is off.
+    pub transaction_modes_require_commas: bool,
+    /// ON rejects a repeated transaction-mode kind in one list (MySQL: each
+    /// characteristic category at most once).
+    pub transaction_modes_reject_duplicates: bool,
     /// Accept `ABORT` as an exact `ROLLBACK` synonym.
     pub abort_transaction_alias: bool,
     /// Accept `END` as an exact `COMMIT` synonym.
@@ -3147,6 +3155,44 @@ pub struct UtilitySyntax {
     /// Accept `RELEASE <name>` without the `SAVEPOINT` keyword. When off,
     /// `RELEASE SAVEPOINT <name>` remains available with transaction savepoints.
     pub release_savepoint_keyword_optional: bool,
+    /// Accept SQLite's `{DEFERRED | IMMEDIATE | EXCLUSIVE}` transaction-mode modifier
+    /// between `BEGIN` and the optional `TRANSACTION` keyword (stored on
+    /// [`TransactionStatement::Begin`](crate::ast::TransactionStatement::Begin)'s `mode`
+    /// field). On for SQLite/Lenient; off elsewhere. PostgreSQL's `BEGIN` takes its own,
+    /// differently-shaped modifier set (`ISOLATION LEVEL …` / `READ ONLY|WRITE` / `[NOT]
+    /// DEFERRABLE`, the existing [`TransactionMode`](crate::ast::TransactionMode) list),
+    /// deliberately not modelled here, so it stays off there and the leading modifier
+    /// keyword falls through to today's error (engine-probed: `pg_query` rejects `BEGIN
+    /// DEFERRED`/`BEGIN IMMEDIATE`/`BEGIN EXCLUSIVE`).
+    pub begin_transaction_mode: bool,
+    /// Accept the MySQL `XA` distributed-transaction family — `XA {START | BEGIN} xid [JOIN |
+    /// RESUME]`, `XA END xid [SUSPEND [FOR MIGRATE]]`, `XA PREPARE xid`, `XA COMMIT xid [ONE
+    /// PHASE]`, `XA ROLLBACK xid`, and `XA RECOVER [CONVERT XID]` (the X/Open two-phase-commit
+    /// verbs; `sql_yacc.yy` `xa:`). One flag gates the whole family because it is a single
+    /// dialect unit reached through one unique leading `XA` keyword (the
+    /// [`kill`](UtilitySyntax::kill) leading-keyword-gate precedent, not a keyword shared with
+    /// another dialect). On for MySQL and the Lenient superset (a pure addition there — no other
+    /// dialect claims `XA`); off elsewhere, where the leading `XA` keyword is not dispatched and
+    /// surfaces as an unknown statement. Live mysql:8.4.10: every grammar-valid form answers
+    /// `ER_UNSUPPORTED_PS` 1295 (recognized, not preparable over the wire). See
+    /// [`XaStatement`](crate::ast::XaStatement).
+    pub xa_transactions: bool,
+}
+
+/// Dialect-owned utility-statement syntax extensions accepted by the parser.
+///
+/// Non-TCL utility statements whose leading keyword a dialect dispatches — COPY, PRAGMA,
+/// ATTACH, prepared statements, locks, replication, … — the statement-keyword analogue of
+/// [`MutationSyntax::merge`]. Transaction-control grammar lives in [`TransactionSyntax`].
+/// Whether each statement is dispatched is explicit dialect data: when a flag is off the
+/// keyword is left undispatched and surfaces as an unknown statement.
+/// **Statement-head flags on this axis are consumed by the parser's statement-head router**
+/// (`parser::statement_dispatch`); parse bodies live in family modules (`util`, …).
+/// `EXPLAIN` is not gated here (accepted dialect-agnostically for now). Introspection,
+/// physical-maintenance, and access-control statements live in [`ShowSyntax`],
+/// [`MaintenanceSyntax`], and [`AccessControlSyntax`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UtilitySyntax {
     /// Accept the PostgreSQL `COPY <table>|(<query>) {FROM|TO} <endpoint> ...` bulk
     /// data-transfer statement. PostgreSQL-only (also its generic/permissive supersets);
     /// off in ANSI and MySQL, which have no `COPY`, so there the leading `COPY` keyword
@@ -3444,28 +3490,6 @@ pub struct UtilitySyntax {
     /// MySQL-only among the shipped presets (plus the Lenient superset). See
     /// [`InstanceLockStatement`](crate::ast::InstanceLockStatement).
     pub lock_instance: bool,
-    /// Accept SQLite's `{DEFERRED | IMMEDIATE | EXCLUSIVE}` transaction-mode modifier
-    /// between `BEGIN` and the optional `TRANSACTION` keyword (stored on
-    /// [`TransactionStatement::Begin`](crate::ast::TransactionStatement::Begin)'s `mode`
-    /// field). On for SQLite/Lenient; off elsewhere. PostgreSQL's `BEGIN` takes its own,
-    /// differently-shaped modifier set (`ISOLATION LEVEL …` / `READ ONLY|WRITE` / `[NOT]
-    /// DEFERRABLE`, the existing [`TransactionMode`](crate::ast::TransactionMode) list),
-    /// deliberately not modelled here, so it stays off there and the leading modifier
-    /// keyword falls through to today's error (engine-probed: `pg_query` rejects `BEGIN
-    /// DEFERRED`/`BEGIN IMMEDIATE`/`BEGIN EXCLUSIVE`).
-    pub begin_transaction_mode: bool,
-    /// Accept the MySQL `XA` distributed-transaction family — `XA {START | BEGIN} xid [JOIN |
-    /// RESUME]`, `XA END xid [SUSPEND [FOR MIGRATE]]`, `XA PREPARE xid`, `XA COMMIT xid [ONE
-    /// PHASE]`, `XA ROLLBACK xid`, and `XA RECOVER [CONVERT XID]` (the X/Open two-phase-commit
-    /// verbs; `sql_yacc.yy` `xa:`). One flag gates the whole family because it is a single
-    /// dialect unit reached through one unique leading `XA` keyword (the
-    /// [`kill`](UtilitySyntax::kill) leading-keyword-gate precedent, not a keyword shared with
-    /// another dialect). On for MySQL and the Lenient superset (a pure addition there — no other
-    /// dialect claims `XA`); off elsewhere, where the leading `XA` keyword is not dispatched and
-    /// surfaces as an unknown statement. Live mysql:8.4.10: every grammar-valid form answers
-    /// `ER_UNSUPPORTED_PS` 1295 (recognized, not preparable over the wire). See
-    /// [`XaStatement`](crate::ast::XaStatement).
-    pub xa_transactions: bool,
     /// Accept the MySQL standalone `RENAME TABLE <a> TO <b>[, ...]` and `RENAME USER <u>
     /// TO <v>[, ...]` object-rename statements (both →
     /// [`Statement::Rename`](crate::ast::Statement::Rename)). A leading-keyword gate like
@@ -3553,6 +3577,8 @@ pub struct UtilitySyntax {
 /// out of [`UtilitySyntax`] at its 16-field line as the introspection axis. Each flag is a
 /// leading-keyword dispatch gate: when off the keyword is not dispatched and surfaces as
 /// an unknown statement (or the typed-`SHOW` lookahead falls through to the session reader).
+/// **Statement-head gates are consumed by `parser::statement_dispatch`**; parse bodies live
+/// in the SHOW/session family modules.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ShowSyntax {
     /// Accept MySQL's `DESCRIBE`/`DESC` keywords as EXPLAIN synonyms *and* the MySQL
@@ -3768,7 +3794,9 @@ pub struct ShowSyntax {
 /// The storage-maintenance statements and their operands. Split out of [`UtilitySyntax`]
 /// at its 16-field line as the maintenance axis, distinct from the introspection and
 /// access-control axes. Each flag is a leading-keyword dispatch gate: when off the keyword
-/// is not dispatched and surfaces as an unknown statement.
+/// is not dispatched and surfaces as an unknown statement. **Statement-head gates are
+/// consumed by `parser::statement_dispatch`**; parse bodies live in the maintenance family
+/// modules.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MaintenanceSyntax {
     /// Accept the SQLite `VACUUM [<schema>] [INTO <expr>]` database-compaction
@@ -5499,16 +5527,17 @@ pub struct FeatureSet {
     /// `IS`, `<=>`, the DuckDB lambda, the bitwise family, quantified comparisons)
     /// accepted by the parser.
     pub operator_syntax: OperatorSyntax,
-    /// Function-call forms (named arguments, the `SEPARATOR`/`WITHIN GROUP` tails, the
-    /// `UTC_*`/`COLUMNS(…)`/`EXTRACT(… FROM …)` special calls) accepted by the parser.
+    /// Function-call forms accepted by the parser (named arguments, cast/convert shape,
+    /// `UTC_*`/`COLUMNS(…)`/`EXTRACT(… FROM …)` special calls, …).
+    /// Aggregate tails (`SEPARATOR`/`WITHIN GROUP`/`FILTER`/`OVER` eligibility) live in
+    /// [`aggregate_call_syntax`](Self::aggregate_call_syntax); keyword string specials live
+    /// in [`string_func_forms`](Self::string_func_forms).
     pub call_syntax: CallSyntax,
     /// Keyword string/scalar special-form syntax — the flags whose sole AST product
-    /// is a [`StringFunc`](crate::ast::StringFunc), gathered from
-    /// [`call_syntax`](Self::call_syntax).
+    /// is a [`StringFunc`](crate::ast::StringFunc).
     pub string_func_forms: StringFuncForms,
     /// Aggregate/window function-call syntax — the in-parenthesis and post-`)` tails,
-    /// the argument-shape/arity restrictions, and the `OVER`-eligibility gate,
-    /// gathered from [`call_syntax`](Self::call_syntax).
+    /// the argument-shape/arity restrictions, and the `OVER`-eligibility gate.
     pub aggregate_call_syntax: AggregateCallSyntax,
     /// Pattern-match predicate forms (`LIKE`/`ILIKE`/`SIMILAR TO`) accepted by the
     /// parser. `LIKE` is SQL core (on everywhere); `ILIKE`/`SIMILAR TO` are gated.
@@ -5560,20 +5589,24 @@ pub struct FeatureSet {
     /// `CREATE VIEW`/`CREATE DATABASE IF NOT EXISTS`), gathered from the schema-change
     /// surface into one per-site table.
     pub existence_guards: ExistenceGuards,
-    /// SELECT-clause syntax forms accepted by the parser (`DISTINCT ON`, the
-    /// offset / fetch-first row-limiting spelling).
+    /// SELECT-body syntax forms accepted by the parser (`DISTINCT ON`, `QUALIFY`,
+    /// projection aliases, set-op quantifiers, …). Row-limiting / locking / pipe tails
+    /// live in [`query_tail_syntax`](Self::query_tail_syntax); `GROUP BY`/`ORDER BY`
+    /// modes live in [`grouping_syntax`](Self::grouping_syntax).
     pub select_syntax: SelectSyntax,
     /// Query-tail syntax — the row-limiting/locking family and the trailing
-    /// ClickHouse/pipe clauses parsed after the SELECT body, gathered from
-    /// [`select_syntax`](Self::select_syntax).
+    /// ClickHouse/pipe clauses parsed after the SELECT body.
     pub query_tail_syntax: QueryTailSyntax,
     /// `GROUP BY`/`ORDER BY` grouping-and-ordering syntax (grouping sets, clause
-    /// modes, and quantifiers), gathered from [`select_syntax`](Self::select_syntax).
+    /// modes, and quantifiers).
     pub grouping_syntax: GroupingSyntax,
     /// Utility-statement syntax forms the parser dispatches: the
     /// PostgreSQL `COPY`/`COMMENT ON` and SQLite `PRAGMA`/`ATTACH`/`DETACH`
     /// statement gates.
     pub utility_syntax: UtilitySyntax,
+    /// Transaction-control (TCL) syntax — openers, completers, savepoints, mode lists,
+    /// and XA forms — split from [`utility_syntax`](Self::utility_syntax).
+    pub transaction_syntax: TransactionSyntax,
     /// SHOW/DESCRIBE introspection-statement syntax (the session `SHOW` reader, the typed
     /// `SHOW <object>` listings, and `DESCRIBE`/`SUMMARIZE`), gathered from
     /// [`utility_syntax`](Self::utility_syntax).

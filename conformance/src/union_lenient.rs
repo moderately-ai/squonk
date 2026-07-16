@@ -19,8 +19,8 @@
 //! `Lenient` reject of a preset-accepted
 //! statement is sanctioned iff it is attributable to one of:
 //!
-//! 1. **Head-contention ledger** — the six `lenient_excludes` flags in
-//!    [`MULTI_CLAIMANT_STATEMENT_HEADS`]: `variable_assignment` (SET), `do_expression_list`
+//! 1. **Head-contention ledger** — the multi-claimant `lenient_excludes` flags in
+//!    [`MULTI_CLAIMANT_STATEMENT_HEADS`]: `do_expression_list`
 //!    (DO), `prepared_statements_from` (PREPARE/EXECUTE/DEALLOCATE), `drop_database` +
 //!    `index_drop_on_table` (DROP), `access_control_account_grants` (GRANT/REVOKE). Each is
 //!    a MySQL-side one-reading/route exclusion; this lane consumes the ledger rows directly
@@ -106,10 +106,8 @@ struct ExcludedFlag {
 }
 
 const LENIENT_EXCLUDED_FLAGS: &[ExcludedFlag] = &[
-    ExcludedFlag {
-        name: "variable_assignment",
-        is_on: |f| f.session_variables.variable_assignment,
-    },
+    // `variable_assignment` is a base-vs-feature SET head (see
+    // `BASE_VS_FEATURE_STATEMENT_HEADS`), not a multi-claimant Lenient exclusion.
     ExcludedFlag {
         name: "do_expression_list",
         is_on: |f| f.utility_syntax.do_expression_list,
@@ -333,16 +331,14 @@ mod tests {
         );
     }
 
-    /// The head-ledger exclusions have teeth: each of the six is a genuine
-    /// MySQL-accept / Lenient-reject acceptance gap, and the lane attributes it to the
-    /// ledger row (not a private allowlist). Measured under the fitted `MySql` preset (all
-    /// six excluded flags are MySQL-exclusive among the shipped presets).
+    /// The head-ledger exclusions have teeth: each multi-claimant `lenient_excludes` flag is a
+    /// genuine MySQL-accept / Lenient-reject acceptance gap, and the lane attributes it to the
+    /// ledger row (not a private allowlist). Measured under the fitted `MySql` preset.
+    /// (`variable_assignment` / SET is base-vs-feature, not a multi-claimant exclusion.)
     #[test]
     fn head_ledger_exclusions_are_genuine_gaps_and_consumed() {
         // (statement, the ledger head-keyword it must be attributed to).
         let cases: &[(&str, &str)] = &[
-            ("SET a = 1, b = 2", "SET"),                       // variable_assignment
-            ("SET @v := 1", "SET"),                            // variable_assignment (`:=`)
             ("DO 1", "DO"),                                    // do_expression_list
             ("DO 1, 2", "DO"),                                 // do_expression_list
             ("PREPARE s FROM 'SELECT 1'", "PREPARE"),          // prepared_statements_from

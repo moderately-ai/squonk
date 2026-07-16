@@ -26,12 +26,9 @@ use super::{
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
     STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, UtilitySyntax,
+    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
-use crate::precedence::{
-    Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
-    RANGE_PREDICATE_ABOVE_COMPARISON, STANDARD_SET_OPERATION_BINDING_POWERS,
-};
+use crate::precedence::STANDARD_SET_OPERATION_BINDING_POWERS;
 
 impl AccessControlSyntax {
     /// Access-control syntax enabled by this preset.
@@ -289,30 +286,6 @@ impl UtilitySyntax {
     /// Utility-statement syntax enabled by this preset.
     pub const QUILTDB: Self = Self {
         comment_if_exists: true,
-        start_transaction: true,
-        start_transaction_block_optional: false,
-        transaction_work_keyword: true,
-        begin_transaction_keyword: true,
-        commit_transaction_keyword: true,
-        rollback_transaction_keyword: true,
-        transaction_name: false,
-        begin_transaction_modes: true,
-        transaction_savepoints: true,
-        set_transaction: true,
-        transaction_isolation_mode: true,
-        transaction_access_mode: true,
-        transaction_deferrable_mode: true,
-        start_transaction_isolation_mode: true,
-        start_transaction_deferrable_mode: true,
-        start_transaction_consistent_snapshot: false,
-        transaction_multiple_modes: true,
-        transaction_mode_comma_required: false,
-        transaction_modes_unique: false,
-        abort_transaction_alias: true,
-        end_transaction_alias: true,
-        transaction_release: false,
-        transaction_chain: true,
-        release_savepoint_keyword_optional: true,
         copy: true,
         copy_into: false,
         stage_references: false,
@@ -346,8 +319,6 @@ impl UtilitySyntax {
         do_expression_list: false,
         lock_tables: false,
         lock_instance: false,
-        begin_transaction_mode: false,
-        xa_transactions: false,
         rename_statement: false,
         signal_diagnostics: false,
         export_import_database: false,
@@ -355,8 +326,40 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
+};
+}
+impl TransactionSyntax {
+    /// Transaction-control surface for the `QUILTDB` preset (split from UtilitySyntax).
+    pub const QUILTDB: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        transaction_name: false,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: true,
+        transaction_modes_require_commas: false,
+        transaction_modes_reject_duplicates: false,
+        abort_transaction_alias: true,
+        end_transaction_alias: true,
+        transaction_release: false,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: true,
+        begin_transaction_mode: false,
+        xa_transactions: false,
     };
 }
+
 
 impl FeatureSet {
     /// The complete QuiltDB feature set.
@@ -372,6 +375,7 @@ impl FeatureSet {
         select_syntax: SelectSyntax::QUILTDB,
         type_name_syntax: TypeNameSyntax::QUILTDB,
         utility_syntax: UtilitySyntax::QUILTDB,
+        transaction_syntax: TransactionSyntax::QUILTDB,
         identifier_casing: Casing::Lower,
         identifier_quotes: STANDARD_IDENTIFIER_QUOTES,
         default_null_ordering: NullOrdering::NullsLast,
@@ -382,116 +386,7 @@ impl FeatureSet {
         reserved_as_label: KeywordSet::EMPTY,
         catalog_qualified_names: true,
         byte_classes: POSTGRES_BYTE_CLASSES,
-        binding_powers: BindingPowerTable {
-            or: BindingPower {
-                left: 10,
-                right: 11,
-                assoc: Assoc::Left,
-            },
-            xor: BindingPower {
-                left: 15,
-                right: 16,
-                assoc: Assoc::Left,
-            },
-            and: BindingPower {
-                left: 20,
-                right: 21,
-                assoc: Assoc::Left,
-            },
-            comparison: BindingPower {
-                left: 40,
-                right: 41,
-                assoc: Assoc::NonAssoc,
-            },
-            range_predicate_override: Some(RANGE_PREDICATE_ABOVE_COMPARISON),
-            // The `IS`-family predicates (`IS NULL`, `IS DISTINCT FROM`, `IS TRUE`, …) rank one
-            // tier below comparison, so `a <> b IS NULL` groups `(a <> b) IS NULL`
-            // (`%nonassoc IS ISNULL NOTNULL`, engine-measured on PostgreSQL 16).
-            is_predicate_override: Some(IS_PREDICATE_BELOW_COMPARISON),
-            double_equals: BindingPower {
-                left: 40,
-                right: 41,
-                assoc: Assoc::NonAssoc,
-            },
-            additive: BindingPower {
-                left: 50,
-                right: 51,
-                assoc: Assoc::Left,
-            },
-            multiplicative: BindingPower {
-                left: 60,
-                right: 61,
-                assoc: Assoc::Left,
-            },
-            exponent: BindingPower {
-                left: 65,
-                right: 66,
-                assoc: Assoc::Left,
-            },
-            string_concat: BindingPower {
-                left: 45,
-                right: 46,
-                assoc: Assoc::Left,
-            },
-            any_operator: BindingPower {
-                left: 45,
-                right: 46,
-                assoc: Assoc::Left,
-            },
-            json_get: BindingPower {
-                left: 45,
-                right: 46,
-                assoc: Assoc::Left,
-            },
-            bitwise_or: BindingPower {
-                left: 45,
-                right: 46,
-                assoc: Assoc::Left,
-            },
-            bitwise_and: BindingPower {
-                left: 45,
-                right: 46,
-                assoc: Assoc::Left,
-            },
-            bitwise_shift: BindingPower {
-                left: 45,
-                right: 46,
-                assoc: Assoc::Left,
-            },
-            bitwise_xor: BindingPower {
-                left: 45,
-                right: 46,
-                assoc: Assoc::Left,
-            },
-            prefix_not: 30,
-            prefix_sign: 80,
-            prefix_bitwise_not: 46,
-            at_time_zone: BindingPower {
-                left: 70,
-                right: 71,
-                assoc: Assoc::Left,
-            },
-            collate: BindingPower {
-                left: 74,
-                right: 75,
-                assoc: Assoc::Left,
-            },
-            subscript: BindingPower {
-                left: 84,
-                right: 85,
-                assoc: Assoc::Left,
-            },
-            typecast: BindingPower {
-                left: 88,
-                right: 89,
-                assoc: Assoc::Left,
-            },
-            field_selection: BindingPower {
-                left: 92,
-                right: 93,
-                assoc: Assoc::Left,
-            },
-        },
+        binding_powers: FeatureSet::POSTGRES.binding_powers, // shared with Postgres (byte-identical; avoid dual SoT)
         set_operation_powers: STANDARD_SET_OPERATION_BINDING_POWERS,
         string_literals: StringLiteralSyntax::POSTGRES,
         numeric_literals: NumericLiteralSyntax::POSTGRES,

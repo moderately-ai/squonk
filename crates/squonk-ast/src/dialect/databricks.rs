@@ -74,7 +74,7 @@ use super::{
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
     STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, UtilitySyntax,
+    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -285,30 +285,6 @@ impl UtilitySyntax {
     /// tested parser gate, so it clears the preset's conservatism bar. Every other utility
     /// knob is conservatively ANSI.
     pub const DATABRICKS: Self = Self {
-        start_transaction: true,
-        start_transaction_block_optional: false,
-        transaction_work_keyword: true,
-        begin_transaction_keyword: true,
-        commit_transaction_keyword: true,
-        rollback_transaction_keyword: true,
-        transaction_name: false,
-        begin_transaction_modes: true,
-        transaction_savepoints: true,
-        set_transaction: true,
-        transaction_isolation_mode: true,
-        transaction_access_mode: true,
-        transaction_deferrable_mode: true,
-        start_transaction_isolation_mode: true,
-        start_transaction_deferrable_mode: true,
-        start_transaction_consistent_snapshot: false,
-        transaction_multiple_modes: true,
-        transaction_mode_comma_required: false,
-        transaction_modes_unique: false,
-        abort_transaction_alias: false,
-        end_transaction_alias: false,
-        transaction_release: false,
-        transaction_chain: true,
-        release_savepoint_keyword_optional: true,
         copy: false,
         copy_into: false,
         stage_references: false,
@@ -343,8 +319,6 @@ impl UtilitySyntax {
         do_expression_list: false,
         lock_tables: false,
         lock_instance: false,
-        begin_transaction_mode: false,
-        xa_transactions: false,
         rename_statement: false,
         signal_diagnostics: false,
         export_import_database: false,
@@ -352,8 +326,40 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
+};
+}
+impl TransactionSyntax {
+    /// Transaction-control surface for the `DATABRICKS` preset (split from UtilitySyntax).
+    pub const DATABRICKS: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        transaction_name: false,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: true,
+        transaction_modes_require_commas: false,
+        transaction_modes_reject_duplicates: false,
+        abort_transaction_alias: false,
+        end_transaction_alias: false,
+        transaction_release: false,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: true,
+        begin_transaction_mode: false,
+        xa_transactions: false,
     };
 }
+
 
 impl ShowSyntax {
     /// The `DATABRICKS` preset for show syntax.
@@ -463,6 +469,7 @@ impl FeatureSet {
         // The typed `SHOW FUNCTIONS` listing — the first typed-`SHOW` gate on under
         // Databricks (see `UtilitySyntax::DATABRICKS`); every other utility knob is ANSI.
         utility_syntax: UtilitySyntax::DATABRICKS,
+        transaction_syntax: TransactionSyntax::DATABRICKS,
         show_syntax: ShowSyntax::DATABRICKS,
         maintenance_syntax: MaintenanceSyntax::DATABRICKS,
         access_control_syntax: AccessControlSyntax::DATABRICKS,

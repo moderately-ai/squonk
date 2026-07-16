@@ -19,7 +19,7 @@ use super::{
     OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
     STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, UtilitySyntax,
+    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -664,30 +664,6 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
-        start_transaction: true,
-        start_transaction_block_optional: false,
-        transaction_work_keyword: true,
-        begin_transaction_keyword: true,
-        commit_transaction_keyword: true,
-        rollback_transaction_keyword: true,
-        transaction_name: false,
-        begin_transaction_modes: true,
-        transaction_savepoints: true,
-        set_transaction: true,
-        transaction_isolation_mode: true,
-        transaction_access_mode: true,
-        transaction_deferrable_mode: true,
-        start_transaction_isolation_mode: true,
-        start_transaction_deferrable_mode: true,
-        start_transaction_consistent_snapshot: false,
-        transaction_multiple_modes: true,
-        transaction_mode_comma_required: false,
-        transaction_modes_unique: false,
-        abort_transaction_alias: false,
-        end_transaction_alias: false,
-        transaction_release: false,
-        transaction_chain: true,
-        release_savepoint_keyword_optional: true,
         copy: false,
         // `COPY INTO` is Snowflake-specific bulk load/unload — not standard SQL, so the
         // ANSI baseline leaves the surface off (MySQL and the other ANSI-derived presets
@@ -753,11 +729,9 @@ impl UtilitySyntax {
         // (the standard/PostgreSQL `BEGIN` takes its own `TransactionMode` list instead),
         // so the ANSI baseline leaves the modifier keyword unrecognized and it falls
         // through to the existing `BEGIN`-body error.
-        begin_transaction_mode: false,
         // MySQL's `XA` distributed-transaction family is MySQL-only, so the ANSI baseline
         // leaves the leading `XA` keyword undispatched (every ANSI-derived preset inherits
         // it off unless it opts back in).
-        xa_transactions: false,
         // The standalone `RENAME TABLE`/`RENAME USER` statements are MySQL-only, so the
         // ANSI baseline does not dispatch the leading `RENAME` keyword.
         rename_statement: false,
@@ -775,8 +749,40 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
+};
+}
+impl TransactionSyntax {
+    /// Transaction-control surface for the `ANSI` preset (split from UtilitySyntax).
+    pub const ANSI: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        transaction_name: false,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: true,
+        transaction_modes_require_commas: false,
+        transaction_modes_reject_duplicates: false,
+        abort_transaction_alias: false,
+        end_transaction_alias: false,
+        transaction_release: false,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: true,
+        begin_transaction_mode: false,
+        xa_transactions: false,
     };
 }
+
 
 impl ShowSyntax {
     /// The `ANSI` predefined value.
@@ -1110,6 +1116,7 @@ impl FeatureSet {
         query_tail_syntax: QueryTailSyntax::ANSI,
         grouping_syntax: GroupingSyntax::ANSI,
         utility_syntax: UtilitySyntax::ANSI,
+        transaction_syntax: TransactionSyntax::ANSI,
         show_syntax: ShowSyntax::ANSI,
         maintenance_syntax: MaintenanceSyntax::ANSI,
         access_control_syntax: AccessControlSyntax::ANSI,

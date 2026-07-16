@@ -116,6 +116,7 @@ fn feature_enablement(feature: Feature, preset: &FeatureSet) -> Enablement {
         Feature::AccessControlSyntax => preset.access_control_syntax != ansi.access_control_syntax,
         Feature::TypeNameSyntax => preset.type_name_syntax != ansi.type_name_syntax,
         Feature::TargetSpelling => preset.target_spelling != ansi.target_spelling,
+        Feature::TransactionSyntax => preset.transaction_syntax != ansi.transaction_syntax,
     };
     if diverges {
         Enablement::Diverges
@@ -395,9 +396,10 @@ mod tests {
             access_control_syntax: _,
             type_name_syntax: _,
             target_spelling: _,
+            transaction_syntax: _,
         } = FeatureSet::ANSI;
 
-        assert_eq!(FEATURES.len(), 48);
+        assert_eq!(FEATURES.len(), 49);
     }
 
     // --- ISO 9075 feature taxonomy (prod-coverage-iso-feature-taxonomy) ------

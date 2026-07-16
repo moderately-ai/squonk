@@ -15,7 +15,7 @@
 //!
 //! # What this preset adds over ANSI
 //!
-//! Four grammar gates, each documented as Snowflake surface:
+//! Five grammar gates and the `COPY INTO` utility delta are enabled as data deltas:
 //!
 //! - [`semi_structured_access`](ExpressionSyntax::semi_structured_access) — the
 //!   `base:key[0].field` path syntax over `VARIANT`/`OBJECT`/`ARRAY` columns, Snowflake's
@@ -37,12 +37,16 @@
 //!   Oracle superset — either clause order, the after-`WHERE` position, and `NOCYCLE`
 //!   (which Snowflake's docs omit) — a documented conservative-direction over-acceptance;
 //!   the `PRIOR` operator is scoped to the `CONNECT BY` condition alone.
+//! - [`table_json_path`](TableExpressionSyntax::table_json_path) — PartiQL-style `@path`
+//!   lookups in `FROM` table-positioned JSON/VARIANT expressions.
+//! - [`copy_into`](UtilitySyntax::copy_into) and [`stage_references`](UtilitySyntax::stage_references)
+//!   for bulk load/unload statements with staged locations.
 //!
 //! Snowflake's identifier lexis needs no delta: it folds unquoted identifiers to
 //! **upper**case ([`Casing::Upper`], already ANSI's value) and quotes with the standard
 //! `"…"` ([`STANDARD_IDENTIFIER_QUOTES`], likewise ANSI). The `semi_structured_access`
 //! path rides the `:` trigger, which contends with
-//! [`ParameterSyntax::named_colon`](super::ParameterSyntax::named_colon); Snowflake spells
+//! [`ParameterSyntax::named_colon`](super::ParameterSyntax::named_colon); Snowflake speaks
 //! bind variables with `?`/`:name` *outside* SQL text and does not enable colon parameters
 //! in-grammar, so `named_colon` stays off (ANSI's value) and the `:` trigger has a single
 //! claimant — the lexical-consistency `const` assert below enforces it.
@@ -57,7 +61,7 @@ use super::{
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
     STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TypeNameSyntax, UtilitySyntax,
+    TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -228,30 +232,6 @@ impl UtilitySyntax {
     pub const SNOWFLAKE: Self = Self {
         copy_into: true,
         stage_references: true,
-        start_transaction: true,
-        start_transaction_block_optional: false,
-        transaction_work_keyword: true,
-        begin_transaction_keyword: true,
-        commit_transaction_keyword: true,
-        rollback_transaction_keyword: true,
-        transaction_name: false,
-        begin_transaction_modes: true,
-        transaction_savepoints: true,
-        set_transaction: true,
-        transaction_isolation_mode: true,
-        transaction_access_mode: true,
-        transaction_deferrable_mode: true,
-        start_transaction_isolation_mode: true,
-        start_transaction_deferrable_mode: true,
-        start_transaction_consistent_snapshot: false,
-        transaction_multiple_modes: true,
-        transaction_mode_comma_required: false,
-        transaction_modes_unique: false,
-        abort_transaction_alias: false,
-        end_transaction_alias: false,
-        transaction_release: false,
-        transaction_chain: true,
-        release_savepoint_keyword_optional: true,
         copy: false,
         comment_on: false,
         comment_if_exists: false,
@@ -284,8 +264,6 @@ impl UtilitySyntax {
         do_expression_list: false,
         lock_tables: false,
         lock_instance: false,
-        begin_transaction_mode: false,
-        xa_transactions: false,
         rename_statement: false,
         signal_diagnostics: false,
         export_import_database: false,
@@ -293,8 +271,40 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
+};
+}
+impl TransactionSyntax {
+    /// Transaction-control surface for the `SNOWFLAKE` preset (split from UtilitySyntax).
+    pub const SNOWFLAKE: Self = Self {
+        start_transaction: true,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: true,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        transaction_name: false,
+        begin_transaction_modes: true,
+        transaction_savepoints: true,
+        set_transaction: true,
+        transaction_isolation_mode: true,
+        transaction_access_mode: true,
+        transaction_deferrable_mode: true,
+        start_transaction_isolation_mode: true,
+        start_transaction_deferrable_mode: true,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: true,
+        transaction_modes_require_commas: false,
+        transaction_modes_reject_duplicates: false,
+        abort_transaction_alias: false,
+        end_transaction_alias: false,
+        transaction_release: false,
+        transaction_chain: true,
+        release_savepoint_keyword_optional: true,
+        begin_transaction_mode: false,
+        xa_transactions: false,
     };
 }
+
 
 impl ExpressionSyntax {
     /// Snowflake expression surface: the ANSI baseline plus semi-structured path access
@@ -407,6 +417,7 @@ impl FeatureSet {
         grouping_syntax: GroupingSyntax::SNOWFLAKE,
         // The `COPY INTO` bulk load/unload statement.
         utility_syntax: UtilitySyntax::SNOWFLAKE,
+        transaction_syntax: TransactionSyntax::SNOWFLAKE,
         show_syntax: ShowSyntax::ANSI,
         maintenance_syntax: MaintenanceSyntax::ANSI,
         access_control_syntax: AccessControlSyntax::ANSI,
@@ -440,9 +451,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn snowflake_is_ansi_plus_the_four_gates_and_the_qualify_reservation() {
-        // The preset is ANSI with a documented, closed set of divergent axes: the grammar
-        // gates (over two sub-presets), the `COPY INTO` utility gate, the `QUALIFY`
+    fn snowflake_is_ansi_plus_the_five_gates_and_the_qualify_reservation() {
+        // The preset is ANSI with a documented, closed set of divergent axes: five grammar
+        // gates (including `table_json_path`), the `COPY INTO` utility gate, the `QUALIFY`
         // reservation, and the `PIVOT`/`UNPIVOT`/`MATCH_RECOGNIZE` table-operator `ColId`
         // reservation. Asserting the whole rest equals ANSI keeps the "ANSI-derived, every
         // delta documented" claim honest against a future stray edit. Bind to locals so the
@@ -450,7 +461,7 @@ mod tests {
         let ansi = FeatureSet::ANSI;
         let sf = FeatureSet::SNOWFLAKE;
 
-        // The two divergent sub-presets.
+        // The four divergent sub-presets.
         assert_eq!(sf.select_syntax, SelectSyntax::SNOWFLAKE);
         assert_ne!(sf.select_syntax, ansi.select_syntax);
         assert_eq!(sf.expression_syntax, ExpressionSyntax::SNOWFLAKE);
@@ -558,11 +569,11 @@ mod tests {
     }
 
     #[test]
-    fn snowflake_enables_exactly_the_four_staged_gates() {
-        // The capstone: semi-structured access, QUALIFY, GROUP BY ALL, and the Oracle-style
-        // CONNECT BY hierarchical query clause are on, and each
+    fn snowflake_enables_exactly_the_five_staged_gates() {
+        // The capstone: semi-structured access, QUALIFY, GROUP BY ALL, table-JSON path,
+        // and the Oracle-style CONNECT BY hierarchical query clause are on, and each
         // is off in the ANSI base it derives from — while ORDER BY ALL stays off (Snowflake
-        // ships GROUP BY ALL without it). Forcing the four back off recovers the ANSI
+        // ships GROUP BY ALL without it). Forcing the five back off recovers the ANSI
         // sub-presets verbatim.
         let ansi = FeatureSet::ANSI;
         let sf = FeatureSet::SNOWFLAKE;
@@ -573,6 +584,8 @@ mod tests {
         // The Oracle-style hierarchical query clause; on for Snowflake, off in ANSI.
         assert!(sf.select_syntax.connect_by_clause && !ansi.select_syntax.connect_by_clause);
         assert!(sf.grouping_syntax.group_by_all && !ansi.grouping_syntax.group_by_all);
+        assert!(sf.table_expressions.table_json_path);
+        assert!(!ansi.table_expressions.table_json_path);
         // Snowflake has no ORDER BY ALL — the flag the field doc names as the split.
         assert!(!sf.grouping_syntax.order_by_all);
         assert_eq!(
@@ -602,13 +615,20 @@ mod tests {
             },
             ansi.expression_syntax,
         );
+        assert_eq!(
+            TableExpressionSyntax {
+                table_json_path: false,
+                ..sf.table_expressions
+            },
+            ansi.table_expressions,
+        );
     }
 
     #[test]
     fn snowflake_is_lexically_consistent_and_dependency_clean() {
         // Both self-consistency registries must be clean: the semi-structured `:` trigger
-        // has a single claimant (colon parameters stay off), and none of the four
-        // contextual gates rides an unset base flag.
+        // has a single claimant (colon parameters stay off), and none of the five contextual
+        // gates rides an unset base flag.
         let sf = FeatureSet::SNOWFLAKE;
         assert_eq!(sf.lexical_conflict(), None);
         assert!(sf.is_lexically_consistent());

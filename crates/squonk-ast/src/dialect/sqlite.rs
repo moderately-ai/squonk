@@ -17,7 +17,7 @@ use super::{
     ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax, SQLITE_BYTE_CLASSES,
     SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
     StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
-    UtilitySyntax,
+    TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, STANDARD_SET_OPERATION_BINDING_POWERS,
@@ -932,30 +932,6 @@ impl GroupingSyntax {
 impl UtilitySyntax {
     /// The `SQLITE` preset for utility syntax.
     pub const SQLITE: Self = Self {
-        start_transaction: false,
-        start_transaction_block_optional: false,
-        transaction_work_keyword: false,
-        begin_transaction_keyword: true,
-        commit_transaction_keyword: true,
-        rollback_transaction_keyword: true,
-        transaction_name: true,
-        begin_transaction_modes: false,
-        transaction_savepoints: true,
-        set_transaction: false,
-        transaction_isolation_mode: false,
-        transaction_access_mode: false,
-        transaction_deferrable_mode: false,
-        start_transaction_isolation_mode: false,
-        start_transaction_deferrable_mode: false,
-        start_transaction_consistent_snapshot: false,
-        transaction_multiple_modes: false,
-        transaction_mode_comma_required: false,
-        transaction_modes_unique: false,
-        abort_transaction_alias: false,
-        end_transaction_alias: true,
-        transaction_release: false,
-        transaction_chain: false,
-        release_savepoint_keyword_optional: true,
         copy: false,
         // `COPY INTO` is Snowflake bulk load/unload; SQLite has no such statement.
         copy_into: false,
@@ -1012,10 +988,8 @@ impl UtilitySyntax {
         // SQLite's `BEGIN {DEFERRED|IMMEDIATE|EXCLUSIVE}` transaction-mode modifier
         // (engine-measured on rusqlite 3.53.2: all three accept, `BEGIN CONCURRENT`
         // rejects, doubling the modifier rejects).
-        begin_transaction_mode: true,
         // MySQL's `XA` distributed-transaction family is MySQL-only; SQLite has no `XA`
         // statement, so the leading `XA` keyword is not dispatched.
-        xa_transactions: false,
         // The standalone `RENAME TABLE`/`RENAME USER` statements are MySQL-only; SQLite
         // renames via `ALTER TABLE … RENAME TO`, so the leading `RENAME` is not dispatched.
         rename_statement: false,
@@ -1031,8 +1005,40 @@ impl UtilitySyntax {
         flush: false,
         purge_binary_logs: false,
         replication_statements: false,
+};
+}
+impl TransactionSyntax {
+    /// Transaction-control surface for the `SQLITE` preset (split from UtilitySyntax).
+    pub const SQLITE: Self = Self {
+        start_transaction: false,
+        start_transaction_block_optional: false,
+        transaction_work_keyword: false,
+        begin_transaction_keyword: true,
+        commit_transaction_keyword: true,
+        rollback_transaction_keyword: true,
+        transaction_name: true,
+        begin_transaction_modes: false,
+        transaction_savepoints: true,
+        set_transaction: false,
+        transaction_isolation_mode: false,
+        transaction_access_mode: false,
+        transaction_deferrable_mode: false,
+        start_transaction_isolation_mode: false,
+        start_transaction_deferrable_mode: false,
+        start_transaction_consistent_snapshot: false,
+        transaction_multiple_modes: false,
+        transaction_modes_require_commas: false,
+        transaction_modes_reject_duplicates: false,
+        abort_transaction_alias: false,
+        end_transaction_alias: true,
+        transaction_release: false,
+        transaction_chain: false,
+        release_savepoint_keyword_optional: true,
+        begin_transaction_mode: true,
+        xa_transactions: false,
     };
 }
+
 
 impl ShowSyntax {
     /// The `SQLITE` preset for show syntax.
@@ -1302,6 +1308,7 @@ impl FeatureSet {
         // `VACUUM`/`REINDEX`/`ANALYZE` maintenance trio are dispatched; the PostgreSQL
         // `COPY`/`COMMENT ON` flags stay off (SQLite has neither).
         utility_syntax: UtilitySyntax::SQLITE,
+        transaction_syntax: TransactionSyntax::SQLITE,
         show_syntax: ShowSyntax::SQLITE,
         maintenance_syntax: MaintenanceSyntax::SQLITE,
         access_control_syntax: AccessControlSyntax::SQLITE,

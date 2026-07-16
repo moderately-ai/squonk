@@ -83,7 +83,7 @@ use super::{
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
     SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
     StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
-    UtilitySyntax,
+    TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
@@ -273,6 +273,7 @@ impl FeatureSet {
         query_tail_syntax: QueryTailSyntax::ANSI,
         grouping_syntax: GroupingSyntax::ANSI,
         utility_syntax: UtilitySyntax::ANSI,
+        transaction_syntax: TransactionSyntax::ANSI,
         show_syntax: ShowSyntax::ANSI,
         maintenance_syntax: MaintenanceSyntax::ANSI,
         access_control_syntax: AccessControlSyntax::ANSI,
