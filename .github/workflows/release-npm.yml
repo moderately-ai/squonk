@@ -426,8 +426,11 @@ jobs:
 
       - name: Audit every package manifest
         run: |
+          # Use `npm pack --dry-run`, not `npm publish --dry-run`: the latter still
+          # consults the registry and fails when the version is already published
+          # (bootstrap-then-publish, or a re-run of the release workflow).
           for dir in dist/npm/*; do
-            npm publish "$dir" --dry-run --access public
+            npm pack "$dir" --dry-run
           done
 
   portable-runtime:
@@ -577,8 +580,9 @@ jobs:
 
       - name: Review every exact publish manifest again
         run: |
+          # Pack dry-run only — registry presence is handled by the publish loop below.
           for label in native-darwin-arm64 native-darwin-x64 native-linux-arm64-gnu native-linux-x64-gnu native-linux-arm64-musl native-linux-x64-musl native-win32-arm64-msvc native-win32-x64-msvc ${{ needs.package_matrix.outputs.labels }}; do
-            npm publish "./$label" --dry-run --provenance --access public
+            npm pack "./$label" --dry-run
           done
 
       - name: Publish with OIDC provenance
