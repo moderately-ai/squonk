@@ -127,6 +127,12 @@ pub const PG_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     b"\t\tset\tnAMes",
     // Continued E-string segments still reject invalid `\\U` escapes (libpg_query).
     b"do''e'f''\n''icU_\\Ucccc_\\Uccccccf''\n''icU_\\Ucccc_\\UcccccE''c'\n''",
+    // DO body U& strings validate Unicode escapes (invalid `\\d`).
+    b"Do'S'U&'\\d'",
+    // DO admits multiple Sconst args separated by any whitespace (VT/tab), not only
+    // newline-continued single constants.
+    b"Do''\x0b''",
+    b"Do'?'\x0b'e'",
     // PostgreSQL's scanner accepts digit runs beyond u32 and materializes them via
     // its C `atol` -> parser-int path; Squonk retains the spelling and mirrors that
     // value only in the structural oracle projection.
@@ -828,6 +834,9 @@ pub const DUCKDB_DIFFERENTIAL_RAW_BYTES_REPLAYS: &[&[u8]] = &[
     // extract_statement_count path treats Catalog Error as parse accept.
     b"pragma\nn",
     b"PRAGMA n",
+    // DESCRIBE/SUMMARIZE admit a single-part Sconst table name.
+    b"describe e'0e'",
+    b"\x0c\x0c\x0c\x0c\x0c\x0c\x0c\x0cdescribe\x0c\x0c\x0c\x0c\x0c\x0c\x0c\x0ce'0e'",
     // `GRANT` is unreserved in DuckDB and can name a FROM relation; the second
     // unreserved word is its alias.
     b"FROM grant sm8",

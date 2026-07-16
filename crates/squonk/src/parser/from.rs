@@ -741,7 +741,15 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 meta,
             })
         } else {
-            let name = self.parse_object_name()?;
+            // DuckDB admits a single-part Sconst table name after DESCRIBE/SUMMARIZE
+            // (`DESCRIBE e'0e'`, `SUMMARIZE 't'`; engine-measured on libduckdb 1.5.4).
+            let name = if self.features().identifier_syntax.string_literal_table_names
+                && self.peek_is_name_sconst()?
+            {
+                ObjectName(thin_vec![self.parse_name_sconst_ident("a table name")?])
+            } else {
+                self.parse_object_name()?
+            };
             let meta = self.make_meta(start.union(self.preceding_span()));
             Ok(ShowRefTarget::Name { name, meta })
         }

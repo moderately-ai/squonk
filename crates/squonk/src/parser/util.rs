@@ -5095,10 +5095,30 @@ impl<'a, D: Dialect> Parser<'a, D> {
         if token.kind != TokenKind::String {
             return Ok(None);
         }
+        // One string token only — no adjacent-string continuation. DO (and other
+        // multi-`Sconst` positions) admit several string args separated by any
+        // whitespace (`DO 'a'\t'b'`); folding them into one constant would reject
+        // libpg_query-valid multi-arg forms with "expected a newline between
+        // adjacent string literals". `U&'…'` still folds optional `UESCAPE` and
+        // validates the escape body so invalid `U&'\d'` is rejected.
         self.advance()?;
+        let text = self.span_text(token.span);
+        let is_unicode = matches!(text.as_bytes(), [b'U' | b'u', b'&', b'\'', ..]);
+        let span = if is_unicode {
+            let span = self.consume_optional_uescape(token.span)?;
+            if !crate::ast::unicode_escape_string_is_valid(self.span_text(span)) {
+                return Err(crate::error::ParseError::lexical(
+                    span,
+                    crate::tokenizer::LexErrorKind::InvalidEscapeSequence,
+                ));
+            }
+            span
+        } else {
+            token.span
+        };
         Ok(Some(Literal {
             kind: LiteralKind::String,
-            meta: self.make_meta(token.span),
+            meta: self.make_meta(span),
         }))
     }
 
