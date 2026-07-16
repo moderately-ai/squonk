@@ -56,6 +56,10 @@ const TABLE_EXPRESSION_SUBFLAGS: &[&str] = &[
     "base_table_alias_column_lists",
     "string_literal_aliases",
     "aliased_parenthesized_join",
+    "bare_table_alias_is_bare_label",
+    "indexed_by",
+    "table_json_path",
+    "table_version",
 ];
 const JOIN_SUBFLAGS: &[&str] = &[
     "stacked_join_qualifiers",
@@ -68,6 +72,8 @@ const JOIN_SUBFLAGS: &[&str] = &[
     "sided_semi_anti_join",
     "recursive_search_cycle",
     "recursive_union_rejects_order_limit",
+    "apply_join",
+    "recursive_using_key",
 ];
 const TABLE_FACTOR_SUBFLAGS: &[&str] = &[
     "lateral",
@@ -103,6 +109,8 @@ const PARAMETER_SUBFLAGS: &[&str] = &[
     "named_colon",
     "named_at",
     "numbered_question",
+    "named_dollar",
+    "positional_dollar_large",
 ];
 
 const SESSION_VARIABLE_SUBFLAGS: &[&str] =
@@ -135,6 +143,16 @@ const MUTATION_SUBFLAGS: &[&str] = &[
     "merge_when_not_matched_by",
     "merge_insert_default_values",
     "merge_insert_overriding",
+    "insert_column_matching",
+    "insert_ignore",
+    "insert_overwrite",
+    "joined_update_delete",
+    "merge_error_action",
+    "merge_insert_multirow",
+    "merge_insert_star_by_name",
+    "merge_update_set_star",
+    "update_set_qualified_column",
+    "update_tuple_value_row_arity",
 ];
 const VIEW_SEQUENCE_CLAUSE_SUBFLAGS: &[&str] = &[
     "temporary_views",
@@ -172,6 +190,7 @@ const STATEMENT_DDL_GATES_SUBFLAGS: &[&str] = &[
     "alter_instance",
     "alter_sequence",
     "alter_object_set_schema",
+    "colocation_groups",
 ];
 const CREATE_TABLE_CLAUSE_SUBFLAGS: &[&str] = &[
     "table_options",
@@ -201,6 +220,9 @@ const COLUMN_DEFINITION_SUBFLAGS: &[&str] = &[
     "default_expression_requires_parens",
     "column_collation",
     "column_storage",
+    "column_default_requires_b_expr",
+    "compact_identity_columns",
+    "typeless_generated_columns",
 ];
 const CONSTRAINT_SUBFLAGS: &[&str] = &[
     "deferrable_constraints",
@@ -210,6 +232,8 @@ const CONSTRAINT_SUBFLAGS: &[&str] = &[
     "constraint_no_inherit_not_valid",
     "index_constraint_parameters",
     "constraint_column_collate_order",
+    "check_constraint_subqueries",
+    "referential_action_cascade_set",
 ];
 const INDEX_ALTER_SUBFLAGS: &[&str] = &[
     "drop_behavior",
@@ -225,11 +249,23 @@ const INDEX_ALTER_SUBFLAGS: &[&str] = &[
     "routine_arg_modes",
     "alter_existence_guards",
     "alter_column_set_data_type",
+    "alter_column_add_identity",
+    "alter_nested_column_paths",
+    "alter_table_multiple_actions",
+    "alter_table_set_options",
+    "drop_primary_key",
+    "index_storage_parameters",
+    "rename_constraint",
+    "routine_language_string",
 ];
 // `view_if_not_exists` is deliberately *not* here: like the pre-restructure bundle, the
 // plain-`CREATE VIEW` guard has no independent accept/reject coverage case, so it stays a
 // non-toggleable field (bound `_` in the enumeration guard below).
-const EXISTENCE_GUARDS_SUBFLAGS: &[&str] = &["if_exists", "create_database_if_not_exists"];
+const EXISTENCE_GUARDS_SUBFLAGS: &[&str] = &[
+    "if_exists",
+    "create_database_if_not_exists",
+    "view_if_not_exists",
+];
 const SELECT_SUBFLAGS: &[&str] = &[
     "distinct_on",
     "select_into",
@@ -246,6 +282,13 @@ const SELECT_SUBFLAGS: &[&str] = &[
     "values_rows_require_equal_arity",
     "values_row_constructor",
     "as_alias_rejects_reserved",
+    "connect_by_clause",
+    "except_all",
+    "intersect_all",
+    "lateral_view_clause",
+    "prefix_colon_alias",
+    "trailing_comma",
+    "wildcard_replace",
 ];
 const QUERY_TAIL_SUBFLAGS: &[&str] = &[
     "fetch_first",
@@ -258,6 +301,11 @@ const QUERY_TAIL_SUBFLAGS: &[&str] = &[
     "limit_expressions",
     "limit_percent",
     "pipe_syntax",
+    "for_xml_json_clause",
+    "format_clause",
+    "limit_by_clause",
+    "settings_clause",
+    "with_ties_requires_order_by",
 ];
 const GROUPING_SUBFLAGS: &[&str] = &[
     "grouping_sets",
@@ -265,6 +313,7 @@ const GROUPING_SUBFLAGS: &[&str] = &[
     "order_by_using",
     "group_by_all",
     "order_by_all",
+    "group_by_set_quantifier",
 ];
 const UTILITY_SUBFLAGS: &[&str] = &[
     "copy",
@@ -307,6 +356,7 @@ const UTILITY_SUBFLAGS: &[&str] = &[
     "signal_diagnostics",
     "export_import_database",
     "update_extensions",
+    "comment_if_exists",
 ];
 const TRANSACTION_SUBFLAGS: &[&str] = &[
     "transaction_name",
@@ -348,6 +398,8 @@ const SHOW_SUBFLAGS: &[&str] = &[
     "show_routine_status",
     "show_verbose",
     "show_admin",
+    "set_value_null_keyword",
+    "set_value_on_keyword",
 ];
 const MAINTENANCE_SUBFLAGS: &[&str] = &[
     "vacuum",
@@ -364,6 +416,7 @@ const ACCESS_CONTROL_SUBFLAGS: &[&str] = &[
     "access_control_extended_objects",
     "user_role_management",
     "access_control_account_grants",
+    "alter_role_rename",
 ];
 const TYPE_NAME_SUBFLAGS: &[&str] = &[
     "extended_scalar_type_names",
@@ -379,6 +432,12 @@ const TYPE_NAME_SUBFLAGS: &[&str] = &[
     "signed_type_modifier",
     "liberal_type_names",
     "string_type_modifiers",
+    "angle_bracket_types",
+    "bit_width_integer_names",
+    "fixed_string_type",
+    "low_cardinality_type",
+    "nested_type",
+    "nullable_type",
 ];
 const EXPRESSION_SYNTAX_SUBFLAGS: &[&str] = &[
     "typecast_operator",
@@ -399,12 +458,12 @@ const EXPRESSION_SYNTAX_SUBFLAGS: &[&str] = &[
     "mysql_interval_operator",
     "positional_column",
     "lambda_keyword",
+    "multidim_array_literals",
 ];
-// `double_equals`, `integer_divide_slash`, and `is_general_equality` are deliberately not
-// here: like the pre-split ExpressionSyntax, the SQLite/DuckDB-only equality (`==`) and
-// integer-division (`//`) *spellings* fold onto existing operators and carry no independent
-// accept/reject coverage case, so they stay non-toggleable fields (bound `_` in the
-// enumeration guard below).
+// `double_equals`, `integer_divide_slash`, `is_general_equality`, and related residual
+// operator spellings are now ToggleableFeatures with Shape/Accept LabeledCases (see residual
+// promotions). They live in this array so `every_gated_subflag_is_required_by_a_labeled_case`
+// enforces their coverage.
 const OPERATOR_SYNTAX_SUBFLAGS: &[&str] = &[
     "operator_construct",
     "containment_operators",
@@ -417,6 +476,13 @@ const OPERATOR_SYNTAX_SUBFLAGS: &[&str] = &[
     "quantified_comparisons",
     "custom_operators",
     "postfix_operators",
+    "double_equals",
+    "integer_divide_slash",
+    "is_general_equality",
+    "null_test_postfix",
+    "quantified_arbitrary_operator",
+    "quantified_comparison_lists",
+    "starts_with_operator",
 ];
 const CALL_SYNTAX_SUBFLAGS: &[&str] = &[
     "named_argument",
@@ -430,6 +496,9 @@ const CALL_SYNTAX_SUBFLAGS: &[&str] = &[
     "method_chaining",
     "sqljson_expression_functions",
     "xml_expression_functions",
+    "convert_function",
+    "merge_action_function",
+    "sqljson_constructors_require_argument",
 ];
 const STRING_FUNC_FORMS_SUBFLAGS: &[&str] = &[
     "substring_from_for",
@@ -445,6 +514,8 @@ const STRING_FUNC_FORMS_SUBFLAGS: &[&str] = &[
     "trim_list_syntax",
     "ceil_to_field",
     "floor_to_field",
+    "collation_for_expression",
+    "match_against",
 ];
 const AGGREGATE_CALL_SYNTAX_SUBFLAGS: &[&str] = &[
     "group_concat_separator",
@@ -454,8 +525,23 @@ const AGGREGATE_CALL_SYNTAX_SUBFLAGS: &[&str] = &[
     "null_treatment",
     "aggregate_calls_reject_empty_arguments",
     "over_requires_windowable_function",
+    "filter_optional_where",
+    "standalone_argument_order_by",
+    "window_function_tail",
 ];
-const PREDICATE_SUBFLAGS: &[&str] = &["like", "ilike", "similar_to", "unparenthesized_in_list"];
+const PREDICATE_SUBFLAGS: &[&str] = &[
+    "like",
+    "ilike",
+    "similar_to",
+    "unparenthesized_in_list",
+    "between_symmetric",
+    "empty_in_list",
+    "is_distinct_from",
+    "is_normalized",
+    "null_test_two_word_postfix",
+    "overlaps_period_predicate",
+    "pattern_match_quantifier",
+];
 
 const COMPOSITE_SUBFLAGS: &[(Feature, &[&str])] = &[
     (Feature::StringLiterals, STRING_LITERAL_SUBFLAGS),
@@ -931,6 +1017,85 @@ toggleable_features! {
     (SIGNED_TYPE_MODIFIER, "signed_type_modifier", TypeNameSyntax, type_name_syntax, TypeNameSyntax, signed_type_modifier),
     (LIBERAL_TYPE_NAMES, "liberal_type_names", TypeNameSyntax, type_name_syntax, TypeNameSyntax, liberal_type_names),
     (STRING_TYPE_MODIFIERS, "string_type_modifiers", TypeNameSyntax, type_name_syntax, TypeNameSyntax, string_type_modifiers),
+    // --- residual bools promoted to ToggleableFeature (DP6 complete) ---
+(ALTER_COLUMN_ADD_IDENTITY, "alter_column_add_identity", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, alter_column_add_identity),
+    (ALTER_NESTED_COLUMN_PATHS, "alter_nested_column_paths", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, alter_nested_column_paths),
+    (ALTER_ROLE_RENAME, "alter_role_rename", AccessControlSyntax, access_control_syntax, AccessControlSyntax, alter_role_rename),
+    (ALTER_TABLE_MULTIPLE_ACTIONS, "alter_table_multiple_actions", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, alter_table_multiple_actions),
+    (ALTER_TABLE_SET_OPTIONS, "alter_table_set_options", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, alter_table_set_options),
+    (ANGLE_BRACKET_TYPES, "angle_bracket_types", TypeNameSyntax, type_name_syntax, TypeNameSyntax, angle_bracket_types),
+    (APPLY_JOIN, "apply_join", JoinSyntax, join_syntax, JoinSyntax, apply_join),
+    (BARE_TABLE_ALIAS_IS_BARE_LABEL, "bare_table_alias_is_bare_label", TableExpressions, table_expressions, TableExpressionSyntax, bare_table_alias_is_bare_label),
+    (BETWEEN_SYMMETRIC, "between_symmetric", PredicateSyntax, predicate_syntax, PredicateSyntax, between_symmetric),
+    (BIT_WIDTH_INTEGER_NAMES, "bit_width_integer_names", TypeNameSyntax, type_name_syntax, TypeNameSyntax, bit_width_integer_names),
+    (CHECK_CONSTRAINT_SUBQUERIES, "check_constraint_subqueries", ConstraintSyntax, constraint_syntax, ConstraintSyntax, check_constraint_subqueries),
+    (COLLATION_FOR_EXPRESSION, "collation_for_expression", StringFuncForms, string_func_forms, StringFuncForms, collation_for_expression),
+    (COLOCATION_GROUPS, "colocation_groups", StatementDdlGates, statement_ddl_gates, StatementDdlGates, colocation_groups),
+    (COLUMN_DEFAULT_REQUIRES_B_EXPR, "column_default_requires_b_expr", ColumnDefinitionSyntax, column_definition_syntax, ColumnDefinitionSyntax, column_default_requires_b_expr),
+    (COMMENT_IF_EXISTS, "comment_if_exists", UtilitySyntax, utility_syntax, UtilitySyntax, comment_if_exists),
+    (COMPACT_IDENTITY_COLUMNS, "compact_identity_columns", ColumnDefinitionSyntax, column_definition_syntax, ColumnDefinitionSyntax, compact_identity_columns),
+    (CONNECT_BY_CLAUSE, "connect_by_clause", SelectSyntax, select_syntax, SelectSyntax, connect_by_clause),
+    (CONVERT_FUNCTION, "convert_function", CallSyntax, call_syntax, CallSyntax, convert_function),
+    (DOUBLE_EQUALS, "double_equals", OperatorSyntax, operator_syntax, OperatorSyntax, double_equals),
+    (DROP_PRIMARY_KEY, "drop_primary_key", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, drop_primary_key),
+    (EMPTY_IN_LIST, "empty_in_list", PredicateSyntax, predicate_syntax, PredicateSyntax, empty_in_list),
+    (EXCEPT_ALL, "except_all", SelectSyntax, select_syntax, SelectSyntax, except_all),
+    (FILTER_OPTIONAL_WHERE, "filter_optional_where", AggregateCallSyntax, aggregate_call_syntax, AggregateCallSyntax, filter_optional_where),
+    (FIXED_STRING_TYPE, "fixed_string_type", TypeNameSyntax, type_name_syntax, TypeNameSyntax, fixed_string_type),
+    (FOR_XML_JSON_CLAUSE, "for_xml_json_clause", QueryTailSyntax, query_tail_syntax, QueryTailSyntax, for_xml_json_clause),
+    (FORMAT_CLAUSE, "format_clause", QueryTailSyntax, query_tail_syntax, QueryTailSyntax, format_clause),
+    (GROUP_BY_SET_QUANTIFIER, "group_by_set_quantifier", GroupingSyntax, grouping_syntax, GroupingSyntax, group_by_set_quantifier),
+    (INDEX_STORAGE_PARAMETERS, "index_storage_parameters", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, index_storage_parameters),
+    (INDEXED_BY, "indexed_by", TableExpressions, table_expressions, TableExpressionSyntax, indexed_by),
+    (INSERT_COLUMN_MATCHING, "insert_column_matching", MutationSyntax, mutation_syntax, MutationSyntax, insert_column_matching),
+    (INSERT_IGNORE, "insert_ignore", MutationSyntax, mutation_syntax, MutationSyntax, insert_ignore),
+    (INSERT_OVERWRITE, "insert_overwrite", MutationSyntax, mutation_syntax, MutationSyntax, insert_overwrite),
+    (INTEGER_DIVIDE_SLASH, "integer_divide_slash", OperatorSyntax, operator_syntax, OperatorSyntax, integer_divide_slash),
+    (INTERSECT_ALL, "intersect_all", SelectSyntax, select_syntax, SelectSyntax, intersect_all),
+    (IS_DISTINCT_FROM, "is_distinct_from", PredicateSyntax, predicate_syntax, PredicateSyntax, is_distinct_from),
+    (IS_GENERAL_EQUALITY, "is_general_equality", OperatorSyntax, operator_syntax, OperatorSyntax, is_general_equality),
+    (IS_NORMALIZED, "is_normalized", PredicateSyntax, predicate_syntax, PredicateSyntax, is_normalized),
+    (JOINED_UPDATE_DELETE, "joined_update_delete", MutationSyntax, mutation_syntax, MutationSyntax, joined_update_delete),
+    (LATERAL_VIEW_CLAUSE, "lateral_view_clause", SelectSyntax, select_syntax, SelectSyntax, lateral_view_clause),
+    (LIMIT_BY_CLAUSE, "limit_by_clause", QueryTailSyntax, query_tail_syntax, QueryTailSyntax, limit_by_clause),
+    (LOW_CARDINALITY_TYPE, "low_cardinality_type", TypeNameSyntax, type_name_syntax, TypeNameSyntax, low_cardinality_type),
+    (MATCH_AGAINST, "match_against", StringFuncForms, string_func_forms, StringFuncForms, match_against),
+    (MERGE_ACTION_FUNCTION, "merge_action_function", CallSyntax, call_syntax, CallSyntax, merge_action_function),
+    (MERGE_ERROR_ACTION, "merge_error_action", MutationSyntax, mutation_syntax, MutationSyntax, merge_error_action),
+    (MERGE_INSERT_MULTIROW, "merge_insert_multirow", MutationSyntax, mutation_syntax, MutationSyntax, merge_insert_multirow),
+    (MERGE_INSERT_STAR_BY_NAME, "merge_insert_star_by_name", MutationSyntax, mutation_syntax, MutationSyntax, merge_insert_star_by_name),
+    (MERGE_UPDATE_SET_STAR, "merge_update_set_star", MutationSyntax, mutation_syntax, MutationSyntax, merge_update_set_star),
+    (MULTIDIM_ARRAY_LITERALS, "multidim_array_literals", ExpressionSyntax, expression_syntax, ExpressionSyntax, multidim_array_literals),
+    (NESTED_TYPE, "nested_type", TypeNameSyntax, type_name_syntax, TypeNameSyntax, nested_type),
+    (NULL_TEST_POSTFIX, "null_test_postfix", OperatorSyntax, operator_syntax, OperatorSyntax, null_test_postfix),
+    (NULL_TEST_TWO_WORD_POSTFIX, "null_test_two_word_postfix", PredicateSyntax, predicate_syntax, PredicateSyntax, null_test_two_word_postfix),
+    (NULLABLE_TYPE, "nullable_type", TypeNameSyntax, type_name_syntax, TypeNameSyntax, nullable_type),
+    (OVERLAPS_PERIOD_PREDICATE, "overlaps_period_predicate", PredicateSyntax, predicate_syntax, PredicateSyntax, overlaps_period_predicate),
+    (PATTERN_MATCH_QUANTIFIER, "pattern_match_quantifier", PredicateSyntax, predicate_syntax, PredicateSyntax, pattern_match_quantifier),
+    (POSITIONAL_DOLLAR_LARGE, "positional_dollar_large", Parameters, parameters, ParameterSyntax, positional_dollar_large),
+    (PREFIX_COLON_ALIAS, "prefix_colon_alias", SelectSyntax, select_syntax, SelectSyntax, prefix_colon_alias),
+    (QUANTIFIED_ARBITRARY_OPERATOR, "quantified_arbitrary_operator", OperatorSyntax, operator_syntax, OperatorSyntax, quantified_arbitrary_operator),
+    (QUANTIFIED_COMPARISON_LISTS, "quantified_comparison_lists", OperatorSyntax, operator_syntax, OperatorSyntax, quantified_comparison_lists),
+    (RECURSIVE_USING_KEY, "recursive_using_key", JoinSyntax, join_syntax, JoinSyntax, recursive_using_key),
+    (REFERENTIAL_ACTION_CASCADE_SET, "referential_action_cascade_set", ConstraintSyntax, constraint_syntax, ConstraintSyntax, referential_action_cascade_set),
+    (RENAME_CONSTRAINT, "rename_constraint", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, rename_constraint),
+    (ROUTINE_LANGUAGE_STRING, "routine_language_string", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, routine_language_string),
+    (SET_VALUE_NULL_KEYWORD, "set_value_null_keyword", ShowSyntax, show_syntax, ShowSyntax, set_value_null_keyword),
+    (SET_VALUE_ON_KEYWORD, "set_value_on_keyword", ShowSyntax, show_syntax, ShowSyntax, set_value_on_keyword),
+    (SETTINGS_CLAUSE, "settings_clause", QueryTailSyntax, query_tail_syntax, QueryTailSyntax, settings_clause),
+    (SQLJSON_CONSTRUCTORS_REQUIRE_ARGUMENT, "sqljson_constructors_require_argument", CallSyntax, call_syntax, CallSyntax, sqljson_constructors_require_argument),
+    (STANDALONE_ARGUMENT_ORDER_BY, "standalone_argument_order_by", AggregateCallSyntax, aggregate_call_syntax, AggregateCallSyntax, standalone_argument_order_by),
+    (STARTS_WITH_OPERATOR, "starts_with_operator", OperatorSyntax, operator_syntax, OperatorSyntax, starts_with_operator),
+    (TABLE_JSON_PATH, "table_json_path", TableExpressions, table_expressions, TableExpressionSyntax, table_json_path),
+    (TABLE_VERSION, "table_version", TableExpressions, table_expressions, TableExpressionSyntax, table_version),
+    (TRAILING_COMMA, "trailing_comma", SelectSyntax, select_syntax, SelectSyntax, trailing_comma),
+    (TYPELESS_GENERATED_COLUMNS, "typeless_generated_columns", ColumnDefinitionSyntax, column_definition_syntax, ColumnDefinitionSyntax, typeless_generated_columns),
+    (UPDATE_SET_QUALIFIED_COLUMN, "update_set_qualified_column", MutationSyntax, mutation_syntax, MutationSyntax, update_set_qualified_column),
+    (UPDATE_TUPLE_VALUE_ROW_ARITY, "update_tuple_value_row_arity", MutationSyntax, mutation_syntax, MutationSyntax, update_tuple_value_row_arity),
+    (VIEW_IF_NOT_EXISTS, "view_if_not_exists", ExistenceGuards, existence_guards, ExistenceGuards, view_if_not_exists),
+    (WILDCARD_REPLACE, "wildcard_replace", SelectSyntax, select_syntax, SelectSyntax, wildcard_replace),
+    (WINDOW_FUNCTION_TAIL, "window_function_tail", AggregateCallSyntax, aggregate_call_syntax, AggregateCallSyntax, window_function_tail),
+    (WITH_TIES_REQUIRES_ORDER_BY, "with_ties_requires_order_by", QueryTailSyntax, query_tail_syntax, QueryTailSyntax, with_ties_requires_order_by),
 }
 
 // `versioned_comments` is an `Option<u32>` (the modelled `MYSQL_VERSION_ID`
@@ -1364,6 +1529,155 @@ const EXPONENT_OPERATOR: ToggleableFeature = ToggleableFeature {
 
 /// Every gated sub-flag as a toggleable feature. The enumeration guard below
 /// destructures the sub-flag structs, so a new flag must be added here too.
+// Residual promotions: top-level / lexically-coupled flags that cannot use the
+// `toggleable_features!` nested-bool arm.
+
+// Top-level scalar knobs: like `LOGICAL_OR_PIPE` / `EXPONENT_OPERATOR`, these are
+// hand-written ToggleableFeatures referenced by LabeledCases but deliberately *not*
+// listed in `TOGGLEABLE_FEATURES` (that array enumerates composite-knob sub-flags only;
+// `labels_resolve_in_the_feature_registry` requires every entry to map into
+// `COMPOSITE_SUBFLAGS`).
+
+/// PostgreSQL `#` bitwise-XOR operator. Coupled rivals (`line_comment_hash`,
+/// `positional_column`) claim the same `#` trigger — enabling XOR vacates them.
+const HASH_BITWISE_XOR: ToggleableFeature = ToggleableFeature {
+    sub_flag: "hash_bitwise_xor",
+    feature: Feature::HashBitwiseXor,
+    catalog_id: None,
+    is_enabled: |features| features.hash_bitwise_xor,
+    set_enabled: |features, on| {
+        features.with(
+            FeatureDelta::EMPTY
+                .hash_bitwise_xor(on)
+                .comment_syntax(CommentSyntax {
+                    line_comment_hash: if on {
+                        false
+                    } else {
+                        features.comment_syntax.line_comment_hash
+                    },
+                    ..features.comment_syntax
+                })
+                .expression_syntax(ExpressionSyntax {
+                    positional_column: if on {
+                        false
+                    } else {
+                        features.expression_syntax.positional_column
+                    },
+                    ..features.expression_syntax
+                }),
+        )
+    },
+};
+
+/// Named `$name` placeholders. Coupled with dollar-quoted strings
+/// (`LexicalConflict::NamedDollarParameterVersusDollarQuotedString`).
+const NAMED_DOLLAR: ToggleableFeature = ToggleableFeature {
+    sub_flag: "named_dollar",
+    feature: Feature::Parameters,
+    catalog_id: None,
+    is_enabled: |features| features.parameters.named_dollar,
+    set_enabled: |features, on| {
+        features.with(
+            FeatureDelta::EMPTY
+                .parameters(ParameterSyntax {
+                    named_dollar: on,
+                    ..features.parameters
+                })
+                .string_literals(StringLiteralSyntax {
+                    dollar_quoted_strings: if on {
+                        false
+                    } else {
+                        features.string_literals.dollar_quoted_strings
+                    },
+                    ..features.string_literals
+                }),
+        )
+    },
+};
+
+/// Three-part `catalog.schema.table` relation names (vs SQLite's two-part cap).
+const CATALOG_QUALIFIED_NAMES: ToggleableFeature = ToggleableFeature {
+    sub_flag: "catalog_qualified_names",
+    feature: Feature::CatalogQualifiedNames,
+    catalog_id: None,
+    is_enabled: |features| features.catalog_qualified_names,
+    set_enabled: |features, on| features.with(FeatureDelta::EMPTY.catalog_qualified_names(on)),
+};
+
+fn projection_is_double_equals(parsed: &Parsed) -> bool {
+    let SetExpr::Select { select, .. } = query_body(parsed) else {
+        return false;
+    };
+    matches!(
+        select.projection.as_slice(),
+        [SelectItem::Expr {
+            expr: Expr::BinaryOp {
+                op: BinaryOperator::Eq(EqualsSpelling::Double),
+                ..
+            },
+            ..
+        }]
+    )
+}
+
+fn projection_is_integer_divide_slash(parsed: &Parsed) -> bool {
+    let SetExpr::Select { select, .. } = query_body(parsed) else {
+        return false;
+    };
+    matches!(
+        select.projection.as_slice(),
+        [SelectItem::Expr {
+            expr: Expr::BinaryOp {
+                op: BinaryOperator::IntegerDivide(IntegerDivideSpelling::SlashSlash),
+                ..
+            },
+            ..
+        }]
+    )
+}
+
+fn projection_is_starts_with(parsed: &Parsed) -> bool {
+    let SetExpr::Select { select, .. } = query_body(parsed) else {
+        return false;
+    };
+    matches!(
+        select.projection.as_slice(),
+        [SelectItem::Expr {
+            expr: Expr::BinaryOp {
+                op: BinaryOperator::StartsWith,
+                ..
+            },
+            ..
+        }]
+    )
+}
+
+fn cast_target_is_fixed_string(parsed: &Parsed) -> bool {
+    let SetExpr::Select { select, .. } = query_body(parsed) else {
+        return false;
+    };
+    matches!(
+        select.projection.as_slice(),
+        [SelectItem::Expr {
+            expr: Expr::Cast { data_type, .. },
+            ..
+        }] if matches!(data_type.as_ref(), DataType::FixedString { .. })
+    )
+}
+
+fn cast_target_is_fixed_width_int(parsed: &Parsed) -> bool {
+    let SetExpr::Select { select, .. } = query_body(parsed) else {
+        return false;
+    };
+    matches!(
+        select.projection.as_slice(),
+        [SelectItem::Expr {
+            expr: Expr::Cast { data_type, .. },
+            ..
+        }] if matches!(data_type.as_ref(), DataType::FixedWidthInt { .. })
+    )
+}
+
 const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &ESCAPE_STRINGS,
     &DOLLAR_QUOTED,
@@ -1731,6 +2045,87 @@ const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &SIGNED_TYPE_MODIFIER,
     &LIBERAL_TYPE_NAMES,
     &STRING_TYPE_MODIFIERS,
+    // --- residual promotions ---
+&ALTER_COLUMN_ADD_IDENTITY,
+    &ALTER_NESTED_COLUMN_PATHS,
+    &ALTER_ROLE_RENAME,
+    &ALTER_TABLE_MULTIPLE_ACTIONS,
+    &ALTER_TABLE_SET_OPTIONS,
+    &ANGLE_BRACKET_TYPES,
+    &APPLY_JOIN,
+    &BARE_TABLE_ALIAS_IS_BARE_LABEL,
+    &BETWEEN_SYMMETRIC,
+    &BIT_WIDTH_INTEGER_NAMES,
+    &CHECK_CONSTRAINT_SUBQUERIES,
+    &COLLATION_FOR_EXPRESSION,
+    &COLOCATION_GROUPS,
+    &COLUMN_DEFAULT_REQUIRES_B_EXPR,
+    &COMMENT_IF_EXISTS,
+    &COMPACT_IDENTITY_COLUMNS,
+    &CONNECT_BY_CLAUSE,
+    &CONVERT_FUNCTION,
+    &DOUBLE_EQUALS,
+    &DROP_PRIMARY_KEY,
+    &EMPTY_IN_LIST,
+    &EXCEPT_ALL,
+    &FILTER_OPTIONAL_WHERE,
+    &FIXED_STRING_TYPE,
+    &FOR_XML_JSON_CLAUSE,
+    &FORMAT_CLAUSE,
+    &GROUP_BY_SET_QUANTIFIER,
+    &INDEX_STORAGE_PARAMETERS,
+    &INDEXED_BY,
+    &INSERT_COLUMN_MATCHING,
+    &INSERT_IGNORE,
+    &INSERT_OVERWRITE,
+    &INTEGER_DIVIDE_SLASH,
+    &INTERSECT_ALL,
+    &IS_DISTINCT_FROM,
+    &IS_GENERAL_EQUALITY,
+    &IS_NORMALIZED,
+    &JOINED_UPDATE_DELETE,
+    &LATERAL_VIEW_CLAUSE,
+    &LIMIT_BY_CLAUSE,
+    &LOW_CARDINALITY_TYPE,
+    &MATCH_AGAINST,
+    &MERGE_ACTION_FUNCTION,
+    &MERGE_ERROR_ACTION,
+    &MERGE_INSERT_MULTIROW,
+    &MERGE_INSERT_STAR_BY_NAME,
+    &MERGE_UPDATE_SET_STAR,
+    &MULTIDIM_ARRAY_LITERALS,
+    &NAMED_DOLLAR,
+    &NESTED_TYPE,
+    &NULL_TEST_POSTFIX,
+    &NULL_TEST_TWO_WORD_POSTFIX,
+    &NULLABLE_TYPE,
+    &OVERLAPS_PERIOD_PREDICATE,
+    &PATTERN_MATCH_QUANTIFIER,
+    &POSITIONAL_DOLLAR_LARGE,
+    &PREFIX_COLON_ALIAS,
+    &QUANTIFIED_ARBITRARY_OPERATOR,
+    &QUANTIFIED_COMPARISON_LISTS,
+    &RECURSIVE_USING_KEY,
+    &REFERENTIAL_ACTION_CASCADE_SET,
+    &RENAME_CONSTRAINT,
+    &ROUTINE_LANGUAGE_STRING,
+    &SET_VALUE_NULL_KEYWORD,
+    &SET_VALUE_ON_KEYWORD,
+    &SETTINGS_CLAUSE,
+    &SQLJSON_CONSTRUCTORS_REQUIRE_ARGUMENT,
+    &STANDALONE_ARGUMENT_ORDER_BY,
+    &STARTS_WITH_OPERATOR,
+    &TABLE_JSON_PATH,
+    &TABLE_VERSION,
+    &TRAILING_COMMA,
+    &TYPELESS_GENERATED_COLUMNS,
+    &UPDATE_SET_QUALIFIED_COLUMN,
+    &UPDATE_TUPLE_VALUE_ROW_ARITY,
+    &VIEW_IF_NOT_EXISTS,
+    &WILDCARD_REPLACE,
+    &WINDOW_FUNCTION_TAIL,
+    &WITH_TIES_REQUIRES_ORDER_BY,
+
 ];
 
 /// What a labelled case expects of a parse: an accept/reject outcome, or — for a
@@ -5345,6 +5740,494 @@ const LABELED_CASES: &[LabeledCase] = &[
         required: &[&LIMIT_PERCENT],
         forbidden: &[],
     },
+    // --- residual promotions (verified Accept/Reject/Shape) ---
+LabeledCase {
+        sql: "ALTER TABLE t ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY",
+        expect: Expect::Accept,
+        required: &[&ALTER_COLUMN_ADD_IDENTITY],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "ALTER TABLE t ADD COLUMN s.s2.j INTEGER",
+        expect: Expect::Accept,
+        required: &[&ALTER_NESTED_COLUMN_PATHS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "ALTER ROLE r RENAME TO s",
+        expect: Expect::Accept,
+        required: &[&ALTER_ROLE_RENAME],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "ALTER TABLE t ADD COLUMN a INT, DROP COLUMN b",
+        expect: Expect::Accept,
+        required: &[&ALTER_TABLE_MULTIPLE_ACTIONS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "ALTER TABLE t SET (fillfactor = 70)",
+        expect: Expect::Accept,
+        required: &[&ALTER_TABLE_SET_OPTIONS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT CAST(x AS ARRAY<INT64>)",
+        expect: Expect::Accept,
+        required: &[&ANGLE_BRACKET_TYPES],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * FROM t CROSS APPLY (SELECT 1) AS s",
+        expect: Expect::Accept,
+        required: &[&APPLY_JOIN],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * FROM t cross",
+        expect: Expect::Accept,
+        required: &[&BARE_TABLE_ALIAS_IS_BARE_LABEL],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a BETWEEN SYMMETRIC 1 AND 2",
+        expect: Expect::Accept,
+        required: &[&BETWEEN_SYMMETRIC],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT CAST(x AS Int256)",
+        expect: Expect::Shape(cast_target_is_fixed_width_int),
+        required: &[&BIT_WIDTH_INTEGER_NAMES],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * FROM a.b.c",
+        expect: Expect::Accept,
+        required: &[&CATALOG_QUALIFIED_NAMES],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "CREATE TABLE t (x INT CHECK (x IN (SELECT 1)))",
+        expect: Expect::Accept,
+        required: &[&CHECK_CONSTRAINT_SUBQUERIES],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT COLLATION FOR ('foo')",
+        expect: Expect::Accept,
+        required: &[&COLLATION_FOR_EXPRESSION],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "CREATE COLOCATION GROUP IF NOT EXISTS g PARTITION BY HASH (id) SHARDS 4",
+        expect: Expect::Accept,
+        required: &[&COLOCATION_GROUPS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "CREATE TABLE t (a INT DEFAULT a AND b)",
+        expect: Expect::Reject,
+        required: &[&COLUMN_DEFAULT_REQUIRES_B_EXPR],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "COMMENT IF EXISTS ON TABLE t IS 'table'",
+        expect: Expect::Accept,
+        required: &[&COMMENT_IF_EXISTS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "CREATE TABLE t (id INT IDENTITY, v TEXT)",
+        expect: Expect::Accept,
+        required: &[&COMPACT_IDENTITY_COLUMNS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * FROM t START WITH a = 1 CONNECT BY PRIOR a = b",
+        expect: Expect::Accept,
+        required: &[&CONNECT_BY_CLAUSE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT CONVERT('x' USING utf8mb4)",
+        expect: Expect::Accept,
+        required: &[&CONVERT_FUNCTION],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a == b",
+        expect: Expect::Shape(projection_is_double_equals),
+        required: &[&DOUBLE_EQUALS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "ALTER TABLE t DROP PRIMARY KEY",
+        expect: Expect::Accept,
+        required: &[&DROP_PRIMARY_KEY],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 1 WHERE 1 IN ()",
+        expect: Expect::Accept,
+        required: &[&EMPTY_IN_LIST],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 1 EXCEPT ALL SELECT 2",
+        expect: Expect::Accept,
+        required: &[&EXCEPT_ALL],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT sum(x) FILTER (x > 1)",
+        expect: Expect::Accept,
+        required: &[&FILTER_OPTIONAL_WHERE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT CAST(x AS FixedString(16))",
+        expect: Expect::Shape(cast_target_is_fixed_string),
+        required: &[&FIXED_STRING_TYPE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a FROM t FOR JSON PATH",
+        expect: Expect::Accept,
+        required: &[&FOR_XML_JSON_CLAUSE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 1 FORMAT JSON",
+        expect: Expect::Accept,
+        required: &[&FORMAT_CLAUSE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT i FROM t GROUP BY DISTINCT i",
+        expect: Expect::Accept,
+        required: &[&GROUP_BY_SET_QUANTIFIER],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 1 # 2",
+        expect: Expect::Accept,
+        required: &[&HASH_BITWISE_XOR],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "CREATE INDEX i ON t (a) WITH (fillfactor = 70)",
+        expect: Expect::Accept,
+        required: &[&INDEX_STORAGE_PARAMETERS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * FROM t INDEXED BY ix",
+        expect: Expect::Accept,
+        required: &[&INDEXED_BY],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "INSERT INTO t BY NAME SELECT 1 AS a",
+        expect: Expect::Accept,
+        required: &[&INSERT_COLUMN_MATCHING],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "INSERT IGNORE INTO t VALUES (1)",
+        expect: Expect::Accept,
+        required: &[&INSERT_IGNORE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "INSERT OVERWRITE INTO t VALUES (1)",
+        expect: Expect::Accept,
+        required: &[&INSERT_OVERWRITE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a // b",
+        expect: Expect::Shape(projection_is_integer_divide_slash),
+        required: &[&INTEGER_DIVIDE_SLASH],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 1 INTERSECT ALL SELECT 2",
+        expect: Expect::Accept,
+        required: &[&INTERSECT_ALL],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a IS DISTINCT FROM b",
+        expect: Expect::Accept,
+        required: &[&IS_DISTINCT_FROM],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a IS b",
+        expect: Expect::Accept,
+        required: &[&IS_GENERAL_EQUALITY],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 'a' IS NORMALIZED",
+        expect: Expect::Accept,
+        required: &[&IS_NORMALIZED],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "UPDATE t JOIN u ON t.i = u.i SET t.a = 1",
+        expect: Expect::Accept,
+        required: &[&JOINED_UPDATE_DELETE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a FROM t LATERAL VIEW explode(col) v AS c",
+        expect: Expect::Accept,
+        required: &[&LATERAL_VIEW_CLAUSE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a FROM t LIMIT 2 BY x",
+        expect: Expect::Accept,
+        required: &[&LIMIT_BY_CLAUSE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT CAST(x AS LowCardinality(String))",
+        expect: Expect::Accept,
+        required: &[&LOW_CARDINALITY_TYPE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT MATCH(a) AGAINST('x') FROM t",
+        expect: Expect::Accept,
+        required: &[&MATCH_AGAINST],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT merge_action()",
+        expect: Expect::Accept,
+        required: &[&MERGE_ACTION_FUNCTION],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "MERGE INTO t USING s ON t.i = s.i WHEN MATCHED THEN ERROR",
+        expect: Expect::Accept,
+        required: &[&MERGE_ERROR_ACTION],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "MERGE INTO t USING s ON true WHEN NOT MATCHED THEN INSERT VALUES (1), (2)",
+        expect: Expect::Accept,
+        required: &[&MERGE_INSERT_MULTIROW],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "MERGE INTO t USING s ON t.i = s.i WHEN NOT MATCHED THEN INSERT *",
+        expect: Expect::Accept,
+        required: &[&MERGE_INSERT_STAR_BY_NAME],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "MERGE INTO t USING s ON t.i = s.i WHEN MATCHED THEN UPDATE SET *",
+        expect: Expect::Accept,
+        required: &[&MERGE_UPDATE_SET_STAR],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT ARRAY[[1, 2], [3, 4]]",
+        expect: Expect::Accept,
+        required: &[&MULTIDIM_ARRAY_LITERALS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT $name",
+        expect: Expect::Accept,
+        required: &[&NAMED_DOLLAR],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT CAST(x AS Nested(y UInt8))",
+        expect: Expect::Accept,
+        required: &[&NESTED_TYPE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 1 WHERE a ISNULL",
+        expect: Expect::Accept,
+        required: &[&NULL_TEST_POSTFIX],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a NOT NULL",
+        expect: Expect::Accept,
+        required: &[&NULL_TEST_TWO_WORD_POSTFIX],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT CAST(x AS Nullable(String))",
+        expect: Expect::Accept,
+        required: &[&NULLABLE_TYPE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT (a, b) OVERLAPS (c, d)",
+        expect: Expect::Accept,
+        required: &[&OVERLAPS_PERIOD_PREDICATE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * FROM t WHERE a LIKE ANY (ARRAY['%a', '%o'])",
+        expect: Expect::Accept,
+        required: &[&PATTERN_MATCH_QUANTIFIER],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT $99999999999",
+        expect: Expect::Accept,
+        required: &[&POSITIONAL_DOLLAR_LARGE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT j : 42",
+        expect: Expect::Accept,
+        required: &[&PREFIX_COLON_ALIAS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a + ANY (SELECT 1)",
+        expect: Expect::Accept,
+        required: &[&QUANTIFIED_ARBITRARY_OPERATOR],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * FROM t WHERE a = ANY (b)",
+        expect: Expect::Accept,
+        required: &[&QUANTIFIED_COMPARISON_LISTS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "WITH RECURSIVE cte(x) USING KEY (x) AS (SELECT 1 UNION SELECT x FROM cte) SELECT * FROM cte",
+        expect: Expect::Accept,
+        required: &[&RECURSIVE_USING_KEY],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "CREATE TABLE t (a INT REFERENCES p (id) ON DELETE CASCADE)",
+        expect: Expect::Accept,
+        required: &[&REFERENTIAL_ACTION_CASCADE_SET],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "ALTER TABLE t RENAME CONSTRAINT old TO new",
+        expect: Expect::Accept,
+        required: &[&RENAME_CONSTRAINT],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "CREATE FUNCTION f() RETURNS INTEGER LANGUAGE 'sql' AS 'x'",
+        expect: Expect::Accept,
+        required: &[&ROUTINE_LANGUAGE_STRING],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SET o = null",
+        expect: Expect::Accept,
+        required: &[&SET_VALUE_NULL_KEYWORD],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SET o = on",
+        expect: Expect::Accept,
+        required: &[&SET_VALUE_ON_KEYWORD],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 1 SETTINGS max_threads = 8",
+        expect: Expect::Accept,
+        required: &[&SETTINGS_CLAUSE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT JSON()",
+        expect: Expect::Reject,
+        required: &[&SQLJSON_CONSTRUCTORS_REQUIRE_ARGUMENT],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT rank(ORDER BY b DESC) OVER w",
+        expect: Expect::Accept,
+        required: &[&STANDALONE_ARGUMENT_ORDER_BY],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 'hello' ^@ 'he'",
+        expect: Expect::Shape(projection_is_starts_with),
+        required: &[&STARTS_WITH_OPERATOR],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * FROM src[0]",
+        expect: Expect::Accept,
+        required: &[&TABLE_JSON_PATH],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * FROM t FOR SYSTEM_TIME AS OF '2020-01-01'",
+        expect: Expect::Accept,
+        required: &[&TABLE_VERSION],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT a, FROM t",
+        expect: Expect::Accept,
+        required: &[&TRAILING_COMMA],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "CREATE TABLE t (x INTEGER, y GENERATED ALWAYS AS (x + 1))",
+        expect: Expect::Accept,
+        required: &[&TYPELESS_GENERATED_COLUMNS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "UPDATE t SET t.a = 1",
+        expect: Expect::Accept,
+        required: &[&UPDATE_SET_QUALIFIED_COLUMN],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "UPDATE t SET (a, b) = ROW(1)",
+        expect: Expect::Reject,
+        required: &[&UPDATE_TUPLE_VALUE_ROW_ARITY],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "CREATE VIEW IF NOT EXISTS v AS SELECT 1",
+        expect: Expect::Accept,
+        required: &[&VIEW_IF_NOT_EXISTS],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT * REPLACE (1 AS a) FROM t",
+        expect: Expect::Accept,
+        required: &[&WILDCARD_REPLACE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT LEAD(a) RESPECT NULLS OVER () FROM t",
+        expect: Expect::Accept,
+        required: &[&WINDOW_FUNCTION_TAIL],
+        forbidden: &[],
+    },
+    LabeledCase {
+        sql: "SELECT 1 FETCH FIRST 1 ROW WITH TIES",
+        expect: Expect::Reject,
+        required: &[&WITH_TIES_REQUIRES_ORDER_BY],
+        forbidden: &[],
+    },
+
 ];
 
 /// Whether the first GROUP BY item of `parsed` is a `ROLLUP` grouping construct — the
@@ -5752,116 +6635,50 @@ mod tests {
         }
     }
 
-    /// DP6 remainder: every dialect bool is either a ToggleableFeature (with LabeledCase via
-    /// `every_gated_subflag_is_required_by_a_labeled_case`) or listed here as covered by its
-    /// parent Feature axis objective coverage. Closes the bool inventory without inventing
-    /// non-exercising SQL labels.
+    /// DP6 complete: every formerly residual bool is a ToggleableFeature required by a
+    /// LabeledCase (see residual promotions in `toggleable_features!` / `LABELED_CASES`).
     #[test]
-    fn every_bool_field_is_toggleable_or_axis_covered() {
-        use squonk::ast::dialect::Feature;
+    fn every_residual_bool_is_now_toggleable() {
         let toggleable: std::collections::HashSet<&str> = TOGGLEABLE_FEATURES
             .iter()
             .map(|t| t.sub_flag)
             .collect();
-        const AXIS_COVERED: &[(&str, Feature)] = &[
-    ("alter_column_add_identity", Feature::IndexAlterSyntax),
-    ("alter_nested_column_paths", Feature::IndexAlterSyntax),
-    ("alter_role_rename", Feature::AccessControlSyntax),
-    ("alter_table_multiple_actions", Feature::IndexAlterSyntax),
-    ("alter_table_set_options", Feature::IndexAlterSyntax),
-    ("angle_bracket_types", Feature::TypeNameSyntax),
-    ("apply_join", Feature::JoinSyntax),
-    ("bare_table_alias_is_bare_label", Feature::TableExpressions),
-    ("between_symmetric", Feature::PredicateSyntax),
-    ("bit_width_integer_names", Feature::TypeNameSyntax),
-    ("catalog_qualified_names", Feature::CatalogQualifiedNames),
-    ("check_constraint_subqueries", Feature::ConstraintSyntax),
-    ("collation_for_expression", Feature::StringFuncForms),
-    ("colocation_groups", Feature::StatementDdlGates),
-    ("column_default_requires_b_expr", Feature::ColumnDefinitionSyntax),
-    ("comment_if_exists", Feature::UtilitySyntax),
-    ("compact_identity_columns", Feature::ColumnDefinitionSyntax),
-    ("connect_by_clause", Feature::SelectSyntax),
-    ("convert_function", Feature::CallSyntax),
-    ("double_equals", Feature::OperatorSyntax),
-    ("drop_primary_key", Feature::IndexAlterSyntax),
-    ("empty_in_list", Feature::PredicateSyntax),
-    ("except_all", Feature::SelectSyntax),
-    ("filter_optional_where", Feature::AggregateCallSyntax),
-    ("fixed_string_type", Feature::TypeNameSyntax),
-    ("for_xml_json_clause", Feature::QueryTailSyntax),
-    ("format_clause", Feature::QueryTailSyntax),
-    ("group_by_set_quantifier", Feature::GroupingSyntax),
-    ("hash_bitwise_xor", Feature::HashBitwiseXor),
-    ("index_storage_parameters", Feature::IndexAlterSyntax),
-    ("indexed_by", Feature::TableExpressions),
-    ("insert_column_matching", Feature::MutationSyntax),
-    ("insert_ignore", Feature::MutationSyntax),
-    ("insert_overwrite", Feature::MutationSyntax),
-    ("integer_divide_slash", Feature::OperatorSyntax),
-    ("intersect_all", Feature::SelectSyntax),
-    ("is_distinct_from", Feature::PredicateSyntax),
-    ("is_general_equality", Feature::OperatorSyntax),
-    ("is_normalized", Feature::PredicateSyntax),
-    ("joined_update_delete", Feature::MutationSyntax),
-    ("lateral_view_clause", Feature::SelectSyntax),
-    ("limit_by_clause", Feature::QueryTailSyntax),
-    ("low_cardinality_type", Feature::TypeNameSyntax),
-    ("match_against", Feature::StringFuncForms),
-    ("merge_action_function", Feature::CallSyntax),
-    ("merge_error_action", Feature::MutationSyntax),
-    ("merge_insert_multirow", Feature::MutationSyntax),
-    ("merge_insert_star_by_name", Feature::MutationSyntax),
-    ("merge_update_set_star", Feature::MutationSyntax),
-    ("multidim_array_literals", Feature::ExpressionSyntax),
-    ("named_dollar", Feature::Parameters),
-    ("nested_type", Feature::TypeNameSyntax),
-    ("null_test_postfix", Feature::OperatorSyntax),
-    ("null_test_two_word_postfix", Feature::PredicateSyntax),
-    ("nullable_type", Feature::TypeNameSyntax),
-    ("overlaps_period_predicate", Feature::PredicateSyntax),
-    ("pattern_match_quantifier", Feature::PredicateSyntax),
-    ("positional_dollar_large", Feature::Parameters),
-    ("prefix_colon_alias", Feature::SelectSyntax),
-    ("quantified_arbitrary_operator", Feature::OperatorSyntax),
-    ("quantified_comparison_lists", Feature::OperatorSyntax),
-    ("recursive_using_key", Feature::JoinSyntax),
-    ("referential_action_cascade_set", Feature::ConstraintSyntax),
-    ("rename_constraint", Feature::IndexAlterSyntax),
-    ("routine_language_string", Feature::IndexAlterSyntax),
-    ("set_value_null_keyword", Feature::ShowSyntax),
-    ("set_value_on_keyword", Feature::ShowSyntax),
-    ("settings_clause", Feature::QueryTailSyntax),
-    ("sqljson_constructors_require_argument", Feature::CallSyntax),
-    ("standalone_argument_order_by", Feature::AggregateCallSyntax),
-    ("starts_with_operator", Feature::OperatorSyntax),
-    ("table_json_path", Feature::TableExpressions),
-    ("table_version", Feature::TableExpressions),
-    ("trailing_comma", Feature::SelectSyntax),
-    ("typeless_generated_columns", Feature::ColumnDefinitionSyntax),
-    ("update_set_qualified_column", Feature::MutationSyntax),
-    ("update_tuple_value_row_arity", Feature::MutationSyntax),
-    ("view_if_not_exists", Feature::ExistenceGuards),
-    ("wildcard_replace", Feature::SelectSyntax),
-    ("window_function_tail", Feature::AggregateCallSyntax),
-    ("with_ties_requires_order_by", Feature::QueryTailSyntax),
-        ];
-        for (name, _) in AXIS_COVERED {
+        // Top-level scalars are labeled but not in TOGGLEABLE_FEATURES (composite-only array).
+        let labeled: std::collections::HashSet<&str> = LABELED_CASES
+            .iter()
+            .flat_map(|c| c.declared().map(|t| t.sub_flag))
+            .collect();
+        for name in [
+            "apply_join",
+            "angle_bracket_types",
+            "between_symmetric",
+            "is_distinct_from",
+            "double_equals",
+            "integer_divide_slash",
+            "named_dollar",
+            "with_ties_requires_order_by",
+            "sqljson_constructors_require_argument",
+            "window_function_tail",
+            "standalone_argument_order_by",
+            "collation_for_expression",
+            "recursive_using_key",
+            "compact_identity_columns",
+            "update_tuple_value_row_arity",
+            "fixed_string_type",
+            "bit_width_integer_names",
+            "starts_with_operator",
+        ] {
             assert!(
-                !toggleable.contains(name),
-                "`{name}` is both ToggleableFeature and AXIS_COVERED"
+                toggleable.contains(name),
+                "`{name}` should be a ToggleableFeature after residual promotion"
             );
         }
-        assert!(
-            AXIS_COVERED.len() >= 80,
-            "expected residual axis-covered bools, got {}",
-            AXIS_COVERED.len()
-        );
-        // Known tracked flags.
-        assert!(toggleable.contains("temporary_views"));
-        assert!(toggleable.contains("create_or_replace_table"));
-        assert!(AXIS_COVERED.iter().any(|(n, _)| *n == "apply_join"));
-        assert!(AXIS_COVERED.iter().any(|(n, _)| *n == "angle_bracket_types"));
+        for name in ["hash_bitwise_xor", "catalog_qualified_names"] {
+            assert!(
+                labeled.contains(name),
+                "`{name}` should be required by a LabeledCase"
+            );
+        }
     }
 
 

@@ -93,13 +93,13 @@ See adversarial synthesis; track completion in PRs. Source findings under
 `/tmp/squonk-adversarial-review/` from the review session.
 
 
-## Optional polish (completed / deferred)
+## Optional polish (completed)
 
 | Item | Status |
 |---|---|
 | Dead simple-head if/else arms | cleaned (table owns simple heads; multi-word arms remain) |
 | `assert_closed_delta` on all ANSI satellites + DuckDB | done |
-| Per-bool LabeledCase for every residual flag | **deferred**: bulk SQL labels fail baseline/lexical-conflict checks; residual bools stay AXIS_COVERED under parent Feature objective coverage + ToggleableFeature inventory for labeled subset |
+| Per-bool LabeledCase for every residual flag | **done** — all 81 former `AXIS_COVERED` bools promoted to `ToggleableFeature` + verified `LabeledCase` (Accept / Reject / Shape); top-level `hash_bitwise_xor` / `catalog_qualified_names` are labeled hand-written toggles outside the composite-only `TOGGLEABLE_FEATURES` array |
 | Scratch review files | removed |
 
 ## Non-goals

@@ -25,8 +25,8 @@ use squonk::ast::dialect::{
 };
 use squonk::ast::precedence::{Assoc, BindingPower};
 use squonk::ast::{
-    BinaryOperator, CastSyntax, DataType, Expr, GroupByItem, NoExt, SelectItem, SetExpr,
-    SetOperator, Statement, TableFactor,
+    BinaryOperator, CastSyntax, DataType, EqualsSpelling, Expr, GroupByItem, IntegerDivideSpelling,
+    NoExt, SelectItem, SetExpr, SetOperator, Statement, TableFactor,
 };
 use squonk::dialect::{Ansi, MySql, Postgres};
 use squonk::tokenizer::{Operator, Token, TokenKind, tokenize_with};

@@ -1,5 +1,6 @@
 ---
 source: conformance/src/coverage/labeled.rs
+assertion_line: 7273
 expression: render_subflag_arrays()
 ---
 string_literals
@@ -33,6 +34,8 @@ parameters
   named_colon
   named_at
   numbered_question
+  named_dollar
+  positional_dollar_large
 session_variables
   user_variables
   system_variables
@@ -54,6 +57,10 @@ table_expressions
   base_table_alias_column_lists
   string_literal_aliases
   aliased_parenthesized_join
+  bare_table_alias_is_bare_label
+  indexed_by
+  table_json_path
+  table_version
 join_syntax
   stacked_join_qualifiers
   full_outer_join
@@ -65,6 +72,8 @@ join_syntax
   sided_semi_anti_join
   recursive_search_cycle
   recursive_union_rejects_order_limit
+  apply_join
+  recursive_using_key
 table_factor_syntax
   lateral
   table_functions
@@ -103,6 +112,16 @@ mutation_syntax
   merge_when_not_matched_by
   merge_insert_default_values
   merge_insert_overriding
+  insert_column_matching
+  insert_ignore
+  insert_overwrite
+  joined_update_delete
+  merge_error_action
+  merge_insert_multirow
+  merge_insert_star_by_name
+  merge_update_set_star
+  update_set_qualified_column
+  update_tuple_value_row_arity
 statement_ddl_gates
   create_or_replace_table
   create_trigger
@@ -132,6 +151,7 @@ statement_ddl_gates
   alter_instance
   alter_sequence
   alter_object_set_schema
+  colocation_groups
 view_sequence_clause_syntax
   temporary_views
   materialized_view_to
@@ -165,6 +185,9 @@ column_definition_syntax
   default_expression_requires_parens
   column_collation
   column_storage
+  column_default_requires_b_expr
+  compact_identity_columns
+  typeless_generated_columns
 constraint_syntax
   deferrable_constraints
   named_inline_non_check_constraints
@@ -173,6 +196,8 @@ constraint_syntax
   constraint_no_inherit_not_valid
   index_constraint_parameters
   constraint_column_collate_order
+  check_constraint_subqueries
+  referential_action_cascade_set
 index_alter_syntax
   drop_behavior
   index_drop_on_table
@@ -187,9 +212,18 @@ index_alter_syntax
   routine_arg_modes
   alter_existence_guards
   alter_column_set_data_type
+  alter_column_add_identity
+  alter_nested_column_paths
+  alter_table_multiple_actions
+  alter_table_set_options
+  drop_primary_key
+  index_storage_parameters
+  rename_constraint
+  routine_language_string
 existence_guards
   if_exists
   create_database_if_not_exists
+  view_if_not_exists
 expression_syntax
   typecast_operator
   subscript
@@ -209,6 +243,7 @@ expression_syntax
   mysql_interval_operator
   positional_column
   lambda_keyword
+  multidim_array_literals
 operator_syntax
   operator_construct
   containment_operators
@@ -221,6 +256,13 @@ operator_syntax
   quantified_comparisons
   custom_operators
   postfix_operators
+  double_equals
+  integer_divide_slash
+  is_general_equality
+  null_test_postfix
+  quantified_arbitrary_operator
+  quantified_comparison_lists
+  starts_with_operator
 call_syntax
   named_argument
   variadic_argument
@@ -233,6 +275,9 @@ call_syntax
   method_chaining
   sqljson_expression_functions
   xml_expression_functions
+  convert_function
+  merge_action_function
+  sqljson_constructors_require_argument
 string_func_forms
   substring_from_for
   substring_leading_for
@@ -247,6 +292,8 @@ string_func_forms
   trim_list_syntax
   ceil_to_field
   floor_to_field
+  collation_for_expression
+  match_against
 aggregate_call_syntax
   group_concat_separator
   within_group
@@ -255,11 +302,21 @@ aggregate_call_syntax
   null_treatment
   aggregate_calls_reject_empty_arguments
   over_requires_windowable_function
+  filter_optional_where
+  standalone_argument_order_by
+  window_function_tail
 predicate_syntax
   like
   ilike
   similar_to
   unparenthesized_in_list
+  between_symmetric
+  empty_in_list
+  is_distinct_from
+  is_normalized
+  null_test_two_word_postfix
+  overlaps_period_predicate
+  pattern_match_quantifier
 select_syntax
   distinct_on
   select_into
@@ -276,6 +333,13 @@ select_syntax
   values_rows_require_equal_arity
   values_row_constructor
   as_alias_rejects_reserved
+  connect_by_clause
+  except_all
+  intersect_all
+  lateral_view_clause
+  prefix_colon_alias
+  trailing_comma
+  wildcard_replace
 query_tail_syntax
   fetch_first
   limit_offset_comma
@@ -287,12 +351,18 @@ query_tail_syntax
   limit_expressions
   limit_percent
   pipe_syntax
+  for_xml_json_clause
+  format_clause
+  limit_by_clause
+  settings_clause
+  with_ties_requires_order_by
 grouping_syntax
   grouping_sets
   with_rollup
   order_by_using
   group_by_all
   order_by_all
+  group_by_set_quantifier
 utility_syntax
   copy
   copy_into
@@ -334,6 +404,7 @@ utility_syntax
   signal_diagnostics
   export_import_database
   update_extensions
+  comment_if_exists
 transaction_syntax
   transaction_name
   start_transaction
@@ -372,6 +443,8 @@ show_syntax
   show_routine_status
   show_verbose
   show_admin
+  set_value_null_keyword
+  set_value_on_keyword
 maintenance_syntax
   vacuum
   vacuum_analyze
@@ -386,6 +459,7 @@ access_control_syntax
   access_control_extended_objects
   user_role_management
   access_control_account_grants
+  alter_role_rename
 type_name_syntax
   extended_scalar_type_names
   enum_type
@@ -400,3 +474,9 @@ type_name_syntax
   signed_type_modifier
   liberal_type_names
   string_type_modifiers
+  angle_bracket_types
+  bit_width_integer_names
+  fixed_string_type
+  low_cardinality_type
+  nested_type
+  nullable_type
