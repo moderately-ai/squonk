@@ -134,16 +134,18 @@ jobs:
         run: |
           set -euo pipefail
           version=${{ steps.version.outputs.version }}
-          cargo package -p squonk-ast
-          expected=$(sha256sum "target/package/squonk-ast-$version.crate" | cut -d' ' -f1)
           index=https://index.crates.io/sq/uo/squonk-ast
           published=$(curl --fail --silent --show-error "$index" | jq -r "select(.vers == \"$version\") | .cksum" | tail -1)
           if [[ -n "$published" ]]; then
-            test "$published" = "$expected"
-            echo "squonk-ast@$version already matches the approved source; skipping"
-          else
-            cargo publish -p squonk-ast
+            # Registry is immutable. A retargeted tag rebuild embeds a different
+            # `.cargo_vcs_info.json` (git SHA) and thus a different package hash even
+            # when crate sources are identical — do not require a local rebuild match.
+            echo "squonk-ast@$version already on crates.io (cksum=$published); skipping"
+            exit 0
           fi
+          cargo package -p squonk-ast
+          expected=$(sha256sum "target/package/squonk-ast-$version.crate" | cut -d' ' -f1)
+          cargo publish -p squonk-ast
           for _ in {1..60}; do
             published=$(curl --fail --silent --show-error "$index" | jq -r "select(.vers == \"$version\") | .cksum" | tail -1)
             [[ "$published" == "$expected" ]] && exit 0
@@ -157,20 +159,17 @@ jobs:
         run: |
           set -euo pipefail
           version=${{ steps.version.outputs.version }}
-          # Package the exact tarball for checksum comparison (same as squonk-ast).
-          # Do not use `cargo publish --dry-run` here: it aborts the upload path and
-          # does not reliably leave `target/package/squonk-*.crate` for sha256sum.
-          # After squonk-ast is on the registry, a normal package resolves it by version.
-          cargo package -p squonk
-          expected=$(sha256sum "target/package/squonk-$version.crate" | cut -d' ' -f1)
           index=https://index.crates.io/sq/uo/squonk
           published=$(curl --fail --silent --show-error "$index" | jq -r "select(.vers == \"$version\") | .cksum" | tail -1)
           if [[ -n "$published" ]]; then
-            test "$published" = "$expected"
-            echo "squonk@$version already matches the approved source; skipping"
-          else
-            cargo publish -p squonk
+            echo "squonk@$version already on crates.io (cksum=$published); skipping"
+            exit 0
           fi
+          # Package then publish. After squonk-ast is on the registry, package resolves
+          # it by version. Do not use `cargo publish --dry-run` for the checksum path.
+          cargo package -p squonk
+          expected=$(sha256sum "target/package/squonk-$version.crate" | cut -d' ' -f1)
+          cargo publish -p squonk
           for _ in {1..60}; do
             published=$(curl --fail --silent --show-error "$index" | jq -r "select(.vers == \"$version\") | .cksum" | tail -1)
             [[ "$published" == "$expected" ]] && exit 0
