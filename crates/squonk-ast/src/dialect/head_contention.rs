@@ -473,7 +473,7 @@ mod tests {
         // ALTER VIEW — MySQL redefinition vs DuckDB `SET SCHEMA` relocation.
         HeadGateValueRow {
             flag: "view_definition_options",
-            get: |f| f.statement_ddl_gates.view_definition_options,
+            get: |f| f.view_sequence_clause_syntax.view_definition_options,
             expected: [F, F, F, T, F],
         },
         HeadGateValueRow {

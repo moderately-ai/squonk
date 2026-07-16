@@ -15,7 +15,7 @@ use super::{
     IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, KeywordOperators, KeywordSet,
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax, SQLITE_BYTE_CLASSES,
-    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
+    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax, StringFuncForms,
     StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
     TransactionSyntax, UtilitySyntax,
 };
@@ -636,8 +636,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `SQLITE` preset for statement ddl gates.
     pub const SQLITE: Self = Self {
+
         colocation_groups: false,
-        materialized_view_to: false,
         // SQLite's `CREATE TRIGGER … BEGIN … END` compound-statement body.
         create_trigger: true,
         // SQLite has no `CREATE MACRO` (its functions are C-registered).
@@ -650,7 +650,6 @@ impl StatementDdlGates {
         // SQLite has no sequence generators (it uses AUTOINCREMENT rowids); `CREATE SEQUENCE`
         // rejects — the `SEQUENCE` keyword falls through to the `CREATE TABLE` expectation.
         create_sequence: false,
-        create_sequence_cache: false,
         extension_ddl: false,
         transform_ddl: false,
         alter_system: false,
@@ -667,13 +666,11 @@ impl StatementDdlGates {
         drop_database: false,
         materialized_views: false,
         // SQLite spells session-local views `CREATE TEMP VIEW`.
-        temporary_views: true,
         routines: false,
         or_replace: false,
         create_or_replace_table: false,
         // `CREATE RECURSIVE VIEW` is a DuckDB form; SQLite leaves `RECURSIVE`
         // unconsumed before the expected `VIEW`.
-        recursive_views: false,
         // SQLite has no stored programs, so no compound-statement routine body.
         compound_statements: false,
         alter_database: false,
@@ -684,9 +681,19 @@ impl StatementDdlGates {
         resource_group: false,
         alter_sequence: false,
         alter_object_set_schema: false,
+};
+}
+impl ViewSequenceClauseSyntax {
+    /// View/sequence clause surface for the `SQLITE` preset.
+    pub const SQLITE: Self = Self {
+        materialized_view_to: false,
+        create_sequence_cache: false,
+        temporary_views: true,
+        recursive_views: false,
         view_definition_options: false,
     };
 }
+
 
 impl CreateTableClauseSyntax {
     /// The `SQLITE` preset for create table clause syntax.
@@ -1296,6 +1303,7 @@ impl FeatureSet {
         comment_syntax: CommentSyntax::SQLITE,
         mutation_syntax: MutationSyntax::SQLITE,
         statement_ddl_gates: StatementDdlGates::SQLITE,
+        view_sequence_clause_syntax: ViewSequenceClauseSyntax::SQLITE,
         create_table_clause_syntax: CreateTableClauseSyntax::SQLITE,
         column_definition_syntax: ColumnDefinitionSyntax::SQLITE,
         constraint_syntax: ConstraintSyntax::SQLITE,

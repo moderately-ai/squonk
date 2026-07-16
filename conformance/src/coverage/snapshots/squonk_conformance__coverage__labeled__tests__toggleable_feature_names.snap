@@ -225,7 +225,6 @@ statement_ddl_gates::extension_ddl
 statement_ddl_gates::logfile_group_ddl
 statement_ddl_gates::materialized_views
 statement_ddl_gates::or_replace
-statement_ddl_gates::recursive_views
 statement_ddl_gates::resource_group
 statement_ddl_gates::routines
 statement_ddl_gates::schema_elements
@@ -233,9 +232,7 @@ statement_ddl_gates::schemas
 statement_ddl_gates::server_definition
 statement_ddl_gates::spatial_reference_system
 statement_ddl_gates::tablespace_ddl
-statement_ddl_gates::temporary_views
 statement_ddl_gates::transform_ddl
-statement_ddl_gates::view_definition_options
 string_func_forms::ceil_to_field
 string_func_forms::floor_to_field
 string_func_forms::overlay_placing
@@ -366,3 +363,8 @@ utility_syntax::update_extensions
 utility_syntax::use_qualified_name
 utility_syntax::use_statement
 utility_syntax::use_string_literal_name
+view_sequence_clause_syntax::create_sequence_cache
+view_sequence_clause_syntax::materialized_view_to
+view_sequence_clause_syntax::recursive_views
+view_sequence_clause_syntax::temporary_views
+view_sequence_clause_syntax::view_definition_options

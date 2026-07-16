@@ -1388,6 +1388,24 @@ pub(crate) const COVERAGE_CASES: &[CoverageCase] = &[
         }]),
     },
     CoverageCase {
+        feature: Feature::ViewSequenceClauseSyntax,
+        polarity: Polarity::Positive,
+        name: "ansi_view_sequence_clause_accepts_temporary_views",
+        coverage: Coverage::Behavior(&[Probe::ParseAccepts {
+            sql: "CREATE TEMPORARY VIEW v AS SELECT 1",
+            features: &FeatureSet::ANSI,
+        }]),
+    },
+    CoverageCase {
+        feature: Feature::ViewSequenceClauseSyntax,
+        polarity: Polarity::Negative,
+        name: "mysql_view_sequence_clause_rejects_temporary_views",
+        coverage: Coverage::Behavior(&[Probe::ParseRejects {
+            sql: "CREATE TEMPORARY VIEW v AS SELECT 1",
+            features: &FeatureSet::MYSQL,
+        }]),
+    },
+    CoverageCase {
         feature: Feature::TransactionSyntax,
         polarity: Polarity::Positive,
         name: "ansi_transaction_syntax_accepts_start_transaction",

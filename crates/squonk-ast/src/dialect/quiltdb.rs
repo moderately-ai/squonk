@@ -24,7 +24,7 @@ use super::{
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     POSTGRES_BYTE_CLASSES, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
-    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
+    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
     TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
@@ -199,9 +199,8 @@ impl ColumnDefinitionSyntax {
 impl StatementDdlGates {
     /// Statement-level DDL productions enabled by this preset.
     pub const QUILTDB: Self = Self {
+
         colocation_groups: true,
-        materialized_view_to: true,
-        create_sequence_cache: true,
         create_trigger: false,
         create_macro: false,
         create_secret: false,
@@ -218,11 +217,9 @@ impl StatementDdlGates {
         databases: true,
         drop_database: false,
         materialized_views: true,
-        temporary_views: true,
         routines: true,
         or_replace: true,
         create_or_replace_table: false,
-        recursive_views: false,
         compound_statements: false,
         alter_database: false,
         alter_database_options: false,
@@ -232,9 +229,19 @@ impl StatementDdlGates {
         resource_group: false,
         alter_sequence: false,
         alter_object_set_schema: false,
+};
+}
+impl ViewSequenceClauseSyntax {
+    /// View/sequence clause surface for the `QUILTDB` preset.
+    pub const QUILTDB: Self = Self {
+        materialized_view_to: true,
+        create_sequence_cache: true,
+        temporary_views: true,
+        recursive_views: false,
         view_definition_options: false,
     };
 }
+
 
 impl TypeNameSyntax {
     /// Type-name syntax enabled by this preset.
@@ -371,6 +378,7 @@ impl FeatureSet {
         index_alter_syntax: IndexAlterSyntax::QUILTDB,
         column_definition_syntax: ColumnDefinitionSyntax::QUILTDB,
         statement_ddl_gates: StatementDdlGates::QUILTDB,
+        view_sequence_clause_syntax: ViewSequenceClauseSyntax::QUILTDB,
         table_expressions: TableExpressionSyntax::QUILTDB,
         mutation_syntax: MutationSyntax::QUILTDB,
         predicate_syntax: PredicateSyntax::QUILTDB,

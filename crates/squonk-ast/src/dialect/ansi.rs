@@ -17,7 +17,7 @@ use super::{
     IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, Keyword, KeywordOperators,
     KeywordSet, MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax,
     OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
-    STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
+    STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
     TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
@@ -377,8 +377,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
+
         colocation_groups: false,
-        materialized_view_to: false,
         // `CREATE TRIGGER`'s only modelled body form is SQLite's, so the standard
         // baseline does not dispatch it.
         create_trigger: false,
@@ -393,7 +393,6 @@ impl StatementDdlGates {
         // T176 sequence generators are an *optional* standard feature modelled via the
         // PostgreSQL/DuckDB presets; the bare-standard baseline does not dispatch `SEQUENCE`.
         create_sequence: false,
-        create_sequence_cache: false,
         extension_ddl: false,
         transform_ddl: false,
         alter_system: false,
@@ -412,13 +411,11 @@ impl StatementDdlGates {
         // ANSI has no MySQL `DROP DATABASE`/`DROP SCHEMA` single-name synonym drop.
         drop_database: false,
         materialized_views: true,
-        temporary_views: true,
         routines: true,
         or_replace: true,
         create_or_replace_table: false,
         // `CREATE RECURSIVE VIEW` is gated to DuckDB/Lenient; the standard baseline
         // leaves `RECURSIVE` unconsumed before the expected `VIEW`.
-        recursive_views: false,
         // The standard baseline has no MySQL-style compound-statement routine body.
         compound_statements: false,
         alter_database: false,
@@ -429,9 +426,19 @@ impl StatementDdlGates {
         resource_group: false,
         alter_sequence: false,
         alter_object_set_schema: false,
+};
+}
+impl ViewSequenceClauseSyntax {
+    /// View/sequence clause surface for the `ANSI` preset.
+    pub const ANSI: Self = Self {
+        materialized_view_to: false,
+        create_sequence_cache: false,
+        temporary_views: true,
+        recursive_views: false,
         view_definition_options: false,
     };
 }
+
 
 impl CreateTableClauseSyntax {
     /// The `ANSI` predefined value.
@@ -1107,6 +1114,7 @@ impl FeatureSet {
         comment_syntax: CommentSyntax::ANSI,
         mutation_syntax: MutationSyntax::ANSI,
         statement_ddl_gates: StatementDdlGates::ANSI,
+        view_sequence_clause_syntax: ViewSequenceClauseSyntax::ANSI,
         create_table_clause_syntax: CreateTableClauseSyntax::ANSI,
         column_definition_syntax: ColumnDefinitionSyntax::ANSI,
         constraint_syntax: ConstraintSyntax::ANSI,

@@ -101,7 +101,7 @@ use super::{
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax, RESERVED_BARE_ALIAS,
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
-    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
+    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax, StringFuncForms,
     StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
     TransactionSyntax, UtilitySyntax,
 };
@@ -314,6 +314,7 @@ impl FeatureSet {
         comment_syntax: CommentSyntax::ANSI,
         mutation_syntax: MutationSyntax::ANSI,
         statement_ddl_gates: StatementDdlGates::ANSI,
+        view_sequence_clause_syntax: ViewSequenceClauseSyntax::ANSI,
         create_table_clause_syntax: CreateTableClauseSyntax::ANSI,
         column_definition_syntax: ColumnDefinitionSyntax::ANSI,
         constraint_syntax: ConstraintSyntax::ANSI,

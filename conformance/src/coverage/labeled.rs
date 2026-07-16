@@ -7,7 +7,7 @@
 
 use super::harness::*;
 use super::*;
-use squonk::ast::dialect::TransactionSyntax;
+use squonk::ast::dialect::{TransactionSyntax, ViewSequenceClauseSyntax};
 
 // --- feature-labelled cases (prod-coverage-required-features-labels) ----------
 //
@@ -136,6 +136,13 @@ const MUTATION_SUBFLAGS: &[&str] = &[
     "merge_insert_default_values",
     "merge_insert_overriding",
 ];
+const VIEW_SEQUENCE_CLAUSE_SUBFLAGS: &[&str] = &[
+    "temporary_views",
+    "materialized_view_to",
+    "recursive_views",
+    "view_definition_options",
+    "create_sequence_cache",
+];
 const STATEMENT_DDL_GATES_SUBFLAGS: &[&str] = &[
     "create_or_replace_table",
     "create_trigger",
@@ -147,7 +154,6 @@ const STATEMENT_DDL_GATES_SUBFLAGS: &[&str] = &[
     "schemas",
     "databases",
     "materialized_views",
-    "temporary_views",
     "routines",
     "compound_statements",
     "or_replace",
@@ -160,14 +166,12 @@ const STATEMENT_DDL_GATES_SUBFLAGS: &[&str] = &[
     "logfile_group_ddl",
     "schema_elements",
     "drop_database",
-    "recursive_views",
     "alter_database",
     "alter_database_options",
     "server_definition",
     "alter_instance",
     "alter_sequence",
     "alter_object_set_schema",
-    "view_definition_options",
 ];
 const CREATE_TABLE_CLAUSE_SUBFLAGS: &[&str] = &[
     "table_options",
@@ -465,6 +469,7 @@ const COMPOSITE_SUBFLAGS: &[(Feature, &[&str])] = &[
     (Feature::TableFactorSyntax, TABLE_FACTOR_SUBFLAGS),
     (Feature::MutationSyntax, MUTATION_SUBFLAGS),
     (Feature::StatementDdlGates, STATEMENT_DDL_GATES_SUBFLAGS),
+    (Feature::ViewSequenceClauseSyntax, VIEW_SEQUENCE_CLAUSE_SUBFLAGS),
     (
         Feature::CreateTableClauseSyntax,
         CREATE_TABLE_CLAUSE_SUBFLAGS,
@@ -658,10 +663,12 @@ toggleable_features! {
     (CREATE_TYPE, "create_type", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_type),
     (CREATE_VIRTUAL_TABLE, "create_virtual_table", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_virtual_table),
     (CREATE_SEQUENCE, "create_sequence", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_sequence),
+    (CREATE_SEQUENCE_CACHE, "create_sequence_cache", ViewSequenceClauseSyntax, view_sequence_clause_syntax, ViewSequenceClauseSyntax, create_sequence_cache),
     (SCHEMAS, "schemas", StatementDdlGates, statement_ddl_gates, StatementDdlGates, schemas),
     (DATABASES, "databases", StatementDdlGates, statement_ddl_gates, StatementDdlGates, databases),
     (MATERIALIZED_VIEWS, "materialized_views", StatementDdlGates, statement_ddl_gates, StatementDdlGates, materialized_views),
-    (TEMPORARY_VIEWS, "temporary_views", StatementDdlGates, statement_ddl_gates, StatementDdlGates, temporary_views),
+    (MATERIALIZED_VIEW_TO, "materialized_view_to", ViewSequenceClauseSyntax, view_sequence_clause_syntax, ViewSequenceClauseSyntax, materialized_view_to),
+    (TEMPORARY_VIEWS, "temporary_views", ViewSequenceClauseSyntax, view_sequence_clause_syntax, ViewSequenceClauseSyntax, temporary_views),
     (ROUTINES, "routines", StatementDdlGates, statement_ddl_gates, StatementDdlGates, routines),
     (COMPOUND_STATEMENTS, "compound_statements", StatementDdlGates, statement_ddl_gates, StatementDdlGates, compound_statements),
     (SPATIAL_REFERENCE_SYSTEM, "spatial_reference_system", StatementDdlGates, statement_ddl_gates, StatementDdlGates, spatial_reference_system),
@@ -889,14 +896,14 @@ toggleable_features! {
     (LOGFILE_GROUP_DDL, "logfile_group_ddl", StatementDdlGates, statement_ddl_gates, StatementDdlGates, logfile_group_ddl),
     (SCHEMA_ELEMENTS, "schema_elements", StatementDdlGates, statement_ddl_gates, StatementDdlGates, schema_elements),
     (DROP_DATABASE, "drop_database", StatementDdlGates, statement_ddl_gates, StatementDdlGates, drop_database),
-    (RECURSIVE_VIEWS, "recursive_views", StatementDdlGates, statement_ddl_gates, StatementDdlGates, recursive_views),
+    (RECURSIVE_VIEWS, "recursive_views", ViewSequenceClauseSyntax, view_sequence_clause_syntax, ViewSequenceClauseSyntax, recursive_views),
     (ALTER_DATABASE, "alter_database", StatementDdlGates, statement_ddl_gates, StatementDdlGates, alter_database),
     (ALTER_DATABASE_OPTIONS, "alter_database_options", StatementDdlGates, statement_ddl_gates, StatementDdlGates, alter_database_options),
     (SERVER_DEFINITION, "server_definition", StatementDdlGates, statement_ddl_gates, StatementDdlGates, server_definition),
     (ALTER_INSTANCE, "alter_instance", StatementDdlGates, statement_ddl_gates, StatementDdlGates, alter_instance),
     (ALTER_SEQUENCE, "alter_sequence", StatementDdlGates, statement_ddl_gates, StatementDdlGates, alter_sequence),
     (ALTER_OBJECT_SET_SCHEMA, "alter_object_set_schema", StatementDdlGates, statement_ddl_gates, StatementDdlGates, alter_object_set_schema),
-    (VIEW_DEFINITION_OPTIONS, "view_definition_options", StatementDdlGates, statement_ddl_gates, StatementDdlGates, view_definition_options),
+    (VIEW_DEFINITION_OPTIONS, "view_definition_options", ViewSequenceClauseSyntax, view_sequence_clause_syntax, ViewSequenceClauseSyntax, view_definition_options),
     (DESCRIBE_SUMMARIZE, "describe_summarize", ShowSyntax, show_syntax, ShowSyntax, describe_summarize),
     (INDEX_DROP_ON_TABLE, "index_drop_on_table", IndexAlterSyntax, index_alter_syntax, IndexAlterSyntax, index_drop_on_table),
     (FROM_FIRST, "from_first", SelectSyntax, select_syntax, SelectSyntax, from_first),
@@ -1471,9 +1478,11 @@ const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &CREATE_TYPE,
     &CREATE_VIRTUAL_TABLE,
     &CREATE_SEQUENCE,
+    &CREATE_SEQUENCE_CACHE,
     &SCHEMAS,
     &DATABASES,
     &MATERIALIZED_VIEWS,
+    &MATERIALIZED_VIEW_TO,
     &TEMPORARY_VIEWS,
     &ROUTINES,
     &COMPOUND_STATEMENTS,
@@ -4099,6 +4108,19 @@ const LABELED_CASES: &[LabeledCase] = &[
         required: &[&CREATE_SEQUENCE],
         forbidden: &[],
     },
+    LabeledCase {
+        sql: "CREATE SEQUENCE s CACHE 10",
+        expect: Expect::Accept,
+        required: &[&CREATE_SEQUENCE, &CREATE_SEQUENCE_CACHE],
+        forbidden: &[],
+    },
+    LabeledCase {
+        // DuckDB matview storage target; requires the matview statement gate plus the clause.
+        sql: "CREATE MATERIALIZED VIEW v TO t AS SELECT 1",
+        expect: Expect::Accept,
+        required: &[&MATERIALIZED_VIEWS, &MATERIALIZED_VIEW_TO],
+        forbidden: &[],
+    },
     // CREATE INDEX PostgreSQL clauses: with the gating flag off the keyword is left
     // unconsumed and the remaining tokens are leftover input -> reject, so each flag
     // is genuinely required.
@@ -5934,16 +5956,21 @@ mod tests {
         } = MutationSyntax::POSTGRES;
         // Every `StatementDdlGates` field is a toggleable statement-head gate with a
         // flip-verified LabeledCase, so the `_` bindings carry no exemption.
+        let ViewSequenceClauseSyntax {
+            create_sequence_cache: _,
+            materialized_view_to: _,
+            temporary_views: _,
+            recursive_views: _,
+            view_definition_options: _,
+        } = ViewSequenceClauseSyntax::POSTGRES;
         let StatementDdlGates {
             colocation_groups: _,
-            materialized_view_to: _,
             create_trigger: _,
             create_macro: _,
             create_secret: _,
             create_type: _,
             create_virtual_table: _,
             create_sequence: _,
-            create_sequence_cache: _,
             extension_ddl: _,
             transform_ddl: _,
             alter_system: _,
@@ -5954,11 +5981,9 @@ mod tests {
             databases: _,
             drop_database: _,
             materialized_views: _,
-            temporary_views: _,
             routines: _,
             or_replace: _,
             create_or_replace_table: _,
-            recursive_views: _,
             compound_statements: _,
             alter_database: _,
             alter_database_options: _,
@@ -5968,7 +5993,6 @@ mod tests {
             resource_group: _,
             alter_sequence: _,
             alter_object_set_schema: _,
-            view_definition_options: _,
         } = StatementDdlGates::POSTGRES;
         let CreateTableClauseSyntax {
             table_options: _,

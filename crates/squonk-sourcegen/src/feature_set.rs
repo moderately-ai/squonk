@@ -217,6 +217,12 @@ const FEATURE_FIELDS: &[FieldMeta] = &[
         None,
     ),
     meta(
+        "view_sequence_clause_syntax",
+        "ViewSequenceClauseSyntax",
+        "view_sequence_clause_syntax",
+        None,
+    ),
+    meta(
         "create_table_clause_syntax",
         "CreateTableClauseSyntax",
         "create_table_clause_syntax",

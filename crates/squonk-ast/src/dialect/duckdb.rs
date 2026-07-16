@@ -20,6 +20,7 @@ use super::{
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS,
     RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax,
     ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
+    ViewSequenceClauseSyntax,
     TableFactorSyntax, TargetSpelling, TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{
@@ -1026,9 +1027,7 @@ impl FeatureSet {
         statement_ddl_gates: StatementDdlGates {
             // DuckDB accepts the shared sequence option core but rejects PostgreSQL's
             // `CACHE` extension.
-            create_sequence_cache: false,
             colocation_groups: false,
-            materialized_view_to: false,
             create_trigger: false,
             create_macro: true,
             create_secret: true,
@@ -1044,13 +1043,11 @@ impl FeatureSet {
             schemas: true,
             drop_database: false,
             materialized_views: true,
-            temporary_views: true,
             routines: true,
             or_replace: true,
             create_or_replace_table: true,
             // DuckDB accepts `CREATE [OR REPLACE] [TEMP] RECURSIVE VIEW v (cols) AS …`
             // (engine-measured on 1.5.4).
-            recursive_views: true,
             compound_statements: false,
             // DuckDB manages extensions with `INSTALL`/`LOAD`, not the PostgreSQL
             // `CREATE`/`ALTER EXTENSION` catalogue DDL.
@@ -1075,6 +1072,12 @@ impl FeatureSet {
             resource_group: false,
             alter_sequence: true,
             alter_object_set_schema: true,
+        },
+        view_sequence_clause_syntax: ViewSequenceClauseSyntax {
+            create_sequence_cache: false,
+            materialized_view_to: false,
+            temporary_views: true,
+            recursive_views: true,
             view_definition_options: false,
         },
         create_table_clause_syntax: CreateTableClauseSyntax {
@@ -1495,7 +1498,6 @@ mod tests {
                 create_or_replace_table: false,
                 schema_elements: true,
                 // DuckDB adds `CREATE RECURSIVE VIEW`; PostgreSQL is gated off here.
-                recursive_views: false,
                 // DuckDB has no `CREATE DATABASE` (uses ATTACH); PostgreSQL admits it.
                 databases: true,
                 // DuckDB has no PostgreSQL-style extension catalogue DDL.
@@ -1505,7 +1507,6 @@ mod tests {
                 // DuckDB has no `ALTER SYSTEM` server-configuration DDL.
                 alter_system: true,
                 // PostgreSQL accepts the `CACHE` sequence option.
-                create_sequence_cache: true,
                 // MySQL's tablespace / logfile-group storage DDL is not a DuckDB statement.
                 tablespace_ddl: false,
                 logfile_group_ddl: false,

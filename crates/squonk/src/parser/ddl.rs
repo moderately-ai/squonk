@@ -340,7 +340,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 // definition surface, which shares the definer prefix with the routine forms
                 // above; a `DEFINER`-led view takes no `ALGORITHM` (that lives on the separate
                 // `view_algorithm` branch), so only the `SQL SECURITY` sub-option follows here.
-                if self.features().statement_ddl_gates.view_definition_options
+                if self.features().view_sequence_clause_syntax.view_definition_options
                     && (self.peek_is_contextual_keyword("VIEW")?
                         || self.peek_is_contextual_keyword("SQL")?)
                 {
@@ -390,7 +390,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // the routine block above; an `OR REPLACE`-prefixed view is handled in that block
         // below). The prefix keywords are fixed-order — a permutation is left for the `VIEW`
         // expectation and surfaces as a clean parse error, mirroring the engine.
-        if self.features().statement_ddl_gates.view_definition_options
+        if self.features().view_sequence_clause_syntax.view_definition_options
             && (self.peek_is_contextual_keyword("ALGORITHM")?
                 || (self.peek_is_contextual_keyword("SQL")?
                     && self.peek_nth_is_contextual_keyword(1, "SECURITY")?))
@@ -501,13 +501,13 @@ impl<'a, D: Dialect> Parser<'a, D> {
             }
             // `CREATE OR REPLACE [TEMP] RECURSIVE VIEW` — the `RECURSIVE` keyword sits
             // directly before `VIEW`, gated to the dialects that model it (DuckDB/Lenient).
-            let recursive = self.features().statement_ddl_gates.recursive_views
+            let recursive = self.features().view_sequence_clause_syntax.recursive_views
                 && self.eat_keyword(Keyword::Recursive)?;
             // MySQL's `CREATE OR REPLACE [ALGORITHM = …] [DEFINER = …] [SQL SECURITY …] VIEW`
             // (the `view_replace [view_algorithm] definer_opt` grammar branch): the option
             // prefix sits between `OR REPLACE` and `VIEW`. All-`None` for a bare/non-MySQL
             // `OR REPLACE VIEW` (the gate is off, or no option keyword is present).
-            let options = if self.features().statement_ddl_gates.view_definition_options {
+            let options = if self.features().view_sequence_clause_syntax.view_definition_options {
                 self.parse_view_option_prefix()?
             } else {
                 ViewOptions::default()
@@ -535,7 +535,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // `CREATE [TEMP] RECURSIVE VIEW` — after the `TEMP`/`TEMPORARY` prefix the
         // `RECURSIVE` keyword is unambiguous (it can only introduce a recursive view),
         // gated to the dialects that model it (DuckDB/Lenient).
-        let recursive = self.features().statement_ddl_gates.recursive_views
+        let recursive = self.features().view_sequence_clause_syntax.recursive_views
             && self.eat_keyword(Keyword::Recursive)?;
         if recursive {
             self.expect_contextual_keyword("VIEW")?;
@@ -1705,9 +1705,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
     ) -> ParseResult<Statement<D::Ext>> {
         // MySQL has temporary *tables* but no temporary *views*, so a consumed `TEMP`/
         // `TEMPORARY` prefix leading into `VIEW` is the syntax error MySQL reports
-        // ([`StatementDdlGates::temporary_views`] off); the dialects that spell
+        // ([`ViewSequenceClauseSyntax::temporary_views`] off); the dialects that spell
         // session-local views (PostgreSQL/SQLite/DuckDB) keep the flag on.
-        if prefix.temporary.is_some() && !self.features().statement_ddl_gates.temporary_views {
+        if prefix.temporary.is_some() && !self.features().view_sequence_clause_syntax.temporary_views {
             let span = start.union(self.preceding_span());
             let found = self.span_text(span).to_owned();
             return Err(self.error_at(
@@ -1739,7 +1739,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             return Err(self.unexpected("a `(` to open the recursive view's required column list"));
         }
         let to = if prefix.materialized
-            && self.features().statement_ddl_gates.materialized_view_to
+            && self.features().view_sequence_clause_syntax.materialized_view_to
             && self.eat_contextual_keyword("TO")?
         {
             Some(self.parse_object_name()?)
@@ -2314,7 +2314,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             // the `SQL SECURITY` sub-option follows the definer here.
             if self.peek_is_contextual_keyword("DEFINER")? {
                 let definer = self.parse_definer()?;
-                if self.features().statement_ddl_gates.view_definition_options
+                if self.features().view_sequence_clause_syntax.view_definition_options
                     && (self.peek_is_contextual_keyword("VIEW")?
                         || self.peek_is_contextual_keyword("SQL")?)
                 {
@@ -2400,7 +2400,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // (both gated on only under Lenient); MySQL takes no `IF EXISTS`, so an `IF EXISTS`
         // guard or a `SET SCHEMA` tail routes to the relocation, and a `(`/`AS` tail routes to
         // the redefinition.
-        if self.features().statement_ddl_gates.view_definition_options {
+        if self.features().view_sequence_clause_syntax.view_definition_options {
             if self.peek_is_contextual_keyword("ALGORITHM")?
                 || (self.peek_is_contextual_keyword("SQL")?
                     && self.peek_nth_is_contextual_keyword(1, "SECURITY")?)
@@ -7067,7 +7067,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// only when the dialect's dedicated sequence-cache gate is enabled.
     fn parse_sequence_options(&mut self) -> ParseResult<ThinVec<IdentityOption<D::Ext>>> {
         let mut options = ThinVec::new();
-        let allow_cache = self.features().statement_ddl_gates.create_sequence_cache;
+        let allow_cache = self.features().view_sequence_clause_syntax.create_sequence_cache;
         while self.peek_is_sequence_option()?
             || (allow_cache && self.peek_is_contextual_keyword("CACHE")?)
         {

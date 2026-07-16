@@ -89,6 +89,8 @@ pub struct FeatureDelta {
     pub mutation_syntax: Option<MutationSyntax>,
     /// Override for the `statement_ddl_gates` dialect-data dimension; `None` preserves the base value.
     pub statement_ddl_gates: Option<StatementDdlGates>,
+    /// Override for the `view_sequence_clause_syntax` dialect-data dimension; `None` preserves the base value.
+    pub view_sequence_clause_syntax: Option<ViewSequenceClauseSyntax>,
     /// Override for the `create_table_clause_syntax` dialect-data dimension; `None` preserves the base value.
     pub create_table_clause_syntax: Option<CreateTableClauseSyntax>,
     /// Override for the `column_definition_syntax` dialect-data dimension; `None` preserves the base value.
@@ -157,6 +159,7 @@ impl FeatureDelta {
         comment_syntax: None,
         mutation_syntax: None,
         statement_ddl_gates: None,
+        view_sequence_clause_syntax: None,
         create_table_clause_syntax: None,
         column_definition_syntax: None,
         constraint_syntax: None,
@@ -341,6 +344,11 @@ impl FeatureDelta {
     /// Override the `statement_ddl_gates` dialect-data dimension.
     pub const fn statement_ddl_gates(mut self, value: StatementDdlGates) -> Self {
         self.statement_ddl_gates = Some(value);
+        self
+    }
+    /// Override the `view_sequence_clause_syntax` dialect-data dimension.
+    pub const fn view_sequence_clause_syntax(mut self, value: ViewSequenceClauseSyntax) -> Self {
+        self.view_sequence_clause_syntax = Some(value);
         self
     }
     /// Override the `create_table_clause_syntax` dialect-data dimension.
@@ -564,6 +572,10 @@ impl FeatureSet {
                 Some(value) => value,
                 None => self.statement_ddl_gates,
             },
+            view_sequence_clause_syntax: match delta.view_sequence_clause_syntax {
+                Some(value) => value,
+                None => self.view_sequence_clause_syntax,
+            },
             create_table_clause_syntax: match delta.create_table_clause_syntax {
                 Some(value) => value,
                 None => self.create_table_clause_syntax,
@@ -698,6 +710,8 @@ pub enum Feature {
     MutationSyntax,
     /// The `statement_ddl_gates` dialect-data dimension.
     StatementDdlGates,
+    /// The `view_sequence_clause_syntax` dialect-data dimension.
+    ViewSequenceClauseSyntax,
     /// The `create_table_clause_syntax` dialect-data dimension.
     CreateTableClauseSyntax,
     /// The `column_definition_syntax` dialect-data dimension.
@@ -731,7 +745,7 @@ pub enum Feature {
 }
 impl Feature {
     /// Features in stable coverage-matrix order; `Feature::ALL[d] as usize == d`.
-    pub const ALL: [Self; 49] = [
+    pub const ALL: [Self; 50] = [
         Self::IdentifierCasing,
         Self::IdentifierQuote,
         Self::DefaultNullOrdering,
@@ -766,6 +780,7 @@ impl Feature {
         Self::CommentSyntax,
         Self::MutationSyntax,
         Self::StatementDdlGates,
+        Self::ViewSequenceClauseSyntax,
         Self::CreateTableClauseSyntax,
         Self::ColumnDefinitionSyntax,
         Self::ConstraintSyntax,
@@ -819,6 +834,7 @@ impl Feature {
             Self::CommentSyntax => "comment_syntax",
             Self::MutationSyntax => "mutation_syntax",
             Self::StatementDdlGates => "statement_ddl_gates",
+            Self::ViewSequenceClauseSyntax => "view_sequence_clause_syntax",
             Self::CreateTableClauseSyntax => "create_table_clause_syntax",
             Self::ColumnDefinitionSyntax => "column_definition_syntax",
             Self::ConstraintSyntax => "constraint_syntax",
@@ -907,6 +923,7 @@ pub const FEATURE_METADATA: &[FeatureMetadata] = &[
     Feature::CommentSyntax.metadata(),
     Feature::MutationSyntax.metadata(),
     Feature::StatementDdlGates.metadata(),
+    Feature::ViewSequenceClauseSyntax.metadata(),
     Feature::CreateTableClauseSyntax.metadata(),
     Feature::ColumnDefinitionSyntax.metadata(),
     Feature::ConstraintSyntax.metadata(),

@@ -17,7 +17,7 @@ use super::{
     IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, Keyword, KeywordOperators,
     KeywordSet, MYSQL_BYTE_CLASSES, MaintenanceSyntax, MutationSyntax, NullOrdering,
     NumericLiteralSyntax, OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax,
-    QueryTailSyntax, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
+    QueryTailSyntax, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
     TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
@@ -375,8 +375,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `MYSQL` preset for statement ddl gates.
     pub const MYSQL: Self = Self {
+
         colocation_groups: false,
-        materialized_view_to: false,
         // MySQL's `CREATE TRIGGER` body is not the modelled SQLite `BEGIN … END` form.
         create_trigger: false,
         // The macro DDL is DuckDB-specific; MySQL has no `CREATE MACRO`.
@@ -387,7 +387,6 @@ impl StatementDdlGates {
         create_virtual_table: false,
         // MySQL has no sequence generators (it uses AUTO_INCREMENT); `CREATE SEQUENCE` rejects.
         create_sequence: false,
-        create_sequence_cache: false,
         extension_ddl: false,
         transform_ddl: false,
         alter_system: false,
@@ -409,13 +408,11 @@ impl StatementDdlGates {
         materialized_views: false,
         // MySQL has temporary *tables* but no temporary *views* — `CREATE TEMPORARY VIEW`
         // is engine-measured-rejected on mysql:8.
-        temporary_views: false,
         routines: true,
         or_replace: true,
         create_or_replace_table: false,
         // `CREATE RECURSIVE VIEW` is a DuckDB form; MySQL leaves `RECURSIVE`
         // unconsumed before the expected `VIEW`.
-        recursive_views: false,
         // MySQL routine/trigger/event bodies are SQL/PSM compound statements
         // (`BEGIN … END` with a `DECLARE` prefix and flow control), parsed by the
         // separate body dispatcher.
@@ -432,9 +429,19 @@ impl StatementDdlGates {
         alter_object_set_schema: false,
         // MySQL owns the view definition-option surface: the `ALGORITHM`/`DEFINER`/`SQL
         // SECURITY` prefix on `CREATE VIEW` and the whole `ALTER VIEW` redefinition.
+};
+}
+impl ViewSequenceClauseSyntax {
+    /// View/sequence clause surface for the `MYSQL` preset.
+    pub const MYSQL: Self = Self {
+        materialized_view_to: false,
+        create_sequence_cache: false,
+        temporary_views: false,
+        recursive_views: false,
         view_definition_options: true,
     };
 }
+
 
 impl CreateTableClauseSyntax {
     /// The `MYSQL` preset for create table clause syntax.
@@ -1384,6 +1391,7 @@ impl FeatureSet {
         comment_syntax: CommentSyntax::MYSQL,
         mutation_syntax: MutationSyntax::MYSQL,
         statement_ddl_gates: StatementDdlGates::MYSQL,
+        view_sequence_clause_syntax: ViewSequenceClauseSyntax::MYSQL,
         create_table_clause_syntax: CreateTableClauseSyntax::MYSQL,
         column_definition_syntax: ColumnDefinitionSyntax::MYSQL,
         constraint_syntax: ConstraintSyntax::MYSQL,

@@ -152,7 +152,7 @@
 
 use super::harness::AdHocDialect;
 use super::*;
-use squonk::ast::dialect::TransactionSyntax;
+use squonk::ast::dialect::{TransactionSyntax, ViewSequenceClauseSyntax};
 use squonk::ast::dialect::{
     GrammarConflict, HeadResolution, LexicalConflict, MULTI_CLAIMANT_STATEMENT_HEADS,
 };
@@ -241,7 +241,7 @@ gate_family! {
     (ANALYZE, "analyze", maintenance_syntax, MaintenanceSyntax, analyze),
     (TABLE_MAINTENANCE, "table_maintenance", maintenance_syntax, MaintenanceSyntax, table_maintenance),
     (UPDATE_EXTENSIONS, "update_extensions", utility_syntax, UtilitySyntax, update_extensions),
-    (VIEW_DEFINITION_OPTIONS, "view_definition_options", statement_ddl_gates, StatementDdlGates, view_definition_options),
+    (VIEW_DEFINITION_OPTIONS, "view_definition_options", view_sequence_clause_syntax, ViewSequenceClauseSyntax, view_definition_options),
     (ALTER_OBJECT_SET_SCHEMA, "alter_object_set_schema", statement_ddl_gates, StatementDdlGates, alter_object_set_schema),
     (ALTER_DATABASE, "alter_database", statement_ddl_gates, StatementDdlGates, alter_database),
     (ALTER_DATABASE_OPTIONS, "alter_database_options", statement_ddl_gates, StatementDdlGates, alter_database_options),

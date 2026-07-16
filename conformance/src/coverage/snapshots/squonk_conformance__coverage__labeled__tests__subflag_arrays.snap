@@ -114,7 +114,6 @@ statement_ddl_gates
   schemas
   databases
   materialized_views
-  temporary_views
   routines
   compound_statements
   or_replace
@@ -127,14 +126,18 @@ statement_ddl_gates
   logfile_group_ddl
   schema_elements
   drop_database
-  recursive_views
   alter_database
   alter_database_options
   server_definition
   alter_instance
   alter_sequence
   alter_object_set_schema
+view_sequence_clause_syntax
+  temporary_views
+  materialized_view_to
+  recursive_views
   view_definition_options
+  create_sequence_cache
 create_table_clause_syntax
   table_options
   without_rowid_table_option

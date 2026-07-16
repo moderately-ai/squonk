@@ -94,7 +94,7 @@ use super::{
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
     ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax, RESERVED_BARE_ALIAS,
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
-    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms,
+    SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax, StringFuncForms,
     StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TypeNameSyntax,
     TransactionSyntax, UtilitySyntax,
 };
@@ -655,8 +655,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `LENIENT` preset for statement ddl gates.
     pub const LENIENT: Self = Self {
+
         colocation_groups: true,
-        materialized_view_to: true,
         // The parse-anything union accepts the SQLite `CREATE TRIGGER` body form too.
         create_trigger: true,
         // …and the DuckDB `CREATE MACRO`/live-body `FUNCTION` macro DDL.
@@ -668,7 +668,6 @@ impl StatementDdlGates {
         create_virtual_table: true,
         // …and the PostgreSQL/DuckDB `CREATE`/`DROP SEQUENCE` T176 generator.
         create_sequence: true,
-        create_sequence_cache: true,
         extension_ddl: true,
         transform_ddl: true,
         alter_system: true,
@@ -687,13 +686,11 @@ impl StatementDdlGates {
         // forgoes the MySQL `DROP DATABASE` spelling.
         drop_database: false,
         materialized_views: true,
-        temporary_views: true,
         routines: true,
         or_replace: true,
         create_or_replace_table: true,
         // …and DuckDB's `CREATE [OR REPLACE] [TEMP] RECURSIVE VIEW` (no-shadowing
         // doctrine: the union carries every real dialect's surface).
-        recursive_views: true,
         // The permissive union carries MySQL's compound-statement body grammar.
         compound_statements: true,
         alter_database: true,
@@ -704,9 +701,19 @@ impl StatementDdlGates {
         resource_group: true,
         alter_sequence: true,
         alter_object_set_schema: true,
+};
+}
+impl ViewSequenceClauseSyntax {
+    /// View/sequence clause surface for the `LENIENT` preset.
+    pub const LENIENT: Self = Self {
+        materialized_view_to: true,
+        create_sequence_cache: true,
+        temporary_views: true,
+        recursive_views: true,
         view_definition_options: true,
     };
 }
+
 
 impl CreateTableClauseSyntax {
     /// The `LENIENT` preset for create table clause syntax.
@@ -1400,6 +1407,7 @@ impl FeatureSet {
         comment_syntax: CommentSyntax::LENIENT,
         mutation_syntax: MutationSyntax::LENIENT,
         statement_ddl_gates: StatementDdlGates::LENIENT,
+        view_sequence_clause_syntax: ViewSequenceClauseSyntax::LENIENT,
         create_table_clause_syntax: CreateTableClauseSyntax::LENIENT,
         column_definition_syntax: ColumnDefinitionSyntax::LENIENT,
         constraint_syntax: ConstraintSyntax::LENIENT,

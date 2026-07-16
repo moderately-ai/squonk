@@ -1542,12 +1542,58 @@ pub struct MutationSyntax {
 }
 
 /// Dialect-owned whole-statement DDL dispatch gates accepted by the parser.
+/// Dialect-owned view/sequence *clause* syntax accepted after a DDL statement head.
 ///
-/// The leading-keyword gates for non-`TABLE` object DDL (the `CREATE`/`DROP` of the
-/// various object kinds, plus the `OR REPLACE` view/function modifier). Split out of the
-/// retired `SchemaChangeSyntax` at its 16-field line as the whole-statement-dispatch axis,
-/// distinct from the table-clause, column-definition, and constraint axes. When off, the
-/// leading keyword is not dispatched and surfaces as an unknown statement.
+/// Post-dispatch refinements on `CREATE VIEW` / `CREATE MATERIALIZED VIEW` / `CREATE SEQUENCE`
+/// — temporary views, recursive views, view `WITH` options, matview `TO` target, sequence
+/// `CACHE` — split out of [`StatementDdlGates`] so whole-statement object-kind gates stay
+/// separate from clause-level grammar. Statement-head flags (`create_sequence`,
+/// `materialized_views`, `or_replace`, …) remain on [`StatementDdlGates`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ViewSequenceClauseSyntax {
+    /// Accept `CACHE <n>` in the option list of `CREATE SEQUENCE`.
+    pub create_sequence_cache: bool,
+    /// Accept a materialized-view storage target: `CREATE MATERIALIZED VIEW name TO target AS ...`.
+    pub materialized_view_to: bool,
+    /// Accept the `TEMP`/`TEMPORARY` modifier on a plain `CREATE [OR REPLACE] VIEW`
+    /// (PostgreSQL/SQLite/DuckDB spell session-local views). On for ANSI/PostgreSQL/SQLite/
+    /// DuckDB/Lenient. MySQL has no temporary views (only temporary *tables*), so it is off;
+    /// a consumed `TEMP`/`TEMPORARY` prefix leading into `VIEW` is then the syntax error
+    /// MySQL reports (engine-measured-rejected on mysql:8). Gates only the view surface — the
+    /// `CREATE TEMPORARY TABLE` form is a separate, unaffected family.
+    pub temporary_views: bool,
+    /// Accept the `RECURSIVE` keyword before `VIEW` in `CREATE [OR REPLACE]
+    /// [TEMP|TEMPORARY] RECURSIVE VIEW <name> (<columns>) AS <query>` (DuckDB,
+    /// engine-measured on duckdb 1.5.4). On for DuckDB/Lenient only — although
+    /// PostgreSQL spells the same form, it is gated to the measured dialect per the
+    /// no-shadowing doctrine rather than widened to the PostgreSQL reference without a
+    /// differential. Off elsewhere, where the `RECURSIVE` keyword is left unconsumed
+    /// before the expected `VIEW` and surfaces as a clean parse error. The keyword sits
+    /// between the `TEMP`/`TEMPORARY` prefix and `VIEW`, never composes with
+    /// `MATERIALIZED`, and requires the explicit column list (the engine desugars a
+    /// recursive view to `WITH RECURSIVE`, which names its output columns).
+    pub recursive_views: bool,
+    /// Accept MySQL's view definition-option surface: the `[ALGORITHM = {UNDEFINED | MERGE |
+    /// TEMPTABLE}] [DEFINER = <user>] [SQL SECURITY {DEFINER | INVOKER}]` prefix (before the
+    /// `VIEW` keyword) on `CREATE VIEW`, and the whole `ALTER VIEW` redefinition statement,
+    /// dispatched to the [`AlterView`](crate::ast::AlterView) node. One flag gates both because
+    /// they are the one MySQL view-definition behaviour — the identical [`ViewOptions`](crate::ast::ViewOptions)
+    /// prefix decorates `CREATE VIEW` and heads `ALTER VIEW`, and no dialect has one without the
+    /// other. On for MySQL/Lenient. Off elsewhere: the option keywords before `VIEW` are left
+    /// unconsumed (a clean parse error), and `ALTER VIEW` routes only to the DuckDB
+    /// [`alter_object_set_schema`](StatementDdlGates::alter_object_set_schema) `SET SCHEMA` head
+    /// where that flag is on. A *separate* behaviour from that schema-relocation gate: this is
+    /// the redefinition/option surface, that is the cross-schema move.
+    pub view_definition_options: bool,
+}
+
+/// Dialect-owned whole-statement non-`TABLE` DDL dispatch gates accepted by the parser.
+///
+/// Leading-object-kind gates for `CREATE`/`DROP`/`ALTER` families other than table-body
+/// clauses (those live on [`CreateTableClauseSyntax`] / [`ColumnDefinitionSyntax`] /
+/// [`ConstraintSyntax`]). View/sequence *clause* refinements after dispatch live on
+/// [`ViewSequenceClauseSyntax`]. Each flag is a statement-head gate unless noted:
+/// when off the keyword is not dispatched and surfaces as an unknown statement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StatementDdlGates {
     /// Accept `CREATE`/`DROP COLOCATION GROUP` and table membership clauses.
@@ -1623,8 +1669,6 @@ pub struct StatementDdlGates {
     /// `CACHE` extension is modelled by [`create_sequence_cache`](Self::create_sequence_cache);
     /// `AS` and `OWNED BY` remain unmodelled.
     pub create_sequence: bool,
-    /// Accept `CACHE <n>` in the option list of `CREATE SEQUENCE`.
-    pub create_sequence_cache: bool,
     /// Accept the PostgreSQL extension-DDL statements `CREATE EXTENSION [IF NOT EXISTS]
     /// <name> [WITH] [SCHEMA s] [VERSION v] [CASCADE]` and `ALTER EXTENSION <name>
     /// {UPDATE [TO v] | ADD <member> | DROP <member>}`, dispatched to the
@@ -1751,15 +1795,6 @@ pub struct StatementDdlGates {
     /// unknown statement (a plain `CREATE VIEW` is unaffected — a separate always-accepted
     /// family).
     pub materialized_views: bool,
-    /// Accept a materialized-view storage target: `CREATE MATERIALIZED VIEW name TO target AS ...`.
-    pub materialized_view_to: bool,
-    /// Accept the `TEMP`/`TEMPORARY` modifier on a plain `CREATE [OR REPLACE] VIEW`
-    /// (PostgreSQL/SQLite/DuckDB spell session-local views). On for ANSI/PostgreSQL/SQLite/
-    /// DuckDB/Lenient. MySQL has no temporary views (only temporary *tables*), so it is off;
-    /// a consumed `TEMP`/`TEMPORARY` prefix leading into `VIEW` is then the syntax error
-    /// MySQL reports (engine-measured-rejected on mysql:8). Gates only the view surface — the
-    /// `CREATE TEMPORARY TABLE` form is a separate, unaffected family.
-    pub temporary_views: bool,
     /// Accept the stored-routine DDL — `CREATE FUNCTION …`, `DROP FUNCTION …`, and
     /// `DROP PROCEDURE …` (PostgreSQL/MySQL SQL/PSM). One flag gates the routine family as
     /// a unit. On for ANSI/PostgreSQL/MySQL/DuckDB/Lenient. SQLite has no stored routines
@@ -1781,17 +1816,6 @@ pub struct StatementDdlGates {
     /// `TABLE` after `OR REPLACE` is left for the `VIEW` expectation and surfaces as a clean
     /// parse error.
     pub create_or_replace_table: bool,
-    /// Accept the `RECURSIVE` keyword before `VIEW` in `CREATE [OR REPLACE]
-    /// [TEMP|TEMPORARY] RECURSIVE VIEW <name> (<columns>) AS <query>` (DuckDB,
-    /// engine-measured on duckdb 1.5.4). On for DuckDB/Lenient only — although
-    /// PostgreSQL spells the same form, it is gated to the measured dialect per the
-    /// no-shadowing doctrine rather than widened to the PostgreSQL reference without a
-    /// differential. Off elsewhere, where the `RECURSIVE` keyword is left unconsumed
-    /// before the expected `VIEW` and surfaces as a clean parse error. The keyword sits
-    /// between the `TEMP`/`TEMPORARY` prefix and `VIEW`, never composes with
-    /// `MATERIALIZED`, and requires the explicit column list (the engine desugars a
-    /// recursive view to `WITH RECURSIVE`, which names its output columns).
-    pub recursive_views: bool,
     /// Parse a routine/trigger/event body as a MySQL SQL/PSM *compound statement* — the
     /// `[<label>:] BEGIN [<declarations>] … END` block with its `DECLARE` prefix, the
     /// flow-control statements (`IF`/`CASE`/`LOOP`/`WHILE`/`REPEAT`/`LEAVE`/`ITERATE`/
@@ -1905,18 +1929,6 @@ pub struct StatementDdlGates {
     /// command parser (a clean parse error for the `VIEW`/`SEQUENCE`/`DATABASE` heads). Gated
     /// to DuckDB per the no-shadowing doctrine, though PostgreSQL shares the grammar.
     pub alter_object_set_schema: bool,
-    /// Accept MySQL's view definition-option surface: the `[ALGORITHM = {UNDEFINED | MERGE |
-    /// TEMPTABLE}] [DEFINER = <user>] [SQL SECURITY {DEFINER | INVOKER}]` prefix (before the
-    /// `VIEW` keyword) on `CREATE VIEW`, and the whole `ALTER VIEW` redefinition statement,
-    /// dispatched to the [`AlterView`](crate::ast::AlterView) node. One flag gates both because
-    /// they are the one MySQL view-definition behaviour — the identical [`ViewOptions`](crate::ast::ViewOptions)
-    /// prefix decorates `CREATE VIEW` and heads `ALTER VIEW`, and no dialect has one without the
-    /// other. On for MySQL/Lenient. Off elsewhere: the option keywords before `VIEW` are left
-    /// unconsumed (a clean parse error), and `ALTER VIEW` routes only to the DuckDB
-    /// [`alter_object_set_schema`](StatementDdlGates::alter_object_set_schema) `SET SCHEMA` head
-    /// where that flag is on. A *separate* behaviour from that schema-relocation gate: this is
-    /// the redefinition/option surface, that is the cross-schema move.
-    pub view_definition_options: bool,
 }
 
 /// Dialect-owned `CREATE TABLE` table-level clause syntax accepted by the parser.
@@ -5568,6 +5580,9 @@ pub struct FeatureSet {
     /// Whole-statement DDL dispatch gates (non-`TABLE` `CREATE`/`DROP` object dispatch),
     /// split from the retired `SchemaChangeSyntax`.
     pub statement_ddl_gates: StatementDdlGates,
+    /// View/sequence clause syntax after a DDL statement head has been chosen —
+    /// temporary/recursive views, view options, matview targets, sequence `CACHE`.
+    pub view_sequence_clause_syntax: ViewSequenceClauseSyntax,
     /// `CREATE TABLE` table-level clause syntax (storage/CTAS/partitioning/inheritance/
     /// persistence clauses), split from the retired `SchemaChangeSyntax`.
     pub create_table_clause_syntax: CreateTableClauseSyntax,

@@ -15,7 +15,7 @@ use super::{
     POSTGRES_BYTE_CLASSES, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS,
     RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax,
-    ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
+    ShowSyntax, StatementDdlGates, ViewSequenceClauseSyntax, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
     TableFactorSyntax, TargetSpelling, TypeNameSyntax, TransactionSyntax, UtilitySyntax,
 };
 use crate::precedence::{
@@ -271,8 +271,8 @@ impl MutationSyntax {
 impl StatementDdlGates {
     /// The `POSTGRES` preset for statement ddl gates.
     pub const POSTGRES: Self = Self {
+
         colocation_groups: false,
-        materialized_view_to: false,
         // PostgreSQL's `CREATE TRIGGER` uses an `EXECUTE FUNCTION` body, not the
         // modelled SQLite `BEGIN … END` form, so it is not dispatched here.
         create_trigger: false,
@@ -285,7 +285,6 @@ impl StatementDdlGates {
         create_virtual_table: false,
         // PostgreSQL has the SQL:2003 T176 sequence generator.
         create_sequence: true,
-        create_sequence_cache: true,
         extension_ddl: true,
         transform_ddl: true,
         // PostgreSQL accepts `ALTER SYSTEM` server-configuration DDL.
@@ -304,12 +303,10 @@ impl StatementDdlGates {
         // `DROP SCHEMA` is the shared name-list drop, not the MySQL DATABASE/SCHEMA synonym.
         drop_database: false,
         materialized_views: true,
-        temporary_views: true,
         routines: true,
         or_replace: true,
         create_or_replace_table: false,
         // `CREATE RECURSIVE VIEW` stays off pending a PostgreSQL differential.
-        recursive_views: false,
         // PostgreSQL routine bodies are opaque `$$…$$`/string definitions, not the
         // MySQL SQL/PSM compound statement.
         compound_statements: false,
@@ -323,9 +320,19 @@ impl StatementDdlGates {
         resource_group: false,
         alter_sequence: false,
         alter_object_set_schema: false,
+};
+}
+impl ViewSequenceClauseSyntax {
+    /// View/sequence clause surface for the `POSTGRES` preset.
+    pub const POSTGRES: Self = Self {
+        materialized_view_to: false,
+        create_sequence_cache: true,
+        temporary_views: true,
+        recursive_views: false,
         view_definition_options: false,
     };
 }
+
 
 impl CreateTableClauseSyntax {
     /// The `POSTGRES` preset for create table clause syntax.
@@ -1154,6 +1161,7 @@ impl FeatureSet {
         comment_syntax: CommentSyntax::POSTGRES,
         mutation_syntax: MutationSyntax::POSTGRES,
         statement_ddl_gates: StatementDdlGates::POSTGRES,
+        view_sequence_clause_syntax: ViewSequenceClauseSyntax::POSTGRES,
         create_table_clause_syntax: CreateTableClauseSyntax::POSTGRES,
         column_definition_syntax: ColumnDefinitionSyntax::POSTGRES,
         constraint_syntax: ConstraintSyntax::POSTGRES,
