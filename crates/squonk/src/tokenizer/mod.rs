@@ -48,6 +48,7 @@ mod trivia;
 
 pub use cursor::Cursor;
 pub use error::{LexError, LexErrorKind};
+pub(crate) use scan::escape_string_segments_are_valid;
 pub use token::{Operator, Punctuation, Token, TokenKind};
 pub use trivia::{TriviaIndex, TriviaKind, TriviaRange};
 

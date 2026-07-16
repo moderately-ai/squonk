@@ -75,6 +75,73 @@ use super::Dialect;
 use super::engine::Parser;
 use super::expr::{number_literal_kind, string_literal_is_name_sconst, string_literal_is_sconst};
 
+/// Validate a possibly-continued `U&'…'` span by concatenating segment *bodies*
+/// (PostgreSQL joins continued constants before escape decoding — so five `\\` in
+/// one segment plus one in the next is six backslashes, a valid pair sequence).
+fn unicode_escape_segments_are_valid(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.len() < 4 || !matches!(bytes[0], b'U' | b'u') || bytes[1] != b'&' || bytes[2] != b'\''
+    {
+        return crate::ast::unicode_escape_string_is_valid(text);
+    }
+    let Some(joined) = join_continued_string_bodies(bytes, 2) else {
+        return false;
+    };
+    let mut synthetic = String::with_capacity(joined.len() + 4);
+    synthetic.push_str("U&'");
+    synthetic.push_str(&joined);
+    synthetic.push('\'');
+    crate::ast::unicode_escape_string_is_valid(&synthetic)
+}
+
+/// Extract and concatenate the bodies of quote-delimited segments in a continued
+/// string span. `first_open` is the index of the first opening `'`.
+fn join_continued_string_bodies(bytes: &[u8], first_open: usize) -> Option<String> {
+    let mut joined = String::new();
+    let mut i = first_open;
+    loop {
+        if i >= bytes.len() || bytes[i] != b'\'' {
+            return None;
+        }
+        i += 1; // past open
+        let body_start = i;
+        let mut closed = false;
+        while i < bytes.len() {
+            if bytes[i] == b'\'' {
+                if i + 1 < bytes.len() && bytes[i + 1] == b'\'' {
+                    i += 2; // doubled quote stays in body
+                } else {
+                    let body = std::str::from_utf8(&bytes[body_start..i]).ok()?;
+                    joined.push_str(body);
+                    i += 1;
+                    closed = true;
+                    break;
+                }
+            } else {
+                i += 1;
+            }
+        }
+        if !closed {
+            return None;
+        }
+        let mut saw_newline = false;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\n' | b'\r' => {
+                    saw_newline = true;
+                    i += 1;
+                }
+                b' ' | b'\t' | 0x0b | 0x0c => i += 1,
+                _ => break,
+            }
+        }
+        if saw_newline && i < bytes.len() && bytes[i] == b'\'' {
+            continue;
+        }
+        return (i == bytes.len()).then_some(joined);
+    }
+}
+
 /// The value shape a `CHANGE REPLICATION SOURCE TO` option name dictates — the parser-internal
 /// axis that [`SOURCE_OPTION_TABLE`] pairs with each [`SourceOption`] so the value grammar is
 /// read once per shape rather than once per option.
@@ -5103,19 +5170,41 @@ impl<'a, D: Dialect> Parser<'a, D> {
         // validates the escape body so invalid `U&'\d'` is rejected.
         self.advance()?;
         let text = self.span_text(token.span);
-        let is_unicode = matches!(text.as_bytes(), [b'U' | b'u', b'&', b'\'', ..]);
-        let span = if is_unicode {
-            let span = self.consume_optional_uescape(token.span)?;
-            if !crate::ast::unicode_escape_string_is_valid(self.span_text(span)) {
+        // Newline continuation only (same-line second strings stay for multi-arg DO).
+        let mut span = self.consume_string_continuations_with(
+            token.span, text, /* same_line_is_error */ false,
+        )?;
+        let full = self.span_text(span);
+        let is_unicode = matches!(full.as_bytes(), [b'U' | b'u', b'&', b'\'', ..]);
+        if is_unicode {
+            span = self.consume_optional_uescape(span)?;
+            let u_full = self.span_text(span);
+            // Continued U& spans join plain `'…'` segments; validate each segment's
+            // escape body (libpg_query rejects `U&''\r'\$'` as invalid Unicode escape).
+            let valid = if u_full.bytes().any(|b| matches!(b, b'\n' | b'\r')) {
+                unicode_escape_segments_are_valid(u_full)
+            } else {
+                crate::ast::unicode_escape_string_is_valid(u_full)
+            };
+            if !valid {
                 return Err(crate::error::ParseError::lexical(
                     span,
                     crate::tokenizer::LexErrorKind::InvalidEscapeSequence,
                 ));
             }
-            span
-        } else {
-            token.span
-        };
+        } else if matches!(full.as_bytes(), [b'E' | b'e', b'\'', ..]) {
+            let valid = if full.bytes().any(|b| matches!(b, b'\n' | b'\r')) {
+                crate::tokenizer::escape_string_segments_are_valid(full)
+            } else {
+                crate::ast::postgres_escape_string_is_valid(full)
+            };
+            if !valid {
+                return Err(crate::error::ParseError::lexical(
+                    span,
+                    crate::tokenizer::LexErrorKind::InvalidEscapeSequence,
+                ));
+            }
+        }
         Ok(Some(Literal {
             kind: LiteralKind::String,
             meta: self.make_meta(span),

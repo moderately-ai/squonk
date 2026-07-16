@@ -212,6 +212,23 @@ impl<'a, D: Dialect> Parser<'a, D> {
         first_span: Span,
         first_text: &str,
     ) -> ParseResult<Span> {
+        self.consume_string_continuations_with(first_span, first_text, true)
+    }
+
+    /// Fold adjacent-string continuations into `first_span`.
+    ///
+    /// When `same_line_is_error` is true (expression primaries), same-line adjacency
+    /// without [`same_line_adjacent_concat`](crate::ast::dialect::StringLiteralSyntax)
+    /// is a hard error. When false (multi-`Sconst` statement positions like `DO`), a
+    /// same-line second string is left unconsumed for the next argument rather than
+    /// rejected — so `DO 'a'\t'b'` is two body args, while `DO 'a'\n'b'` is still one
+    /// continued constant.
+    pub(in crate::parser) fn consume_string_continuations_with(
+        &mut self,
+        first_span: Span,
+        first_text: &str,
+        same_line_is_error: bool,
+    ) -> ParseResult<Span> {
         // A dollar-quoted constant never continues (PostgreSQL leaves the dollar-quote
         // lexer state at its close), so decline before peeking; every other string form
         // is continuable.
@@ -257,13 +274,16 @@ impl<'a, D: Dialect> Parser<'a, D> {
                     if self.features().string_literals.same_line_adjacent_concat {
                         self.advance()?; // join the continuation segment
                         span = span.union(next.span);
-                    } else {
+                    } else if same_line_is_error {
                         let found = self.span_text(next.span).to_owned();
                         return Err(self.error_at(
                             next.span,
                             "a newline between adjacent string literals",
                             found,
                         ));
+                    } else {
+                        // Multi-`Sconst` position: leave the second string for the next arg.
+                        return Ok(span);
                     }
                 }
                 // A comment (or other non-whitespace) in the gap is not a continuation;

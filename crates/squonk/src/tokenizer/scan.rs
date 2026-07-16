@@ -1269,35 +1269,41 @@ fn scan_quoted(cursor: &mut Cursor, scan: QuoteScan) -> Result<Token, LexError> 
 /// [`crate::ast::postgres_escape_string_is_valid`] so an invalid `\U` / octal / NUL
 /// escape in any segment is rejected, matching libpg_query's `invalid Unicode
 /// escape` on continued constants.
-fn escape_string_segments_are_valid(text: &str) -> bool {
+pub(crate) fn escape_string_segments_are_valid(text: &str) -> bool {
     let bytes = text.as_bytes();
     if bytes.len() < 3 || !matches!(bytes[0], b'E' | b'e') || bytes[1] != b'\'' {
         return crate::ast::postgres_escape_string_is_valid(text);
     }
-    let prefix = bytes[0];
-    let mut i = 1; // on first opening quote
+    // PostgreSQL joins continued segment *bodies* before escape decoding, so validate
+    // the concatenated body as one `E'…'` constant.
+    let Some(joined) = join_e_string_bodies(bytes) else {
+        return false;
+    };
+    let mut synthetic = String::with_capacity(joined.len() + 3);
+    synthetic.push(bytes[0] as char); // e or E
+    synthetic.push('\'');
+    synthetic.push_str(&joined);
+    synthetic.push('\'');
+    crate::ast::postgres_escape_string_is_valid(&synthetic)
+}
+
+fn join_e_string_bodies(bytes: &[u8]) -> Option<String> {
+    let mut joined = String::new();
+    let mut i = 1; // on first opening quote after E/e
     loop {
         if i >= bytes.len() || bytes[i] != b'\'' {
-            return false;
+            return None;
         }
-        let seg_open = i;
-        i += 1; // past open
+        i += 1;
+        let body_start = i;
         let mut closed = false;
         while i < bytes.len() {
             match bytes[i] {
                 b'\\' if i + 1 < bytes.len() => i += 2,
                 b'\'' if i + 1 < bytes.len() && bytes[i + 1] == b'\'' => i += 2,
                 b'\'' => {
-                    // Segment bytes: prefix + open..close inclusive.
-                    let mut seg = Vec::with_capacity((i - seg_open) + 2);
-                    seg.push(prefix);
-                    seg.extend_from_slice(&bytes[seg_open..=i]);
-                    let Ok(seg_text) = std::str::from_utf8(&seg) else {
-                        return false;
-                    };
-                    if !crate::ast::postgres_escape_string_is_valid(seg_text) {
-                        return false;
-                    }
+                    let body = std::str::from_utf8(&bytes[body_start..i]).ok()?;
+                    joined.push_str(body);
                     i += 1;
                     closed = true;
                     break;
@@ -1306,9 +1312,8 @@ fn escape_string_segments_are_valid(text: &str) -> bool {
             }
         }
         if !closed {
-            return false;
+            return None;
         }
-        // Optional continuation gap: whitespace containing a newline, then another quote.
         let mut saw_newline = false;
         while i < bytes.len() {
             match bytes[i] {
@@ -1323,8 +1328,7 @@ fn escape_string_segments_are_valid(text: &str) -> bool {
         if saw_newline && i < bytes.len() && bytes[i] == b'\'' {
             continue;
         }
-        // No further continuation: the span must be fully consumed.
-        return i == bytes.len();
+        return (i == bytes.len()).then_some(joined);
     }
 }
 
