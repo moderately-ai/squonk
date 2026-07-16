@@ -202,78 +202,24 @@ mod tests {
 
     #[test]
     fn redshift_is_ansi_plus_only_the_lowercase_fold() {
-        // The strategic claim made auditable: despite Redshift being a PostgreSQL-8 fork, this
-        // preset is ANSI with a *single* divergent axis — the lowercase identifier fold. Asserting
-        // the whole rest equals ANSI keeps the "ANSI-derived, every delta documented, the PG-isms
-        // deferred" claim honest against a future stray edit. Bind to locals so the const reads are
-        // not flagged by clippy's `assertions_on_constants`.
+        // Closed-delta honesty: despite Redshift being a PostgreSQL-8 fork, this preset is
+        // ANSI plus exactly two divergent top-level axes (casing + table_json_path).
         let ansi = FeatureSet::ANSI;
         let redshift = FeatureSet::REDSHIFT;
 
-        // The one delta: lowercase folding (vs ANSI's uppercase).
         assert_eq!(redshift.identifier_casing, Casing::Lower);
-        assert_ne!(redshift.identifier_casing, ansi.identifier_casing);
-        assert_eq!(ansi.identifier_casing, Casing::Upper);
-
-        // The lexis is ANSI verbatim — standard `"…"` quoting, no new delimiter, no
-        // double-quoted strings (Redshift's `"…"` is an identifier, exactly ANSI).
-        assert_eq!(redshift.identifier_quotes, STANDARD_IDENTIFIER_QUOTES);
-        assert_eq!(redshift.identifier_quotes, ansi.identifier_quotes);
-        assert_eq!(redshift.string_literals, ansi.string_literals);
-        assert!(!redshift.string_literals.double_quoted_strings);
-
-        // No reserved-set delta: every position is inherited verbatim from ANSI.
-        assert_eq!(redshift.reserved_column_name, ansi.reserved_column_name);
-        assert_eq!(redshift.reserved_function_name, ansi.reserved_function_name);
-        assert_eq!(redshift.reserved_type_name, ansi.reserved_type_name);
-        assert_eq!(redshift.reserved_bare_alias, ansi.reserved_bare_alias);
-        assert_eq!(redshift.reserved_as_label, KeywordSet::EMPTY);
-
-        // The deferred PG-heritage flags are all OFF — the conservative-off decisions the module
-        // docs record, pinned so a future edit cannot silently turn one on without evidence.
+        assert!(redshift.table_expressions.table_json_path);
+        // Deferred PG-heritage flags stay off.
         assert!(!redshift.predicate_syntax.ilike);
         assert!(!redshift.predicate_syntax.similar_to);
         assert!(!redshift.select_syntax.distinct_on);
         assert!(!redshift.select_syntax.qualify);
 
-        // Everything else is inherited verbatim from ANSI.
-        assert_eq!(redshift.select_syntax, ansi.select_syntax);
-        assert_eq!(redshift.predicate_syntax, ansi.predicate_syntax);
-        assert_eq!(redshift.numeric_literals, ansi.numeric_literals);
-        assert_eq!(redshift.parameters, ansi.parameters);
-        // Redshift diverges from ANSI on exactly the PartiQL / SUPER table-position path.
-        assert_eq!(
-            TableExpressionSyntax {
-                table_json_path: false,
-                ..redshift.table_expressions
-            },
-            ansi.table_expressions,
+        crate::dialect::closed_delta::assert_closed_delta(
+            &ansi,
+            &redshift,
+            &["identifier_casing", "table_expressions"],
         );
-        assert!(redshift.table_expressions.table_json_path);
-        assert_eq!(redshift.expression_syntax, ansi.expression_syntax);
-        assert_eq!(redshift.session_variables, ansi.session_variables);
-        assert_eq!(redshift.identifier_syntax, ansi.identifier_syntax);
-        assert_eq!(redshift.operator_syntax, ansi.operator_syntax);
-        assert_eq!(redshift.call_syntax, ansi.call_syntax);
-        assert_eq!(redshift.mutation_syntax, ansi.mutation_syntax);
-        assert_eq!(redshift.statement_ddl_gates, ansi.statement_ddl_gates);
-        assert_eq!(
-            redshift.create_table_clause_syntax,
-            ansi.create_table_clause_syntax
-        );
-        assert_eq!(
-            redshift.column_definition_syntax,
-            ansi.column_definition_syntax
-        );
-        assert_eq!(redshift.constraint_syntax, ansi.constraint_syntax);
-        assert_eq!(redshift.index_alter_syntax, ansi.index_alter_syntax);
-        assert_eq!(redshift.existence_guards, ansi.existence_guards);
-        assert_eq!(redshift.utility_syntax, ansi.utility_syntax);
-        assert_eq!(redshift.type_name_syntax, ansi.type_name_syntax);
-        assert_eq!(redshift.byte_classes, ansi.byte_classes);
-        assert_eq!(redshift.binding_powers, ansi.binding_powers);
-        assert_eq!(redshift.target_spelling, ansi.target_spelling);
-        assert_eq!(redshift.default_null_ordering, ansi.default_null_ordering);
     }
 
     #[test]

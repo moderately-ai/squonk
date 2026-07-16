@@ -323,9 +323,9 @@ impl<'a, D: Dialect> Parser<'a, D> {
                     .peek()?
                     .is_some_and(|token| token.kind == crate::tokenizer::TokenKind::String)
             {
-                return Ok(Some(Box::new(self.parse_string_or_ident_admitting(
-                    self.features().reserved_column_name,
-                )?)));
+                return Ok(Some(Box::new(
+                    self.parse_column_ident_allowing_string_literal()?,
+                )));
             }
             if self.peek()?.is_some_and(|token| {
                 self.token_admissible(token, self.features().reserved_column_name)
@@ -343,11 +343,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// `SAVEPOINT 'x'`; engine-measured on rusqlite — the string form is a parse accept
     /// and only bind-fails when the savepoint is missing). Elsewhere a plain identifier.
     fn parse_savepoint_name(&mut self) -> ParseResult<crate::ast::Ident> {
-        if self.features().identifier_syntax.string_literal_identifiers {
-            self.parse_string_or_ident_admitting(self.features().reserved_column_name)
-        } else {
-            self.parse_ident()
-        }
+        self.parse_column_ident_allowing_string_literal()
     }
 
     /// Parse SQLite's optional `{DEFERRED | IMMEDIATE | EXCLUSIVE}` transaction-mode

@@ -47,6 +47,7 @@
 //! subset. A statement of the struct's MECE boundary against its sibling axes is *not* an
 //! enumeration, and is encouraged.
 
+pub mod closed_delta;
 pub mod keyword;
 pub mod lex_class;
 

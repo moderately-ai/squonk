@@ -17,13 +17,62 @@
 //!
 //! New statement families add one arm here and their helpers in the owning family
 //! module — never a body of family-specific parsing in this router.
+//!
+//! # Table-driven simple heads
+//!
+//! Single-keyword, single-gate utility/maintenance heads are dispatched from
+//! [`SIMPLE_CONTEXTUAL_HEADS`] / [`try_parse_simple_contextual_head`] so adding a
+//! nullary keyword gate is one table row. Multi-word lookaheads (SHOW TABLES,
+//! LOAD DATA, PREPARE/EXECUTE duals, LOCK TABLES vs INSTANCE, …) stay as explicit
+//! arms below — they are not single-row table entries by nature.
 
 use super::engine::Parser;
 use super::{Dialect, HookResult};
 use crate::ast::dialect::keyword::Keyword;
+use crate::ast::dialect::FeatureSet;
 use crate::ast::{Statement, Spanned};
 use crate::error::ParseResult;
 use crate::tokenizer::Punctuation;
+
+/// A single contextual-keyword statement head: gate + keyword + parse entry.
+///
+/// `parse` is an associated method on [`Parser`] selected by the match in
+/// [`Parser::try_parse_simple_contextual_head`].
+#[derive(Clone, Copy)]
+enum SimpleContextualHead {
+    CommentOn,
+    Pragma,
+    Kill,
+    Shutdown,
+    Restart,
+    Clone,
+    Help,
+    Binlog,
+    Flush,
+    Purge,
+    Rename,
+    Call,
+    Reindex,
+    Xa,
+}
+
+/// Table of simple (keyword, gate, head) rows — order is try-order among these heads only.
+const SIMPLE_CONTEXTUAL_HEADS: &[(&str, fn(&FeatureSet) -> bool, SimpleContextualHead)] = &[
+    ("COMMENT", |f| f.utility_syntax.comment_on, SimpleContextualHead::CommentOn),
+    ("PRAGMA", |f| f.utility_syntax.pragma, SimpleContextualHead::Pragma),
+    ("KILL", |f| f.utility_syntax.kill, SimpleContextualHead::Kill),
+    ("SHUTDOWN", |f| f.utility_syntax.shutdown, SimpleContextualHead::Shutdown),
+    ("RESTART", |f| f.utility_syntax.restart, SimpleContextualHead::Restart),
+    ("CLONE", |f| f.utility_syntax.clone, SimpleContextualHead::Clone),
+    ("HELP", |f| f.utility_syntax.help_statement, SimpleContextualHead::Help),
+    ("BINLOG", |f| f.utility_syntax.binlog, SimpleContextualHead::Binlog),
+    ("FLUSH", |f| f.utility_syntax.flush, SimpleContextualHead::Flush),
+    ("PURGE", |f| f.utility_syntax.purge_binary_logs, SimpleContextualHead::Purge),
+    ("RENAME", |f| f.utility_syntax.rename_statement, SimpleContextualHead::Rename),
+    ("CALL", |f| f.utility_syntax.call, SimpleContextualHead::Call),
+    ("REINDEX", |f| f.maintenance_syntax.reindex, SimpleContextualHead::Reindex),
+    ("XA", |f| f.transaction_syntax.xa_transactions, SimpleContextualHead::Xa),
+];
 
 impl<D: Dialect> Parser<'_, D> {
     /// Dispatch a single statement on its leading token.
@@ -47,6 +96,11 @@ impl<D: Dialect> Parser<'_, D> {
             HookResult::Handled(statement) => return Ok(statement),
             HookResult::NotHandled => {}
             HookResult::Err(error) => return Err(error),
+        }
+
+        // Table-driven single-keyword utility/maintenance heads (see SIMPLE_CONTEXTUAL_HEADS).
+        if let Some(statement) = self.try_parse_simple_contextual_head()? {
+            return Ok(statement);
         }
 
         if self.peek_is_keyword(Keyword::Create)? {
@@ -114,14 +168,7 @@ impl<D: Dialect> Parser<'_, D> {
             // Checked before sessions: `SET TRANSACTION` is transaction control,
             // while every other `SET` is a session statement.
             self.parse_transaction_statement()
-        } else if self.features().transaction_syntax.xa_transactions
-            && self.peek_is_contextual_keyword("XA")?
-        {
-            // `xa_transactions` gates MySQL's `XA` distributed-transaction family on its own
-            // leading keyword (like `kill`): off outside MySQL (and Lenient), where `XA` is
-            // not dispatched and surfaces as an unknown statement.
-            self.parse_xa_statement()
-        } else if self.features().show_syntax.show_tables
+         } else if self.features().show_syntax.show_tables
             && self.peek_is_contextual_keyword("SHOW")?
             && self.peek_starts_show_tables()?
         {
@@ -217,23 +264,7 @@ impl<D: Dialect> Parser<'_, D> {
             // leading keyword; the helper branches on the `INTO` that distinguishes
             // Snowflake `COPY INTO` from the PostgreSQL `COPY <table> {FROM | TO}`.
             self.parse_copy_or_copy_into_statement()
-        } else if self.features().utility_syntax.comment_on
-            && self.peek_is_contextual_keyword("COMMENT")?
-        {
-            // `comment_on` gates the leading `COMMENT` keyword like `copy`: off in
-            // ANSI/MySQL, so `COMMENT ON ...` is never dispatched there and falls through
-            // to the unknown-statement error — the reject path for the PostgreSQL-only
-            // object-metadata statement.
-            self.parse_comment_on_statement()
-        } else if self.features().utility_syntax.pragma
-            && self.peek_is_contextual_keyword("PRAGMA")?
-        {
-            // `pragma` gates the leading `PRAGMA` keyword like `copy`: off everywhere
-            // but SQLite (and Lenient), so elsewhere it falls through to the
-            // unknown-statement error — the reject path for the SQLite-only
-            // configuration statement.
-            self.parse_pragma_statement()
-        } else if self.features().utility_syntax.attach
+         } else if self.features().utility_syntax.attach
             && self.peek_is_contextual_keyword("ATTACH")?
         {
             // `attach` gates `ATTACH` and its `DETACH` inverse as one dialect unit
@@ -342,27 +373,7 @@ impl<D: Dialect> Parser<'_, D> {
             // A *leading* `ANALYZE` is the maintenance statement; the `ANALYZE` inside
             // `EXPLAIN ANALYSE` is consumed by the `EXPLAIN` grammar below, never here.
             self.parse_analyze_statement()
-        } else if self.features().utility_syntax.rename_statement
-            && self.peek_is_contextual_keyword("RENAME")?
-        {
-            // `rename_statement` gates the leading `RENAME` keyword like `kill`: off outside
-            // MySQL (and Lenient), where it falls through to the unknown-statement error. A
-            // non-leading `RENAME` — the `ALTER TABLE … RENAME TO` sub-clause — is consumed
-            // by the `ALTER TABLE` grammar and never reaches this statement-leading position.
-            self.parse_rename_statement()
-        } else if self.features().utility_syntax.flush
-            && self.peek_is_contextual_keyword("FLUSH")?
-        {
-            // `flush` gates the leading `FLUSH` keyword like `kill`: off outside MySQL (and
-            // Lenient), where it falls through to the unknown-statement error.
-            self.parse_flush_statement()
-        } else if self.features().utility_syntax.purge_binary_logs
-            && self.peek_is_contextual_keyword("PURGE")?
-        {
-            // `purge_binary_logs` gates the leading `PURGE` keyword like `kill`: off outside
-            // MySQL (and Lenient), where it falls through to the unknown-statement error.
-            self.parse_purge_statement()
-        } else if self.features().utility_syntax.use_statement
+           } else if self.features().utility_syntax.use_statement
             && self.peek_is_keyword(Keyword::Use)?
         {
             // `use_statement` gates the leading `USE` keyword like `pragma`: on for DuckDB and
@@ -371,11 +382,7 @@ impl<D: Dialect> Parser<'_, D> {
             // consumed by the FROM grammar, so it never reaches this statement-leading
             // position. The accepted name arity is dialect data (`use_qualified_name`).
             self.parse_use_statement()
-        } else if self.features().utility_syntax.kill && self.peek_is_contextual_keyword("KILL")? {
-            // `kill` gates the leading `KILL` keyword like `copy`: off outside MySQL, so
-            // there it is not dispatched and falls through to the unknown-statement error.
-            self.parse_kill_statement()
-        } else if self.features().utility_syntax.handler_statements
+         } else if self.features().utility_syntax.handler_statements
             && self.peek_is_keyword(Keyword::Handler)?
         {
             // `handler_statements` gates the leading `HANDLER` keyword like `kill`: off outside
@@ -589,5 +596,37 @@ impl<D: Dialect> Parser<'_, D> {
         } else {
             Err(self.unexpected("a statement"))
         }
+    }
+
+    /// Try the [`SIMPLE_CONTEXTUAL_HEADS`] table: one contextual keyword, one gate, one parse.
+    fn try_parse_simple_contextual_head(&mut self) -> ParseResult<Option<Statement<D::Ext>>> {
+        for &(keyword, gate, head) in SIMPLE_CONTEXTUAL_HEADS {
+            // Evaluate the gate before any mutable peek so `features` is not held across
+            // `&mut self` borrows.
+            if !gate(self.features()) {
+                continue;
+            }
+            if !self.peek_is_contextual_keyword(keyword)? {
+                continue;
+            }
+            let statement = match head {
+                SimpleContextualHead::CommentOn => self.parse_comment_on_statement()?,
+                SimpleContextualHead::Pragma => self.parse_pragma_statement()?,
+                SimpleContextualHead::Kill => self.parse_kill_statement()?,
+                SimpleContextualHead::Shutdown => self.parse_shutdown_statement()?,
+                SimpleContextualHead::Restart => self.parse_restart_statement()?,
+                SimpleContextualHead::Clone => self.parse_clone_statement()?,
+                SimpleContextualHead::Help => self.parse_help_statement()?,
+                SimpleContextualHead::Binlog => self.parse_binlog_statement()?,
+                SimpleContextualHead::Flush => self.parse_flush_statement()?,
+                SimpleContextualHead::Purge => self.parse_purge_statement()?,
+                SimpleContextualHead::Rename => self.parse_rename_statement()?,
+                SimpleContextualHead::Call => self.parse_call_statement()?,
+                SimpleContextualHead::Reindex => self.parse_reindex_statement()?,
+                SimpleContextualHead::Xa => self.parse_xa_statement()?,
+            };
+            return Ok(Some(statement));
+        }
+        Ok(None)
     }
 }

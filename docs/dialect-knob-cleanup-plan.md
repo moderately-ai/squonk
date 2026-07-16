@@ -82,6 +82,10 @@ order below is merge-safety only.
 | C4.5–C4.6 `:=` / `#` | cross-linked in field docs + FeatureSet `#` ownership section |
 | Closed-delta honesty | satellite tests assert divergent axes (incl. Snowflake table_factor) |
 | All prior ε/δ items | committed |
+| string_literal_identifiers centralization | done (`parse_column_ident_allowing_string_literal`) |
+| Table-driven simple statement heads | done (`SIMPLE_CONTEXTUAL_HEADS`) |
+| Closed-delta helper | done (`dialect::closed_delta`) |
+| DP6 bool inventory partition | done (toggleable ∪ AXIS_COVERED) |
 
 ## Checklist
 

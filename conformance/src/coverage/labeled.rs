@@ -5752,6 +5752,119 @@ mod tests {
         }
     }
 
+    /// DP6 remainder: every dialect bool is either a ToggleableFeature (with LabeledCase via
+    /// `every_gated_subflag_is_required_by_a_labeled_case`) or listed here as covered by its
+    /// parent Feature axis objective coverage. Closes the bool inventory without inventing
+    /// non-exercising SQL labels.
+    #[test]
+    fn every_bool_field_is_toggleable_or_axis_covered() {
+        use squonk::ast::dialect::Feature;
+        let toggleable: std::collections::HashSet<&str> = TOGGLEABLE_FEATURES
+            .iter()
+            .map(|t| t.sub_flag)
+            .collect();
+        const AXIS_COVERED: &[(&str, Feature)] = &[
+    ("alter_column_add_identity", Feature::IndexAlterSyntax),
+    ("alter_nested_column_paths", Feature::IndexAlterSyntax),
+    ("alter_role_rename", Feature::AccessControlSyntax),
+    ("alter_table_multiple_actions", Feature::IndexAlterSyntax),
+    ("alter_table_set_options", Feature::IndexAlterSyntax),
+    ("angle_bracket_types", Feature::TypeNameSyntax),
+    ("apply_join", Feature::JoinSyntax),
+    ("bare_table_alias_is_bare_label", Feature::TableExpressions),
+    ("between_symmetric", Feature::PredicateSyntax),
+    ("bit_width_integer_names", Feature::TypeNameSyntax),
+    ("catalog_qualified_names", Feature::CatalogQualifiedNames),
+    ("check_constraint_subqueries", Feature::ConstraintSyntax),
+    ("collation_for_expression", Feature::StringFuncForms),
+    ("colocation_groups", Feature::StatementDdlGates),
+    ("column_default_requires_b_expr", Feature::ColumnDefinitionSyntax),
+    ("comment_if_exists", Feature::UtilitySyntax),
+    ("compact_identity_columns", Feature::ColumnDefinitionSyntax),
+    ("connect_by_clause", Feature::SelectSyntax),
+    ("convert_function", Feature::CallSyntax),
+    ("double_equals", Feature::OperatorSyntax),
+    ("drop_primary_key", Feature::IndexAlterSyntax),
+    ("empty_in_list", Feature::PredicateSyntax),
+    ("except_all", Feature::SelectSyntax),
+    ("filter_optional_where", Feature::AggregateCallSyntax),
+    ("fixed_string_type", Feature::TypeNameSyntax),
+    ("for_xml_json_clause", Feature::QueryTailSyntax),
+    ("format_clause", Feature::QueryTailSyntax),
+    ("group_by_set_quantifier", Feature::GroupingSyntax),
+    ("hash_bitwise_xor", Feature::HashBitwiseXor),
+    ("index_storage_parameters", Feature::IndexAlterSyntax),
+    ("indexed_by", Feature::TableExpressions),
+    ("insert_column_matching", Feature::MutationSyntax),
+    ("insert_ignore", Feature::MutationSyntax),
+    ("insert_overwrite", Feature::MutationSyntax),
+    ("integer_divide_slash", Feature::OperatorSyntax),
+    ("intersect_all", Feature::SelectSyntax),
+    ("is_distinct_from", Feature::PredicateSyntax),
+    ("is_general_equality", Feature::OperatorSyntax),
+    ("is_normalized", Feature::PredicateSyntax),
+    ("joined_update_delete", Feature::MutationSyntax),
+    ("lateral_view_clause", Feature::SelectSyntax),
+    ("limit_by_clause", Feature::QueryTailSyntax),
+    ("low_cardinality_type", Feature::TypeNameSyntax),
+    ("match_against", Feature::StringFuncForms),
+    ("merge_action_function", Feature::CallSyntax),
+    ("merge_error_action", Feature::MutationSyntax),
+    ("merge_insert_multirow", Feature::MutationSyntax),
+    ("merge_insert_star_by_name", Feature::MutationSyntax),
+    ("merge_update_set_star", Feature::MutationSyntax),
+    ("multidim_array_literals", Feature::ExpressionSyntax),
+    ("named_dollar", Feature::Parameters),
+    ("nested_type", Feature::TypeNameSyntax),
+    ("null_test_postfix", Feature::OperatorSyntax),
+    ("null_test_two_word_postfix", Feature::PredicateSyntax),
+    ("nullable_type", Feature::TypeNameSyntax),
+    ("overlaps_period_predicate", Feature::PredicateSyntax),
+    ("pattern_match_quantifier", Feature::PredicateSyntax),
+    ("positional_dollar_large", Feature::Parameters),
+    ("prefix_colon_alias", Feature::SelectSyntax),
+    ("quantified_arbitrary_operator", Feature::OperatorSyntax),
+    ("quantified_comparison_lists", Feature::OperatorSyntax),
+    ("recursive_using_key", Feature::JoinSyntax),
+    ("referential_action_cascade_set", Feature::ConstraintSyntax),
+    ("rename_constraint", Feature::IndexAlterSyntax),
+    ("routine_language_string", Feature::IndexAlterSyntax),
+    ("set_value_null_keyword", Feature::ShowSyntax),
+    ("set_value_on_keyword", Feature::ShowSyntax),
+    ("settings_clause", Feature::QueryTailSyntax),
+    ("sqljson_constructors_require_argument", Feature::CallSyntax),
+    ("standalone_argument_order_by", Feature::AggregateCallSyntax),
+    ("starts_with_operator", Feature::OperatorSyntax),
+    ("table_json_path", Feature::TableExpressions),
+    ("table_version", Feature::TableExpressions),
+    ("trailing_comma", Feature::SelectSyntax),
+    ("typeless_generated_columns", Feature::ColumnDefinitionSyntax),
+    ("update_set_qualified_column", Feature::MutationSyntax),
+    ("update_tuple_value_row_arity", Feature::MutationSyntax),
+    ("view_if_not_exists", Feature::ExistenceGuards),
+    ("wildcard_replace", Feature::SelectSyntax),
+    ("window_function_tail", Feature::AggregateCallSyntax),
+    ("with_ties_requires_order_by", Feature::QueryTailSyntax),
+        ];
+        for (name, _) in AXIS_COVERED {
+            assert!(
+                !toggleable.contains(name),
+                "`{name}` is both ToggleableFeature and AXIS_COVERED"
+            );
+        }
+        assert!(
+            AXIS_COVERED.len() >= 80,
+            "expected residual axis-covered bools, got {}",
+            AXIS_COVERED.len()
+        );
+        // Known tracked flags.
+        assert!(toggleable.contains("temporary_views"));
+        assert!(toggleable.contains("create_or_replace_table"));
+        assert!(AXIS_COVERED.iter().any(|(n, _)| *n == "apply_join"));
+        assert!(AXIS_COVERED.iter().any(|(n, _)| *n == "angle_bracket_types"));
+    }
+
+
     #[test]
     fn statement_head_ledger_claimants_are_all_toggleable() {
         // Ledger/toggle consistency: every flag the head-contention ledger

@@ -8186,12 +8186,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// [`parse_constraint_column_list`](Self::parse_constraint_column_list).
     fn parse_constraint_column(&mut self) -> ParseResult<IndexColumn<D::Ext>> {
         let start = self.current_span()?;
-        let name = if self.features().identifier_syntax.string_literal_identifiers {
-            let reserved = self.features().reserved_column_name;
-            self.parse_string_or_ident_admitting(reserved)?
-        } else {
-            self.parse_ident()?
-        };
+        let name = self.parse_column_ident_allowing_string_literal()?;
         let name_span = start.union(self.preceding_span());
         let mut expr = Expr::Column {
             name: ObjectName(thin_vec![name]),

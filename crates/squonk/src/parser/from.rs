@@ -2813,6 +2813,26 @@ impl<'a, D: Dialect> Parser<'a, D> {
             && self.peek_is_name_sconst()?)
     }
 
+    /// Central choke for [`IdentifierSyntax::string_literal_identifiers`]: parse a name that
+    /// may be a single-quoted string under the flag, else a plain identifier against
+    /// `reserved`. Call sites must not re-check the flag themselves.
+    pub(super) fn parse_ident_allowing_string_literal(
+        &mut self,
+        reserved: crate::ast::dialect::KeywordSet,
+    ) -> ParseResult<Ident> {
+        if self.features().identifier_syntax.string_literal_identifiers {
+            self.parse_string_or_ident_admitting(reserved)
+        } else {
+            self.parse_ident_admitting(reserved, "an identifier")
+        }
+    }
+
+    /// Like [`parse_ident_allowing_string_literal`](Self::parse_ident_allowing_string_literal)
+    /// using the column-name reserved set (the common DML/DDL/savepoint case).
+    pub(super) fn parse_column_ident_allowing_string_literal(&mut self) -> ParseResult<Ident> {
+        self.parse_ident_allowing_string_literal(self.features().reserved_column_name)
+    }
+
     /// Parse a possibly-dotted name whose *leading* part is gated by `head_reserved`.
     ///
     /// The head's reject set is the caller's position (a table name is a `ColId`; an
