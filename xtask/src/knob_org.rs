@@ -11,7 +11,6 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use crate::TidyResult;
 
@@ -116,13 +115,16 @@ fn feature_fields_meta(src: &str) -> BTreeSet<String> {
 }
 
 /// Every nested bool field on dialect syntax structs must appear as a token in parser/tokenizer.
+///
+/// Implemented with a pure Rust walk of `crates/squonk/src` so the tidy gate does not
+/// depend on an external `rg` binary (CI runners do not install ripgrep for preflight).
 fn check_orphan_bool_flags(root: &Path) -> TidyResult {
     let mod_rs = fs::read_to_string(root.join("crates/squonk-ast/src/dialect/mod.rs"))
         .map_err(|e| vec![format!("read mod.rs: {e}")])?;
     let bools = dialect_bool_fields(&mod_rs);
 
-    // One rg over squonk/src for all names is expensive; batch by checking with rg -F
     let squonk_src = root.join("crates/squonk/src");
+    let corpus = rust_sources_under(&squonk_src).map_err(|e| vec![e])?;
     let mut errors = Vec::new();
     // Allowlist: pure identity/render metadata never consulted by the parser
     let allow: BTreeSet<&str> = [
@@ -135,12 +137,7 @@ fn check_orphan_bool_flags(root: &Path) -> TidyResult {
         if allow.contains(name.as_str()) {
             continue;
         }
-        let status = Command::new("rg")
-            .args(["-q", "-F", name.as_str()])
-            .arg(&squonk_src)
-            .status()
-            .map_err(|e| vec![format!("rg: {e}")])?;
-        if !status.success() {
+        if !corpus.iter().any(|text| text.contains(name.as_str())) {
             errors.push(format!(
                 "orphan bool flag `{name}`: no match under crates/squonk/src (parser/tokenizer)"
             ));
@@ -151,6 +148,29 @@ fn check_orphan_bool_flags(root: &Path) -> TidyResult {
     } else {
         Err(errors)
     }
+}
+
+/// Load every `.rs` file under `dir` (recursive) into memory for fixed-string scans.
+fn rust_sources_under(dir: &Path) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(path) = stack.pop() {
+        let entries =
+            fs::read_dir(&path).map_err(|e| format!("read_dir {}: {e}", path.display()))?;
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("dir entry: {e}"))?;
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+                out.push(
+                    fs::read_to_string(&path)
+                        .map_err(|e| format!("read {}: {e}", path.display()))?,
+                );
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn dialect_bool_fields(mod_rs: &str) -> BTreeSet<String> {
