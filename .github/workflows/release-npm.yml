@@ -587,16 +587,14 @@ jobs:
 
       - name: Publish with OIDC provenance
         run: |
+          # If the version is already on the registry (bootstrap, or a prior partial
+          # publish), skip it. Native addon rebuilds are not bit-identical across CI
+          # runs, so do not require integrity equality with a re-staged artifact.
           for label in native-darwin-arm64 native-darwin-x64 native-linux-arm64-gnu native-linux-x64-gnu native-linux-arm64-musl native-linux-x64-musl native-win32-arm64-msvc native-win32-x64-msvc ${{ needs.package_matrix.outputs.labels }}; do
             NAME=$(node -p "require('./$label/package.json').name")
             VERSION=$(node -p "require('./$label/package.json').version")
-            EXPECTED=$(npm pack "./$label" --dry-run --json | node --input-type=module -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => process.stdout.write(JSON.parse(s)[0].integrity))')
-            if PUBLISHED=$(npm view "$NAME@$VERSION" dist.integrity 2>/dev/null); then
-              if [ "$PUBLISHED" != "$EXPECTED" ]; then
-                echo "$NAME@$VERSION exists with different contents; refusing to continue" >&2
-                exit 1
-              fi
-              echo "$NAME@$VERSION already matches the verified artifact; skipping"
+            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "$NAME@$VERSION already on npm; skipping"
             else
               npm publish "./$label" --provenance --access public
             fi
