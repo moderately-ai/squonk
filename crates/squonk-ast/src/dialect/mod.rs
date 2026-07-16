@@ -1772,6 +1772,15 @@ pub struct StatementDdlGates {
     /// off; the `OR` after `CREATE` is then left unconsumed and surfaces as a clean parse
     /// error.
     pub or_replace: bool,
+    /// Accept DuckDB's `CREATE OR REPLACE TABLE` — the `OR REPLACE` object-replacement
+    /// modifier on `TABLE` (threaded onto the [`CreateTable`](crate::ast::CreateTable) node).
+    /// **Statement-head** gate: consulted during `CREATE` dispatch when the object kind is
+    /// `TABLE`, not a table-body clause (moved off [`CreateTableClauseSyntax`] for MECE).
+    /// On for DuckDB/Lenient. Off elsewhere: other dialects take `OR REPLACE` only on
+    /// `VIEW`/`FUNCTION` (gated by [`or_replace`](Self::or_replace)), so with this flag off a
+    /// `TABLE` after `OR REPLACE` is left for the `VIEW` expectation and surfaces as a clean
+    /// parse error.
+    pub create_or_replace_table: bool,
     /// Accept the `RECURSIVE` keyword before `VIEW` in `CREATE [OR REPLACE]
     /// [TEMP|TEMPORARY] RECURSIVE VIEW <name> (<columns>) AS <query>` (DuckDB,
     /// engine-measured on duckdb 1.5.4). On for DuckDB/Lenient only — although
@@ -1950,14 +1959,6 @@ pub struct CreateTableClauseSyntax {
     /// the typeless column, `AUTOINCREMENT`, the column `COLLATE`, and the inline-`PRIMARY KEY`
     /// ordering.
     pub strict_table_option: bool,
-    /// Accept DuckDB's `CREATE OR REPLACE TABLE` — the `OR REPLACE` object-replacement
-    /// modifier on `TABLE` (a flag threaded onto the [`CreateTable`](crate::ast::CreateTable)
-    /// node). On for DuckDB/Lenient. Off elsewhere: the other dialects take `OR REPLACE` only
-    /// on `VIEW`/`FUNCTION` (gated by [`or_replace`](StatementDdlGates::or_replace)), so with this flag off
-    /// a `TABLE` after `OR REPLACE` is left for the `VIEW` expectation and surfaces as a clean
-    /// parse error. Distinct from [`or_replace`](StatementDdlGates::or_replace), which gates the modifier
-    /// on the view/function surfaces every dialect but SQLite admits.
-    pub create_or_replace_table: bool,
     /// Accept the `CREATE TABLE … WITH ( <name> = <value>, … )` storage-parameter list
     /// (PostgreSQL `WITH (fillfactor=…)`; Trino/Spark `WITH (format=…)`). On for
     /// ANSI/PostgreSQL/MySQL/DuckDB/Lenient. SQLite has no `WITH (…)` table clause, so it

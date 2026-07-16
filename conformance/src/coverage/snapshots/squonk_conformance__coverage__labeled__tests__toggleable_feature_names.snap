@@ -46,7 +46,6 @@ constraint_syntax::deferrable_constraints
 constraint_syntax::exclusion_constraints
 constraint_syntax::index_constraint_parameters
 constraint_syntax::named_inline_non_check_constraints
-create_table_clause_syntax::create_or_replace_table
 create_table_clause_syntax::create_table_as_execute
 create_table_clause_syntax::create_table_as_with_data
 create_table_clause_syntax::declarative_partitioning
@@ -214,6 +213,7 @@ statement_ddl_gates::alter_sequence
 statement_ddl_gates::alter_system
 statement_ddl_gates::compound_statements
 statement_ddl_gates::create_macro
+statement_ddl_gates::create_or_replace_table
 statement_ddl_gates::create_secret
 statement_ddl_gates::create_sequence
 statement_ddl_gates::create_trigger

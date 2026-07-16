@@ -17,7 +17,7 @@ use thin_vec::ThinVec;
 /// An SQL create table.
 pub struct CreateTable<X: Extension = NoExt> {
     /// `CREATE OR REPLACE TABLE` (DuckDB): atomically replaces an existing table.
-    /// Gated by [`CreateTableClauseSyntax::create_or_replace_table`](crate::dialect::CreateTableClauseSyntax::create_or_replace_table) —
+    /// Gated by [`StatementDdlGates::create_or_replace_table`](crate::dialect::StatementDdlGates::create_or_replace_table) —
     /// off elsewhere, where `OR REPLACE` before `TABLE` surfaces as a clean parse error
     /// (only `VIEW`/`FUNCTION` take `OR REPLACE` in the other dialects).
     pub or_replace: bool,

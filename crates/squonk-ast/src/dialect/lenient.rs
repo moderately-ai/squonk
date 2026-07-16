@@ -690,6 +690,7 @@ impl StatementDdlGates {
         temporary_views: true,
         routines: true,
         or_replace: true,
+        create_or_replace_table: true,
         // …and DuckDB's `CREATE [OR REPLACE] [TEMP] RECURSIVE VIEW` (no-shadowing
         // doctrine: the union carries every real dialect's surface).
         recursive_views: true,
@@ -717,8 +718,6 @@ impl CreateTableClauseSyntax {
         // The parse-anything union accepts the SQLite trailing `STRICT` table option —
         // additive over the shared surface.
         strict_table_option: true,
-        // …and DuckDB's `CREATE OR REPLACE TABLE` / `CREATE [PERSISTENT] SECRET`.
-        create_or_replace_table: true,
         storage_parameters: true,
         on_commit: true,
         create_table_as_with_data: true,

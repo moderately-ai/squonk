@@ -412,6 +412,7 @@ impl StatementDdlGates {
         temporary_views: false,
         routines: true,
         or_replace: true,
+        create_or_replace_table: false,
         // `CREATE RECURSIVE VIEW` is a DuckDB form; MySQL leaves `RECURSIVE`
         // unconsumed before the expected `VIEW`.
         recursive_views: false,
@@ -445,8 +446,6 @@ impl CreateTableClauseSyntax {
         // MySQL has no SQLite trailing `STRICT` table option (its column-type enforcement is
         // the `STRICT_*` SQL modes, not table surface syntax).
         strict_table_option: false,
-        // `OR REPLACE TABLE` and `CREATE SECRET` are DuckDB-specific.
-        create_or_replace_table: false,
         // MySQL has no PostgreSQL-style `WITH (<param> = <value>)` storage-parameter
         // clause on `CREATE TABLE` (its table options are bare `<KEY> = <value>` pairs,
         // gated by `table_options`), so the parenthesized form is off

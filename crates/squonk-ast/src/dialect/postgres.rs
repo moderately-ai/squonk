@@ -307,6 +307,7 @@ impl StatementDdlGates {
         temporary_views: true,
         routines: true,
         or_replace: true,
+        create_or_replace_table: false,
         // `CREATE RECURSIVE VIEW` stays off pending a PostgreSQL differential.
         recursive_views: false,
         // PostgreSQL routine bodies are opaque `$$…$$`/string definitions, not the
@@ -336,8 +337,6 @@ impl CreateTableClauseSyntax {
         // PostgreSQL has no SQLite trailing `STRICT` table option; the trailing `STRICT` is
         // rejected as leftover input.
         strict_table_option: false,
-        // `OR REPLACE TABLE` and `CREATE SECRET` are DuckDB-specific.
-        create_or_replace_table: false,
         storage_parameters: true,
         on_commit: true,
         create_table_as_with_data: true,

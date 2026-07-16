@@ -1047,6 +1047,7 @@ impl FeatureSet {
             temporary_views: true,
             routines: true,
             or_replace: true,
+            create_or_replace_table: true,
             // DuckDB accepts `CREATE [OR REPLACE] [TEMP] RECURSIVE VIEW v (cols) AS …`
             // (engine-measured on 1.5.4).
             recursive_views: true,
@@ -1077,7 +1078,6 @@ impl FeatureSet {
             view_definition_options: false,
         },
         create_table_clause_syntax: CreateTableClauseSyntax {
-            create_or_replace_table: true,
             // DuckDB has no PostgreSQL-style declarative partitioning (its `PARTITION_BY` is a
             // COPY/export option, not a `CREATE TABLE` clause).
             declarative_partitioning: false,
@@ -1433,11 +1433,11 @@ mod tests {
         // (`create_type`), all of which PostgreSQL lacks. Every other field is inherited
         // verbatim (forcing the four off recovers PG).
         assert!(duck.statement_ddl_gates.create_macro);
-        assert!(duck.create_table_clause_syntax.create_or_replace_table);
+        assert!(duck.statement_ddl_gates.create_or_replace_table);
         assert!(duck.statement_ddl_gates.create_secret);
         assert!(duck.statement_ddl_gates.create_type);
         assert!(!pg.statement_ddl_gates.create_macro);
-        assert!(!pg.create_table_clause_syntax.create_or_replace_table);
+        assert!(!pg.statement_ddl_gates.create_or_replace_table);
         assert!(!pg.statement_ddl_gates.create_secret);
         assert!(!pg.statement_ddl_gates.create_type);
         // DuckDB matches the PostgreSQL schema-change surface except for the four
@@ -1491,6 +1491,8 @@ mod tests {
                 create_macro: false,
                 create_secret: false,
                 create_type: false,
+                // DuckDB adds `CREATE OR REPLACE TABLE`; PostgreSQL is gated off here.
+                create_or_replace_table: false,
                 schema_elements: true,
                 // DuckDB adds `CREATE RECURSIVE VIEW`; PostgreSQL is gated off here.
                 recursive_views: false,
@@ -1518,7 +1520,6 @@ mod tests {
         );
         assert_eq!(
             CreateTableClauseSyntax {
-                create_or_replace_table: false,
                 declarative_partitioning: true,
                 table_inheritance: true,
                 like_source_table: true,

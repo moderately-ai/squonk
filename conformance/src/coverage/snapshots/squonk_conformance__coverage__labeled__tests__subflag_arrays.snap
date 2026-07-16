@@ -104,6 +104,7 @@ mutation_syntax
   merge_insert_default_values
   merge_insert_overriding
 statement_ddl_gates
+  create_or_replace_table
   create_trigger
   create_macro
   create_secret
@@ -138,7 +139,6 @@ create_table_clause_syntax
   table_options
   without_rowid_table_option
   strict_table_option
-  create_or_replace_table
   storage_parameters
   on_commit
   create_table_as_with_data

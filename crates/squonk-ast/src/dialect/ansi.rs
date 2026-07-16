@@ -415,6 +415,7 @@ impl StatementDdlGates {
         temporary_views: true,
         routines: true,
         or_replace: true,
+        create_or_replace_table: false,
         // `CREATE RECURSIVE VIEW` is gated to DuckDB/Lenient; the standard baseline
         // leaves `RECURSIVE` unconsumed before the expected `VIEW`.
         recursive_views: false,
@@ -442,8 +443,6 @@ impl CreateTableClauseSyntax {
         // The SQLite trailing `STRICT` table option is a dialect extension, not standard
         // surface, so the baseline rejects it.
         strict_table_option: false,
-        // `OR REPLACE TABLE` and `CREATE SECRET` are DuckDB-only extensions.
-        create_or_replace_table: false,
         storage_parameters: true,
         on_commit: true,
         create_table_as_with_data: true,

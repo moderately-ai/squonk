@@ -670,6 +670,7 @@ impl StatementDdlGates {
         temporary_views: true,
         routines: false,
         or_replace: false,
+        create_or_replace_table: false,
         // `CREATE RECURSIVE VIEW` is a DuckDB form; SQLite leaves `RECURSIVE`
         // unconsumed before the expected `VIEW`.
         recursive_views: false,
@@ -695,8 +696,6 @@ impl CreateTableClauseSyntax {
         without_rowid_table_option: true,
         // SQLite accepts the trailing `STRICT` table option (strict column-type enforcement).
         strict_table_option: true,
-        // `OR REPLACE TABLE` and `CREATE SECRET` are DuckDB-specific.
-        create_or_replace_table: false,
         storage_parameters: false,
         on_commit: false,
         create_table_as_with_data: true,

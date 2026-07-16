@@ -221,6 +221,7 @@ impl StatementDdlGates {
         temporary_views: true,
         routines: true,
         or_replace: true,
+        create_or_replace_table: false,
         recursive_views: false,
         compound_statements: false,
         alter_database: false,

@@ -494,8 +494,7 @@ impl<'a, D: Dialect> Parser<'a, D> {
             // and surfaces as the "expected VIEW, found TABLE" parse error.
             if self
                 .features()
-                .create_table_clause_syntax
-                .create_or_replace_table
+                .statement_ddl_gates.create_or_replace_table
                 && self.eat_keyword(Keyword::Table)?
             {
                 return self.parse_create_table_rest(start, true, temporary, false);
