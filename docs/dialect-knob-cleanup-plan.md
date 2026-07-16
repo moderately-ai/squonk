@@ -61,11 +61,20 @@ order below is merge-safety only.
 | **ε TransactionSyntax extract** | TCL flags moved off `UtilitySyntax` onto new top-level `transaction_syntax` (26 fields); sourcegen regenerated; conformance updated |
 | Tests | squonk-ast 303, squonk 1578, squonk-conformance 334 green |
 
+### Landed (commits on main)
+
+| Commit theme | Status |
+|---|---|
+| Plan + packaging honesty + head ledger | committed |
+| statement_dispatch + dual-require + stage_references | committed |
+| TransactionSyntax extract | committed |
+| prefix_colon_alias position split | committed |
+
 ### Still open (equal priority)
 
 | Item | Notes |
 |---|---|
-| **ε remaining axis splits** | StatementDdlGates clause tails; CreateTableClause head/column; `prefix_colon_alias` re-home |
+| **ε remaining axis splits** | StatementDdlGates clause tails; CreateTableClause head vs column (`table_options` AUTO_INCREMENT) |
 | **C0.*** | Live catalog script + drift gate |
 | **ζ DP6** | Expand properties to every stable FeatureSet bool |
 | **C2.17 closed-delta ratchets** | Uniform template for every preset |
