@@ -160,8 +160,12 @@ function stageNativePackage(platformPackage, addon) {
     cpu: [platformPackage.cpu],
     ...(platformPackage.libc ? { libc: [platformPackage.libc] } : {}),
     engines: { node: ">=22" },
+    author: "Moderately AI",
+    homepage: "https://github.com/moderately-ai/squonk#readme",
     repository: { type: "git", url: "git+https://github.com/moderately-ai/squonk.git", directory: "crates/squonk-node" },
+    bugs: { url: "https://github.com/moderately-ai/squonk/issues" },
     publishConfig: { access: "public" },
+    keywords: ["sql", "parser", "native", "node", "napi"],
     license: "MIT",
   };
   writeFileSync(join(out, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
