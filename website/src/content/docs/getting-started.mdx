@@ -1,0 +1,78 @@
+---
+title: Getting started
+description: Install squonk and parse your first SQL statement to an AST in Rust, Python, or TypeScript.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+squonk is one SQL parser with three language surfaces. Pick your ecosystem below —
+each snippet installs the package and parses a first statement into a typed AST.
+
+## Install and parse
+
+<Tabs syncKey="lang">
+  <TabItem label="Rust" icon="seti:rust">
+    ```sh
+    cargo add squonk
+    ```
+
+    ```rust
+    use squonk::parse;
+
+    let parsed = parse("select 1 +  2").expect("well-formed SQL parses");
+    assert_eq!(parsed.to_string(), "SELECT 1 + 2");
+    ```
+
+    The default build includes only the ANSI dialect. Other dialects are opt-in
+    Cargo features — see [Dialects](/guides/dialects/).
+  </TabItem>
+
+  <TabItem label="Python" icon="seti:python">
+    ```sh
+    pip install squonk
+    ```
+
+    ```python
+    import squonk as sql
+
+    doc = sql.parse("select salary from employees", dialect="ansi")
+    assert doc.to_sql() == "SELECT salary FROM employees"
+
+    idents = [ident.text for ident in doc.find_all(sql.Ident)]
+    ```
+
+    The wheel ships prebuilt for CPython 3.11–3.14 on Linux, macOS, and Windows —
+    no Rust or C toolchain required at install time.
+  </TabItem>
+
+  <TabItem label="TypeScript" icon="seti:javascript">
+    ```sh
+    npm install squonk
+    ```
+
+    ```ts
+    import { parse } from "squonk";
+
+    const doc = parse("select id, name from users where id = 1", { dialect: "postgres" });
+    console.log(doc.toSQL());
+    ```
+
+    The unscoped `squonk` package bundles every dialect. For a smaller artifact,
+    install a focused `@squonk-sql/<dialect>` package instead. Node and Bun get a
+    synchronous native engine with automatic WASM fallback; Deno, Workers, and
+    browsers get runtime-specific WASM entrypoints.
+  </TabItem>
+</Tabs>
+
+## What you get back
+
+A parse returns an owned **document** wrapping the AST. Every node carries a byte
+span and a stable ID, so you can walk the tree, map any node back to its exact
+source bytes, render it back to SQL, or hand it to a formatter or linter.
+
+## Next steps
+
+- [Parsing SQL to an AST](/guides/parsing/) — walking the tree, spans, and recovery.
+- [Dialects](/guides/dialects/) — the 14 built-in dialects and how to select one.
+- [Transpiling between dialects](/guides/transpiling/) — convert a query from one engine's SQL to another.
+- [Try it live](/playground/) — parse and transpile SQL in your browser.
