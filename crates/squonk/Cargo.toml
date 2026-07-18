@@ -3,7 +3,7 @@
 
 [package]
 name = "squonk"
-description = "Extensible, fast, multi-dialect SQL tokenizer and parser for Rust"
+description = "Extensible, fast, multi-dialect SQL tokenizer, parser, and transpiler for Rust"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,8 +12,8 @@ repository.workspace = true
 authors.workspace = true
 readme = "README.md"
 documentation = "https://docs.rs/squonk"
-keywords = ["sql", "parser", "ast", "dialect", "transpile"]
-categories = ["parser-implementations", "database"]
+keywords = ["sql", "parser", "sql-parser", "dialect", "transpile"]
+categories = ["parser-implementations", "compilers", "database"]
 autotests = false
 # Deliberate publish allowlist (not the git-tracked default): the library sources,
 # the runnable API examples, the integration tests, the crate README, and a
