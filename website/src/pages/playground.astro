@@ -1,0 +1,244 @@
+---
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Moderately AI Inc.
+//
+// Standalone interactive playground. It runs entirely client-side: the squonk
+// WASM engine is loaded in the browser via the async `createSquonk` factory, so
+// no SQL ever leaves the page. Kept outside the Starlight docs collection so it
+// can own its full-width layout.
+const title = "SQL playground — parse & transpile SQL in your browser | squonk";
+const description =
+  "Parse SQL to an AST and transpile between 14 dialects live in your browser. Powered by squonk's WebAssembly engine — nothing is sent to a server.";
+const canonical = new URL("/playground/", Astro.site).href;
+const dialects = [
+  "ansi", "postgres", "mysql", "sqlite", "duckdb", "bigquery", "snowflake",
+  "redshift", "databricks", "clickhouse", "hive", "mssql", "quiltdb", "lenient",
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">squonk</a>
+      <nav>
+        <a href="/getting-started/">Docs</a>
+        <a href="/guides/transpiling/">Transpiling</a>
+        <a href="https://github.com/moderately-ai/squonk" rel="noopener">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1>SQL playground</h1>
+      <p class="lede">
+        Parse SQL to an AST or transpile it between dialects — live, in your
+        browser. Nothing is sent to a server.
+      </p>
+
+      <div class="controls">
+        <label>
+          Mode
+          <select id="mode">
+            <option value="ast">Parse → AST (JSON)</option>
+            <option value="transpile">Transpile → SQL</option>
+            <option value="format">Format → SQL</option>
+          </select>
+        </label>
+        <label>
+          Source dialect
+          <select id="source">
+            {dialects.map((d) => <option value={d} selected={d === "postgres"}>{d}</option>)}
+          </select>
+        </label>
+        <label id="target-wrap" hidden>
+          Target dialect
+          <select id="target">
+            {dialects.map((d) => <option value={d} selected={d === "mysql"}>{d}</option>)}
+          </select>
+        </label>
+        <span class="status" id="status" role="status">Loading engine…</span>
+      </div>
+
+      <div class="panes">
+        <section>
+          <h2>SQL input</h2>
+          <textarea id="input" spellcheck="false" autocomplete="off">SELECT id, name FROM users WHERE created_at > now() - interval '7 days' LIMIT 10;</textarea>
+        </section>
+        <section>
+          <h2>Output</h2>
+          <pre id="output" aria-live="polite"></pre>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      import { createSquonk } from "squonk/browser";
+
+      const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+      const input = $<HTMLTextAreaElement>("input");
+      const output = $<HTMLPreElement>("output");
+      const mode = $<HTMLSelectElement>("mode");
+      const source = $<HTMLSelectElement>("source");
+      const target = $<HTMLSelectElement>("target");
+      const targetWrap = $<HTMLElement>("target-wrap");
+      const status = $<HTMLElement>("status");
+
+      let ready = false;
+      let squonk: Awaited<ReturnType<typeof createSquonk>> | null = null;
+
+      function setStatus(text: string, error = false) {
+        status.textContent = text;
+        status.classList.toggle("error", error);
+      }
+
+      function run() {
+        if (!ready || !squonk) return;
+        const sql = input.value;
+        const src = source.value as Parameters<typeof squonk.parseJson>[1] extends infer O ? string : string;
+        try {
+          if (mode.value === "transpile") {
+            output.textContent = squonk.transpile(sql, {
+              sourceDialect: src as never,
+              targetDialect: target.value as never,
+            });
+          } else if (mode.value === "format") {
+            output.textContent = squonk.format(sql, { dialect: src as never });
+          } else {
+            const ast = squonk.parseJson(sql, { dialect: src as never });
+            output.textContent = JSON.stringify(ast, null, 2);
+          }
+          setStatus("OK");
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          output.textContent = message;
+          setStatus("Parse error", true);
+        }
+      }
+
+      function syncModeUi() {
+        targetWrap.hidden = mode.value !== "transpile";
+      }
+
+      let debounce: number | undefined;
+      function scheduleRun() {
+        window.clearTimeout(debounce);
+        debounce = window.setTimeout(run, 150);
+      }
+
+      input.addEventListener("input", scheduleRun);
+      for (const el of [mode, source, target]) {
+        el.addEventListener("change", () => {
+          syncModeUi();
+          run();
+        });
+      }
+
+      createSquonk()
+        .then((api) => {
+          squonk = api;
+          ready = true;
+          syncModeUi();
+          setStatus(`Ready — squonk v${api.version()}`);
+          run();
+        })
+        .catch((err) => {
+          setStatus(`Failed to load engine: ${err instanceof Error ? err.message : err}`, true);
+        });
+    </script>
+
+    <style>
+      :root {
+        --bg: #ffffff;
+        --fg: #1a1f2b;
+        --muted: #5b667a;
+        --border: #e3e8f0;
+        --panel: #f7f9fc;
+        --accent: #0f766e;
+        --error: #b42318;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b1220;
+          --fg: #e6edf6;
+          --muted: #93a1b5;
+          --border: #22304a;
+          --panel: #121b2c;
+          --accent: #5eead4;
+          --error: #ff9b8f;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .brand { font-weight: 700; font-size: 1.1rem; color: var(--fg); text-decoration: none; }
+      nav { display: flex; gap: 1.1rem; }
+      nav a, .brand { color: var(--fg); }
+      nav a { color: var(--muted); text-decoration: none; }
+      nav a:hover { color: var(--accent); }
+      main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+      h1 { margin: 0.5rem 0 0.25rem; font-size: 1.9rem; }
+      .lede { margin: 0 0 1.25rem; color: var(--muted); max-width: 60ch; }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem; color: var(--muted); }
+      select {
+        padding: 0.4rem 0.5rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--fg);
+        font: inherit;
+      }
+      .status { margin-left: auto; align-self: center; font-size: 0.85rem; color: var(--muted); }
+      .status.error { color: var(--error); }
+      .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+      @media (max-width: 760px) { .panes { grid-template-columns: 1fr; } }
+      section h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 0.4rem; }
+      textarea, pre {
+        width: 100%;
+        min-height: 340px;
+        margin: 0;
+        padding: 0.85rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--fg);
+        font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      textarea { resize: vertical; }
+      pre { overflow: auto; white-space: pre-wrap; word-break: break-word; }
+    </style>
+  </body>
+</html>
