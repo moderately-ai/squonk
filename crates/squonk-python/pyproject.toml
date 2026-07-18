@@ -31,6 +31,11 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Rust",
     "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Database",
+    # The package ships a PEP 561 `py.typed` marker plus `.pyi` stubs (see
+    # `[tool.mypy].files`), so the typed surface is real and filterable on PyPI.
+    "Typing :: Typed",
     # OS classifiers match the wheels the release workflow actually builds AND
     # install-smokes (`.github/workflows/release-python.yml`): manylinux x86_64, macOS
     # arm64 + x86_64, Windows x86_64. Per docs/platform-support.md, an OS is advertised
