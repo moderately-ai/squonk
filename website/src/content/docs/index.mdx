@@ -1,0 +1,72 @@
+---
+title: A fast, multi-dialect SQL parser for Rust, Python & TypeScript
+description: squonk parses SQL to a compact, owned AST across 14 dialects, then renders, formats, redacts, and transpiles it — one Rust engine shared by Rust, Python, and TypeScript/WASM.
+template: splash
+hero:
+  title: A fast, multi-dialect SQL parser for Rust, Python &amp; TypeScript
+  tagline: Parse SQL to a typed AST, then render, format, redact, or transpile it across 14 dialects — one engine, three languages.
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+    - text: Open the playground
+      link: /playground/
+      variant: secondary
+      icon: rocket
+    - text: View on GitHub
+      link: https://github.com/moderately-ai/squonk
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+## Why squonk
+
+<CardGrid stagger>
+  <Card title="Dialects are data, not subclasses" icon="setting">
+    A dialect is a small delta over a shared spec — inspect it, diff two
+    presets field by field, or define a custom dialect without forking parser
+    code. 14 built-in dialects ship today: ANSI, Postgres, MySQL, SQLite,
+    DuckDB, BigQuery, Snowflake, Redshift, Databricks, ClickHouse, Hive,
+    MSSQL, and more.
+  </Card>
+  <Card title="An AST built for tooling" icon="puzzle">
+    Every node is owned, `'static`, and carries a byte span and a stable node
+    ID. Trees can be stored, sent across threads, and mapped back to the exact
+    source bytes — ideal for linters, formatters, and analysis.
+  </Card>
+  <Card title="Transpile between dialects" icon="random">
+    Parse under one dialect and render under another in a single call. Produce
+    canonical, fully-parenthesized, or PII-redacted SQL, or convert a query
+    from one engine's syntax to another.
+  </Card>
+  <Card title="One core, three languages" icon="seti:html">
+    Rust, Python, and TypeScript/WASM all parse SQL with the same
+    implementation — no subtle differences between bindings, and the default
+    Rust dependency tree is a single micro-crate.
+  </Card>
+</CardGrid>
+
+## Install
+
+<CardGrid>
+  <Card title="Rust" icon="seti:rust">
+    ```sh
+    cargo add squonk
+    ```
+  </Card>
+  <Card title="Python" icon="seti:python">
+    ```sh
+    pip install squonk
+    ```
+  </Card>
+  <Card title="TypeScript / JavaScript" icon="seti:javascript">
+    ```sh
+    npm install squonk
+    ```
+  </Card>
+</CardGrid>
+
+Head to the [getting-started guide](/getting-started/) for a first parse in each
+language, or [try it live in the playground](/playground/).
