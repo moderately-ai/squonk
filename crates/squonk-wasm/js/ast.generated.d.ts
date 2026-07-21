@@ -688,6 +688,8 @@ export type CommentTarget =
   | "Table"
   | "Column"
   | "Database"
+  | "Schema"
+  | "Sequence"
   | "View"
   | "MaterializedView"
   | "Index"

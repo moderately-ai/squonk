@@ -11,7 +11,7 @@ use crate::ast::*;
 pub(crate) struct RenderShapeFingerprint<const VALUE: u64>;
 pub(crate) const CURRENT_RENDER_SHAPE_DCL: RenderShapeFingerprint<0x0bc66b9b4759b4e4> =
     RenderShapeFingerprint;
-pub(crate) const CURRENT_RENDER_SHAPE_DDL: RenderShapeFingerprint<0xb7fb9938befad896> =
+pub(crate) const CURRENT_RENDER_SHAPE_DDL: RenderShapeFingerprint<0xeed5a2062b4dd7a0> =
     RenderShapeFingerprint;
 pub(crate) const CURRENT_RENDER_SHAPE_DML: RenderShapeFingerprint<0x5bdcbbc8cc864aec> =
     RenderShapeFingerprint;
@@ -2144,6 +2144,8 @@ pub(crate) fn render_shape_comment_target<X: Extension>(node: &CommentTarget<X>)
         CommentTarget::Table => {}
         CommentTarget::Column => {}
         CommentTarget::Database => {}
+        CommentTarget::Schema => {}
+        CommentTarget::Sequence => {}
         CommentTarget::View => {}
         CommentTarget::MaterializedView => {}
         CommentTarget::Index => {}

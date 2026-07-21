@@ -1732,6 +1732,10 @@ pub enum CommentTarget<X: Extension = NoExt> {
     Column,
     /// `COMMENT ON DATABASE <name>`.
     Database,
+    /// `COMMENT ON SCHEMA <name>`.
+    Schema,
+    /// `COMMENT ON SEQUENCE <name>`.
+    Sequence,
     /// `COMMENT ON VIEW <name>`.
     View,
     /// `COMMENT ON MATERIALIZED VIEW <name>`.

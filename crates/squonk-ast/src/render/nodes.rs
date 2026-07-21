@@ -173,7 +173,7 @@ use crate::generated::render_skeleton as skeleton;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0x0bc66b9b4759b4e4> = skeleton::CURRENT_RENDER_SHAPE_DCL;
 #[cfg(test)]
-const _: skeleton::RenderShapeFingerprint<0xb7fb9938befad896> = skeleton::CURRENT_RENDER_SHAPE_DDL;
+const _: skeleton::RenderShapeFingerprint<0xeed5a2062b4dd7a0> = skeleton::CURRENT_RENDER_SHAPE_DDL;
 #[cfg(test)]
 const _: skeleton::RenderShapeFingerprint<0x5bdcbbc8cc864aec> = skeleton::CURRENT_RENDER_SHAPE_DML;
 #[cfg(test)]
@@ -2566,6 +2566,8 @@ impl<X: Extension + Render> Render for Statement<X> {
                     CommentTarget::Table => "TABLE ",
                     CommentTarget::Column => "COLUMN ",
                     CommentTarget::Database => "DATABASE ",
+                    CommentTarget::Schema => "SCHEMA ",
+                    CommentTarget::Sequence => "SEQUENCE ",
                     CommentTarget::View => "VIEW ",
                     CommentTarget::MaterializedView => "MATERIALIZED VIEW ",
                     CommentTarget::Index => "INDEX ",

@@ -5336,6 +5336,10 @@ impl<'a, D: Dialect> Parser<'a, D> {
             (CommentTarget::Column, self.parse_object_name()?, None)
         } else if self.eat_contextual_keyword("DATABASE")? {
             (CommentTarget::Database, self.parse_object_name()?, None)
+        } else if self.eat_contextual_keyword("SCHEMA")? {
+            (CommentTarget::Schema, self.parse_object_name()?, None)
+        } else if self.eat_contextual_keyword("SEQUENCE")? {
+            (CommentTarget::Sequence, self.parse_object_name()?, None)
         } else if self.eat_contextual_keyword("VIEW")? {
             (CommentTarget::View, self.parse_object_name()?, None)
         } else if self.eat_contextual_keyword("MATERIALIZED")? {
@@ -12769,6 +12773,20 @@ mod tests {
             panic!("expected a procedure target");
         };
         assert_eq!(arg_types.as_ref().map(|types| types.len()), Some(2));
+
+        // PostgreSQL's `comment_text` object kinds also cover SCHEMA and
+        // SEQUENCE; both parse to their own target so a consumer can act on
+        // (or reject) them typed rather than seeing a parse error.
+        for (sql, expected) in [
+            ("COMMENT ON SCHEMA s IS 'x'", CommentTarget::Schema),
+            ("COMMENT ON SEQUENCE seq IS 'x'", CommentTarget::Sequence),
+        ] {
+            let parsed = parse_with(sql, crate::ParseConfig::new(PG_DIALECT)).unwrap();
+            let Statement::CommentOn { comment, .. } = &parsed.statements()[0] else {
+                panic!("expected a comment-on statement for {sql:?}");
+            };
+            assert_eq!(comment.target, expected, "{sql:?}");
+        }
     }
 
     #[test]

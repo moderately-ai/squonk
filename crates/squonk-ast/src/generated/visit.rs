@@ -5248,6 +5248,8 @@ where
         CommentTarget::Table => {}
         CommentTarget::Column => {}
         CommentTarget::Database => {}
+        CommentTarget::Schema => {}
+        CommentTarget::Sequence => {}
         CommentTarget::View => {}
         CommentTarget::MaterializedView => {}
         CommentTarget::Index => {}
@@ -23542,6 +23544,8 @@ where
         CommentTarget::Table => {}
         CommentTarget::Column => {}
         CommentTarget::Database => {}
+        CommentTarget::Schema => {}
+        CommentTarget::Sequence => {}
         CommentTarget::View => {}
         CommentTarget::MaterializedView => {}
         CommentTarget::Index => {}

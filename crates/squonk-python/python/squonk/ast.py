@@ -2511,6 +2511,8 @@ CommentTargetJson: TypeAlias = Union[
     Literal["Table"],
     Literal["Column"],
     Literal["Database"],
+    Literal["Schema"],
+    Literal["Sequence"],
     Literal["View"],
     Literal["MaterializedView"],
     Literal["Index"],
