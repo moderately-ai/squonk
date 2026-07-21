@@ -54,6 +54,7 @@ mod tests {
         for sql in [
             "CREATE TABLE t (id BIGINT) COLOCATE WITH anchor",
             "CREATE TABLE t (id BIGINT) WITH (x = 1) COLOCATE WITH anchor ON (id)",
+            "CREATE TABLE t (id BIGINT) COLOCATE WITH anchor ON (id) IN COLOCATION GROUP g",
             "CREATE TABLE t (id BIGINT) IN COLOCATION GROUP g",
             "CREATE TABLE t (id BIGINT) WITH (x = 1) IN COLOCATION GROUP g ON (id)",
             "ALTER TABLE t SET COLOCATION GROUP g ON (id)",
