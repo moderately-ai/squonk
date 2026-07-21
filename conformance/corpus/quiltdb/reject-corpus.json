@@ -15,6 +15,10 @@
     { "id": "ddl-change-column", "sql": "ALTER TABLE t CHANGE COLUMN c d BIGINT" },
     { "id": "ddl-tblproperties", "sql": "ALTER TABLE t SET TBLPROPERTIES ('k' = 'v')" },
     { "id": "ddl-alter-drop-index", "sql": "ALTER TABLE t DROP INDEX idx" },
-    { "id": "ddl-trailing-index-using", "sql": "CREATE INDEX idx ON t (c) USING btree" }
+    { "id": "ddl-trailing-index-using", "sql": "CREATE INDEX idx ON t (c) USING btree" },
+    { "id": "colocation-both-create-clauses", "sql": "CREATE TABLE t (id BIGINT) COLOCATE WITH anchor ON (id) IN COLOCATION GROUP g" },
+    { "id": "colocation-in-group-on-plus-with", "sql": "CREATE TABLE t (id BIGINT) WITH (x = 1) IN COLOCATION GROUP g ON (id)" },
+    { "id": "colocation-in-group-neither-arm", "sql": "CREATE TABLE t (id BIGINT) IN COLOCATION GROUP g" },
+    { "id": "colocation-alter-op-not-standalone", "sql": "ALTER TABLE t SET COLOCATION GROUP g, ADD COLUMN x INT" }
   ]
 }
