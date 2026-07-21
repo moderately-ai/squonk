@@ -1126,6 +1126,7 @@ impl FeatureSet {
             column_conflict_resolution_clause: false,
             typeless_column_definitions: false,
             joined_autoincrement_attribute: false,
+            underscored_autoincrement_attribute: false,
             inline_primary_key_ordering: false,
             named_column_collate_constraint: false,
             identity_columns: true,

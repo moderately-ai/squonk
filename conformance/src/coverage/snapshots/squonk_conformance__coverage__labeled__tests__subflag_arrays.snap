@@ -1,6 +1,6 @@
 ---
 source: conformance/src/coverage/labeled.rs
-assertion_line: 7273
+assertion_line: 7291
 expression: render_subflag_arrays()
 ---
 string_literals
@@ -179,6 +179,7 @@ column_definition_syntax
   column_conflict_resolution_clause
   typeless_column_definitions
   joined_autoincrement_attribute
+  underscored_autoincrement_attribute
   inline_primary_key_ordering
   named_column_collate_constraint
   identity_columns

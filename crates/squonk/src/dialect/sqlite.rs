@@ -361,6 +361,60 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_joined_autoincrement_is_the_attribute_never_a_type_word() {
+        use crate::ast::{AutoIncrementSpelling, ColumnOption, CreateTableBody, TableElement};
+
+        // Engine-measured on sqlite3 3.54.0: `AUTOINCREMENT` is a reserved keyword that can
+        // never appear inside a `typename` word run — `a INTEGER AUTOINCREMENT (5)` and the
+        // bare `a AUTOINCREMENT` both syntax-error — while the underscored `AUTO_INCREMENT`
+        // is an ordinary identifier the typename absorbs (`a INTEGER AUTO_INCREMENT` creates
+        // the table). The liberal-type-word exclusion mirrors exactly that split: with the
+        // `joined_autoincrement_attribute` gate on, the joined spelling always reads as the
+        // column attribute; with `underscored_autoincrement_attribute` off, the underscored
+        // spelling stays an ordinary affinity word.
+        //
+        // The attribute reading, pinned: the type stays typed and the trailing keyword is the
+        // joined-spelling attribute, not the second word of a liberal type name.
+        let sql = "CREATE TABLE t (a INTEGER AUTOINCREMENT)";
+        let parsed =
+            parse_with(sql, crate::ParseConfig::new(Sqlite)).unwrap_or_else(|err| panic!("{err}"));
+        let Statement::CreateTable { create, .. } = &parsed.statements()[0] else {
+            panic!("expected a CREATE TABLE statement");
+        };
+        let CreateTableBody::Definition { elements, .. } = &create.body else {
+            panic!("expected a column-definition body");
+        };
+        let TableElement::Column { column, .. } = &elements[0] else {
+            panic!("expected a column element");
+        };
+        assert!(matches!(column.data_type, Some(DataType::Integer { .. })));
+        let spelling = column.constraints.iter().find_map(|c| match c.option {
+            ColumnOption::AutoIncrement { spelling, .. } => Some(spelling),
+            _ => None,
+        });
+        assert_eq!(spelling, Some(AutoIncrementSpelling::Joined));
+        assert_eq!(sqlite_render(sql), sql);
+
+        // Excluded from the liberal run, the keyword can no longer carry a liberal modifier
+        // list — the engine-measured reject (previously over-accepted as a two-word liberal
+        // run with args).
+        assert!(
+            parse_with(
+                "CREATE TABLE t (a INTEGER AUTOINCREMENT (5))",
+                crate::ParseConfig::new(Sqlite)
+            )
+            .is_err()
+        );
+
+        // The underscored spelling's gate is off here, so it stays an ordinary affinity
+        // word — the engine's reading.
+        assert!(matches!(
+            first_column_type(Sqlite, "CREATE TABLE t (a INTEGER AUTO_INCREMENT)"),
+            DataType::Liberal { .. }
+        ));
+    }
+
+    #[test]
     fn sqlite_accepts_begin_transaction_mode_and_round_trips() {
         // SQLite's `BEGIN {DEFERRED|IMMEDIATE|EXCLUSIVE} [TRANSACTION]` transaction-mode
         // modifier (`sqlite-begin-transaction-modifiers`) — engine-measured via rusqlite
