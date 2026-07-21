@@ -11,7 +11,7 @@
 //! `COMMENT IF EXISTS ON ...` guard, and colocation-group DDL.
 //!
 //! Its PostgreSQL-compatible query surface rejects wildcard `EXCLUDE`/`RENAME`,
-//! `ILIKE`, `IS [NOT] DISTINCT FROM`, `NATURAL CROSS JOIN`, `TABLESAMPLE`, and
+//! `IS [NOT] DISTINCT FROM`, `NATURAL CROSS JOIN`, `TABLESAMPLE`, and
 //! `INTERSECT ALL`/`EXCEPT ALL`. Alternative DDL spellings such as `MODIFY COLUMN`,
 //! `CHANGE COLUMN`, `SET TBLPROPERTIES`, table-scoped `DROP INDEX`, and trailing
 //! index `USING` remain outside the grammar. On top of the PostgreSQL session
@@ -104,7 +104,9 @@ impl PredicateSyntax {
     /// Predicate syntax enabled by this preset.
     pub const QUILTDB: Self = Self {
         is_distinct_from: false,
-        ilike: false,
+        // The engine executes ILIKE (DataFusion's case-insensitive match) and
+        // its mutation predicate suite pins it, so the grammar accepts it.
+        ilike: true,
         like: true,
         similar_to: true,
         overlaps_period_predicate: true,

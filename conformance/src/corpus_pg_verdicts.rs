@@ -852,7 +852,7 @@ fn pg_unexercised_statement_productions_have_permanent_oracle_probes() {
 // rejects (e.g. `RESET SESSION AUTHORIZATION`, `CREATE INDEX ... INCLUDE (...)`) rather than
 // mis-splitting an unconsumed tail into further statements — a pre-existing under-consumption
 // tracked in its own follow-ups, not an over-acceptance.
-const PG_REGRESS_QUADRANT: (usize, usize, usize, usize) = (29673, 5406, 0, 262);
+const PG_REGRESS_QUADRANT: (usize, usize, usize, usize) = (29676, 5403, 0, 262);
 
 /// Per-family coverage-gap counts (PG accepts / we reject), ranked by statement head
 /// (object kind appended for CREATE/ALTER/DROP). Families below
@@ -890,10 +890,10 @@ const PG_REGRESS_GAP_FAMILIES: &[(&str, usize)] = &[
     ("DROP DOMAIN", 71),
     ("CREATE POLICY", 63),
     ("INSERT", 61),
-    ("COMMENT", 56),
     ("CREATE OPERATOR", 56),
     ("ALTER OPERATOR FAMILY", 55),
     ("DROP USER", 55),
+    ("COMMENT", 53),
     ("CREATE COLLATION", 53),
     ("CREATE USER", 53),
     ("ALTER SUBSCRIPTION", 45),
