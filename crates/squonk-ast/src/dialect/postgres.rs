@@ -380,6 +380,7 @@ impl ColumnDefinitionSyntax {
         // PostgreSQL has no joined `AUTOINCREMENT` attribute (its auto-increment is `serial`
         // types / `GENERATED … AS IDENTITY`); the trailing keyword is rejected.
         joined_autoincrement_attribute: false,
+        underscored_autoincrement_attribute: false,
         // PostgreSQL's inline `PRIMARY KEY` takes no `ASC`/`DESC` order qualifier (ordering is a
         // per-index-column property, not an inline column constraint); the trailing keyword is
         // rejected.

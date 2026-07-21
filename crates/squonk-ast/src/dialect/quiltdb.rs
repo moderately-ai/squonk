@@ -188,7 +188,11 @@ impl ColumnDefinitionSyntax {
         column_conflict_resolution_clause: false,
         typeless_column_definitions: false,
         typeless_generated_columns: false,
-        joined_autoincrement_attribute: false,
+        // Both auto-increment spellings are admitted: the engine's contract
+        // treats AUTOINCREMENT / AUTO_INCREMENT as SERIAL-equivalent identity
+        // (quiltdb-harness `identity::autoincrement_keyword_is_serial_equivalent`).
+        joined_autoincrement_attribute: true,
+        underscored_autoincrement_attribute: true,
         inline_primary_key_ordering: false,
         named_column_collate_constraint: false,
         identity_columns: true,
