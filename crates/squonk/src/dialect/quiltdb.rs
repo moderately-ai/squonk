@@ -90,6 +90,9 @@ mod tests {
         for sql in [
             "SELECT * REPLACE (1 AS id) FROM t",
             "SELECT * FROM a NATURAL LEFT JOIN b",
+            // The engine executes ILIKE (DataFusion's case-insensitive
+            // match), so the grammar accepts it.
+            "SELECT 1 WHERE 'a' ILIKE 'A'",
         ] {
             parse_with(sql, ParseConfig::new(QuiltDb))
                 .unwrap_or_else(|error| panic!("failed to parse {sql:?}: {error}"));
@@ -101,7 +104,6 @@ mod tests {
             "SELECT * FROM a INTERSECT ALL SELECT * FROM b",
             "SELECT * FROM a EXCEPT ALL SELECT * FROM b",
             "SELECT 1 WHERE 1 IS DISTINCT FROM 2",
-            "SELECT 1 WHERE 'a' ILIKE 'A'",
         ] {
             assert!(
                 parse_with(sql, ParseConfig::new(QuiltDb)).is_err(),

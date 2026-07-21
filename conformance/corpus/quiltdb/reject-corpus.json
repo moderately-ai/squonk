@@ -2,7 +2,6 @@
   "cases": [
     { "id": "query-wildcard-exclude", "sql": "SELECT * EXCLUDE (id) FROM t" },
     { "id": "query-wildcard-rename", "sql": "SELECT * RENAME (id AS other) FROM t" },
-    { "id": "query-ilike", "sql": "SELECT 'a' ILIKE 'A'" },
     { "id": "query-is-distinct-from", "sql": "SELECT 1 IS DISTINCT FROM 2" },
     { "id": "query-natural-cross", "sql": "SELECT * FROM a NATURAL CROSS JOIN b" },
     { "id": "query-left-semi", "sql": "SELECT * FROM a LEFT SEMI JOIN b ON a.id = b.id" },
