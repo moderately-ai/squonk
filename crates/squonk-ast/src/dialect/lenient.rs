@@ -759,6 +759,7 @@ impl ColumnDefinitionSyntax {
         // The parse-anything union accepts the SQLite joined `AUTOINCREMENT` attribute —
         // additive over the shared surface.
         joined_autoincrement_attribute: true,
+        underscored_autoincrement_attribute: true,
         // The parse-anything union accepts the SQLite inline-`PRIMARY KEY` `ASC`/`DESC`
         // ordering too — additive over the shared surface.
         inline_primary_key_ordering: true,

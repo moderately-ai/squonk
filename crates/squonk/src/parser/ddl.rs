@@ -6791,25 +6791,28 @@ impl<'a, D: Dialect> Parser<'a, D> {
 
     /// Consume an auto-increment column attribute, if one is written and admitted:
     /// SQLite's joined `AUTOINCREMENT` (gated by `joined_autoincrement_attribute`) or the
-    /// `AUTO_INCREMENT` underscore spelling (MySQL's `table_options`). Each spelling
-    /// self-gates on its own flag so the two toggle independently. Returns the surface
-    /// spelling so it round-trips, or `None` when no keyword is present or admitted (no
-    /// input consumed).
+    /// `AUTO_INCREMENT` underscore spelling (gated by
+    /// `underscored_autoincrement_attribute`). Each spelling self-gates on its own flag
+    /// so the two toggle independently. Returns the surface spelling so it round-trips,
+    /// or `None` when no keyword is present or admitted (no input consumed).
     fn parse_optional_auto_increment_spelling(
         &mut self,
     ) -> ParseResult<Option<AutoIncrementSpelling>> {
         let column_def = self.features().column_definition_syntax;
-        let create_table = self.features().create_table_clause_syntax;
         // SQLite's attribute is `AUTOINCREMENT` (one solid word); the underscore
         // `AUTO_INCREMENT` is *not* a SQLite attribute — SQLite reads it as a bareword
-        // type-name token, so as a column attribute it is a syntax reject there. Only
-        // MySQL (`table_options`) admits the underscore spelling.
+        // type-name token, so as a column attribute it is a syntax reject there. MySQL
+        // admits the underscore spelling (its own gate, no longer piggybacked on the
+        // trailing-table-options flag, so a preset can take the column attribute
+        // without the whole MySQL option vocabulary).
         if column_def.joined_autoincrement_attribute
             && self.eat_contextual_keyword("AUTOINCREMENT")?
         {
             return Ok(Some(AutoIncrementSpelling::Joined));
         }
-        if create_table.table_options && self.eat_contextual_keyword("AUTO_INCREMENT")? {
+        if column_def.underscored_autoincrement_attribute
+            && self.eat_contextual_keyword("AUTO_INCREMENT")?
+        {
             return Ok(Some(AutoIncrementSpelling::Underscored));
         }
         Ok(None)
@@ -9692,20 +9695,69 @@ mod tests {
             .expect_err("flag off rejects the joined AUTOINCREMENT attribute");
 
         // The joined `AUTOINCREMENT` and the underscored MySQL `AUTO_INCREMENT` gate on
-        // separate flags, so neither admits the other's spelling. Enabling the joined flag on
-        // ANSI does *not* enable the underscored attribute (it rides `table_options`, off here)…
+        // separate flags, so neither admits the other's spelling. Enabling the joined flag
+        // on ANSI does *not* enable the underscored attribute (its own
+        // `underscored_autoincrement_attribute` flag, off here)…
         parse_with(
             "CREATE TABLE t (a INTEGER AUTO_INCREMENT)",
             crate::ParseConfig::new(ANSI_PLUS_JOINED_DIALECT),
         )
         .expect_err("the joined flag does not admit the underscored spelling");
-        // …and MySQL — which admits the underscored spelling via `table_options` but leaves the
-        // joined flag off — rejects the bare `AUTOINCREMENT` keyword.
+        // …and MySQL — which admits the underscored spelling but leaves the joined flag
+        // off — rejects the bare `AUTOINCREMENT` keyword.
         parse_with(
             "CREATE TABLE t (a INTEGER PRIMARY KEY AUTOINCREMENT)",
             crate::ParseConfig::new(MYSQL_RENDER),
         )
         .expect_err("MySQL has no joined AUTOINCREMENT attribute");
+
+        // The underscored attribute is its own flag, not a rider on the MySQL
+        // trailing-table-options gate: forcing it on over ANSI (whose
+        // `table_options` stays off) admits `AUTO_INCREMENT` and records the
+        // underscored spelling, while the trailing-option grammar stays rejected.
+        const ANSI_PLUS_UNDERSCORED: FeatureSet = FeatureSet::ANSI.with(
+            FeatureDelta::EMPTY.column_definition_syntax(ColumnDefinitionSyntax {
+                underscored_autoincrement_attribute: true,
+                ..ColumnDefinitionSyntax::ANSI
+            }),
+        );
+        const ANSI_PLUS_UNDERSCORED_DIALECT: FeatureDialect = FeatureDialect {
+            features: &ANSI_PLUS_UNDERSCORED,
+        };
+        let parsed = parse_with(
+            "CREATE TABLE t (a INTEGER AUTO_INCREMENT)",
+            crate::ParseConfig::new(ANSI_PLUS_UNDERSCORED_DIALECT),
+        )
+        .expect("the underscored flag admits AUTO_INCREMENT on its own");
+        let CreateTableBody::Definition { elements, .. } = &create_table_of(&parsed).body else {
+            panic!("expected a definition body");
+        };
+        let TableElement::Column { column, .. } = &elements[0] else {
+            panic!("expected a column");
+        };
+        let spelling = column.constraints.iter().find_map(|c| match c.option {
+            ColumnOption::AutoIncrement { spelling, .. } => Some(spelling),
+            _ => None,
+        });
+        assert_eq!(spelling, Some(AutoIncrementSpelling::Underscored));
+        parse_with(
+            "CREATE TABLE t (a INTEGER) ENGINE = InnoDB",
+            crate::ParseConfig::new(ANSI_PLUS_UNDERSCORED_DIALECT),
+        )
+        .expect_err("the underscored flag does not open the trailing-option grammar");
+
+        // The QuiltDB preset admits BOTH spellings: the engine contract treats
+        // them as SERIAL-equivalent identity columns.
+        const QUILTDB_DIALECT: FeatureDialect = FeatureDialect {
+            features: &FeatureSet::QUILTDB,
+        };
+        for sql in [
+            "CREATE TABLE t (a INTEGER AUTO_INCREMENT)",
+            "CREATE TABLE t (a INTEGER AUTOINCREMENT)",
+        ] {
+            parse_with(sql, crate::ParseConfig::new(QUILTDB_DIALECT))
+                .unwrap_or_else(|e| panic!("QuiltDB accepts {sql}: {e:?}"));
+        }
     }
 
     #[test]

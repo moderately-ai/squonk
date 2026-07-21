@@ -484,6 +484,7 @@ impl ColumnDefinitionSyntax {
         // The SQLite joined `AUTOINCREMENT` attribute is a dialect extension, not standard
         // surface, so the baseline rejects it.
         joined_autoincrement_attribute: false,
+        underscored_autoincrement_attribute: false,
         // An `ASC`/`DESC` order on an inline `PRIMARY KEY` is a SQLite extension; the standard
         // baseline leaves the trailing keyword unconsumed and rejects it.
         inline_primary_key_ordering: false,

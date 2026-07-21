@@ -2127,6 +2127,21 @@ pub struct ColumnDefinitionSyntax {
     /// attribute is an independent grammar point from the typeless column, the column
     /// `COLLATE`, and the inline-`PRIMARY KEY` ordering.
     pub joined_autoincrement_attribute: bool,
+    /// Accept the underscored MySQL `AUTO_INCREMENT` column attribute
+    /// (`a INT AUTO_INCREMENT`), recorded as
+    /// [`AutoIncrementSpelling::Underscored`](crate::ast::AutoIncrementSpelling::Underscored)
+    /// so it round-trips with the underscore. Its own gate — one behaviour = one flag —
+    /// rather than a rider on [`table_options`](CreateTableClauseSyntax::table_options),
+    /// so a preset can admit the column attribute without MySQL's whole trailing
+    /// table-option vocabulary (QuiltDB does exactly that: the attribute is
+    /// SERIAL-equivalent there while `ENGINE = …` options stay parse errors). On for
+    /// MySQL and Lenient (whose `table_options` previously implied it — same accepted
+    /// surface) and QuiltDB; off elsewhere, where the trailing `AUTO_INCREMENT` is left
+    /// unconsumed and surfaces as a clean parse error. The joined SQLite spelling stays
+    /// separately gated by
+    /// [`joined_autoincrement_attribute`](Self::joined_autoincrement_attribute), so the
+    /// two spellings toggle independently.
+    pub underscored_autoincrement_attribute: bool,
     /// Accept an `ASC`/`DESC` sort-order qualifier on an inline `PRIMARY KEY` column
     /// constraint (`CREATE TABLE t (a INTEGER PRIMARY KEY DESC)`), recorded in the
     /// [`ColumnOption::PrimaryKey`](crate::ast::ColumnOption) `ascending` field (`ASC` →

@@ -95,12 +95,21 @@ impl<'a, D: Dialect> Parser<'a, D> {
     /// shadow the generated-column parse (engine edge `x FOO GENERATED bar` is left an
     /// accepted gap, never over-accepted).
     fn peek_is_liberal_type_word(&mut self) -> ParseResult<bool> {
+        let column_def = self.features().column_definition_syntax;
+        // The auto-increment spellings are excluded exactly when their
+        // attribute gate admits them (the IDENTITY pattern below): absorbing
+        // the word as a type word would shadow the attribute parse — and,
+        // worse, force a liberal reparse whose first word is a reserved type
+        // name, turning `a INTEGER AUTO_INCREMENT` into a parse error at
+        // `INTEGER`. With the gate off the word stays an ordinary affinity
+        // word (SQLite's engine-measured reading).
         if self.peek_is_contextual_keyword("GENERATED")?
-            || (self
-                .features()
-                .column_definition_syntax
-                .compact_identity_columns
+            || (column_def.compact_identity_columns
                 && self.peek_is_contextual_keyword("IDENTITY")?)
+            || (column_def.joined_autoincrement_attribute
+                && self.peek_is_contextual_keyword("AUTOINCREMENT")?)
+            || (column_def.underscored_autoincrement_attribute
+                && self.peek_is_contextual_keyword("AUTO_INCREMENT")?)
         {
             return Ok(false);
         }

@@ -496,6 +496,7 @@ impl ColumnDefinitionSyntax {
         // MySQL spells auto-increment as the underscored `AUTO_INCREMENT` attribute (gated by
         // `table_options`), never SQLite's joined `AUTOINCREMENT`, so the joined spelling is off.
         joined_autoincrement_attribute: false,
+        underscored_autoincrement_attribute: true,
         // MySQL's inline `PRIMARY KEY` takes no `ASC`/`DESC` order qualifier; the trailing
         // keyword is left unconsumed and rejected.
         inline_primary_key_ordering: false,

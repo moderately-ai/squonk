@@ -214,6 +214,7 @@ const COLUMN_DEFINITION_SUBFLAGS: &[&str] = &[
     "column_conflict_resolution_clause",
     "typeless_column_definitions",
     "joined_autoincrement_attribute",
+    "underscored_autoincrement_attribute",
     "inline_primary_key_ordering",
     "named_column_collate_constraint",
     "identity_columns",
@@ -743,6 +744,7 @@ toggleable_features! {
     (COLUMN_CONFLICT_RESOLUTION_CLAUSE, "column_conflict_resolution_clause", ColumnDefinitionSyntax, column_definition_syntax, ColumnDefinitionSyntax, column_conflict_resolution_clause),
     (TYPELESS_COLUMN_DEFINITIONS, "typeless_column_definitions", ColumnDefinitionSyntax, column_definition_syntax, ColumnDefinitionSyntax, typeless_column_definitions),
     (JOINED_AUTOINCREMENT_ATTRIBUTE, "joined_autoincrement_attribute", ColumnDefinitionSyntax, column_definition_syntax, ColumnDefinitionSyntax, joined_autoincrement_attribute),
+    (UNDERSCORED_AUTOINCREMENT_ATTRIBUTE, "underscored_autoincrement_attribute", ColumnDefinitionSyntax, column_definition_syntax, ColumnDefinitionSyntax, underscored_autoincrement_attribute),
     (INLINE_PRIMARY_KEY_ORDERING, "inline_primary_key_ordering", ColumnDefinitionSyntax, column_definition_syntax, ColumnDefinitionSyntax, inline_primary_key_ordering),
     (NAMED_COLUMN_COLLATE_CONSTRAINT, "named_column_collate_constraint", ColumnDefinitionSyntax, column_definition_syntax, ColumnDefinitionSyntax, named_column_collate_constraint),
     (CREATE_TRIGGER, "create_trigger", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_trigger),
@@ -1786,6 +1788,7 @@ const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &COLUMN_CONFLICT_RESOLUTION_CLAUSE,
     &TYPELESS_COLUMN_DEFINITIONS,
     &JOINED_AUTOINCREMENT_ATTRIBUTE,
+    &UNDERSCORED_AUTOINCREMENT_ATTRIBUTE,
     &INLINE_PRIMARY_KEY_ORDERING,
     &NAMED_COLUMN_COLLATE_CONSTRAINT,
     &CREATE_TRIGGER,
@@ -4539,9 +4542,12 @@ const LABELED_CASES: &[LabeledCase] = &[
         required: &[&PARTIAL_INDEX],
         forbidden: &[],
     },
-    // MySQL CREATE TABLE storage decorations, both gated by `table_options`: with the
-    // flag off the trailing `ENGINE = InnoDB` is leftover input, and the column-level
-    // `AUTO_INCREMENT` is an unconsumed attribute -> reject. So the flag is required.
+    // MySQL CREATE TABLE storage decorations: the trailing `ENGINE = InnoDB` is
+    // gated by `table_options` (flag off leaves it as leftover input -> reject),
+    // and the column-level `AUTO_INCREMENT` attribute rides its own
+    // `underscored_autoincrement_attribute` flag — no longer a rider on
+    // `table_options`, so a preset (QuiltDB) can take the column attribute
+    // without the MySQL trailing-option vocabulary.
     LabeledCase {
         sql: "CREATE TABLE t (id INT) ENGINE = InnoDB",
         expect: Expect::Accept,
@@ -4551,7 +4557,7 @@ const LABELED_CASES: &[LabeledCase] = &[
     LabeledCase {
         sql: "CREATE TABLE t (id INT AUTO_INCREMENT)",
         expect: Expect::Accept,
-        required: &[&TABLE_OPTIONS],
+        required: &[&UNDERSCORED_AUTOINCREMENT_ATTRIBUTE],
         forbidden: &[],
     },
     // The trailing `WITHOUT ROWID` table option rides its own `without_rowid_table_option`
@@ -4580,7 +4586,7 @@ const LABELED_CASES: &[LabeledCase] = &[
     },
     // The joined `AUTOINCREMENT` attribute rides its own `joined_autoincrement_attribute` flag
     // (split out of the retired `sqlite_table_decorations` bundle); the underscored
-    // MySQL `AUTO_INCREMENT` spelling stays on `table_options` (see the case above).
+    // MySQL `AUTO_INCREMENT` spelling rides its own flag too (see the case above).
     LabeledCase {
         sql: "CREATE TABLE t (a INTEGER PRIMARY KEY AUTOINCREMENT)",
         expect: Expect::Accept,
@@ -6945,6 +6951,7 @@ mod tests {
             typeless_column_definitions: _,
             typeless_generated_columns: _,
             joined_autoincrement_attribute: _,
+            underscored_autoincrement_attribute: _,
             inline_primary_key_ordering: _,
             named_column_collate_constraint: _,
             identity_columns: _,

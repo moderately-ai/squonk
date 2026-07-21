@@ -1,6 +1,6 @@
 ---
 source: conformance/src/coverage/labeled.rs
-assertion_line: 7287
+assertion_line: 7291
 expression: render_toggleable_feature_names()
 ---
 access_control_syntax::access_control
@@ -45,6 +45,7 @@ column_definition_syntax::joined_autoincrement_attribute
 column_definition_syntax::named_column_collate_constraint
 column_definition_syntax::typeless_column_definitions
 column_definition_syntax::typeless_generated_columns
+column_definition_syntax::underscored_autoincrement_attribute
 comment_syntax::line_comment_ends_at_carriage_return
 comment_syntax::line_comment_hash
 comment_syntax::nested_block_comments

@@ -736,6 +736,7 @@ impl ColumnDefinitionSyntax {
         // SQLite accepts the joined `AUTOINCREMENT` attribute on an inline `PRIMARY KEY` column
         // (its own one-word keyword, distinct from MySQL's underscored `AUTO_INCREMENT`).
         joined_autoincrement_attribute: true,
+        underscored_autoincrement_attribute: false,
         // SQLite accepts an `ASC`/`DESC` order qualifier on an inline `PRIMARY KEY` column
         // (`a INTEGER PRIMARY KEY DESC`).
         inline_primary_key_ordering: true,
