@@ -14,7 +14,10 @@
 //! `ILIKE`, `IS [NOT] DISTINCT FROM`, `NATURAL CROSS JOIN`, `TABLESAMPLE`, and
 //! `INTERSECT ALL`/`EXCEPT ALL`. Alternative DDL spellings such as `MODIFY COLUMN`,
 //! `CHANGE COLUMN`, `SET TBLPROPERTIES`, table-scoped `DROP INDEX`, and trailing
-//! index `USING` remain outside the grammar.
+//! index `USING` remain outside the grammar. On top of the PostgreSQL session
+//! statements it accepts the introspection forms the engine serves as
+//! `information_schema` plans: `DESCRIBE <table>` and the typed `SHOW TABLES` /
+//! `SHOW COLUMNS FROM <tbl>` listings ([`ShowSyntax::QUILTDB`]).
 
 use super::{
     AccessControlSyntax, AggregateCallSyntax, CallSyntax, CaretOperator, Casing,
@@ -367,6 +370,32 @@ impl TransactionSyntax {
     };
 }
 
+impl ShowSyntax {
+    /// Show/describe syntax enabled by this preset: the PostgreSQL base
+    /// (generic session `SET`/`RESET`/`SHOW <var>`) plus the three
+    /// introspection forms QuiltDB's engine serves as `information_schema`
+    /// plans — `DESCRIBE <table>` and the typed `SHOW TABLES` /
+    /// `SHOW COLUMNS FROM <tbl>` listings. The remaining typed-`SHOW`
+    /// family (`SHOW CREATE TABLE`, `SHOW FUNCTIONS`, admin forms) stays
+    /// off: the engine has no plans for them, so the grammar rejects them
+    /// rather than parsing statements that can only fail downstream.
+    pub const QUILTDB: Self = Self {
+        describe: true,
+        describe_summarize: false,
+        session_statements: true,
+        set_value_reserved_words: ShowSyntax::POSTGRES.set_value_reserved_words,
+        set_value_on_keyword: true,
+        set_value_null_keyword: false,
+        show_tables: true,
+        show_columns: true,
+        show_create_table: false,
+        show_functions: false,
+        show_routine_status: false,
+        show_verbose: false,
+        show_admin: false,
+    };
+}
+
 impl FeatureSet {
     /// The complete QuiltDB feature set.
     pub const QUILTDB: Self = Self {
@@ -417,7 +446,7 @@ impl FeatureSet {
         existence_guards: ExistenceGuards::POSTGRES,
         query_tail_syntax: QueryTailSyntax::POSTGRES,
         grouping_syntax: GroupingSyntax::POSTGRES,
-        show_syntax: ShowSyntax::POSTGRES,
+        show_syntax: ShowSyntax::QUILTDB,
         maintenance_syntax: MaintenanceSyntax::POSTGRES,
         target_spelling: TargetSpelling::Postgres,
     };
