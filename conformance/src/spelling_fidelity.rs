@@ -541,7 +541,9 @@ const CORPUS_PINS: &[(&str, usize, usize, usize, usize)] = &[
     // only lossy hunk was a decoded `U&"…"` -> `"…"` identifier round-trip exactly.
     // PostgreSQL's two `ABORT` statements now parse through the measured rollback-alias
     // production: the uppercase form is exact and the lowercase form is case-only.
-    ("pg_regress", 29673, 14824, 14175, 674),
+    // +3 accepted / +3 exact: the `COMMENT ON SCHEMA` / `COMMENT ON SEQUENCE` targets
+    // now parse and round-trip byte-identically.
+    ("pg_regress", 29676, 14827, 14175, 674),
     ("sqlglot_complex", 232, 137, 46, 49),
     ("sqlglot_identity", 514, 479, 2, 33),
     // +4 accepted / +4 exact: `parse-mysql-trigger-ddl` added the shared name-only
