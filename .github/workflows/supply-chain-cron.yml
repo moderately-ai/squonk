@@ -41,7 +41,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install stable toolchain
         # `cargo deny` shells out to `cargo metadata`, which needs a toolchain.
@@ -52,7 +52,7 @@ jobs:
       - name: Install cargo-deny
         # Prebuilt + pinned, the same version and convention as ci.yml's gate step
         # (deny.toml requires >= 0.18; this is well above that floor).
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2
         with:
           tool: cargo-deny@0.19.6
           fallback: none
