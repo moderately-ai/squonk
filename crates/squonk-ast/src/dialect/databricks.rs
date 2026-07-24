@@ -34,7 +34,8 @@
 //!   `const` assert below enforces it.
 //! - [`qualify`](SelectSyntax::qualify) — the `QUALIFY <predicate>` post-window filter
 //!   (Databricks Runtime 10.4 LTS and above). `QUALIFY` is reserved in every identifier
-//!   position (see [`DATABRICKS_QUALIFY_RESERVATION`]); the reservation is what lets
+//!   position (see [`DATABRICKS_RESERVED_COLUMN_NAME`], composed from the shared
+//!   [`QUALIFY_RESERVATION`]); the reservation is what lets
 //!   `FROM t QUALIFY …` read the clause rather than a table alias named `qualify`, matching
 //!   Spark's ANSI reserved-keyword parser. (Default Databricks does not enforce reserved
 //!   keywords, so `SELECT qualify FROM t` becomes a conservative reject here rather than an
@@ -68,9 +69,9 @@ use super::{
     AccessControlSyntax, AggregateCallSyntax, CallSyntax, CaretOperator, Casing,
     ColumnDefinitionSyntax, CommentSyntax, ConstraintSyntax, CreateTableClauseSyntax,
     DoubleAmpersand, ExistenceGuards, ExpressionSyntax, FeatureSet, GroupingSyntax,
-    IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, Keyword, KeywordOperators,
-    KeywordSet, MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax,
-    OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
+    IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, KeywordOperators, KeywordSet,
+    MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
+    ParameterSyntax, PipeOperator, PredicateSyntax, QUALIFY_RESERVATION, QueryTailSyntax,
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
     STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
@@ -88,31 +89,27 @@ pub const DATABRICKS_IDENTIFIER_QUOTES: &[IdentifierQuote] = &[
     IdentifierQuote::Symmetric('`'),
 ];
 
-/// `QUALIFY`, reserved by Databricks' ANSI-strict Spark parser (its reserved-keyword list
-/// rejects the word as an unquoted identifier). Unioned into all four per-position reject
-/// sets below, mirroring the Snowflake preset: the bare-alias reservation is load-bearing
-/// for the grammar — it is what lets `FROM t QUALIFY …` read the clause instead of a table
-/// alias named `qualify`, and the column/function/type reservations match the "reserved
-/// everywhere" status. `AS`-label position stays open (`SELECT 1 AS qualify`), keeping
-/// `reserved_as_label` empty like every ANSI-derived preset.
-pub const DATABRICKS_QUALIFY_RESERVATION: KeywordSet =
-    KeywordSet::from_keywords(&[Keyword::Qualify]);
+// Databricks reserves `QUALIFY` (the shared [`QUALIFY_RESERVATION`]) in all four identifier
+// positions — column/table name, function name, type name, and bare alias — via its
+// ANSI-strict Spark parser's reserved-keyword list. The bare-alias reservation is
+// load-bearing: it lets `FROM t QUALIFY …` read the clause instead of a table alias named
+// `qualify`. `AS`-label position stays open (`SELECT 1 AS qualify`), keeping
+// `reserved_as_label` empty like every ANSI-derived preset.
 
-/// The ANSI column-name reject set plus [`DATABRICKS_QUALIFY_RESERVATION`].
+/// The ANSI column-name reject set plus the shared [`QUALIFY_RESERVATION`].
 pub const DATABRICKS_RESERVED_COLUMN_NAME: KeywordSet =
-    RESERVED_COLUMN_NAME.union(DATABRICKS_QUALIFY_RESERVATION);
+    RESERVED_COLUMN_NAME.union(QUALIFY_RESERVATION);
 
-/// The ANSI function-name reject set plus [`DATABRICKS_QUALIFY_RESERVATION`].
+/// The ANSI function-name reject set plus the shared [`QUALIFY_RESERVATION`].
 pub const DATABRICKS_RESERVED_FUNCTION_NAME: KeywordSet =
-    RESERVED_FUNCTION_NAME.union(DATABRICKS_QUALIFY_RESERVATION);
+    RESERVED_FUNCTION_NAME.union(QUALIFY_RESERVATION);
 
-/// The ANSI type-name reject set plus [`DATABRICKS_QUALIFY_RESERVATION`].
-pub const DATABRICKS_RESERVED_TYPE_NAME: KeywordSet =
-    RESERVED_TYPE_NAME.union(DATABRICKS_QUALIFY_RESERVATION);
+/// The ANSI type-name reject set plus the shared [`QUALIFY_RESERVATION`].
+pub const DATABRICKS_RESERVED_TYPE_NAME: KeywordSet = RESERVED_TYPE_NAME.union(QUALIFY_RESERVATION);
 
-/// The ANSI bare-alias reject set plus [`DATABRICKS_QUALIFY_RESERVATION`].
+/// The ANSI bare-alias reject set plus the shared [`QUALIFY_RESERVATION`].
 pub const DATABRICKS_RESERVED_BARE_ALIAS: KeywordSet =
-    RESERVED_BARE_ALIAS.union(DATABRICKS_QUALIFY_RESERVATION);
+    RESERVED_BARE_ALIAS.union(QUALIFY_RESERVATION);
 
 impl SelectSyntax {
     /// Databricks SELECT surface: the ANSI baseline plus the documented Databricks
@@ -502,6 +499,7 @@ const _: () = assert!(FeatureSet::DATABRICKS.has_no_grammar_conflict());
 
 #[cfg(test)]
 mod tests {
+    use super::super::Keyword;
     use super::*;
 
     #[test]
@@ -559,8 +557,7 @@ mod tests {
         assert_eq!(dbx.reserved_bare_alias, DATABRICKS_RESERVED_BARE_ALIAS);
         // `QUALIFY` is the sole addition — dropping it recovers the ANSI sets verbatim.
         assert_eq!(
-            dbx.reserved_column_name
-                .difference(DATABRICKS_QUALIFY_RESERVATION),
+            dbx.reserved_column_name.difference(QUALIFY_RESERVATION),
             ansi.reserved_column_name,
         );
         assert!(dbx.reserved_column_name.contains(Keyword::Qualify));

@@ -91,9 +91,9 @@ use super::{
     AccessControlSyntax, AggregateCallSyntax, CallSyntax, CaretOperator, Casing,
     ColumnDefinitionSyntax, CommentSyntax, ConstraintSyntax, CreateTableClauseSyntax,
     DoubleAmpersand, ExistenceGuards, ExpressionSyntax, FeatureSet, GroupingSyntax,
-    IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, Keyword, KeywordOperators,
-    KeywordSet, MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax,
-    OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
+    IdentifierQuote, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, KeywordOperators, KeywordSet,
+    MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
+    PIVOT_RESERVATION, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
     RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
     STANDARD_BYTE_CLASSES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
@@ -108,10 +108,13 @@ use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_
 /// lexis MySQL uses under its default `ANSI_QUOTES`-off mode.
 pub const BIGQUERY_IDENTIFIER_QUOTES: &[IdentifierQuote] = &[IdentifierQuote::Symmetric('`')];
 
-/// `PIVOT` and `UNPIVOT`, GoogleSQL's row/column rotation operators. Neither is a
-/// BigQuery *reserved* keyword — both are absent from the GoogleSQL reserved-keyword
-/// list and stay usable as ordinary unquoted identifiers (GoogleSQL lexical-structure
-/// reference, "Reserved keywords":
+/// The ANSI `ColId` reject set plus the shared [`PIVOT_RESERVATION`] (`PIVOT`/`UNPIVOT`),
+/// confined to this one axis.
+///
+/// `PIVOT`/`UNPIVOT` are GoogleSQL's row/column rotation operators. Neither is a BigQuery
+/// *reserved* keyword — both are absent from the GoogleSQL reserved-keyword list and stay
+/// usable as ordinary unquoted identifiers (GoogleSQL lexical-structure reference,
+/// "Reserved keywords":
 /// <https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#reserved_keywords>).
 /// They are instead *position-reserved*: the `pivot_operator` / `unpivot_operator`
 /// grammar attaches directly to a `from_item`, so `FROM t PIVOT (…)` must read the
@@ -120,24 +123,16 @@ pub const BIGQUERY_IDENTIFIER_QUOTES: &[IdentifierQuote] = &[IdentifierQuote::Sy
 /// <https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#pivot_operator>).
 ///
 /// Modelling that reachability in this parser's shared-`ColId` alias grammar means
-/// reserving both on the `ColId` axis only — [`RESERVED_COLUMN_NAME`], the set a bare
-/// *and* `AS`-introduced table alias, a column name, and a table name all draw from —
-/// and *not* the function-name, type-name, or projection bare-label axes, which stay
-/// open (`pivot(1)`, `CAST(1 AS pivot)`, `SELECT 1 pivot` still parse), matching
-/// BigQuery's non-reserved status. This is the deliberate minimal deviation from the
-/// DuckDB `DUCKDB_PIVOT_RESERVATION`, which unions into all four positions because
-/// DuckDB's engine genuinely classes the words `reserved`. The unavoidable reachability
-/// cost: under this preset an unquoted `pivot`/`unpivot` is not admitted as a column/table
-/// name or a table alias — quote it (`` `pivot` ``) to use it as an identifier there.
-pub const BIGQUERY_PIVOT_RESERVATION: KeywordSet =
-    KeywordSet::from_keywords(&[Keyword::Pivot, Keyword::Unpivot]);
-
-/// The ANSI `ColId` reject set plus [`BIGQUERY_PIVOT_RESERVATION`]; see that const for
-/// why the reservation is confined to this one axis. The function-name, type-name, and
-/// bare-label reject sets take no delta over ANSI, so BigQuery keeps the shared consts
-/// for those three positions.
-pub const BIGQUERY_RESERVED_COLUMN_NAME: KeywordSet =
-    RESERVED_COLUMN_NAME.union(BIGQUERY_PIVOT_RESERVATION);
+/// reserving both on the `ColId` axis only — the set a bare *and* `AS`-introduced table
+/// alias, a column name, and a table name all draw from — and *not* the function-name,
+/// type-name, or projection bare-label axes, which stay open (`pivot(1)`,
+/// `CAST(1 AS pivot)`, `SELECT 1 pivot` still parse), matching BigQuery's non-reserved
+/// status. This is the deliberate minimal deviation from DuckDB, which reserves the same
+/// [`PIVOT_RESERVATION`] in all four positions because DuckDB's engine genuinely classes
+/// the words `reserved`. The unavoidable reachability cost: under this preset an unquoted
+/// `pivot`/`unpivot` is not admitted as a column/table name or a table alias — quote it
+/// (`` `pivot` ``) to use it as an identifier there.
+pub const BIGQUERY_RESERVED_COLUMN_NAME: KeywordSet = RESERVED_COLUMN_NAME.union(PIVOT_RESERVATION);
 
 impl StringLiteralSyntax {
     /// BigQuery string surface: the ANSI baseline plus `"…"` double-quoted string constants
@@ -301,7 +296,7 @@ impl FeatureSet {
         default_null_ordering: NullOrdering::NullsLast,
         // The one reserved-set delta over ANSI: `PIVOT`/`UNPIVOT` are position-reserved on
         // the `ColId` axis so a bare `FROM t PIVOT (…)` reaches the operator instead of
-        // aliasing `t` as `pivot` (see [`BIGQUERY_PIVOT_RESERVATION`]). Confined to
+        // aliasing `t` as `pivot` (see [`BIGQUERY_RESERVED_COLUMN_NAME`]). Confined to
         // `reserved_column_name`; the function/type/bare-label positions stay ANSI, matching
         // BigQuery's non-reserved status for the words. (BigQuery's `QUALIFY`/`EXCEPT`-in-star
         // reservations ride gates not modelled here.)
@@ -381,6 +376,7 @@ const _: () = assert!(FeatureSet::BIGQUERY.has_no_grammar_conflict());
 
 #[cfg(test)]
 mod tests {
+    use super::super::Keyword;
     use super::*;
 
     #[test]
@@ -422,8 +418,7 @@ mod tests {
         assert_eq!(bq.reserved_column_name, BIGQUERY_RESERVED_COLUMN_NAME);
         assert_ne!(bq.reserved_column_name, ansi.reserved_column_name);
         assert_eq!(
-            bq.reserved_column_name
-                .difference(BIGQUERY_PIVOT_RESERVATION),
+            bq.reserved_column_name.difference(PIVOT_RESERVATION),
             ansi.reserved_column_name,
         );
         assert!(bq.reserved_column_name.contains(Keyword::Pivot));

@@ -1208,7 +1208,7 @@ mod tests {
     // ---- the standard PIVOT table factor (BigQuery/Snowflake/Oracle) ----------------
     //
     // BigQuery/Snowflake position-reserve `PIVOT`/`UNPIVOT` on the `ColId` axis (their
-    // `*_RESERVED_COLUMN_NAME` sets — the `DUCKDB_PIVOT_RESERVATION` mechanism, minus the
+    // `*_RESERVED_COLUMN_NAME` sets — the shared `PIVOT_RESERVATION` mechanism, minus the
     // function/type/projection axes those engines keep open), so a bare `FROM t PIVOT (…)`
     // reaches the operator directly — see `bigquery_pivot_reachable_on_a_bare_factor` below.
     // The explicit-alias form (`FROM t AS s PIVOT (…)`) stays reachable too; the tests here

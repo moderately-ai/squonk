@@ -190,4 +190,80 @@ mod tests {
                 .unwrap_or_else(|error| panic!("failed to reparse {rendered:?}: {error}"));
         }
     }
+
+    /// Out-of-surface constructs reject at parse *and the error names the construct* — not
+    /// a token the user did not write. Each pair is (sql, a substring the message must
+    /// contain). These pin the reject-quality contract: a regression that reverts a fix
+    /// (the keyword swallowed as an alias, the STORAGE clause failing at the column's own
+    /// type, the bare "expected NULL") fails here rather than silently degrading the message.
+    #[test]
+    fn out_of_surface_rejects_name_the_construct() {
+        for (sql, needle) in [
+            // Per-column STORAGE routes to the constraint loop and names STORAGE (the
+            // typed-vs-liberal type parse no longer fails at the column's own `INT`).
+            (
+                "CREATE TABLE t (id INT STORAGE PLAIN)",
+                "expected a column constraint, found STORAGE",
+            ),
+            // QUALIFY / PIVOT / UNPIVOT are reserved as identifiers, so the trailing keyword
+            // itself is the reported token instead of being swallowed as a bare alias.
+            (
+                "SELECT id, ROW_NUMBER() OVER (ORDER BY v) AS rn FROM l QUALIFY rn = 1",
+                "found QUALIFY",
+            ),
+            (
+                "SELECT * FROM l PIVOT (SUM(v) FOR id IN (1, 2))",
+                "found PIVOT",
+            ),
+            (
+                "SELECT * FROM l UNPIVOT (val FOR col IN (v))",
+                "found UNPIVOT",
+            ),
+            // IS [NOT] DISTINCT FROM names the construct rather than the bare "expected NULL".
+            (
+                "SELECT id FROM l WHERE v IS DISTINCT FROM 10",
+                "does not support `IS [NOT] DISTINCT FROM`",
+            ),
+            (
+                "SELECT id FROM l WHERE v IS NOT DISTINCT FROM 10",
+                "does not support `IS [NOT] DISTINCT FROM`",
+            ),
+            // The unmodelled ALTER TABLE DROP INDEX/KEY action names the keyword, not the
+            // index name it used to swallow the keyword into.
+            (
+                "ALTER TABLE t DROP INDEX ix",
+                "expected a column or constraint to drop, found INDEX",
+            ),
+            (
+                "ALTER TABLE t DROP KEY k",
+                "expected a column or constraint to drop, found KEY",
+            ),
+        ] {
+            let error = parse_with(sql, ParseConfig::new(QuiltDb))
+                .expect_err(&format!("{sql:?} must reject"));
+            let rendered = error.to_string();
+            assert!(
+                rendered.contains(needle),
+                "{sql:?} reject should name the construct: expected substring {needle:?}, got {rendered:?}",
+            );
+        }
+    }
+
+    /// A column literally named `index`/`key` (dropped bare, or with only a drop-behavior
+    /// word following) still routes to the column-drop path — the DROP-INDEX guard's
+    /// discriminator does not over-fire on a terminator or a `CASCADE`/`RESTRICT` behavior.
+    /// Paired negative control for the DROP-INDEX reject above.
+    #[test]
+    fn drop_bare_column_named_index_still_parses() {
+        for sql in [
+            "ALTER TABLE t DROP index",
+            "ALTER TABLE t DROP COLUMN index",
+            "ALTER TABLE t DROP key",
+            "ALTER TABLE t DROP index CASCADE",
+            "ALTER TABLE t DROP index RESTRICT",
+        ] {
+            parse_with(sql, ParseConfig::new(QuiltDb))
+                .unwrap_or_else(|error| panic!("{sql:?} should parse as a column drop: {error}"));
+        }
+    }
 }

@@ -6997,6 +6997,7 @@ mod tests {
             alter_nested_column_paths: _,
             alter_column_set_data_type: _,
             alter_table_multiple_actions: _,
+            alter_table_drop_index: _,
         } = IndexAlterSyntax::POSTGRES;
         let ExistenceGuards {
             if_exists: _,

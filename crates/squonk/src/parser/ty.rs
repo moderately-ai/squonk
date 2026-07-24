@@ -63,6 +63,22 @@ impl<'a, D: Dialect> Parser<'a, D> {
             if !self.peek_is_liberal_type_word()? {
                 return Ok(typed);
             }
+            // A trailing type-word can extend a typed head into a multi-word liberal name
+            // (`LONG INTEGER`), but only when the head itself can start a liberal run. When
+            // the typed head is a reserved type spelling — e.g. `INT` under a postgres-derived
+            // `reserved_type_name`, which is *not* a liberal type-word — no multi-word liberal
+            // reading is possible, so the typed result stands and the trailing word belongs to
+            // the enclosing production (a column attribute like `STORAGE`, a cast terminator,
+            // …). Re-checking the head after the rewind keeps dialects whose head IS a liberal
+            // word (SQLite's `INT`) on the reparse path, so their genuine multi-word and
+            // bad-argument liberal errors still surface rather than being masked.
+            let after_typed = self.checkpoint();
+            self.rewind(checkpoint);
+            if self.peek_is_liberal_type_word()? {
+                return self.parse_liberal_type_name(start);
+            }
+            self.rewind(after_typed);
+            return Ok(typed);
         }
         self.rewind(checkpoint);
         self.parse_liberal_type_name(start)

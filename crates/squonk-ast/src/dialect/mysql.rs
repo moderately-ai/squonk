@@ -555,6 +555,9 @@ impl IndexAlterSyntax {
         // MySQL's `DROP INDEX <name> ON <table> [ALGORITHM …] [LOCK …]` — mandatory ON,
         // online-DDL execution hints.
         index_drop_on_table: true,
+        // MySQL supports the syntax, but squonk does not model its parse yet, so the guard
+        // still rejects it (naming the keyword) until the action is implemented.
+        alter_table_drop_index: false,
         index_concurrently: false,
         index_using_method: false,
         partial_index: false,
