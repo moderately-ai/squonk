@@ -807,6 +807,7 @@ impl IndexAlterSyntax {
         // the shared bare-name `DROP INDEX <name> [, …]`. LENIENT keeps the more permissive
         // name-list drop and forgoes the MySQL `DROP INDEX … ON <table>` form.
         index_drop_on_table: false,
+        alter_table_drop_index: false,
         index_concurrently: true,
         index_using_method: true,
         partial_index: true,

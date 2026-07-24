@@ -4970,6 +4970,33 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 meta,
             });
         }
+        // MySQL's `ALTER TABLE … DROP {INDEX|KEY} <name>` — gated by
+        // `alter_table_drop_index`, which no preset models the parse of yet, so this reject
+        // is universal for now. Detect the two-token shape — the `INDEX`/`KEY` keyword
+        // followed by an index NAME — and name the keyword; without this guard the keyword is
+        // swallowed as the dropped column's name and the reject surfaces at the index name
+        // instead. The disambiguation from a column literally named `index`/`key`: after the
+        // column form (`DROP index [CASCADE|RESTRICT]`) only a drop-behavior word or a
+        // terminator (`;`, `,`, end of input) can follow, whereas the index form is followed
+        // by a name. An index name may itself be a non-reserved keyword (e.g. `a`, which is a
+        // `Keyword` token, not a `Word`), so a name is any word/quoted/keyword token that is
+        // not the `CASCADE`/`RESTRICT` drop-behavior. A bare `DROP index` (nothing following)
+        // still routes to the column path below; when a dialect implements the action (flag
+        // on), it handles it ahead of this guard.
+        if !self.features().index_alter_syntax.alter_table_drop_index
+            && (self.peek_is_contextual_keyword("INDEX")?
+                || self.peek_is_contextual_keyword("KEY")?)
+            && self.peek_nth(1)?.is_some_and(|token| {
+                matches!(
+                    token.kind,
+                    TokenKind::Word | TokenKind::QuotedIdent | TokenKind::Keyword(_)
+                )
+            })
+            && !self.peek_nth_is_contextual_keyword(1, "CASCADE")?
+            && !self.peek_nth_is_contextual_keyword(1, "RESTRICT")?
+        {
+            return Err(self.unexpected("a column or constraint to drop"));
+        }
         let column_keyword = self.eat_contextual_keyword("COLUMN")?;
         let if_exists = existence_guards && self.parse_schema_change_if_exists()?;
         let name = self.parse_alter_column_target(

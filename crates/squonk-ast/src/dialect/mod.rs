@@ -86,8 +86,9 @@ mod snowflake;
 mod sqlite;
 
 pub use ansi::{
-    ANSI, RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME,
-    RESERVED_SET_VALUE_WORDS, RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES,
+    ANSI, MATCH_RECOGNIZE_RESERVATION, PIVOT_RESERVATION, QUALIFY_RESERVATION, RESERVED_BARE_ALIAS,
+    RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS, RESERVED_TYPE_NAME,
+    STANDARD_IDENTIFIER_QUOTES,
 };
 #[cfg(feature = "bigquery")]
 pub use bigquery::{BIGQUERY, BIGQUERY_IDENTIFIER_QUOTES};
@@ -95,9 +96,9 @@ pub use bigquery::{BIGQUERY, BIGQUERY_IDENTIFIER_QUOTES};
 pub use clickhouse::{CLICKHOUSE, CLICKHOUSE_IDENTIFIER_QUOTES};
 #[cfg(feature = "databricks")]
 pub use databricks::{
-    DATABRICKS, DATABRICKS_IDENTIFIER_QUOTES, DATABRICKS_QUALIFY_RESERVATION,
-    DATABRICKS_RESERVED_BARE_ALIAS, DATABRICKS_RESERVED_COLUMN_NAME,
-    DATABRICKS_RESERVED_FUNCTION_NAME, DATABRICKS_RESERVED_TYPE_NAME,
+    DATABRICKS, DATABRICKS_IDENTIFIER_QUOTES, DATABRICKS_RESERVED_BARE_ALIAS,
+    DATABRICKS_RESERVED_COLUMN_NAME, DATABRICKS_RESERVED_FUNCTION_NAME,
+    DATABRICKS_RESERVED_TYPE_NAME,
 };
 #[cfg(feature = "duckdb")]
 pub use duckdb::{DUCKDB, DUCKDB_BINDING_POWERS};
@@ -125,8 +126,8 @@ pub use quiltdb::QUILTDB;
 pub use redshift::REDSHIFT;
 #[cfg(feature = "snowflake")]
 pub use snowflake::{
-    SNOWFLAKE, SNOWFLAKE_QUALIFY_RESERVATION, SNOWFLAKE_RESERVED_BARE_ALIAS,
-    SNOWFLAKE_RESERVED_COLUMN_NAME, SNOWFLAKE_RESERVED_FUNCTION_NAME, SNOWFLAKE_RESERVED_TYPE_NAME,
+    SNOWFLAKE, SNOWFLAKE_RESERVED_BARE_ALIAS, SNOWFLAKE_RESERVED_COLUMN_NAME,
+    SNOWFLAKE_RESERVED_FUNCTION_NAME, SNOWFLAKE_RESERVED_TYPE_NAME,
     SNOWFLAKE_TABLE_OPERATOR_RESERVATION,
 };
 #[cfg(feature = "sqlite")]
@@ -2348,6 +2349,14 @@ pub struct IndexAlterSyntax {
     /// flag off a `DROP INDEX i ON t` leaves `ON` unconsumed and surfaces as a clean parse
     /// error.
     pub index_drop_on_table: bool,
+    /// Accept the MySQL `ALTER TABLE … DROP {INDEX | KEY} <name>` action (an index drop
+    /// nested inside `ALTER TABLE`, distinct from the standalone `DROP INDEX` governed by
+    /// [`index_drop_on_table`](Self::index_drop_on_table)). No preset models the *parse* of
+    /// this action yet, so it is `false` everywhere; with the flag off, a `DROP INDEX`/`DROP
+    /// KEY` followed by a name is a clean parse error naming the keyword rather than
+    /// swallowing it as the dropped column's name. A dialect that adds the parse flips this
+    /// to `true` and handles the action.
+    pub alter_table_drop_index: bool,
     /// Accept `CREATE INDEX CONCURRENTLY` (PostgreSQL builds the index without an
     /// exclusive table lock). Not ANSI.
     pub index_concurrently: bool,

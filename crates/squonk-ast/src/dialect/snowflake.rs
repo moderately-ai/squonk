@@ -24,7 +24,8 @@
 //! - [`qualify`](SelectSyntax::qualify) — the `QUALIFY <predicate>` post-window filter.
 //!   Snowflake ships `QUALIFY` and lists it in its reserved-keyword set, so the clause is
 //!   admitted *and* `QUALIFY` is reserved in every identifier position (see
-//!   [`SNOWFLAKE_QUALIFY_RESERVATION`]); the reservation is what lets `FROM t QUALIFY …`
+//!   [`SNOWFLAKE_RESERVED_COLUMN_NAME`], composed from the shared [`QUALIFY_RESERVATION`]);
+//!   the reservation is what lets `FROM t QUALIFY …`
 //!   read the clause rather than a table alias named `qualify`.
 //! - [`group_by_all`](GroupingSyntax::group_by_all) — the `GROUP BY ALL` clause mode.
 //!   Snowflake ships `GROUP BY ALL`; it does **not** ship `ORDER BY ALL`, so
@@ -55,9 +56,10 @@ use super::{
     AccessControlSyntax, AggregateCallSyntax, CallSyntax, CaretOperator, Casing,
     ColumnDefinitionSyntax, CommentSyntax, ConstraintSyntax, CreateTableClauseSyntax,
     DoubleAmpersand, ExistenceGuards, ExpressionSyntax, FeatureSet, GroupingSyntax,
-    IdentifierSyntax, IndexAlterSyntax, JoinSyntax, Keyword, KeywordOperators, KeywordSet,
-    MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
-    ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax, RESERVED_BARE_ALIAS,
+    IdentifierSyntax, IndexAlterSyntax, JoinSyntax, KeywordOperators, KeywordSet,
+    MATCH_RECOGNIZE_RESERVATION, MaintenanceSyntax, MutationSyntax, NullOrdering,
+    NumericLiteralSyntax, OperatorSyntax, PIVOT_RESERVATION, ParameterSyntax, PipeOperator,
+    PredicateSyntax, QUALIFY_RESERVATION, QueryTailSyntax, RESERVED_BARE_ALIAS,
     RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_BYTE_CLASSES,
     STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
     StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
@@ -65,20 +67,17 @@ use super::{
 };
 use crate::precedence::{STANDARD_BINDING_POWERS, STANDARD_SET_OPERATION_BINDING_POWERS};
 
-/// `QUALIFY`, reserved by Snowflake (its documented reserved-keyword list rejects the word
-/// as any unquoted identifier). Unioned into all four per-position reject sets below,
-/// mirroring the engine-probed DuckDB profile: the bare-alias reservation is load-bearing
-/// for the grammar — it is what lets `FROM t QUALIFY …` read the clause instead of a table
-/// alias named `qualify`, and the column/function/type reservations match Snowflake's
-/// "reserved everywhere" status. `AS`-label position stays open (`SELECT 1 AS qualify`),
-/// keeping `reserved_as_label` empty like every ANSI-derived preset.
-pub const SNOWFLAKE_QUALIFY_RESERVATION: KeywordSet =
-    KeywordSet::from_keywords(&[Keyword::Qualify]);
+// Snowflake reserves `QUALIFY` (the shared [`QUALIFY_RESERVATION`]) in all four identifier
+// positions — column/table name, function name, type name, and bare alias — via its
+// documented reserved-keyword list, mirroring the engine-probed DuckDB profile. The
+// bare-alias reservation is load-bearing: it lets `FROM t QUALIFY …` read the clause
+// instead of a table alias named `qualify`. `AS`-label position stays open
+// (`SELECT 1 AS qualify`), keeping `reserved_as_label` empty like every ANSI-derived preset.
 
-/// `PIVOT`, `UNPIVOT`, and `MATCH_RECOGNIZE` — Snowflake's FROM-clause table operators.
-/// Unlike [`SNOWFLAKE_QUALIFY_RESERVATION`], none of these is a Snowflake *reserved*
-/// keyword: all three are absent from Snowflake's reserved-keyword list and stay usable
-/// as ordinary unquoted identifiers
+/// `PIVOT`, `UNPIVOT`, and `MATCH_RECOGNIZE` — Snowflake's FROM-clause table operators,
+/// composed from the shared [`PIVOT_RESERVATION`] and [`MATCH_RECOGNIZE_RESERVATION`].
+/// Unlike `QUALIFY`, none of these is a Snowflake *reserved* keyword: all three are absent
+/// from Snowflake's reserved-keyword list and stay usable as ordinary unquoted identifiers
 /// (<https://docs.snowflake.com/en/sql-reference/reserved-keywords>). Each is instead
 /// *position-reserved* — recognized as an operator immediately after a table reference —
 /// so a bare factor must not swallow the keyword as a correlation alias:
@@ -89,38 +88,37 @@ pub const SNOWFLAKE_QUALIFY_RESERVATION: KeywordSet =
 /// (<https://docs.snowflake.com/en/sql-reference/constructs/match_recognize>) all attach
 /// the operator directly to the `FROM` object.
 ///
-/// As with BigQuery's `BIGQUERY_PIVOT_RESERVATION`, the
-/// reservation is confined to the `ColId` axis ([`SNOWFLAKE_RESERVED_COLUMN_NAME`]) — the
-/// load-bearing set for bare-alias reachability — and deliberately *not* the function,
-/// type, or projection bare-label axes, which Snowflake keeps open (`pivot(1)`,
-/// `CAST(1 AS pivot)`, `SELECT 1 pivot` still parse). This is the minimal deviation from
-/// the DuckDB `DUCKDB_PIVOT_RESERVATION` (all
-/// four positions, because DuckDB's engine genuinely reserves the words); QUALIFY, a real
-/// Snowflake reserved keyword, still rides all four via
-/// [`SNOWFLAKE_QUALIFY_RESERVATION`]. `MATCH_RECOGNIZE` rides Snowflake alone — BigQuery
-/// has no such operator. The reachability cost mirrors BigQuery's: under this preset an
-/// unquoted `pivot`/`unpivot`/`match_recognize` is not admitted as a column/table name or
-/// table alias — quote it (`"pivot"`) to use it as an identifier there.
+/// As on BigQuery's `ColId`-only pivot reservation, the reservation is confined to
+/// the `ColId` axis ([`SNOWFLAKE_RESERVED_COLUMN_NAME`]) — the load-bearing set for
+/// bare-alias reachability — and deliberately *not* the function, type, or projection
+/// bare-label axes, which Snowflake keeps open (`pivot(1)`, `CAST(1 AS pivot)`,
+/// `SELECT 1 pivot` still parse). This is the minimal deviation from DuckDB, which
+/// reserves the same [`PIVOT_RESERVATION`] in all four positions because its engine
+/// genuinely classes the words `reserved`; QUALIFY, a real Snowflake reserved keyword,
+/// still rides all four via the shared [`QUALIFY_RESERVATION`]. `MATCH_RECOGNIZE` rides
+/// Snowflake alone — BigQuery has no such operator. The reachability cost mirrors
+/// BigQuery's: under this preset an unquoted `pivot`/`unpivot`/`match_recognize` is not
+/// admitted as a column/table name or table alias — quote it (`"pivot"`) to use it as an
+/// identifier there.
 pub const SNOWFLAKE_TABLE_OPERATOR_RESERVATION: KeywordSet =
-    KeywordSet::from_keywords(&[Keyword::Pivot, Keyword::Unpivot, Keyword::MatchRecognize]);
+    PIVOT_RESERVATION.union(MATCH_RECOGNIZE_RESERVATION);
 
-/// The ANSI column-name reject set plus [`SNOWFLAKE_QUALIFY_RESERVATION`] and the
+/// The ANSI column-name reject set plus the shared [`QUALIFY_RESERVATION`] and the
 /// [`SNOWFLAKE_TABLE_OPERATOR_RESERVATION`] `ColId`-axis reservation.
 pub const SNOWFLAKE_RESERVED_COLUMN_NAME: KeywordSet = RESERVED_COLUMN_NAME
-    .union(SNOWFLAKE_QUALIFY_RESERVATION)
+    .union(QUALIFY_RESERVATION)
     .union(SNOWFLAKE_TABLE_OPERATOR_RESERVATION);
 
-/// The ANSI function-name reject set plus [`SNOWFLAKE_QUALIFY_RESERVATION`].
+/// The ANSI function-name reject set plus the shared [`QUALIFY_RESERVATION`].
 pub const SNOWFLAKE_RESERVED_FUNCTION_NAME: KeywordSet =
-    RESERVED_FUNCTION_NAME.union(SNOWFLAKE_QUALIFY_RESERVATION);
+    RESERVED_FUNCTION_NAME.union(QUALIFY_RESERVATION);
 
-/// The ANSI type-name reject set plus [`SNOWFLAKE_QUALIFY_RESERVATION`].
-pub const SNOWFLAKE_RESERVED_TYPE_NAME: KeywordSet =
-    RESERVED_TYPE_NAME.union(SNOWFLAKE_QUALIFY_RESERVATION);
+/// The ANSI type-name reject set plus the shared [`QUALIFY_RESERVATION`].
+pub const SNOWFLAKE_RESERVED_TYPE_NAME: KeywordSet = RESERVED_TYPE_NAME.union(QUALIFY_RESERVATION);
 
-/// The ANSI bare-alias reject set plus [`SNOWFLAKE_QUALIFY_RESERVATION`].
+/// The ANSI bare-alias reject set plus the shared [`QUALIFY_RESERVATION`].
 pub const SNOWFLAKE_RESERVED_BARE_ALIAS: KeywordSet =
-    RESERVED_BARE_ALIAS.union(SNOWFLAKE_QUALIFY_RESERVATION);
+    RESERVED_BARE_ALIAS.union(QUALIFY_RESERVATION);
 
 impl SelectSyntax {
     /// Snowflake SELECT surface: the ANSI baseline plus the documented Snowflake
@@ -449,6 +447,7 @@ const _: () = assert!(FeatureSet::SNOWFLAKE.has_no_grammar_conflict());
 
 #[cfg(test)]
 mod tests {
+    use super::super::Keyword;
     use super::*;
 
     #[test]
@@ -482,7 +481,7 @@ mod tests {
         // Dropping QUALIFY *and* the table operators recovers the ANSI column set verbatim.
         assert_eq!(
             sf.reserved_column_name
-                .difference(SNOWFLAKE_QUALIFY_RESERVATION)
+                .difference(QUALIFY_RESERVATION)
                 .difference(SNOWFLAKE_TABLE_OPERATOR_RESERVATION),
             ansi.reserved_column_name,
         );
@@ -501,15 +500,15 @@ mod tests {
         // operator leaks in.
         assert_eq!(
             sf.reserved_function_name,
-            RESERVED_FUNCTION_NAME.union(SNOWFLAKE_QUALIFY_RESERVATION),
+            RESERVED_FUNCTION_NAME.union(QUALIFY_RESERVATION),
         );
         assert_eq!(
             sf.reserved_type_name,
-            RESERVED_TYPE_NAME.union(SNOWFLAKE_QUALIFY_RESERVATION),
+            RESERVED_TYPE_NAME.union(QUALIFY_RESERVATION),
         );
         assert_eq!(
             sf.reserved_bare_alias,
-            RESERVED_BARE_ALIAS.union(SNOWFLAKE_QUALIFY_RESERVATION),
+            RESERVED_BARE_ALIAS.union(QUALIFY_RESERVATION),
         );
         // `AS`-label position stays open (`SELECT 1 AS qualify`).
         assert_eq!(sf.reserved_as_label, KeywordSet::EMPTY);
