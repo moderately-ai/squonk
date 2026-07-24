@@ -16,40 +16,27 @@ use super::{
     DUCKDB_BYTE_CLASSES, DoubleAmpersand, ExistenceGuards, ExpressionSyntax, FeatureSet,
     GroupingSyntax, IdentifierSyntax, IndexAlterSyntax, JoinSyntax, Keyword, KeywordOperators,
     KeywordSet, MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax,
-    OperatorSyntax, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
-    RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS,
-    RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax,
-    ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax, TableExpressionSyntax,
-    TableFactorSyntax, TargetSpelling, TransactionSyntax, TypeNameSyntax, UtilitySyntax,
-    ViewSequenceClauseSyntax,
+    OperatorSyntax, PIVOT_RESERVATION, ParameterSyntax, PipeOperator, PredicateSyntax,
+    QUALIFY_RESERVATION, QueryTailSyntax, RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME,
+    RESERVED_FUNCTION_NAME, RESERVED_SET_VALUE_WORDS, RESERVED_TYPE_NAME,
+    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
+    StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
+    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::{
     Assoc, BindingPower, BindingPowerTable, IS_PREDICATE_BELOW_COMPARISON,
     STANDARD_SET_OPERATION_BINDING_POWERS,
 };
 
-/// `QUALIFY` (`duckdb_keywords()` class `reserved`, DuckDB 1.5.4), the fully-reserved
-/// half of DuckDB's reservation delta over the shared PostgreSQL-derived model.
-/// Unioned into all four per-position reject sets below because DuckDB's `reserved`
-/// class rejects the word as a column/table name, function name, type name, *and*
-/// bare alias (probed: `SELECT qualify FROM t`, `SELECT * FROM qualify`,
-/// `SELECT qualify(1)`, `CAST(1 AS qualify)`, `SELECT 1 qualify`, and
-/// `FROM t qualify` all syntax-error; `SELECT 1 AS qualify` labels). The same
-/// hand-composition pattern the SQLite/MySQL presets use for their reservation deltas.
-pub const DUCKDB_QUALIFY_RESERVATION: KeywordSet = KeywordSet::from_keywords(&[Keyword::Qualify]);
-
-/// `PIVOT` and `UNPIVOT` (`duckdb_keywords()` class `reserved`, DuckDB 1.5.4), the
-/// row/column rotation operators. Like `QUALIFY`'s `reserved` class (and unlike the
-/// `type_function` join words), both are rejected in all four identifier positions —
-/// column/table name, function name, type name, and bare alias — while `AS pivot` still
-/// labels (probed: `SELECT pivot FROM t`, `SELECT * FROM pivot`, `SELECT pivot(1)`,
-/// `CAST(1 AS pivot)`, `SELECT 1 pivot` all syntax-error; `SELECT 1 AS pivot` parses —
-/// identically for `unpivot`). The bare-alias reservation is load-bearing for the
-/// grammar: it is what lets `FROM t PIVOT (…)` read the operator instead of a table
-/// alias named `pivot`. Unioned into all four reject sets below, exactly like
-/// [`DUCKDB_QUALIFY_RESERVATION`].
-pub const DUCKDB_PIVOT_RESERVATION: KeywordSet =
-    KeywordSet::from_keywords(&[Keyword::Pivot, Keyword::Unpivot]);
+// DuckDB reserves `QUALIFY` and the `PIVOT`/`UNPIVOT` operators (`duckdb_keywords()`
+// class `reserved`, DuckDB 1.5.4) in all five identifier positions — column/table name,
+// function name, type name, generic `SET` value, and bare alias (probed: `SELECT qualify
+// FROM t`, `SELECT * FROM qualify`, `SELECT qualify(1)`, `CAST(1 AS qualify)`,
+// `SELECT 1 qualify`, `FROM t qualify` all syntax-error; `SELECT 1 AS qualify` labels;
+// identically for `pivot`/`unpivot`). The bare-alias reservation is load-bearing: it is
+// what lets `FROM t PIVOT (…)` read the operator instead of a table alias named `pivot`.
+// The keyword lists are the shared agnostic `QUALIFY_RESERVATION` / `PIVOT_RESERVATION`;
+// DuckDB composes them per position below.
 
 /// The nonstandard-join keywords, `ASOF` and `POSITIONAL` (`duckdb_keywords()` class
 /// `type_function`, like `CROSS`, DuckDB 1.5.4). Unlike `QUALIFY`'s `reserved` class,
@@ -110,8 +97,8 @@ pub const DUCKDB_UNRESERVED_BARE_ALIAS_RESERVATION: KeywordSet =
 pub const DUCKDB_RESERVED_COLUMN_NAME: KeywordSet = RESERVED_COLUMN_NAME
     .difference(DUCKDB_UNRESERVED_CARVEOUT)
     .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
-    .union(DUCKDB_QUALIFY_RESERVATION)
-    .union(DUCKDB_PIVOT_RESERVATION)
+    .union(QUALIFY_RESERVATION)
+    .union(PIVOT_RESERVATION)
     .union(DUCKDB_NONSTANDARD_JOIN_RESERVATION)
     .union(DUCKDB_SEMI_ANTI_JOIN_RESERVATION);
 
@@ -124,8 +111,8 @@ pub const DUCKDB_RESERVED_COLUMN_NAME: KeywordSet = RESERVED_COLUMN_NAME
 pub const DUCKDB_RESERVED_FUNCTION_NAME: KeywordSet = RESERVED_FUNCTION_NAME
     .difference(DUCKDB_UNRESERVED_CARVEOUT)
     .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
-    .union(DUCKDB_QUALIFY_RESERVATION)
-    .union(DUCKDB_PIVOT_RESERVATION)
+    .union(QUALIFY_RESERVATION)
+    .union(PIVOT_RESERVATION)
     .union(DUCKDB_SEMI_ANTI_JOIN_RESERVATION);
 
 /// DuckDB type-name reject set: the shared model plus `QUALIFY` and `PIVOT`/`UNPIVOT`
@@ -135,16 +122,16 @@ pub const DUCKDB_RESERVED_FUNCTION_NAME: KeywordSet = RESERVED_FUNCTION_NAME
 pub const DUCKDB_RESERVED_TYPE_NAME: KeywordSet = RESERVED_TYPE_NAME
     .difference(DUCKDB_UNRESERVED_CARVEOUT)
     .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
-    .union(DUCKDB_QUALIFY_RESERVATION)
-    .union(DUCKDB_PIVOT_RESERVATION);
+    .union(QUALIFY_RESERVATION)
+    .union(PIVOT_RESERVATION);
 
 /// Fully reserved words rejected in a DuckDB generic `SET` value. The PostgreSQL-derived
 /// base is extended by DuckDB's own `reserved` keyword additions.
 pub const DUCKDB_RESERVED_SET_VALUE_WORDS: KeywordSet = RESERVED_SET_VALUE_WORDS
     .difference(DUCKDB_UNRESERVED_CARVEOUT)
     .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
-    .union(DUCKDB_QUALIFY_RESERVATION)
-    .union(DUCKDB_PIVOT_RESERVATION);
+    .union(QUALIFY_RESERVATION)
+    .union(PIVOT_RESERVATION);
 
 /// DuckDB bare-label reject set: the shared model plus `QUALIFY`, so a projection or
 /// FROM-relation bare alias cannot swallow the clause keyword (`SELECT a FROM t
@@ -156,8 +143,8 @@ pub const DUCKDB_RESERVED_SET_VALUE_WORDS: KeywordSet = RESERVED_SET_VALUE_WORDS
 pub const DUCKDB_RESERVED_BARE_ALIAS: KeywordSet = RESERVED_BARE_ALIAS
     .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
     .union(DUCKDB_UNRESERVED_BARE_ALIAS_RESERVATION)
-    .union(DUCKDB_QUALIFY_RESERVATION)
-    .union(DUCKDB_PIVOT_RESERVATION)
+    .union(QUALIFY_RESERVATION)
+    .union(PIVOT_RESERVATION)
     .union(DUCKDB_NONSTANDARD_JOIN_RESERVATION)
     .union(DUCKDB_SEMI_ANTI_JOIN_RESERVATION);
 
@@ -1169,6 +1156,7 @@ impl FeatureSet {
             alter_column_add_identity: false,
             drop_behavior: true,
             index_drop_on_table: false,
+            alter_table_drop_index: false,
             index_concurrently: true,
             index_using_method: true,
             partial_index: true,
@@ -1651,8 +1639,8 @@ mod tests {
             RESERVED_FUNCTION_NAME
                 .difference(DUCKDB_UNRESERVED_CARVEOUT)
                 .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
-                .union(DUCKDB_QUALIFY_RESERVATION)
-                .union(DUCKDB_PIVOT_RESERVATION)
+                .union(QUALIFY_RESERVATION)
+                .union(PIVOT_RESERVATION)
                 .union(DUCKDB_SEMI_ANTI_JOIN_RESERVATION)
         );
         assert_eq!(
@@ -1660,8 +1648,8 @@ mod tests {
             RESERVED_TYPE_NAME
                 .difference(DUCKDB_UNRESERVED_CARVEOUT)
                 .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
-                .union(DUCKDB_QUALIFY_RESERVATION)
-                .union(DUCKDB_PIVOT_RESERVATION)
+                .union(QUALIFY_RESERVATION)
+                .union(PIVOT_RESERVATION)
         );
     }
 
@@ -1747,8 +1735,8 @@ mod tests {
             RESERVED_COLUMN_NAME
                 .difference(DUCKDB_UNRESERVED_CARVEOUT)
                 .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
-                .union(DUCKDB_QUALIFY_RESERVATION)
-                .union(DUCKDB_PIVOT_RESERVATION)
+                .union(QUALIFY_RESERVATION)
+                .union(PIVOT_RESERVATION)
                 .union(DUCKDB_NONSTANDARD_JOIN_RESERVATION)
                 .union(DUCKDB_SEMI_ANTI_JOIN_RESERVATION)
         );
@@ -1757,8 +1745,8 @@ mod tests {
             RESERVED_BARE_ALIAS
                 .difference(DUCKDB_ORDINARY_SPECIAL_VALUE_NAMES)
                 .union(DUCKDB_UNRESERVED_BARE_ALIAS_RESERVATION)
-                .union(DUCKDB_QUALIFY_RESERVATION)
-                .union(DUCKDB_PIVOT_RESERVATION)
+                .union(QUALIFY_RESERVATION)
+                .union(PIVOT_RESERVATION)
                 .union(DUCKDB_NONSTANDARD_JOIN_RESERVATION)
                 .union(DUCKDB_SEMI_ANTI_JOIN_RESERVATION)
         );

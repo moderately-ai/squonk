@@ -791,6 +791,7 @@ impl IndexAlterSyntax {
         drop_behavior: false,
         // SQLite's `DROP INDEX` is the shared name-list drop, not the MySQL `ON <table>` form.
         index_drop_on_table: false,
+        alter_table_drop_index: false,
         index_concurrently: false,
         index_using_method: false,
         partial_index: true,

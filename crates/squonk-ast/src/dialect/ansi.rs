@@ -150,6 +150,32 @@ pub const RESERVED_TYPE_NAME: KeywordSet =
 /// `SELECT a filter` rejecting while `SELECT a select` accepts.
 pub const RESERVED_BARE_ALIAS: KeywordSet = POSTGRES_AS_LABEL_KEYWORDS;
 
+// --- Shared construct-keyword reservation deltas -----------------------------
+//
+// Role-defined reservation facts, composed by the non-ANSI presets that admit (or
+// deliberately reject) these constructs, and unused by the ANSI baseline itself.
+// Each names *what the keyword is* — a clause keyword, a table operator — not which
+// dialect reserves it, so a dialect unions it into whichever per-position reject
+// sets that dialect reserves it in rather than re-declaring the keyword list.
+//
+// Reservation is load-bearing regardless of the dialect's feature state: a dialect
+// that HAS the construct reserves the keyword so a bare alias cannot swallow the
+// live clause/operator (`FROM t QUALIFY …` reads the clause, not an alias `qualify`);
+// a dialect that lacks it but still reserves the keyword makes the parse-reject NAME
+// the construct (`found QUALIFY`) instead of surfacing at the next token. PostgreSQL/
+// ANSI leave them unreserved (admitting `qualify`/`pivot` as ordinary identifiers).
+
+/// The `QUALIFY <predicate>` post-window filter clause keyword.
+pub const QUALIFY_RESERVATION: KeywordSet = KeywordSet::from_keywords(&[Keyword::Qualify]);
+
+/// The `PIVOT` / `UNPIVOT` row/column rotation table operators.
+pub const PIVOT_RESERVATION: KeywordSet =
+    KeywordSet::from_keywords(&[Keyword::Pivot, Keyword::Unpivot]);
+
+/// The `MATCH_RECOGNIZE` row-pattern-recognition table operator.
+pub const MATCH_RECOGNIZE_RESERVATION: KeywordSet =
+    KeywordSet::from_keywords(&[Keyword::MatchRecognize]);
+
 impl CommentSyntax {
     /// The `ANSI` predefined value.
     pub const ANSI: Self = Self {
@@ -533,6 +559,8 @@ impl IndexAlterSyntax {
         drop_behavior: true,
         // ANSI has no MySQL `DROP INDEX … ON <table>` form.
         index_drop_on_table: false,
+        // No preset models the parse of `ALTER TABLE … DROP {INDEX|KEY} <name>` yet.
+        alter_table_drop_index: false,
         index_concurrently: false,
         index_using_method: false,
         partial_index: false,

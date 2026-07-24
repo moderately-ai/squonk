@@ -1134,6 +1134,15 @@ impl<'a, D: Dialect> Parser<'a, D> {
                     meta,
                 });
             }
+            // `IS [NOT] DISTINCT FROM` with the predicate feature off: `DISTINCT` here
+            // is the unsupported construct, not a stray token where `NULL` was due. Name
+            // it, so the reject points at the real culprit rather than reporting the bare
+            // "expected `NULL`, found DISTINCT" the fallthrough would.
+            if self.peek_is_keyword(Keyword::Distinct)? {
+                return Err(self.unexpected(
+                    "`NULL` (this dialect does not support `IS [NOT] DISTINCT FROM`)",
+                ));
+            }
             self.expect_keyword(Keyword::Null)?;
             let span = expr.span().union(self.preceding_span());
             let meta = self.make_meta(span);

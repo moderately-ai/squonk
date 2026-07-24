@@ -11,10 +11,11 @@
 //! `COMMENT IF EXISTS ON ...` guard, and colocation-group DDL.
 //!
 //! Its PostgreSQL-compatible query surface rejects wildcard `EXCLUDE`/`RENAME`,
-//! `IS [NOT] DISTINCT FROM`, `NATURAL CROSS JOIN`, `TABLESAMPLE`, and
-//! `INTERSECT ALL`/`EXCEPT ALL`. Alternative DDL spellings such as `MODIFY COLUMN`,
-//! `CHANGE COLUMN`, `SET TBLPROPERTIES`, table-scoped `DROP INDEX`, and trailing
-//! index `USING` remain outside the grammar. On top of the PostgreSQL session
+//! `IS [NOT] DISTINCT FROM`, `NATURAL CROSS JOIN`, `TABLESAMPLE`, `QUALIFY`,
+//! `PIVOT`/`UNPIVOT`, and `INTERSECT ALL`/`EXCEPT ALL`. Alternative DDL spellings
+//! such as `MODIFY COLUMN`, `CHANGE COLUMN`, `SET TBLPROPERTIES`, per-column
+//! `STORAGE`/`COMPRESSION`, table-scoped `DROP INDEX`, and trailing index `USING`
+//! remain outside the grammar. On top of the PostgreSQL session
 //! statements it accepts the introspection forms the engine serves as
 //! `information_schema` plans: `DESCRIBE <table>` and the typed `SHOW TABLES` /
 //! `SHOW COLUMNS FROM <tbl>` listings ([`ShowSyntax::QUILTDB`]).
@@ -25,11 +26,12 @@ use super::{
     DoubleAmpersand, ExistenceGuards, ExpressionSyntax, FeatureSet, GroupingSyntax,
     IdentifierSyntax, IndexAlterSyntax, JoinSyntax, KeywordOperators, KeywordSet,
     MaintenanceSyntax, MutationSyntax, NullOrdering, NumericLiteralSyntax, OperatorSyntax,
-    POSTGRES_BYTE_CLASSES, ParameterSyntax, PipeOperator, PredicateSyntax, QueryTailSyntax,
-    RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME, RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME,
-    STANDARD_IDENTIFIER_QUOTES, SelectSyntax, SessionVariableSyntax, ShowSyntax, StatementDdlGates,
-    StringFuncForms, StringLiteralSyntax, TableExpressionSyntax, TableFactorSyntax, TargetSpelling,
-    TransactionSyntax, TypeNameSyntax, UtilitySyntax, ViewSequenceClauseSyntax,
+    PIVOT_RESERVATION, POSTGRES_BYTE_CLASSES, ParameterSyntax, PipeOperator, PredicateSyntax,
+    QUALIFY_RESERVATION, QueryTailSyntax, RESERVED_BARE_ALIAS, RESERVED_COLUMN_NAME,
+    RESERVED_FUNCTION_NAME, RESERVED_TYPE_NAME, STANDARD_IDENTIFIER_QUOTES, SelectSyntax,
+    SessionVariableSyntax, ShowSyntax, StatementDdlGates, StringFuncForms, StringLiteralSyntax,
+    TableExpressionSyntax, TableFactorSyntax, TargetSpelling, TransactionSyntax, TypeNameSyntax,
+    UtilitySyntax, ViewSequenceClauseSyntax,
 };
 use crate::precedence::STANDARD_SET_OPERATION_BINDING_POWERS;
 
@@ -165,6 +167,7 @@ impl IndexAlterSyntax {
         index_storage_parameters: true,
         drop_behavior: true,
         index_drop_on_table: false,
+        alter_table_drop_index: false,
         index_concurrently: true,
         index_using_method: true,
         partial_index: true,
@@ -201,7 +204,12 @@ impl ColumnDefinitionSyntax {
         default_expression_requires_parens: false,
         column_default_requires_b_expr: true,
         column_collation: true,
-        column_storage: true,
+        // Per-column `STORAGE`/`COMPRESSION` (PostgreSQL physical-storage attributes)
+        // are off: QuiltDB owns its on-disk layout, so it never honours a per-column
+        // directive. Off routes the keyword to the constraint loop, which names it
+        // ("expected a column constraint, found STORAGE") — a clean reject, unlike the
+        // on-path which fails at the column's own type token.
+        column_storage: false,
     };
 }
 
@@ -402,6 +410,31 @@ impl ShowSyntax {
     };
 }
 
+// The `QUALIFY` clause and the `PIVOT`/`UNPIVOT` operators — the shared
+// [`QUALIFY_RESERVATION`] and [`PIVOT_RESERVATION`] — are all feature-off in this dialect,
+// but reserving the keywords as identifiers makes a use of them NAME the construct in the
+// reject instead of being swallowed by a source's alias: without it `... FROM t QUALIFY p`
+// reads `QUALIFY` as `t`'s bare alias and the reject surfaces at `p`, never naming the
+// construct. Two alias positions must reject them — the bare *table* alias reads the
+// `ColId` set (`reserved_column_name`, since QuiltDB's bare table alias is a `ColId`, not a
+// bare label) and the bare *projection* alias reads `reserved_bare_alias` — so the
+// reservation composes into both. Function/type positions stay base (more permissive than
+// DuckDB: `qualify(1)` / `CAST(1 AS qualify)` parse). The identifier cost is deliberate:
+// `qualify`/`pivot`/`unpivot` cease to be usable as column/table names — forward-compatible
+// if QuiltDB later adopts the constructs, when they must be reserved regardless.
+
+/// `RESERVED_COLUMN_NAME` plus the `QUALIFY`/`PIVOT`/`UNPIVOT` construct keywords, so the
+/// bare table alias cannot swallow them.
+const QUILTDB_RESERVED_COLUMN_NAME: KeywordSet = RESERVED_COLUMN_NAME
+    .union(QUALIFY_RESERVATION)
+    .union(PIVOT_RESERVATION);
+
+/// `RESERVED_BARE_ALIAS` plus the same construct keywords, so the bare projection alias
+/// cannot swallow them.
+const QUILTDB_RESERVED_BARE_ALIAS: KeywordSet = RESERVED_BARE_ALIAS
+    .union(QUALIFY_RESERVATION)
+    .union(PIVOT_RESERVATION);
+
 impl FeatureSet {
     /// The complete QuiltDB feature set.
     pub const QUILTDB: Self = Self {
@@ -421,10 +454,10 @@ impl FeatureSet {
         identifier_casing: Casing::Lower,
         identifier_quotes: STANDARD_IDENTIFIER_QUOTES,
         default_null_ordering: NullOrdering::NullsLast,
-        reserved_column_name: RESERVED_COLUMN_NAME,
+        reserved_column_name: QUILTDB_RESERVED_COLUMN_NAME,
         reserved_function_name: RESERVED_FUNCTION_NAME,
         reserved_type_name: RESERVED_TYPE_NAME,
-        reserved_bare_alias: RESERVED_BARE_ALIAS,
+        reserved_bare_alias: QUILTDB_RESERVED_BARE_ALIAS,
         reserved_as_label: KeywordSet::EMPTY,
         catalog_qualified_names: true,
         byte_classes: POSTGRES_BYTE_CLASSES,
