@@ -439,6 +439,9 @@ impl StatementDdlGates {
         routines: true,
         or_replace: true,
         create_or_replace_table: false,
+        // `CREATE OR REPLACE MATERIALIZED VIEW` is gated to QuiltDB; the standard
+        // baseline leaves `MATERIALIZED` unconsumed before the expected `VIEW`.
+        create_or_replace_materialized_view: false,
         // `CREATE RECURSIVE VIEW` is gated to DuckDB/Lenient; the standard baseline
         // leaves `RECURSIVE` unconsumed before the expected `VIEW`.
         // The standard baseline has no MySQL-style compound-statement routine body.

@@ -177,6 +177,7 @@ mod tests {
             "DELETE FROM t JOIN u ON t.id = u.id",
             "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED THEN INSERT VALUES (1), (2)",
             "CREATE MATERIALIZED VIEW mv TO target AS SELECT 1",
+            "CREATE OR REPLACE MATERIALIZED VIEW mv AS SELECT 1",
             "CREATE TABLE t (id INT IDENTITY, v TEXT)",
             "CREATE TABLE t (id INT IDENTITY(5, 2), v TEXT)",
             "ALTER TABLE t ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY",

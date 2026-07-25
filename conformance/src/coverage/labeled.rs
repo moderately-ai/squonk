@@ -163,6 +163,7 @@ const VIEW_SEQUENCE_CLAUSE_SUBFLAGS: &[&str] = &[
 ];
 const STATEMENT_DDL_GATES_SUBFLAGS: &[&str] = &[
     "create_or_replace_table",
+    "create_or_replace_materialized_view",
     "create_trigger",
     "create_macro",
     "create_secret",
@@ -750,6 +751,7 @@ toggleable_features! {
     (CREATE_TRIGGER, "create_trigger", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_trigger),
     (CREATE_MACRO, "create_macro", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_macro),
     (CREATE_OR_REPLACE_TABLE, "create_or_replace_table", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_or_replace_table),
+    (CREATE_OR_REPLACE_MATERIALIZED_VIEW, "create_or_replace_materialized_view", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_or_replace_materialized_view),
     (CREATE_SECRET, "create_secret", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_secret),
     (CREATE_TYPE, "create_type", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_type),
     (CREATE_VIRTUAL_TABLE, "create_virtual_table", StatementDdlGates, statement_ddl_gates, StatementDdlGates, create_virtual_table),
@@ -1794,6 +1796,7 @@ const TOGGLEABLE_FEATURES: &[&ToggleableFeature] = &[
     &CREATE_TRIGGER,
     &CREATE_MACRO,
     &CREATE_OR_REPLACE_TABLE,
+    &CREATE_OR_REPLACE_MATERIALIZED_VIEW,
     &CREATE_SECRET,
     &CREATE_TYPE,
     &CREATE_VIRTUAL_TABLE,
@@ -4454,6 +4457,17 @@ const LABELED_CASES: &[LabeledCase] = &[
         required: &[&CREATE_OR_REPLACE_TABLE],
         forbidden: &[],
     },
+    // CREATE OR REPLACE MATERIALIZED VIEW (QuiltDB): with
+    // `create_or_replace_materialized_view` off, `OR REPLACE` still parses (POSTGRES has
+    // `or_replace`) and `MATERIALIZED VIEW` still parses on its own head, but the two
+    // cannot compose — `MATERIALIZED` is expected to be `VIEW` -> reject, so the flag is
+    // genuinely required.
+    LabeledCase {
+        sql: "CREATE OR REPLACE MATERIALIZED VIEW m AS SELECT 1",
+        expect: Expect::Accept,
+        required: &[&CREATE_OR_REPLACE_MATERIALIZED_VIEW],
+        forbidden: &[],
+    },
     // CREATE [PERSISTENT] SECRET (DuckDB): the whole-statement DDL gate — with
     // `create_secret` off the `PERSISTENT`/`SECRET` keyword falls through to the `TABLE`
     // expectation -> reject, so the flag is genuinely required.
@@ -6918,6 +6932,7 @@ mod tests {
             routines: _,
             or_replace: _,
             create_or_replace_table: _,
+            create_or_replace_materialized_view: _,
             compound_statements: _,
             alter_database: _,
             alter_database_options: _,
@@ -6997,6 +7012,7 @@ mod tests {
             alter_nested_column_paths: _,
             alter_column_set_data_type: _,
             alter_table_multiple_actions: _,
+            alter_table_drop_index: _,
         } = IndexAlterSyntax::POSTGRES;
         let ExistenceGuards {
             if_exists: _,

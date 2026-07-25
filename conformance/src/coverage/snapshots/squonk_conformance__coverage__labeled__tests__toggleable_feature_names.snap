@@ -1,6 +1,5 @@
 ---
 source: conformance/src/coverage/labeled.rs
-assertion_line: 7291
 expression: render_toggleable_feature_names()
 ---
 access_control_syntax::access_control
@@ -281,6 +280,7 @@ statement_ddl_gates::alter_system
 statement_ddl_gates::colocation_groups
 statement_ddl_gates::compound_statements
 statement_ddl_gates::create_macro
+statement_ddl_gates::create_or_replace_materialized_view
 statement_ddl_gates::create_or_replace_table
 statement_ddl_gates::create_secret
 statement_ddl_gates::create_sequence

@@ -306,6 +306,10 @@ impl StatementDdlGates {
         routines: true,
         or_replace: true,
         create_or_replace_table: false,
+        // PostgreSQL has no replace form for a materialized view — a redefinition is
+        // `DROP` then `CREATE` — so `MATERIALIZED` after `OR REPLACE` is left for the
+        // expected `VIEW` and rejects.
+        create_or_replace_materialized_view: false,
         // `CREATE RECURSIVE VIEW` stays off pending a PostgreSQL differential.
         // PostgreSQL routine bodies are opaque `$$…$$`/string definitions, not the
         // MySQL SQL/PSM compound statement.

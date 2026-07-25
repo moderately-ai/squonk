@@ -688,6 +688,9 @@ impl StatementDdlGates {
         routines: true,
         or_replace: true,
         create_or_replace_table: true,
+        // …and QuiltDB's `CREATE OR REPLACE MATERIALIZED VIEW` (no-shadowing doctrine:
+        // the union carries every real dialect's surface).
+        create_or_replace_materialized_view: true,
         // …and DuckDB's `CREATE [OR REPLACE] [TEMP] RECURSIVE VIEW` (no-shadowing
         // doctrine: the union carries every real dialect's surface).
         // The permissive union carries MySQL's compound-statement body grammar.

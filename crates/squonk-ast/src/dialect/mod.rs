@@ -1824,6 +1824,22 @@ pub struct StatementDdlGates {
     /// `TABLE` after `OR REPLACE` is left for the `VIEW` expectation and surfaces as a clean
     /// parse error.
     pub create_or_replace_table: bool,
+    /// Accept `CREATE OR REPLACE MATERIALIZED VIEW <name> AS <query>` — the `OR REPLACE`
+    /// object-replacement modifier on `MATERIALIZED VIEW` (Oracle/Snowflake/BigQuery/
+    /// Databricks). **Statement-head** gate, the sibling of
+    /// [`create_or_replace_table`](Self::create_or_replace_table): consulted during `CREATE`
+    /// dispatch once `OR REPLACE` is consumed, where the bare `MATERIALIZED VIEW` head is
+    /// unreachable (that arm is dispatched before the modifier). On for QuiltDB only.
+    /// PostgreSQL has no replace form for a materialized view — a redefinition is `DROP`
+    /// then `CREATE` — so it is off there and everywhere else, leaving `MATERIALIZED` for
+    /// the `VIEW` expectation, which surfaces as a clean parse error.
+    ///
+    /// Requires [`materialized_views`](Self::materialized_views) and
+    /// [`or_replace`](Self::or_replace): this flag composes two heads a dialect must
+    /// already spell separately, it does not introduce either. The `TEMP`/`TEMPORARY`
+    /// prefix never composes with it (no dialect spells a temporary materialized view), so
+    /// a consumed `temporary` leaves `MATERIALIZED` for the same clean parse error.
+    pub create_or_replace_materialized_view: bool,
     /// Parse a routine/trigger/event body as a MySQL SQL/PSM *compound statement* — the
     /// `[<label>:] BEGIN [<declarations>] … END` block with its `DECLARE` prefix, the
     /// flow-control statements (`IF`/`CASE`/`LOOP`/`WHILE`/`REPEAT`/`LEAVE`/`ITERATE`/
