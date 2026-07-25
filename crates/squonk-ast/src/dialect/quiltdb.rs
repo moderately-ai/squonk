@@ -236,6 +236,11 @@ impl StatementDdlGates {
         routines: true,
         or_replace: true,
         create_or_replace_table: false,
+        // QuiltDB adopts `CREATE OR REPLACE MATERIALIZED VIEW` (Oracle/Snowflake/
+        // BigQuery spell it) — a deliberate superset of the PostgreSQL base, which
+        // has no replace form for a matview. The engine drops the binding and its
+        // backing snapshot table, then re-snapshots.
+        create_or_replace_materialized_view: true,
         compound_statements: false,
         alter_database: false,
         alter_database_options: false,
