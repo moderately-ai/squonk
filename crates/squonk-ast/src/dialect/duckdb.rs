@@ -1032,6 +1032,9 @@ impl FeatureSet {
             routines: true,
             or_replace: true,
             create_or_replace_table: true,
+            // DuckDB takes `OR REPLACE` on `TABLE`/`VIEW`/`FUNCTION`, not on a
+            // materialized view.
+            create_or_replace_materialized_view: false,
             // DuckDB accepts `CREATE [OR REPLACE] [TEMP] RECURSIVE VIEW v (cols) AS …`
             // (engine-measured on 1.5.4).
             compound_statements: false,

@@ -1818,7 +1818,8 @@ pub struct CreateSchema<X: Extension = NoExt> {
     pub meta: Meta,
 }
 
-/// `CREATE [OR REPLACE] [TEMP|TEMPORARY] VIEW` and `CREATE MATERIALIZED VIEW`,
+/// `CREATE [OR REPLACE] [TEMP|TEMPORARY] VIEW` and
+/// `CREATE [OR REPLACE] MATERIALIZED VIEW`,
 /// with the `AS <query>` body that every view shares (a view body reuses [`Query`]
 /// rather than re-deriving the SELECT grammar).
 ///
@@ -1827,7 +1828,12 @@ pub struct CreateSchema<X: Extension = NoExt> {
 /// only for a regular view and `with_data` only for a materialized one. `OR
 /// REPLACE` and the `MATERIALIZED` keyword (with its `WITH [NO] DATA` populate
 /// clause) are PostgreSQL extensions gated by `schema_change_syntax` dialect data;
-/// the ANSI `WITH [CASCADED|LOCAL] CHECK OPTION` is always accepted.
+/// the ANSI `WITH [CASCADED|LOCAL] CHECK OPTION` is always accepted. The two compose
+/// only where
+/// [`StatementDdlGates::create_or_replace_materialized_view`](crate::dialect::StatementDdlGates::create_or_replace_materialized_view)
+/// is on (QuiltDB): PostgreSQL has no replace form for a materialized view. `or_replace`
+/// and `if_not_exists` are never both set — they state opposite intents for the same
+/// name collision, and the parser rejects a head carrying both.
 ///
 /// `recursive` records the `CREATE [OR REPLACE] [TEMP|TEMPORARY] RECURSIVE VIEW`
 /// spelling (DuckDB, gated by

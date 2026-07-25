@@ -80,9 +80,12 @@ type CreateTableTail<X> = (
 
 /// The optional `CREATE [OR REPLACE] [TEMP|TEMPORARY] [MATERIALIZED|RECURSIVE] VIEW`
 /// prefix already consumed before the view body. The flags are not independent —
-/// `or_replace`/`materialized` are mutually exclusive, `recursive` never co-occurs
-/// with `materialized`, and `temporary` only attaches to a regular view — but the
-/// dispatcher enforces that, so the body parser takes them as given.
+/// `or_replace` co-occurs with `materialized` only where
+/// [`StatementDdlGates::create_or_replace_materialized_view`](crate::ast::dialect::StatementDdlGates)
+/// is on (the bare `MATERIALIZED VIEW` head is dispatched before `OR REPLACE` is read,
+/// so that gated arm is the sole site that sets both), `recursive` never co-occurs with
+/// `materialized`, and `temporary` attaches to neither — but the dispatcher enforces all
+/// of that, so the body parser takes them as given.
 struct ViewPrefix {
     or_replace: bool,
     /// The MySQL `[ALGORITHM = …] [DEFINER = …] [SQL SECURITY …]` definition-option prefix,
@@ -502,6 +505,33 @@ impl<'a, D: Dialect> Parser<'a, D> {
                 && self.eat_keyword(Keyword::Table)?
             {
                 return self.parse_create_table_rest(start, true, temporary, false);
+            }
+            // `CREATE OR REPLACE MATERIALIZED VIEW` — the sibling of the `TABLE` arm above:
+            // the bare `MATERIALIZED VIEW` head is dispatched far earlier (before `OR REPLACE`
+            // is even read), so this is the only place the two heads can compose. Gated to the
+            // dialects that model the replace form (QuiltDB); with the flag off `MATERIALIZED`
+            // is left for the `VIEW` expectation below and surfaces as the "expected VIEW,
+            // found MATERIALIZED" parse error. No dialect spells a TEMPORARY materialized
+            // view, so a consumed `temporary` rules this arm out the same way it rules out the
+            // spatial-reference-system arm above.
+            if temporary.is_none()
+                && self
+                    .features()
+                    .statement_ddl_gates
+                    .create_or_replace_materialized_view
+                && self.eat_contextual_keyword("MATERIALIZED")?
+            {
+                self.expect_contextual_keyword("VIEW")?;
+                return self.parse_create_view(
+                    start,
+                    ViewPrefix {
+                        or_replace: true,
+                        options: ViewOptions::default(),
+                        materialized: true,
+                        recursive: false,
+                        temporary: None,
+                    },
+                );
             }
             // `CREATE OR REPLACE [TEMP] RECURSIVE VIEW` — the `RECURSIVE` keyword sits
             // directly before `VIEW`, gated to the dialects that model it (DuckDB/Lenient).
@@ -1733,6 +1763,22 @@ impl<'a, D: Dialect> Parser<'a, D> {
         let allows_if_not_exists =
             prefix.materialized || self.features().existence_guards.view_if_not_exists;
         let if_not_exists = allows_if_not_exists && self.parse_if_not_exists()?;
+        // `OR REPLACE` and `IF NOT EXISTS` state opposite intents for the SAME collision
+        // — overwrite what is there vs leave what is there — so a head carrying both is a
+        // contradiction, not a precedence question. Rejecting here keeps the engine from
+        // having to invent a winner (it would otherwise silently prefer one), and matches
+        // the engines that spell both modifiers. Only reachable where a dialect gates both
+        // on for one object kind.
+        if prefix.or_replace && if_not_exists {
+            let span = start.union(self.preceding_span());
+            let found = self.span_text(span).to_owned();
+            return Err(self.error_at(
+                span,
+                "either `OR REPLACE` or `IF NOT EXISTS`, not both (they state opposite \
+                 intents for the same name collision)",
+                found,
+            ));
+        }
         let name = self.parse_object_name()?;
         let columns = if self.peek_is_punct(Punctuation::LParen)? {
             self.parse_parenthesized_ident_list(
@@ -12550,6 +12596,79 @@ mod tests {
         assert!(view.if_not_exists);
         assert_eq!(view.with_data, Some(false));
         assert!(view.check_option.is_none());
+    }
+
+    #[test]
+    fn create_or_replace_materialized_view_parses_and_round_trips() {
+        use crate::dialect::QuiltDb;
+        // The two heads compose only under the QuiltDB gate: `MATERIALIZED VIEW` is
+        // dispatched long before `OR REPLACE` is read, so this arm is the sole site
+        // that can set both flags.
+        let parsed = parse_with(
+            "CREATE OR REPLACE MATERIALIZED VIEW m AS SELECT 1",
+            crate::ParseConfig::new(QuiltDb),
+        )
+        .expect("QuiltDB parses CREATE OR REPLACE MATERIALIZED VIEW");
+        let view = create_view_of(&parsed);
+        assert!(view.or_replace);
+        assert!(view.materialized);
+        assert!(!view.if_not_exists);
+        assert!(view.check_option.is_none());
+        // The renderer already emits `OR REPLACE` before `MATERIALIZED`, so the node
+        // round-trips without a render change.
+        let rendered = parsed.to_sql();
+        assert_eq!(
+            rendered,
+            "CREATE OR REPLACE MATERIALIZED VIEW m AS SELECT 1"
+        );
+        parse_with(&rendered, crate::ParseConfig::new(QuiltDb)).expect("re-parses");
+    }
+
+    #[test]
+    fn create_or_replace_materialized_view_is_gated_off_outside_quiltdb() {
+        use crate::dialect::Postgres;
+        // PostgreSQL has no replace form for a materialized view — a redefinition is
+        // `DROP` then `CREATE`. With the gate off, `MATERIALIZED` is left for the
+        // expected `VIEW` and rejects. Both heads parse on their own, so this pins the
+        // COMPOSITION as the gated thing, not either half.
+        parse_with(
+            "CREATE OR REPLACE MATERIALIZED VIEW m AS SELECT 1",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect_err("PostgreSQL does not dispatch CREATE OR REPLACE MATERIALIZED VIEW");
+        parse_with(
+            "CREATE MATERIALIZED VIEW m AS SELECT 1",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("PostgreSQL still parses the bare materialized head");
+        parse_with(
+            "CREATE OR REPLACE VIEW v AS SELECT 1",
+            crate::ParseConfig::new(Postgres),
+        )
+        .expect("PostgreSQL still parses the plain replace head");
+    }
+
+    #[test]
+    fn create_view_rejects_or_replace_combined_with_if_not_exists() {
+        use crate::dialect::QuiltDb;
+        // Opposite intents for the same collision — overwrite vs leave alone. Rejected
+        // rather than resolved by a silent precedence.
+        parse_with(
+            "CREATE OR REPLACE MATERIALIZED VIEW IF NOT EXISTS m AS SELECT 1",
+            crate::ParseConfig::new(QuiltDb),
+        )
+        .expect_err("OR REPLACE and IF NOT EXISTS cannot both be spelled");
+        // Each modifier alone still parses, so the rejection is the pair, not either one.
+        parse_with(
+            "CREATE OR REPLACE MATERIALIZED VIEW m AS SELECT 1",
+            crate::ParseConfig::new(QuiltDb),
+        )
+        .expect("OR REPLACE alone parses");
+        parse_with(
+            "CREATE MATERIALIZED VIEW IF NOT EXISTS m AS SELECT 1",
+            crate::ParseConfig::new(QuiltDb),
+        )
+        .expect("IF NOT EXISTS alone parses");
     }
 
     #[test]

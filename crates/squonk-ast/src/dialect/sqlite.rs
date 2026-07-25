@@ -668,6 +668,8 @@ impl StatementDdlGates {
         routines: false,
         or_replace: false,
         create_or_replace_table: false,
+        // SQLite has neither `OR REPLACE` nor materialized views.
+        create_or_replace_materialized_view: false,
         // `CREATE RECURSIVE VIEW` is a DuckDB form; SQLite leaves `RECURSIVE`
         // unconsumed before the expected `VIEW`.
         // SQLite has no stored programs, so no compound-statement routine body.

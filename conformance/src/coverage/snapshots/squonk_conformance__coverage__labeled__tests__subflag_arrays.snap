@@ -1,6 +1,5 @@
 ---
 source: conformance/src/coverage/labeled.rs
-assertion_line: 7291
 expression: render_subflag_arrays()
 ---
 string_literals
@@ -124,6 +123,7 @@ mutation_syntax
   update_tuple_value_row_arity
 statement_ddl_gates
   create_or_replace_table
+  create_or_replace_materialized_view
   create_trigger
   create_macro
   create_secret

@@ -410,6 +410,9 @@ impl StatementDdlGates {
         routines: true,
         or_replace: true,
         create_or_replace_table: false,
+        // MySQL takes `OR REPLACE` only on `VIEW`; `MATERIALIZED` after it is left for
+        // the expected `VIEW`.
+        create_or_replace_materialized_view: false,
         // `CREATE RECURSIVE VIEW` is a DuckDB form; MySQL leaves `RECURSIVE`
         // unconsumed before the expected `VIEW`.
         // MySQL routine/trigger/event bodies are SQL/PSM compound statements
