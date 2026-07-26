@@ -83,7 +83,7 @@ jobs:
           - surface: all-dialects
     steps:
       - name: Check out
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install stable toolchain (+ wasm32 target)
         # rust-toolchain.toml pins `stable`; installed explicitly like the other
@@ -133,7 +133,7 @@ jobs:
         task: [core-tests, python-check]
     steps:
       - name: Check out
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
@@ -147,7 +147,7 @@ jobs:
       - name: Install cargo-nextest
         if: matrix.task == 'core-tests'
         # Pinned to the same version as `ci.yml`/`oracle-nightly.yml`.
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
         with:
           tool: cargo-nextest@0.9.140
           fallback: none
