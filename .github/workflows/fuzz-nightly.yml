@@ -104,7 +104,7 @@ jobs:
       DUCKDB_VERSION: "1.5.4"
     steps:
       - name: Check out
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install nightly toolchain
         # libFuzzer requires nightly; the crates themselves stay on stable
@@ -140,7 +140,7 @@ jobs:
         # dance whose only purpose was to keep rust-toolchain.toml from pulling a second
         # (stable) toolchain: no `cargo install` runs at all now. Version pinned so a
         # nightly tool bump is a deliberate, reviewable change.
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2
+        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
         with:
           tool: cargo-fuzz@0.13.2
 
