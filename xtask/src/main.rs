@@ -74,6 +74,22 @@ fn main() {
             Err(errors) => fail("xtask knob-org", errors),
         }
     }
+    // `oracle-mysql` is a runner: it provisions the external MySQL dependency
+    // (docker, unless a server is already reachable), runs the oracle-featured
+    // conformance suite, and tears down what it started. Takes no arguments.
+    if command == "oracle-mysql" {
+        if !rest.is_empty() {
+            usage();
+            process::exit(2);
+        }
+        match xtask::run_oracle_mysql(&root) {
+            Ok(code) => process::exit(code),
+            Err(message) => {
+                eprintln!("error: {message}");
+                process::exit(2);
+            }
+        }
+    }
     // `semver` validates the checked baseline in 0.x and shells out to
     // cargo-semver-checks after 1.0, returning that tool's status.
     if command == "semver" {
@@ -150,5 +166,8 @@ fn usage() {
     );
     eprintln!(
         "       cargo xtask semver   # validate the current-major baseline; compare both published crates against v<major>.0.0 with all features"
+    );
+    eprintln!(
+        "       cargo xtask oracle-mysql   # run the oracle-featured conformance suite, auto-provisioning (and removing) the mysql:8 container when no server is reachable"
     );
 }

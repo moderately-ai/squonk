@@ -10,11 +10,13 @@ use std::path::{Path, PathBuf};
 mod feature_matrix;
 mod knob_org;
 mod license_header;
+mod oracle;
 mod preflight;
 mod semver;
 pub use feature_matrix::run as run_feature_matrix;
 pub use knob_org::check_knob_org;
 pub use license_header::{check_license_headers, write_license_headers};
+pub use oracle::run as run_oracle_mysql;
 pub use preflight::run_preflight;
 pub use semver::run as run_semver;
 
