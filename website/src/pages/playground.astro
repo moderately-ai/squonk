@@ -10,10 +10,7 @@ const title = "SQL playground — parse & transpile SQL in your browser | squonk
 const description =
   "Parse SQL to an AST and transpile between 14 dialects live in your browser. Powered by squonk's WebAssembly engine — nothing is sent to a server.";
 const canonical = new URL("/playground/", Astro.site).href;
-const dialects = [
-  "ansi", "postgres", "mysql", "sqlite", "duckdb", "bigquery", "snowflake",
-  "redshift", "databricks", "clickhouse", "hive", "mssql", "quiltdb", "lenient",
-];
+import { dialects } from "../dialects";
 ---
 
 <!doctype html>
@@ -86,6 +83,7 @@ const dialects = [
 
     <script>
       import { createSquonk } from "squonk/browser";
+      import type { DialectName } from "../dialects";
 
       const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
       const input = $<HTMLTextAreaElement>("input");
@@ -107,17 +105,19 @@ const dialects = [
       function run() {
         if (!ready || !squonk) return;
         const sql = input.value;
-        const src = source.value as Parameters<typeof squonk.parseJson>[1] extends infer O ? string : string;
+        // The selects' options are rendered from the same `dialects` const the
+        // DialectName type derives from, so the cast is sound by construction.
+        const src = source.value as DialectName;
         try {
           if (mode.value === "transpile") {
             output.textContent = squonk.transpile(sql, {
-              sourceDialect: src as never,
-              targetDialect: target.value as never,
+              sourceDialect: src,
+              targetDialect: target.value as DialectName,
             });
           } else if (mode.value === "format") {
-            output.textContent = squonk.format(sql, { dialect: src as never });
+            output.textContent = squonk.format(sql, { dialect: src });
           } else {
-            const ast = squonk.parseJson(sql, { dialect: src as never });
+            const ast = squonk.parseJson(sql, { dialect: src });
             output.textContent = JSON.stringify(ast, null, 2);
           }
           setStatus("OK");
