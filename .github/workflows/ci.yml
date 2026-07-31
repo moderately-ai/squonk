@@ -181,7 +181,12 @@ jobs:
           key: python
           cache-bin: false
       - name: Install Python development tools
-        run: python -m pip install 'maturin>=1.7,<2.0' 'pytest>=8' 'ruff>=0.6' 'mypy>=1.15' 'pyright>=1.1.400'
+        # ruff is pinned exactly: its lint defaults move between minors (0.16.0
+        # introduced I001/RUF022/PYI030 findings across the generated surface),
+        # so a floating constraint turns an upstream release into a red PR that
+        # changed nothing. Bump deliberately, together with the autofix sweep
+        # and the matching squonk-sourcegen template update.
+        run: python -m pip install 'maturin>=1.7,<2.0' 'pytest>=8' 'ruff==0.15.22' 'mypy>=1.15' 'pyright>=1.1.400'
       - name: Build and install wheel
         working-directory: crates/squonk-python
         run: |
