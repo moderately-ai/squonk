@@ -15,9 +15,10 @@ import squonk as sql
 doc = sql.parse("SELECT id, name FROM users WHERE id = 1", dialect="ansi")
 ```
 
-`parse` returns a **document** that owns the whole tree. Nodes are `'static` and
-carry a byte span plus a stable node ID, so the tree can be stored, sent across
-threads, and mapped back to the exact source bytes it came from.
+`parse` returns a **document** that owns the whole tree — no node borrows from
+the source string. Every node carries a byte span plus a stable node ID, so the
+tree can be stored, sent across threads, and mapped back to the exact source
+bytes it came from.
 
 ## Walking the tree
 
