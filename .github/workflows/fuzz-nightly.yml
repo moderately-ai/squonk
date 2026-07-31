@@ -140,7 +140,7 @@ jobs:
         # dance whose only purpose was to keep rust-toolchain.toml from pulling a second
         # (stable) toolchain: no `cargo install` runs at all now. Version pinned so a
         # nightly tool bump is a deliberate, reviewable change.
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2
         with:
           tool: cargo-fuzz@0.13.2
 

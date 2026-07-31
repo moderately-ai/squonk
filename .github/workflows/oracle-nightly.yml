@@ -39,7 +39,7 @@ jobs:
           cache-bin: false
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2
         with:
           tool: cargo-nextest@0.9.140
           fallback: none
@@ -100,7 +100,7 @@ jobs:
           cache-bin: false
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2
         with:
           tool: cargo-nextest@0.9.140
           fallback: none
@@ -132,7 +132,7 @@ jobs:
           cache-bin: false
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2
         with:
           tool: cargo-nextest@0.9.140
           fallback: none

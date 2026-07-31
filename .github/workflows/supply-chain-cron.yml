@@ -52,7 +52,7 @@ jobs:
       - name: Install cargo-deny
         # Prebuilt + pinned, the same version and convention as ci.yml's gate step
         # (deny.toml requires >= 0.18; this is well above that floor).
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2
         with:
           tool: cargo-deny@0.19.6
           fallback: none
