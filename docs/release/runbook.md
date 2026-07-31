@@ -8,9 +8,10 @@ The protected `release-crates.yml` workflow is the primary publisher. It verifie
 freely, but registry writes require both an explicit `publish: true` dispatch from the
 exact version tag and approval of the `crates-io` GitHub environment.
 
-Version 1.0.0 completed this procedure on 2026-07-12. The current coordinated release
-candidate is **2.0.0**; `v1.0.0` remains the historical 1.x baseline and
-`v2.0.0` becomes the 2.x baseline at release.
+Versions 1.0.0 (2026-07-12) and 2.0.0 (2026-07-15) completed this procedure. The
+current coordinated release candidate is **3.0.0**; `v2.0.0` remains the historical
+2.x baseline and `v3.0.0` becomes the 3.x baseline at release. Version literals in
+the examples below date from the 2.0.0 cycle — substitute the current candidate.
 
 ## What publishes where
 
@@ -120,7 +121,7 @@ Recovery from a bad publish is **a new patch version**, not an edit: yank the ba
 
 ## Version lineage
 
-The first stable version is **`1.0.0`** and the current release candidate is **`2.0.0`**.
+The first stable version is **`1.0.0`** and the current release candidate is **`3.0.0`**.
 The workspace, Python wheel, seven scoped npm facades, npm umbrella, and eight native npm
 platform packages move in lockstep. The `1.0.0` baseline is a hard commitment—no breaking
 public-API change is permitted before `2.0.0`.

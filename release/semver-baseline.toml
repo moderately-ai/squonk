@@ -6,5 +6,5 @@
 # prior-major baseline from silently skipping compatibility checks. Package paths
 # deliberately survive crate-name changes.
 schema = 1
-baseline_tag = "v2.0.0"
+baseline_tag = "v3.0.0"
 packages = ["crates/squonk-ast", "crates/squonk"]

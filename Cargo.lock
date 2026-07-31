@@ -2801,7 +2801,7 @@ dependencies = [
 
 [[package]]
 name = "squonk"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "insta",
  "serde",
@@ -2813,7 +2813,7 @@ dependencies = [
 
 [[package]]
 name = "squonk-ast"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2823,7 +2823,7 @@ dependencies = [
 
 [[package]]
 name = "squonk-bench"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "codspeed-criterion-compat",
  "dhat",
@@ -2848,7 +2848,7 @@ dependencies = [
 
 [[package]]
 name = "squonk-conformance"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "arbitrary",
  "bolero",
@@ -2867,7 +2867,7 @@ dependencies = [
 
 [[package]]
 name = "squonk-node"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "napi",
  "napi-build",
@@ -2879,7 +2879,7 @@ dependencies = [
 
 [[package]]
 name = "squonk-python"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "pyo3",
  "serde",
@@ -2889,7 +2889,7 @@ dependencies = [
 
 [[package]]
 name = "squonk-sourcegen"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -2899,7 +2899,7 @@ dependencies = [
 
 [[package]]
 name = "squonk-wasm"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "serde",
  "serde-wasm-bindgen",
@@ -3641,7 +3641,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "2.0.0"
+version = "3.0.0"
 
 [[package]]
 name = "yoke"
