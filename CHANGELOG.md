@@ -9,6 +9,86 @@ All notable changes to this project are documented here. The format is based on 
 
 _No unreleased changes yet._
 
+## [3.0.0] — 2026-07-31
+
+A dialect-surface release: QuiltDB's grammar closes several gaps against its engine contract, `COMMENT ON` grows two typed targets, and the project gains a documentation site with an in-browser playground. The major version is forced by the stable-API contract, not by churn: three dialect-data structs gained a public field, and two per-dialect reservation constants were replaced by shared ones. All coordinated packages (crates, wheel, npm family) move to 3.0.0 together, and `v3.0.0` becomes the 3.x semver baseline.
+
+### Breaking (Rust API)
+
+- **Three exhaustive dialect-data structs gained a field**:
+  `ColumnDefinitionSyntax::underscored_autoincrement_attribute`,
+  `StatementDdlGates::create_or_replace_materialized_view`, and
+  `IndexAlterSyntax::alter_table_drop_index`. *Migration:* struct literals must
+  name the new field; literals built with functional update from a preset
+  (`ColumnDefinitionSyntax { …, ..ColumnDefinitionSyntax::ANSI }`) compile
+  unchanged.
+- **`DATABRICKS_QUALIFY_RESERVATION` and `SNOWFLAKE_QUALIFY_RESERVATION` are
+  removed.** The QUALIFY / PIVOT+UNPIVOT / MATCH_RECOGNIZE reservation keyword
+  lists are now role-named shared constants — `QUALIFY_RESERVATION`,
+  `PIVOT_RESERVATION`, `MATCH_RECOGNIZE_RESERVATION` — exported from
+  `squonk_ast::dialect`. *Migration:* replace either removed constant with
+  `QUALIFY_RESERVATION`; the composed per-dialect reject sets
+  (`*_RESERVED_COLUMN_NAME` etc.) are value-identical.
+- **`CommentTarget` gained `Schema` and `Sequence` mid-enum.** The enum is
+  `#[non_exhaustive]` so matches are unaffected, but the implicit discriminants
+  of later variants shifted; code casting variants to integers must not rely on
+  the old ordering.
+
+### Added
+
+- **`COMMENT ON SCHEMA` and `COMMENT ON SEQUENCE` parse to their own
+  `CommentTarget` variants** in every dialect with `COMMENT ON` (previously a
+  parse error), matching PostgreSQL's `comment_text` object kinds; render,
+  visit, and the generated Python/TypeScript views follow.
+- **QuiltDB grammar closes engine-contract gaps.** The preset now accepts
+  `ILIKE`, `DESCRIBE`/`DESC`, typed `SHOW TABLES` / `SHOW COLUMNS FROM`
+  (via its own `ShowSyntax::QUILTDB`; the unserved typed-`SHOW` family stays
+  rejected), both auto-increment spellings (`AUTOINCREMENT` /
+  `AUTO_INCREMENT`, SERIAL-equivalent in the engine), and
+  `CREATE OR REPLACE MATERIALIZED VIEW` (new statement-head gate, on for
+  QuiltDB and Lenient).
+- **A documentation and marketing site** (`website/`, Astro + Starlight) with
+  getting-started and dialect/parsing/transpiling guides, plus an entirely
+  client-side SQL playground running the WebAssembly engine; deployed to GitHub
+  Pages by `deploy-site.yml`.
+- **Registry metadata polish** for search facets: crates.io
+  keywords/categories/description, PyPI Topic/Typing trove classifiers, and
+  author/homepage/bugs/keywords on the npm native platform packages.
+
+### Changed
+
+- **QuiltDB narrows two identifier surfaces deliberately**: `qualify`, `pivot`,
+  and `unpivot` are now reserved (column/table-name and bare-alias positions),
+  so a use of the unsupported construct names it in the reject
+  (`found QUALIFY`) instead of being swallowed as an alias — quote the words to
+  keep using them as identifiers. Per-column `STORAGE`/`COMPRESSION` attributes
+  are now rejected with a named construct (the engine owns its on-disk layout).
+- **Reject-message quality**: `IS [NOT] DISTINCT FROM` with the predicate off,
+  and `ALTER TABLE … DROP {INDEX|KEY} <name>` (unmodelled in every preset), now
+  name the construct instead of failing on a nearby token; a column literally
+  named `index`/`key` still drops through the column path.
+- **SQLite engine fidelity**: `AUTOINCREMENT` is excluded from liberal
+  type-name word runs exactly as the engine excludes it from `typename`
+  (measured on sqlite3 3.54.0), so previously over-accepted forms like
+  `a INTEGER AUTOINCREMENT (5)` now reject; every engine-valid input keeps its
+  exact prior AST.
+- **`CREATE … VIEW` rejects `OR REPLACE` combined with `IF NOT EXISTS`** — the
+  two state opposite intents for the same name collision; each alone is
+  unchanged.
+- The MySQL `AUTO_INCREMENT` column attribute rides its own dialect flag
+  instead of the trailing table-options gate (same accepted surface for every
+  existing preset).
+
+### Internal
+
+- GitHub Actions pinned-SHA group bump across the CI and release workflows.
+- `cargo xtask oracle-mysql` runs the oracle-featured conformance suite with the
+  external MySQL dependency provisioned automatically — reusing a reachable
+  server, otherwise starting (and always removing) the same `mysql:8` container
+  CI provisions as a service.
+- `release/semver-baseline.toml` rotates to the `v3.0.0` baseline per the
+  stable-API policy.
+
 ## [2.0.0] — 2026-07-15
 
 This release makes the deliberately breaking interface cleanup identified after the
@@ -137,7 +217,8 @@ First stable release of `squonk`, a lightweight, high-performance, multi-dialect
 
 - **Windows `x86_64` promoted to Tier 1 (tested).** The `cross-os` lane in `platform.yml` now runs the full core-crate `cargo nextest` suite on `windows-latest` on every landing, alongside macOS `arm64` and Linux `x86_64`; a Windows test regression blocks the release. This is a release-notes-worthy tier promotion per the [platform-support](docs/platform-support.md) Evolution rule. See that document for the full Tier 1/2/3 matrix across all three published surfaces.
 
-[Unreleased]: https://github.com/moderately-ai/squonk/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/moderately-ai/squonk/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/moderately-ai/squonk/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/moderately-ai/squonk/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/moderately-ai/squonk/releases/tag/v1.0.0
 
