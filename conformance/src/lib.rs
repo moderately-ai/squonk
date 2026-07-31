@@ -110,7 +110,11 @@
 //! The `oracle-engines` build discovers `libduckdb` automatically through
 //! `.cargo/config.toml` (no env vars); the `oracle-mysql` build connects to an external
 //! `mysql:8` server at `MYSQL_ORACLE_URL` (`m3::MYSQL_ORACLE_URL_ENV`, default
-//! `m3::DEFAULT_MYSQL_ORACLE_URL` = `mysql://root@127.0.0.1:3306`). Every oracle skips
+//! `m3::DEFAULT_MYSQL_ORACLE_URL` = `mysql://root@127.0.0.1:3306`). Locally,
+//! `cargo xtask oracle-mysql` runs this crate's oracle-featured suite with the server
+//! provisioned automatically: it reuses whatever already listens at the oracle URL, and
+//! otherwise starts (and afterwards removes) the same `mysql:8` container CI provisions
+//! as a service. Every oracle skips
 //! cleanly when its engine is absent, so a green run proves parity only for the engines
 //! that actually *ran*. Each
 //! curated-corpus parity test makes that visible: `sqlite`/`duckdb`
