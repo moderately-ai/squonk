@@ -1058,9 +1058,12 @@ fn sorted_dir_entries(dir: &Path) -> Vec<PathBuf> {
 }
 
 fn should_skip_repo_dir(path: &Path) -> bool {
+    // `node_modules` / `dist` / `.astro` / `pkg` are third-party installs and JS build
+    // outputs (the website and the wasm toolchain), not first-party sources — a local
+    // `npm install` or `astro build` must not change what the tidy gates scan.
     matches!(
         path.file_name().and_then(OsStr::to_str),
-        Some(".git" | ".claude" | "target")
+        Some(".git" | ".claude" | "target" | "node_modules" | "dist" | ".astro" | "pkg")
     )
 }
 

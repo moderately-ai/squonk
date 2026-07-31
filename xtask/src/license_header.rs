@@ -44,11 +44,19 @@ const CONFIG_FILE: &str = "license-header.toml";
 
 /// Build-output / dependency directories a source walk must never descend into. The
 /// repo-wide `.git`/`.claude`/`target` skips plus the JS/wasm toolchain outputs
-/// (`node_modules`, wasm-bindgen `pkg`, bundler `dist`) that are untracked build
-/// artifacts, not first-party source. wasm-pack's per-preset outputs are `pkg-<preset>`
-/// directories (gitignored, present only in workspaces that ran a wasm build), so a
-/// `pkg-` prefix skips them alongside the bare `pkg`.
-const SKIP_DIR_NAMES: &[&str] = &[".git", ".claude", "target", "node_modules", "pkg", "dist"];
+/// (`node_modules`, wasm-bindgen `pkg`, bundler `dist`, Astro's generated `.astro`)
+/// that are untracked build artifacts, not first-party source. wasm-pack's per-preset
+/// outputs are `pkg-<preset>` directories (gitignored, present only in workspaces that
+/// ran a wasm build), so a `pkg-` prefix skips them alongside the bare `pkg`.
+const SKIP_DIR_NAMES: &[&str] = &[
+    ".git",
+    ".claude",
+    "target",
+    "node_modules",
+    "pkg",
+    "dist",
+    ".astro",
+];
 
 /// Directory-name prefixes treated like [`SKIP_DIR_NAMES`] members.
 const SKIP_DIR_PREFIXES: &[&str] = &["pkg-"];
