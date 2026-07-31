@@ -88,6 +88,11 @@ jobs:
         with:
           key: preflight-${{ matrix.lane }}
           cache-bin: false
+          # Save only from main: PR runs restore main's cache but a PR-scoped save
+          # duplicates every lane's entry (~2 GB across the matrix) against the
+          # repo's 10 GB quota, evicting the release-path caches — and the save
+          # step itself costs each PR job 10-45 s for a cache nothing reuses.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install cargo-nextest
         if: matrix.nextest
@@ -144,6 +149,8 @@ jobs:
         with:
           key: msrv
           cache-bin: false
+          # Main-only save; see the preflight lane's rationale.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install cargo-hack
         # Prebuilt, checksum-verified, pinned — same convention as cargo-nextest /
@@ -180,6 +187,8 @@ jobs:
         with:
           key: python
           cache-bin: false
+          # Main-only save; see the preflight lane's rationale.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install Python development tools
         # ruff is pinned exactly: its lint defaults move between minors (0.16.0
         # introduced I001/RUF022/PYI030 findings across the generated surface),

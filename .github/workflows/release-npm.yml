@@ -16,6 +16,17 @@ on:
         default: false
   push:
     tags: ["npm-v*", "v*"]
+  # Warm-build heartbeat: release runs are rare, and GitHub Actions caches die on a
+  # 7-day retention clock (and to LRU eviction under the 10 GB repo quota), so the
+  # native/wasm dependency caches this workflow saves were always cold again by the
+  # next release — every native matrix leg rebuilt its whole release-profile dep
+  # graph from scratch (6-12 min each). Building twice a week (no publish — the
+  # publish/bootstrap jobs gate on workflow_dispatch inputs) keeps those caches
+  # alive and lockfile-fresh in the default-branch scope, which tag-triggered
+  # release runs can restore from, and doubles as early warning when a platform
+  # leg breaks between releases.
+  schedule:
+    - cron: "17 6 * * 1,4"
 
 # Builds need only the source tree. The publish job widens this to OIDC locally;
 # every established public package trusts this workflow and the protected `npm`
@@ -161,8 +172,14 @@ jobs:
       - name: Cache variant build artifacts
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          shared-key: wasm-tooling
-          cache-targets: false
+          # One cache shared by all eight variant legs: the variants build the same
+          # dependency graph under different squonk feature sets, so the third-party
+          # release-wasm artifacts are identical across them — only the squonk-*
+          # crates and the LTO link re-run per variant. Target caching is ON (this
+          # was tooling-only when the repo's cache quota had no room for it): the
+          # first leg to finish saves; the rest of a run and later runs restore.
+          shared-key: wasm-release
+          cache-targets: true
 
       - name: Install wasm-bindgen CLI
         uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
