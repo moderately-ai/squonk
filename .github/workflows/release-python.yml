@@ -41,6 +41,12 @@ on:
         default: false
   push:
     tags: ["python-v*", "v*"]
+  # Warm-build heartbeat, mirroring release-npm.yml: keeps the maturin/sccache
+  # dependency caches inside the 7-day retention window and lockfile-fresh so a
+  # real release restores warm instead of rebuilding every wheel leg cold
+  # (publishing still requires an explicit workflow_dispatch with publish: true).
+  schedule:
+    - cron: "17 6 * * 1,4"
 
 # Least privilege by default; individual jobs widen as needed (the publish job adds
 # `id-token: write` for PyPI Trusted Publishing / OIDC — no long-lived API token secret).

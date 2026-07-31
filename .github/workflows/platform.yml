@@ -97,6 +97,10 @@ jobs:
         with:
           key: wasm32-${{ matrix.surface }}
           cache-bin: false
+          # Save only from main: PR-scoped saves duplicate the entry against the
+          # repo's 10 GB cache quota (evicting release-path caches) and cost the
+          # PR job its save time; PRs still restore main's cache.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Compile-check focused ANSI surface
         if: matrix.surface == 'ansi'
@@ -143,6 +147,8 @@ jobs:
         with:
           key: platform-${{ matrix.task }}
           cache-bin: false
+          # Main-only save; see the wasm32 job's rationale.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install cargo-nextest
         if: matrix.task == 'core-tests'
