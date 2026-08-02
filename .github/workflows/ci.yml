@@ -96,7 +96,7 @@ jobs:
 
       - name: Install cargo-nextest
         if: matrix.nextest
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2
         with:
           tool: cargo-nextest@0.9.140
           fallback: none
@@ -113,7 +113,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2
         with:
           tool: cargo-deny@0.19.6
           fallback: none
@@ -155,7 +155,7 @@ jobs:
       - name: Install cargo-hack
         # Prebuilt, checksum-verified, pinned — same convention as cargo-nextest /
         # cargo-deny above.
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2
         with:
           tool: cargo-hack@0.6.45
           fallback: none

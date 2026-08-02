@@ -107,7 +107,7 @@ jobs:
 
       - name: Install cargo-zigbuild
         if: ${{ matrix.zig == true }}
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2
         with:
           tool: cargo-zigbuild@0.23.0
           fallback: none
@@ -182,7 +182,7 @@ jobs:
           cache-targets: true
 
       - name: Install wasm-bindgen CLI
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2
         with:
           tool: wasm-bindgen-cli@0.2.108
           fallback: none
