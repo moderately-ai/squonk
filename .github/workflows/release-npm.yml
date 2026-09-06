@@ -107,13 +107,13 @@ jobs:
 
       - name: Install cargo-zigbuild
         if: ${{ matrix.zig == true }}
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2
         with:
           tool: cargo-zigbuild@0.23.0
           fallback: none
 
       - name: Cache native Rust dependencies
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
         with:
           key: native-v3-${{ matrix.label }}
           cache-bin: false
@@ -170,7 +170,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Cache variant build artifacts
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
         with:
           # One cache shared by all eight variant legs: the variants build the same
           # dependency graph under different squonk feature sets, so the third-party
@@ -182,7 +182,7 @@ jobs:
           cache-targets: true
 
       - name: Install wasm-bindgen CLI
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2
         with:
           tool: wasm-bindgen-cli@0.2.108
           fallback: none

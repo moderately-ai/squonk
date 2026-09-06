@@ -127,7 +127,7 @@ jobs:
           targets: x86_64-unknown-linux-gnu
 
       - name: Cache build artifacts
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
         with:
           # The fuzz crate declares its own `[workspace]`, outside the repo-root one.
           workspaces: conformance/fuzz
@@ -140,7 +140,7 @@ jobs:
         # dance whose only purpose was to keep rust-toolchain.toml from pulling a second
         # (stable) toolchain: no `cargo install` runs at all now. Version pinned so a
         # nightly tool bump is a deliberate, reviewable change.
-        uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2
+        uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2
         with:
           tool: cargo-fuzz@0.13.2
 
